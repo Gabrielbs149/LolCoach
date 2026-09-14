@@ -120,11 +120,13 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
         log(`${minha.type === 'ban' ? 'banir' : 'escolher'} está desligado na configuração — deixando com você`);
       }
 
-      // Na fase PLANNING (os primeiros segundos, "declare sua intenção") a ação
-      // de pick aparece em andamento mas não dá pra travar. Declara e espera.
-      const planejando = minha?.type === 'pick' && sessao.timer?.phase === 'PLANNING';
+      // Na fase PLANNING (os primeiros segundos, "declare sua intenção") o
+      // client marca ações como em andamento — ban inclusive — mas não deixa
+      // fechar nenhuma: o ban "não permitido" que apareceu no registro dele
+      // era isto. Aqui só se declara o pick; banir e travar é na BAN_PICK.
+      const planejando = sessao.timer?.phase === 'PLANNING';
 
-      if (minha && !desligada && planejando && fase.declarou !== minha.id) {
+      if (minha && !desligada && planejando && minha.type === 'pick' && fase.declarou !== minha.id) {
         fase.declarou = minha.id;
         const escolha = primeiroLivre(cfg.picks?.[role], tabela, indisponiveis(sessao));
         if (escolha) {
@@ -137,17 +139,7 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
       if (minha && !desligada && !planejando && fase.acaoFeita !== minha.id) {
         const fora = indisponiveis(sessao);
         const lista = minha.type === 'ban' ? cfg.bans?.[role] : cfg.picks?.[role];
-        // O client diz o que esta conta pode escolher/banir: campeão que a conta
-        // não tem "trava" com HTTP 200 e não acontece nada.
-        const rota = minha.type === 'ban' ? 'bannable-champion-ids' : 'pickable-champion-ids';
-        const ids = await lcu.get(`/lol-champ-select/v1/${rota}`).catch(() => null);
-        const permitidos = Array.isArray(ids) && ids.length ? new Set(ids) : null;
-        const escolha = primeiroLivre(lista, tabela, fora, permitidos);
-        if (!escolha && permitidos && primeiroLivre(lista, tabela, fora)) {
-          fase.acaoFeita = minha.id;
-          log(`${(lista ?? []).join(', ')}: o client diz que esta conta não pode ${minha.type === 'ban' ? 'banir' : 'escolher'} (não tem o campeão?) — não agi`);
-          return;
-        }
+        const escolha = primeiroLivre(lista, tabela, fora);
 
         if (!escolha) {
           // Nenhuma preferência disponível: não inventa, deixa pra você.
