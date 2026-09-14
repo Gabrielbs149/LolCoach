@@ -40,13 +40,10 @@ que a própria Riot abre: a do client (`lockfile`) e a da partida
 (`127.0.0.1:2999`). Posição de inimigo no mapa não existe nessas APIs — e ler o
 minimapa é o que a Riot proibiu em app de terceiro em 2023.
 
-## Chave da Riot (opcional)
+## Chave da Riot
 
-Sem chave o app funciona com o que o client dá: elo, últimas partidas, timeline.
-Uma chave pessoal (developer.riotgames.com) serve pra puxar centenas de
-partidas antigas de uma vez e pra aba **Amigos** (perfil e comparativo de
-qualquer conta pelo nome#tag — o amigo não precisa ter o app). Vai em `%APPDATA%\LolCoach\config.json`. **Nunca
-compartilhe esse arquivo.**
+Já vai dentro do instalador — ninguém precisa criar chave. Se quiser usar a
+sua, coloque em `riot.apiKey` no `%APPDATA%LolCoachconfig.json`.
 
 ## Rodar do código
 

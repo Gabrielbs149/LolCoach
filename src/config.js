@@ -1,5 +1,27 @@
 import { readFile } from 'node:fs/promises';
+import { existsSync, readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { caminhoConfig, garantirConfig } from './caminhos.js';
+
+const AQUI = dirname(fileURLToPath(import.meta.url));
+
+/**
+ * A chave da Riot do Gabriel vai dentro do pacote (chave.json em resources,
+ * gerado por scripts/publicar.js a partir do config dele — nunca entra no
+ * git). Quem não tem chave própria usa essa: ninguém dos amigos precisa
+ * criar conta de desenvolvedor pra ver a aba Amigos e puxar histórico.
+ */
+function chaveEmbutida() {
+  for (const arq of [join(process.resourcesPath ?? '', 'chave.json'), join(AQUI, '..', 'chave-embutida.json')]) {
+    try {
+      if (!existsSync(arq)) continue;
+      const { apiKey } = JSON.parse(readFileSync(arq, 'utf8'));
+      if (apiKey) return apiKey;
+    } catch { /* arquivo estragado: segue sem */ }
+  }
+  return null;
+}
 
 const PADRAO = {
   autoAceitar: { ativo: true, atrasoMs: 0 },
@@ -24,6 +46,11 @@ export async function carregarConfig(caminho = null) {
     if (chave.startsWith('_')) continue;
     const a = PADRAO[chave], b = doUsuario[chave];
     final[chave] = (a && typeof a === 'object' && !Array.isArray(a)) ? { ...a, ...(b ?? {}) } : (b ?? a);
+  }
+  // Só em memória: o config.json de quem instalou continua sem a chave.
+  if (!final.riot?.apiKey) {
+    const chave = chaveEmbutida();
+    if (chave) final.riot = { ...(final.riot ?? {}), apiKey: chave, chaveEmbutida: true };
   }
   return final;
 }

@@ -1763,7 +1763,7 @@ function desenharAmigos(){
   const eu = d.eu?.nome ? d.eu : null;
 
   $('#amAviso').innerHTML = d.semChave
-    ? '<div class="aviso amAviso">Ver amigos precisa de uma chave da Riot no config.json (é de graça em developer.riotgames.com). Sem ela só aparece o que já foi baixado antes.</div>'
+    ? '<div class="aviso amAviso">Sem chave da Riot nesta versão — só aparece o que já foi baixado antes.</div>'
     : (eu && !eu.tag ? '<div class="aviso amAviso">Ainda não sei a sua tag — abre o League uma vez logado nessa conta e você entra na comparação.</div>' : '');
 
   const todos = [...(eu ? [eu] : []), ...d.amigos];

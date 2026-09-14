@@ -1,5 +1,6 @@
 # NUNCA: contém a chave da API da Riot e a conta
 config.json
+chave-embutida.json
 
 # dados de cada pessoa (banco, caches, arte)
 /dados/

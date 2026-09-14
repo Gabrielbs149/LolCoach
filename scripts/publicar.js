@@ -28,6 +28,26 @@ if (!token) {
   process.exit(1);
 }
 
+/**
+ * A chave da Riot vai junto no pacote (resources/chave.json) pra ninguém
+ * precisar de chave própria. Sai do config do Gabriel, nunca do git.
+ */
+const { writeFileSync, readFileSync: ler } = await import('node:fs');
+function chaveDaRiot() {
+  if (process.env.RIOT_KEY) return process.env.RIOT_KEY;
+  for (const arq of [
+    new URL('../config.json', import.meta.url),
+    `${process.env.APPDATA}\\LolCoach\\config.json`,
+  ]) {
+    try { const k = JSON.parse(ler(arq, 'utf8')).riot?.apiKey; if (k) return k; } catch { /* próximo */ }
+  }
+  return null;
+}
+const chave = chaveDaRiot();
+if (!chave) { console.error('sem chave da Riot pra embutir: preencha riot.apiKey no config.json ou defina RIOT_KEY'); process.exit(1); }
+writeFileSync(new URL('../chave-embutida.json', import.meta.url), JSON.stringify({ apiKey: chave }) + '\n', 'utf8');
+console.log('chave da Riot embutida');
+
 const { owner, repo } = pkg.build.publish[0];
 const tag = `v${pkg.version}`;
 
