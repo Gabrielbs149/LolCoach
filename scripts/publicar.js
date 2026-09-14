@@ -28,9 +28,39 @@ if (!token) {
   process.exit(1);
 }
 
-console.log(`publicando LolCoach v${pkg.version} em ${pkg.build.publish[0].owner}/${pkg.build.publish[0].repo}…`);
+const { owner, repo } = pkg.build.publish[0];
+const tag = `v${pkg.version}`;
+
+/**
+ * Cria a release ANTES de gerar: o electron-builder sobe o .exe e o .blockmap
+ * em paralelo e, quando a release ainda não existe, cada envio cria a sua —
+ * ficam duas com a mesma tag e o latest.yml numa só, e o atualizador não acha.
+ */
+const cab = { Authorization: `Bearer ${token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'LolCoach', 'Content-Type': 'application/json' };
+const existente = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}`, { headers: cab });
+if (existente.status === 404) {
+  const r = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases`, {
+    method: 'POST', headers: cab,
+    body: JSON.stringify({ tag_name: tag, name: tag, draft: false, prerelease: false }),
+  });
+  if (!r.ok) { console.error(`não consegui criar a release ${tag}: HTTP ${r.status}`); process.exit(1); }
+  console.log(`release ${tag} criada`);
+} else if (existente.ok) {
+  console.log(`release ${tag} já existe — os arquivos vão pra ela`);
+}
+
+console.log(`publicando LolCoach v${pkg.version} em ${owner}/${repo}…`);
 const r = spawnSync('npx', ['electron-builder', '--win', 'nsis', '--publish', 'always'], {
   stdio: 'inherit', shell: true,
   env: { ...process.env, GH_TOKEN: token },
 });
-process.exit(r.status ?? 1);
+if (r.status) process.exit(r.status);
+
+// Confere o que o atualizador vai ver.
+const latest = await fetch(`https://api.github.com/repos/${owner}/${repo}/releases/latest`, { headers: cab }).then((x) => x.json());
+const nomes = (latest.assets ?? []).map((a) => a.name);
+console.log(`latest = ${latest.tag_name}: ${nomes.join(', ')}`);
+if (latest.tag_name !== tag || !nomes.includes('latest.yml')) {
+  console.error(`ALGO ERRADO: rode "node scripts/github.js arrumar-release ${tag}"`);
+  process.exit(1);
+}
