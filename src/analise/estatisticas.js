@@ -260,14 +260,14 @@ export function porClasse(db, tags, { desde = null, conta = null } = {}) {
  * Ordenar por isso evita o erro de banir um campeão com 0% em 3 jogos e ignorar
  * um com 33% em 18 — o segundo doeu mais.
  */
-export function piores(db, { minimo = 5, desde = null } = {}) {
+export function piores(db, { minimo = 5, desde = null, conta = null } = {}) {
   const linhas = db.prepare(`
     SELECT p.minhaRole role, r.campeao rival, r.championId,
            COUNT(*) jogos, SUM(p.venci) vitorias
     FROM partidas p
     JOIN jogadores meu ON meu.gameId = p.gameId AND meu.participantId = p.meuId
     JOIN jogadores r ON r.gameId = p.gameId AND r.time <> meu.time AND r.role = p.minhaRole
-    WHERE ${CORTE}${recorte(desde)}
+    WHERE ${CORTE}${recorte(desde, null, conta)}
     GROUP BY p.minhaRole, r.campeao HAVING jogos >= ?`).all(minimo);
 
   const porRoleMapa = {};
@@ -284,7 +284,7 @@ export function piores(db, { minimo = 5, desde = null } = {}) {
 }
 
 /** O contrário: com quem ele ganha, pra sugerir pick. */
-export function melhoresCampeoes(db, { minimo = 6, desde = null } = {}) {
+export function melhoresCampeoes(db, { minimo = 6, desde = null, conta = null } = {}) {
   const linhas = db.prepare(`
     SELECT p.minhaRole role, p.meuCampeao campeao, meu.championId,
            COUNT(*) jogos, SUM(p.venci) vitorias,

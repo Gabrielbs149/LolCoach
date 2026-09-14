@@ -42,6 +42,8 @@
   "coleta": {
     "ativo": true
   },
+  "_amigos": "Contas que aparecem na aba Amigos. Monte pela tela; precisa da chave da Riot.",
+  "amigos": [],
   "riot": {
     "_leia": "OPCIONAL. Sem chave o app funciona com o que o client dá (elo, últimas partidas, timeline). A chave só serve pra puxar centenas de partidas antigas de uma vez. Pegue em developer.riotgames.com. NUNCA compartilhe este arquivo.",
     "apiKey": "",

@@ -476,23 +476,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * exigem amostra, porque ali o número aparece na tela e precisa significar
    * alguma coisa.
    */
-  async function sugestoes() {
+  async function sugestoes({ conta = null } = {}) {
     const E = await import('./analise/estatisticas.js');
     const ids = (sql) => db.prepare(sql).all().map((r) => r.id).filter((x) => x > 0 && x < 3000);
+    const daConta = conta ? ` AND meu.nome = '${String(conta).replace(/'/g, "''")}'` : '';
 
     return {
-      bans: E.piores(db, { minimo: 5 }),
-      picks: E.melhoresCampeoes(db, { minimo: 5 }),
+      bans: E.piores(db, { minimo: 5, conta }),
+      picks: E.melhoresCampeoes(db, { minimo: 5, conta }),
       jogados: ids(`
         SELECT DISTINCT meu.championId id
         FROM partidas p JOIN jogadores meu ON meu.gameId = p.gameId AND meu.participantId = p.meuId
-        WHERE p.duracaoS >= 300`),
+        WHERE p.duracaoS >= 300${daConta}`),
       enfrentados: ids(`
         SELECT DISTINCT r.championId id
         FROM partidas p
         JOIN jogadores meu ON meu.gameId = p.gameId AND meu.participantId = p.meuId
         JOIN jogadores r ON r.gameId = p.gameId AND r.time <> meu.time AND r.role = p.minhaRole
-        WHERE p.duracaoS >= 300`),
+        WHERE p.duracaoS >= 300${daConta}`),
     };
   }
 
@@ -612,6 +613,62 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }, 30_000);
   });
 
+  /* ------------------------------------------------------------- amigos */
+
+  const listaDeAmigos = () => (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
+
+  /**
+   * A lista com o que já está em disco de cada um — nunca bate na Riot aqui.
+   * Quem atualiza é a tela, um amigo por vez (`amigoPerfil`), pra não estourar
+   * o limite da chave. `conta` é a sua conta nas telas: vira o "você" da
+   * comparação, com a tag lembrada de quando logou no client.
+   */
+  async function amigos({ conta } = {}) {
+    const { perfilDeAmigo } = await import('./dados/amigos.js');
+    const soDisco = { ...config.riot, apiKey: null };
+    const lista = await Promise.all(listaDeAmigos().map(async (a) => ({
+      nome: a.nome, tag: a.tag,
+      perfil: await perfilDeAmigo(soDisco, a, {}).catch(() => null),
+    })));
+
+    const tags = await tagsConhecidas();
+    const contaLogada = estado?.instantaneo?.().conta ?? null;
+    const logada = contaLogada ? String(contaLogada).split('#') : null;
+    const meuNome = conta || logada?.[0] || config.riot?.gameName || null;
+    const minhaTag = (meuNome && tags[meuNome]) || (logada && logada[0] === meuNome ? logada[1] : null)
+      || (meuNome === config.riot?.gameName ? config.riot?.tagLine : null) || null;
+    const eu = meuNome && minhaTag
+      ? { nome: meuNome, tag: minhaTag, perfil: await perfilDeAmigo(soDisco, { nome: meuNome, tag: minhaTag }, {}).catch(() => null) }
+      : { nome: meuNome, tag: null, perfil: null };
+
+    return { amigos: lista, eu, semChave: !config.riot?.apiKey };
+  }
+
+  /** Perfil de uma conta (amigo ou você mesmo), buscando na Riot se precisar. */
+  async function amigoPerfil({ nome, tag, forcar = false } = {}) {
+    if (!nome || !tag) throw new Error('faltou nome#tag');
+    const { perfilDeAmigo } = await import('./dados/amigos.js');
+    log(`buscando perfil de ${nome}#${tag} na Riot…`);
+    const p = await perfilDeAmigo(config.riot, { nome, tag }, { forcar });
+    if (!p.doCache) log(`perfil de ${nome}#${tag} atualizado (${p.recente?.jogos ?? 0} partidas recentes)`);
+    return p;
+  }
+
+  async function adicionarAmigo({ nome, tag } = {}) {
+    nome = String(nome ?? '').trim(); tag = String(tag ?? '').trim().replace(/^#/, '');
+    if (!nome || !tag) throw new Error('escreva no formato nome#tag');
+    // Confere na Riot antes de guardar: nome errado não vira amigo fantasma.
+    const p = await amigoPerfil({ nome, tag });
+    const atual = listaDeAmigos().filter((a) => !(a.nome.toLowerCase() === nome.toLowerCase() && a.tag.toLowerCase() === tag.toLowerCase()));
+    await salvarConfig({ amigos: [...atual, { nome: p.conta.nome, tag: p.conta.tag }] });
+    return { ok: true, perfil: p };
+  }
+
+  async function removerAmigo({ nome, tag } = {}) {
+    await salvarConfig({ amigos: listaDeAmigos().filter((a) => !(a.nome === nome && a.tag === tag)) });
+    return { ok: true };
+  }
+
   const imagem = (fn, tipo) => async (id) => {
     const corpo = await fn(id);
     if (!corpo) throw new Error('sem imagem');
@@ -623,6 +680,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     campeoes, lerConfig, salvarConfig, vivo,
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
+    amigos, amigoPerfil, adicionarAmigo, removerAmigo,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -668,4 +726,5 @@ const ACOES_DO_PAINEL = [
   'vivo', 'arte', 'campeoes', 'lerConfig', 'salvarConfig',
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
+  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo',
 ];

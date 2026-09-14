@@ -43,8 +43,9 @@ minimapa é o que a Riot proibiu em app de terceiro em 2023.
 ## Chave da Riot (opcional)
 
 Sem chave o app funciona com o que o client dá: elo, últimas partidas, timeline.
-Uma chave pessoal (developer.riotgames.com) serve só pra puxar centenas de
-partidas antigas de uma vez. Vai em `%APPDATA%\LolCoach\config.json`. **Nunca
+Uma chave pessoal (developer.riotgames.com) serve pra puxar centenas de
+partidas antigas de uma vez e pra aba **Amigos** (perfil e comparativo de
+qualquer conta pelo nome#tag — o amigo não precisa ter o app). Vai em `%APPDATA%\LolCoach\config.json`. **Nunca
 compartilhe esse arquivo.**
 
 ## Rodar do código

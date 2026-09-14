@@ -42,38 +42,69 @@ body{
 ::-webkit-scrollbar-track{background:transparent}
 
 /* ------------------------------------------------------------ barra lateral */
+/* Duas larguras: aberta (nome + ícone) e recolhida (só ícone, 56px). A escolha
+   fica no localStorage. Recolhida, tudo o que é texto some e o ícone vira o
+   botão inteiro, com o nome no title. */
 aside{
   width:196px;flex:0 0 196px;background:linear-gradient(180deg,var(--f1),#0a0f16);
   border-right:1px solid var(--borda);display:flex;flex-direction:column;
+  transition:width .15s ease,flex-basis .15s ease;overflow:hidden;
 }
-.marca{padding:16px 16px 12px}
-.marca h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px;
+body.recolhida aside{width:56px;flex-basis:56px}
+.marca{padding:14px 12px 10px 16px;display:flex;flex-direction:column;position:relative}
+.marca h1{margin:0;font-size:16px;font-weight:700;letter-spacing:.2px;white-space:nowrap;
   background:linear-gradient(90deg,var(--ouro-claro),var(--ouro));
   -webkit-background-clip:text;background-clip:text;color:transparent}
-.marca .conta{font-size:12.5px;color:var(--apagado);margin-top:4px}
+.marca h1 .curto{display:none}
+.marca .conta{font-size:12.5px;color:var(--apagado);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .contaSel{margin-top:8px;width:100%;background:var(--f2);color:var(--ouro-claro);border:1px solid var(--borda);
   border-radius:var(--r-s);padding:5px 8px;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
 .contaSel:focus{outline:none;border-color:var(--ouro)}
+.recolher{position:absolute;top:12px;right:8px;width:24px;height:24px;border:1px solid var(--borda);
+  background:var(--f2);color:var(--fraco);border-radius:var(--r-s);cursor:pointer;display:grid;place-items:center;padding:0}
+.recolher:hover{color:var(--texto);border-color:var(--borda-forte)}
+.recolher svg{width:13px;height:13px;transition:transform .15s}
+body.recolhida .marca{padding:12px 0 8px;align-items:center}
+body.recolhida .marca h1 .longo,body.recolhida .marca .conta,body.recolhida .contaSel{display:none}
+body.recolhida .marca h1 .curto{display:inline}
+body.recolhida .recolher{position:static;margin-top:8px}
+body.recolhida .recolher svg{transform:rotate(180deg)}
 
-nav{padding:6px 12px;flex:1}
+nav{padding:4px 10px;flex:1;overflow-y:auto;overflow-x:hidden}
+nav .grupo{font-size:9.5px;text-transform:uppercase;letter-spacing:1px;color:var(--apagado);
+  padding:10px 12px 3px;white-space:nowrap}
+nav .grupo:first-child{padding-top:4px}
 nav button{
-  display:flex;align-items:center;gap:9px;width:100%;text-align:left;position:relative;
-  background:none;border:0;color:var(--fraco);padding:7px 12px;border-radius:var(--r-s);
+  display:flex;align-items:center;gap:10px;width:100%;text-align:left;position:relative;
+  background:none;border:0;color:var(--fraco);padding:7px 11px;border-radius:var(--r-s);
   cursor:pointer;font-size:12.5px;font-family:inherit;margin-bottom:1px;transition:color .12s,background .12s;
+  white-space:nowrap;
 }
 nav button:hover{background:var(--f2);color:var(--texto)}
 nav button.ativo{background:var(--f3);color:var(--ouro-claro);font-weight:600}
 nav button.ativo::before{content:"";position:absolute;left:0;top:9px;bottom:9px;width:3px;
   background:var(--ouro);border-radius:0 3px 3px 0}
-nav .pt{width:7px;height:7px;border-radius:2px;background:currentColor;opacity:.5;flex:0 0 7px;
-  transform:rotate(45deg)}
+nav button svg{width:16px;height:16px;flex:0 0 16px;stroke:currentColor;fill:none;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+nav button.ativo svg{opacity:1}
+nav button .bolha{margin-left:auto;font-size:9.5px;font-weight:800;color:#0b1119;background:var(--ouro);
+  border-radius:99px;padding:1px 6px;line-height:1.4}
+body.recolhida nav{padding:4px 8px}
+body.recolhida nav .grupo{height:1px;padding:0;margin:8px 4px;background:var(--borda);overflow:hidden;color:transparent}
+body.recolhida nav .grupo:first-child{display:none}
+body.recolhida nav button{justify-content:center;padding:9px 0;gap:0}
+body.recolhida nav button .nome,body.recolhida nav button .bolha{display:none}
+body.recolhida nav button.ativo::before{top:7px;bottom:7px}
 
-.estado{padding:15px 20px;border-top:1px solid var(--borda);font-size:12.5px;color:var(--apagado)}
-.estado .l{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.estado{padding:13px 18px;border-top:1px solid var(--borda);font-size:12.5px;color:var(--apagado)}
+.estado .l{display:flex;align-items:center;gap:8px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .estado .l:last-child{margin-bottom:0}
 .luz{width:8px;height:8px;border-radius:50%;background:var(--der);flex:0 0 8px}
 .luz.on{background:var(--vit);box-shadow:0 0 8px #31b07399}
 .estado .atualiza{color:var(--ouro);font-weight:650}
+body.recolhida .estado{padding:12px 0;display:grid;place-items:center}
+body.recolhida .estado .l{margin:0}
+body.recolhida .estado .l span:not(.luz),body.recolhida .estado #estFase,body.recolhida .estado #estAtualiza{display:none}
 
 /* ---------------------------------------------------------------- conteúdo */
 /* Conteúdo travado e centrado. Esticar até a borda da tela é o que fazia as
@@ -617,6 +648,72 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .vazio{color:var(--apagado);font-size:12px;padding:30px;text-align:center;background:var(--f1);
   border:1px solid var(--borda);border-radius:var(--r-m)}
 .carregando{display:flex;align-items:center;gap:9px;justify-content:center}
+/* ------------------------------------------------------------- amigos */
+.amForma{display:flex;gap:var(--e2);align-items:center;margin-bottom:var(--e3);flex-wrap:wrap}
+.amForma .busca{max-width:300px;margin:0}
+.amAviso{margin-bottom:var(--e2)}
+.amGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:var(--e2)}
+.amCartao{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:12px 13px;
+  cursor:pointer;position:relative;transition:border-color .12s}
+.amCartao:hover{border-color:var(--borda-forte)}
+.amCartao.eu{border-color:var(--ouro-escuro);background:linear-gradient(180deg,#171a17,var(--f1))}
+.amCartao.aberto{border-color:var(--ouro)}
+.amCartao .topo{display:flex;align-items:center;gap:10px}
+.amCartao .retrato{width:44px;height:44px;flex:0 0 44px;border-radius:var(--r-s);background:var(--f3);object-fit:cover;
+  border:1px solid var(--borda-forte)}
+.amCartao.eu .retrato{border-color:var(--ouro)}
+.amCartao .quem{min-width:0;flex:1}
+.amCartao .quem b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.amCartao .quem span{font-size:11px;color:var(--apagado)}
+.amCartao .tagEu{position:absolute;top:8px;right:9px;font-size:9px;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--ouro);font-weight:800}
+.amCartao .eloL{display:flex;align-items:center;gap:8px;margin-top:10px}
+.amCartao .eloL .emblema{width:28px;height:28px;flex:0 0 28px;border-radius:50%;display:grid;place-items:center;
+  font-size:10.5px;font-weight:800;color:#0b1119}
+.amCartao .eloL .n{font-size:12.5px;font-weight:700}
+.amCartao .eloL .p{font-size:11px;color:var(--ouro);font-weight:650}
+.amCartao .eloL .sem{font-size:11.5px;color:var(--apagado)}
+.amCartao .num3{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:10px;
+  border-top:1px solid var(--borda);padding-top:8px}
+.amCartao .num3 div{text-align:center}
+.amCartao .num3 b{display:block;font-size:14px;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.amCartao .num3 span{font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--apagado)}
+.amCartao .estadoA{font-size:11px;color:var(--apagado);margin-top:8px;display:flex;align-items:center;gap:6px}
+.amCartao .estadoA.carregando{padding:0;background:none;border:0;justify-content:flex-start}
+.amCartao .estadoA.carregando::before{width:10px;height:10px}
+.amCartao .acoesA{display:flex;gap:4px;margin-top:8px}
+.amCartao .acoesA button{flex:1;background:var(--f2);border:1px solid var(--borda);color:var(--fraco);
+  font:inherit;font-size:11px;padding:4px 0;border-radius:var(--r-s);cursor:pointer}
+.amCartao .acoesA button:hover{color:var(--texto);border-color:var(--borda-forte)}
+.amCartao .acoesA button.tirar:hover{color:var(--der);border-color:#5c2226}
+
+/* Tabela do comparativo: uma coluna por pessoa, o melhor de cada linha em ouro. */
+.amTabela{width:100%;border-collapse:collapse;background:var(--f1);border:1px solid var(--borda);
+  border-radius:var(--r-m);overflow:hidden;font-size:12.5px}
+.amTabela th,.amTabela td{padding:8px 12px;border-bottom:1px solid var(--borda);text-align:right;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.amTabela th{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700;
+  background:var(--f2)}
+.amTabela th:first-child,.amTabela td:first-child{text-align:left;color:var(--fraco);font-weight:600}
+.amTabela th.eu{color:var(--ouro-claro)}
+.amTabela tr:last-child td{border-bottom:0}
+.amTabela td.melhor{color:var(--ouro-claro);font-weight:700;background:#1a1911}
+.amTabela td.pior{color:var(--apagado)}
+.amTabela td img{width:22px;height:22px;border-radius:3px;vertical-align:middle;margin-right:6px;background:var(--f3)}
+.amTabela .cab{display:flex;align-items:center;justify-content:flex-end;gap:7px}
+.amTabela .cab img{width:22px;height:22px;border-radius:50%;background:var(--f3)}
+.amRolagem{overflow-x:auto}
+
+.amDetalhe{margin-top:var(--e3)}
+.amDetalhe .colunas{margin-top:var(--e2)}
+.amUlt{display:flex;flex-direction:column;gap:var(--e1)}
+.amUlt div{display:grid;grid-template-columns:28px 1fr 80px 60px 60px;align-items:center;gap:10px;background:var(--f1);
+  border:1px solid var(--borda);border-left:3px solid var(--borda);border-radius:var(--r-s);padding:4px 10px 4px 6px;font-size:12px}
+.amUlt div.v{border-left-color:var(--vit)} .amUlt div.d{border-left-color:var(--der)}
+.amUlt img{width:28px;height:28px;border-radius:var(--r-s);background:var(--f3)}
+.amUlt .kda{font-variant-numeric:tabular-nums;text-align:right}
+.amUlt .q{color:var(--apagado);font-size:11px;text-align:right}
+
 .carregando::before{content:"";width:14px;height:14px;border:2px solid var(--borda);
   border-top-color:var(--ouro);border-radius:50%;animation:gira .8s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
@@ -626,20 +723,34 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
 <aside>
   <div class="marca">
-    <h1>LolCoach</h1>
+    <h1><span class="longo">LolCoach</span><span class="curto">LC</span></h1>
     <div class="conta" id="conta">—</div>
     <select class="contaSel" id="contaSel" hidden title="qual conta as telas mostram"></select>
+    <button class="recolher" id="recolher" title="recolher a barra">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 3 5 8l5 5"/></svg>
+    </button>
   </div>
   <nav>
-    <button data-aba="visao" class="ativo"><span class="pt"></span>Perfil</button>
-    <button data-aba="partidas"><span class="pt"></span>Partidas</button>
-    <button data-aba="estat"><span class="pt"></span>Estatísticas</button>
-    <button data-aba="builds"><span class="pt"></span>Builds</button>
-    <button data-aba="padroes"><span class="pt"></span>Padrões</button>
-    <button data-aba="vivo"><span class="pt"></span>Ao vivo</button>
-    <button data-aba="patch"><span class="pt"></span>Atualização</button>
-    <button data-aba="config"><span class="pt"></span>Configuração</button>
-    <button data-aba="atividade"><span class="pt"></span>Atividade</button>
+    <div class="grupo">Você</div>
+    <button data-aba="visao" class="ativo" title="Perfil">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span class="nome">Perfil</span></button>
+    <button data-aba="partidas" title="Partidas">
+      <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="nome">Partidas</span></button>
+    <button data-aba="estat" title="Estatísticas">
+      <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg><span class="nome">Estatísticas</span></button>
+    <div class="grupo">Jogo</div>
+    <button data-aba="vivo" title="Ao vivo">
+      <svg viewBox="0 0 24 24"><path d="M2 12h4l3-7 4 14 3-7h6"/></svg><span class="nome">Ao vivo</span></button>
+    <button data-aba="builds" title="Builds">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
+    <button data-aba="patch" title="Atualização">
+      <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Atualização</span></button>
+    <div class="grupo">Galera</div>
+    <button data-aba="amigos" title="Amigos">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c3 0 5 2 5 5"/></svg><span class="nome">Amigos</span></button>
+    <div class="grupo">App</div>
+    <button data-aba="config" title="Configuração">
+      <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><span class="nome">Configuração</span></button>
   </nav>
   <div class="estado">
     <div class="l"><span class="luz" id="luz"></span><span id="estClient">client…</span></div>
@@ -680,6 +791,29 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <h2>Por dia da semana</h2><div id="eDias"></div>
     <h2>Por horário</h2><div id="eHoras"></div>
     <h2>Campeão por campeão</h2><div id="eCampeoes"></div>
+    <div id="treino"></div>
+    <div class="colunas2">
+      <div><h2>O que mais se repete nas suas mortes</h2><div id="tipos"></div></div>
+      <div><h2>Onde você morre</h2><div id="zonas"></div>
+           <h2>Quando você morre</h2><div id="faixas"></div></div>
+    </div>
+  </section>
+
+  <section id="amigos">
+    <div class="titulo">Amigos</div>
+    <div class="amForma">
+      <input class="busca" id="amNome" placeholder="nome#tag — ex.: roIindo#br1" autocomplete="off" onkeydown="if(event.key==='Enter')adicionarAmigo()">
+      <button class="acao" id="amAdicionar" onclick="adicionarAmigo()">Adicionar</button>
+      <button class="acao" onclick="carregarAmigos(true)" title="pergunta de novo à Riot o elo e as partidas de todo mundo">Atualizar todos</button>
+      <span class="salvo" id="amSalvo"></span>
+    </div>
+    <div id="amAviso"></div>
+    <div class="amGrade" id="amGrade"></div>
+    <div id="amDetalhe"></div>
+    <h2>Comparativo — últimas 20 solo de cada um</h2>
+    <div class="amRolagem" id="amCompara"></div>
+    <p class="dica">Tudo aqui vem da API da Riot, então vale pra qualquer conta — o amigo não precisa ter o LolCoach.
+    Cada perfil custa ~24 chamadas e a chave dá 100 a cada 2 minutos: com muita gente a atualização leva alguns minutos.</p>
   </section>
 
   <section id="builds">
@@ -716,14 +850,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="vivo">
     <div class="titulo">Partida ao vivo</div>
     <iframe id="quadroVivo" data-src="/vivo" title="Partida ao vivo"></iframe>
-  </section>
-
-  <section id="padroes">
-    <div class="titulo">Padrões</div>
-    <div id="treino"></div>
-    <h2>O que mais se repete</h2><div id="tipos"></div>
-    <h2>Onde você morre</h2><div id="zonas"></div>
-    <h2>Quando você morre</h2><div id="faixas"></div>
   </section>
 
   <section id="config">
@@ -769,10 +895,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div class="filtros" id="cFiltro"></div>
     <input class="busca" id="cBusca" placeholder="Buscar campeão… (a busca sempre olha o elenco inteiro)" autocomplete="off">
     <div class="grade" id="cGrade"></div>
-  </section>
 
-  <section id="atividade">
-    <div class="titulo">Atividade</div>
     <h2>Manutenção</h2>
     <div class="acoes">
       <button class="acao" data-acao="coletar">Coletar agora</button>
@@ -823,6 +946,7 @@ function trocarConta(nome){
   desenharContaSel();
   carregarVisao(); carregarPartidas(); carregarPadroes();
   if(jaCarregou.has('estat')) carregarEstat();
+  if(jaCarregou.has('amigos')) carregarAmigos();
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mmss = (ms) => `${String(Math.floor(ms/60000)).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}`;
@@ -845,6 +969,14 @@ function abrirAba(nome){
   $('main').scrollTop = 0;
 }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => abrirAba(b.dataset.aba));
+
+/* Barra recolhida ou aberta — lembrada entre aberturas. */
+try { if (localStorage.getItem('barra') === 'recolhida') document.body.classList.add('recolhida'); } catch {}
+$('#recolher').onclick = () => {
+  const r = document.body.classList.toggle('recolhida');
+  $('#recolher').title = r ? 'abrir a barra' : 'recolher a barra';
+  try { localStorage.setItem('barra', r ? 'recolhida' : 'aberta'); } catch {}
+};
 
 /**
  * Bloco de barras — usado no desempenho por role e em todos os padrões.
@@ -1537,8 +1669,208 @@ async function carregarPadroes(){
       destaque: (f.n/r.total).toFixed(1), sub: `por jogo · ${num(f.n)} no total` })));
 }
 
+/* ================================================================= amigos */
+/**
+ * O op.gg entre amigos. A lista vem do config; cada perfil é o que a Riot
+ * conta de qualquer conta (elo, nível, maestria, últimas 20 solo). "Você" entra
+ * pelo mesmo caminho, pra comparação ser maçã com maçã.
+ */
+let amDados = null, amAberto = null, amFila = null;
+const chaveAm = (p) => `${p.nome}#${p.tag}`.toLowerCase();
+const MEIA_HORA = 30 * 60 * 1000;
+
+async function carregarAmigos(forcar = false){
+  if(!amDados) $('#amGrade').innerHTML = carregando();
+  amDados = await pegar(comConta('/api/amigos'));
+  // Se você mesmo estiver na lista de amigos, sai da lista.
+  if(amDados.eu?.tag) amDados.amigos = amDados.amigos.filter(a => chaveAm(a) !== chaveAm(amDados.eu));
+  desenharAmigos();
+  if(amDados.semChave) return;
+  const fila = [amDados.eu, ...amDados.amigos]
+    .filter(p => p?.tag && (forcar || !p.perfil || Date.now() - p.perfil.em > MEIA_HORA));
+  atualizarAmigos(fila, forcar);
+}
+
+/** Um por vez — a chave da Riot não aguenta todo mundo junto. */
+async function atualizarAmigos(fila, forcar){
+  if(amFila){ amFila.push(...fila.filter(p => !amFila.includes(p))); return; }
+  amFila = [...fila];
+  while(amFila.length){
+    const p = amFila.shift();
+    p.carregando = true; desenharAmigos();
+    try {
+      p.perfil = await pegar(`/api/amigo?nome=${encodeURIComponent(p.nome)}&tag=${encodeURIComponent(p.tag)}${forcar?'&forcar=1':''}`);
+      if(p.perfil?.erro) throw new Error(p.perfil.erro);
+      p.erro = null;
+    } catch (e) { p.erro = e.message; if(p.perfil?.erro) p.perfil = null; }
+    p.carregando = false; desenharAmigos();
+  }
+  amFila = null;
+}
+
+async function adicionarAmigo(){
+  const texto = $('#amNome').value.trim();
+  const [nome, tag] = texto.split('#').map(s => s.trim());
+  if(!nome || !tag){ $('#amAviso').innerHTML = '<div class="aviso amAviso">escreva no formato nome#tag, com a tag depois do #</div>'; return; }
+  const b = $('#amAdicionar'); b.disabled = true; b.textContent = 'procurando…';
+  $('#amAviso').innerHTML = '';
+  try {
+    const r = await fetch('/api/amigo/adicionar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome, tag }) }).then(x => x.json());
+    if(r.erro) throw new Error(r.erro);
+    $('#amNome').value = '';
+    const s = $('#amSalvo'); s.textContent = `${r.perfil.conta.nome} adicionado`; s.classList.add('on'); setTimeout(() => s.classList.remove('on'), 2500);
+    await carregarAmigos();
+  } catch (e) {
+    $('#amAviso').innerHTML = `<div class="aviso amAviso">${esc(e.message)}</div>`;
+  }
+  b.disabled = false; b.textContent = 'Adicionar';
+}
+
+async function removerAmigo(ev, nome, tag){
+  ev.stopPropagation();
+  await fetch('/api/amigo/remover', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ nome, tag }) });
+  if(amAberto === `${nome}#${tag}`.toLowerCase()) amAberto = null;
+  await carregarAmigos();
+}
+
+function atualizarAmigo(ev, chave){
+  ev.stopPropagation();
+  const p = [amDados.eu, ...amDados.amigos].find(x => x?.tag && chaveAm(x) === chave);
+  if(p) atualizarAmigos([p], true);
+}
+
+function abrirAmigo(chave){
+  amAberto = amAberto === chave ? null : chave;
+  desenharAmigos();
+}
+
+const eloSolo = (perfil) => perfil?.elos?.find(e => e.chave === 'RANKED_SOLO_5x5') ?? null;
+const eloFlex = (perfil) => perfil?.elos?.find(e => e.chave === 'RANKED_FLEX_SR') ?? null;
+const pontosElo = (e) => !e ? 0 :
+  (['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'].indexOf(e.tier) * 400)
+  + ({IV:0,III:1,II:2,I:3}[e.rank] ?? 0) * 100 + (e.pdl ?? 0);
+
+function cartaoDeAmigo(p, { eu = false } = {}){
+  const perfil = p.perfil, r = perfil?.recente, solo = eloSolo(perfil), chave = chaveAm(p);
+  const taxa = r ? Math.round(r.taxa*100) : null;
+  return `<div class="amCartao ${eu?'eu':''} ${amAberto===chave?'aberto':''}" onclick="abrirAmigo('${esc(chave)}')">
+    ${eu ? '<span class="tagEu">você</span>' : ''}
+    <div class="topo">
+      <img class="retrato" src="${perfil?.icone != null ? '/iconeperfil/'+perfil.icone : ''}" alt="">
+      <div class="quem"><b>${esc(perfil?.conta?.nome ?? p.nome)}</b>
+        <span>#${esc(perfil?.conta?.tag ?? p.tag)}${perfil?.nivel ? ' · nível ' + num(perfil.nivel) : ''}</span></div>
+    </div>
+    <div class="eloL">${solo ? `
+      <span class="emblema" style="background:${COR_TIER[solo.tier] ?? '#8a713f'}">${SIGLA_TIER[solo.tier] ?? '?'}</span>
+      <div><div class="n">${esc(solo.nome)}</div><div class="p">${num(solo.pdl)} PDL · ${solo.vitorias}V ${solo.derrotas}D</div></div>`
+      : `<span class="sem">${perfil ? 'sem solo ranqueada' : (p.erro ? esc(p.erro) : 'ainda sem dados')}</span>`}</div>
+    ${r ? `<div class="num3">
+      <div><b class="${taxa>=52?'v':taxa<=48?'d':''}">${taxa}%</b><span>${r.jogos} jogos</span></div>
+      <div><b>${r.kda.toFixed(2)}</b><span>AMA</span></div>
+      <div><b>${r.csm.toFixed(1)}</b><span>cs/min</span></div>
+    </div>` : ''}
+    ${p.carregando ? '<div class="estadoA carregando">atualizando na Riot…</div>'
+      : perfil ? `<div class="estadoA">atualizado ${haQuanto(new Date(perfil.em).toISOString())}${perfil.desatualizado ? ' · a Riot não respondeu agora' : ''}</div>` : ''}
+    <div class="acoesA">
+      <button onclick="atualizarAmigo(event,'${esc(chave)}')" ${p.carregando?'disabled':''}>atualizar</button>
+      ${eu ? '' : `<button class="tirar" onclick="removerAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">tirar</button>`}
+    </div>
+  </div>`;
+}
+
+function desenharAmigos(){
+  const d = amDados; if(!d) return;
+  const eu = d.eu?.nome ? d.eu : null;
+
+  $('#amAviso').innerHTML = d.semChave
+    ? '<div class="aviso amAviso">Ver amigos precisa de uma chave da Riot no config.json (é de graça em developer.riotgames.com). Sem ela só aparece o que já foi baixado antes.</div>'
+    : (eu && !eu.tag ? '<div class="aviso amAviso">Ainda não sei a sua tag — abre o League uma vez logado nessa conta e você entra na comparação.</div>' : '');
+
+  const todos = [...(eu ? [eu] : []), ...d.amigos];
+  $('#amGrade').innerHTML = todos.length
+    ? todos.map(p => cartaoDeAmigo(p, { eu: p === eu })).join('')
+    : '<div class="vazio">adicione alguém pelo nome#tag ali em cima</div>';
+
+  /* ---- detalhe de quem está aberto ---- */
+  const aberto = todos.find(p => p.tag && chaveAm(p) === amAberto && p.perfil);
+  $('#amDetalhe').innerHTML = aberto ? detalheDeAmigo(aberto) : '';
+
+  /* ---- comparativo ---- */
+  const cols = todos.filter(p => p.perfil);
+  if(cols.length < 2){
+    $('#amCompara').innerHTML = `<div class="vazio">${cols.length ? 'adicione mais alguém pra comparar' : 'esperando os dados chegarem…'}</div>`;
+    return;
+  }
+  const linha = (rot, vals, { maiorMelhor = true, ranquear = true, formato = (v) => v } = {}) => {
+    const nums = vals.map(v => v?.num ?? null).filter(v => v != null);
+    const melhor = ranquear && nums.length > 1 ? (maiorMelhor ? Math.max(...nums) : Math.min(...nums)) : null;
+    const pior = ranquear && nums.length > 1 ? (maiorMelhor ? Math.min(...nums) : Math.max(...nums)) : null;
+    return `<tr><td>${esc(rot)}</td>${vals.map(v => {
+      const cls = v?.num == null || melhor === pior ? '' : v.num === melhor ? 'melhor' : v.num === pior ? 'pior' : '';
+      return `<td class="${cls}">${v == null ? '—' : (v.html ?? esc(formato(v.num)))}</td>`;
+    }).join('')}</tr>`;
+  };
+  const rec = (p, f) => p.perfil.recente ? f(p.perfil.recente) : null;
+  const pctV = (f) => (p) => rec(p, r => ({ num: Math.round(f(r)*100), html: Math.round(f(r)*100) + '%' }));
+  const dec = (f, casas = 1) => (p) => rec(p, r => ({ num: +f(r).toFixed(casas), html: f(r).toFixed(casas) }));
+  const eloLinha = (pega) => (p) => { const e = pega(p.perfil); return e ? { num: pontosElo(e), html: `${esc(e.nome)} <span style="color:var(--apagado)">${num(e.pdl)} PDL</span>` } : { num: 0, html: '<span style="color:var(--apagado)">sem elo</span>' }; };
+
+  const linhas = [
+    ['Solo/Duo', eloLinha(eloSolo)],
+    ['Flex', eloLinha(eloFlex)],
+    ['Nível', (p) => p.perfil.nivel ? { num: p.perfil.nivel, html: num(p.perfil.nivel) } : null],
+    ['Taxa de vitória', pctV(r => r.taxa)],
+    ['AMA', dec(r => r.kda, 2)],
+    ['CS por minuto', dec(r => r.csm)],
+    ['Dano por minuto', (p) => rec(p, r => ({ num: Math.round(r.dpm), html: num(Math.round(r.dpm)) }))],
+    ['Ouro por minuto', (p) => rec(p, r => ({ num: Math.round(r.gpm), html: num(Math.round(r.gpm)) }))],
+    ['Visão por minuto', dec(r => r.vspm, 2)],
+    ['Participação em abates', pctV(r => r.participacao)],
+    ['Fatia do dano do time', pctV(r => r.fatiaDano)],
+    ['Duração média', (p) => rec(p, r => ({ num: Math.round(r.duracaoMedia/60), html: Math.round(r.duracaoMedia/60) + ' min' })), { ranquear: false }],
+    ['Mais jogado', (p) => rec(p, r => { const c = r.campeoes[0]; return c ? { html: `${icone(c.championId)}${esc(c.campeao)} <span style="color:var(--apagado)">${c.jogos}j · ${Math.round(c.taxa*100)}%</span>` } : null; }), { ranquear: false }],
+    ['Role principal', (p) => rec(p, r => { const x = r.roles[0]; return x ? { html: `${esc(x.role)} <span style="color:var(--apagado)">${Math.round(x.fatia*100)}%</span>` } : null; }), { ranquear: false }],
+  ];
+
+  $('#amCompara').innerHTML = `<table class="amTabela">
+    <thead><tr><th></th>${cols.map(p => `<th class="${p === eu ? 'eu' : ''}"><div class="cab">
+      <img src="${p.perfil.icone != null ? '/iconeperfil/'+p.perfil.icone : ''}" alt="">${esc(p.perfil.conta?.nome ?? p.nome)}</div></th>`).join('')}</tr></thead>
+    <tbody>${linhas.map(([rot, f, op]) => linha(rot, cols.map(f), op)).join('')}</tbody>
+  </table>`;
+}
+
+function detalheDeAmigo(p){
+  const perfil = p.perfil, r = perfil.recente;
+  const elos = perfil.elos ?? [];
+  return `<div class="amDetalhe">
+    <h2>${esc(perfil.conta?.nome ?? p.nome)} <span style="text-transform:none;letter-spacing:0">#${esc(perfil.conta?.tag ?? p.tag)}</span></h2>
+    <div class="colunas">
+      <div>
+        ${elos.length ? elos.map(e => `<div class="elo">
+          <span class="emblema" style="background:${COR_TIER[e.tier] ?? '#8a713f'}">${SIGLA_TIER[e.tier] ?? '?'}</span>
+          <div class="txt"><div class="fila">${esc(e.fila)}</div><div class="nome">${esc(e.nome)}</div><div class="pdl">${num(e.pdl)} PDL</div></div>
+          <div class="placar"><b class="${e.taxa>=0.52?'v':e.taxa<=0.48?'d':''}">${Math.round(e.taxa*100)}%</b>${e.vitorias}V ${e.derrotas}D</div>
+        </div>`).join('') : '<div class="semElo">sem ranqueada nesta temporada</div>'}
+        ${perfil.maestria?.length ? `<h2>Maestria</h2><div class="maestria">${perfil.maestria.map(x => `
+          <div class="mLinha">${icone(x.championId)}<span class="n">${esc(nomeDoId(x.championId))}</span>
+            <span class="nv">${x.nivel}</span><span class="pts">${num(Math.round(x.pontos/1000))}k</span></div>`).join('')}</div>` : ''}
+        ${r?.roles?.length ? `<h2>Onde joga</h2>${barras(r.roles.map(x => ({ rotulo: x.role, valor: Math.round(x.fatia*100), destaque: Math.round(x.fatia*100)+'%', sub: `${x.jogos} jogos` })), {caixa:true, estreito:true})}` : ''}
+      </div>
+      <div>
+        ${r ? `<h2>Campeões das últimas ${r.jogos}</h2><div class="mini">${r.campeoes.map(c => { const t = Math.round(c.taxa*100); return `
+          <div class="miniLinha">${icone(c.championId)}<span class="n">${esc(c.campeao)}</span>
+            <span class="wr ${t>=53?'v':t<=47?'d':''}">${t}%</span><span class="kda">${c.kda.toFixed(2)}:1 · ${c.jogos}j</span></div>`; }).join('')}</div>
+        <h2>Últimas partidas</h2><div class="amUlt">${r.ultimas.map(u => `
+          <div class="${u.venci?'v':'d'}">${icone(u.championId)}<span>${esc(u.campeao)} <span style="color:var(--apagado)">${esc(u.role)}</span></span>
+            <span class="kda">${esc(u.kda)}</span><span class="q">${mmssCurto(u.duracaoS)}</span><span class="q">${haQuanto(new Date(u.quando).toISOString())}</span></div>`).join('')}</div>`
+        : '<div class="vazio">sem partidas ranqueadas recentes</div>'}
+      </div>
+    </div>
+  </div>`;
+}
+
 /* ============================================================ configuração */
-const ROLES_CFG = [['top','top'],['jungle','jungle'],['middle','mid'],['bottom','adc'],['utility','sup']];
+const ROLES_CFG =[['top','top'],['jungle','jungle'],['middle','mid'],['bottom','adc'],['utility','sup']];
 const ATRASOS = [[0,'instantâneo'],[1500,'1,5s'],[3000,'3s']];
 
 let cfg = null, listaCampeoes = [], roleAtual = 'jungle', alvo = 'picks', gravando = null;
@@ -1723,7 +2055,7 @@ async function carregarConfig(){
   cfg.champSelect ??= {}; cfg.champSelect.picks ??= {}; cfg.champSelect.bans ??= {}; cfg.autoAceitar ??= {};
 
   // As sugestões saem das partidas dele; sem elas a tela ainda funciona.
-  pegar('/api/sugestoes')
+  pegar(comConta('/api/sugestoes'))
     .then((s) => { sugestoesCfg = s; desenharSugestoes(); desenharGrade(); })
     .catch(() => {});
 
@@ -1789,7 +2121,7 @@ async function tick(){
  * abertura do app atrasaria a única tela que a maioria quer ver.
  */
 const CARREGADORES = {
-  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds,
+  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos,
   // O iframe do ao vivo só nasce quando a aba é aberta: antes ele ficava
   // consultando a API do jogo a cada 2s mesmo com o painel escondido.
   vivo: () => { const q = document.getElementById('quadroVivo'); if (!q.src) q.src = q.dataset.src; },

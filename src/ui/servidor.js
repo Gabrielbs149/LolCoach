@@ -120,6 +120,29 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      // Amigos: adicionar/remover precisam de corpo e resposta.
+      const am = req.method === 'POST' && url.pathname.match(/^\/api\/amigo\/(adicionar|remover)$/);
+      if (am) {
+        const pedacos = [];
+        for await (const p of req) pedacos.push(p);
+        try {
+          const corpo = JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}');
+          const acao = am[1] === 'adicionar' ? acoes.adicionarAmigo : acoes.removerAmigo;
+          return enviar(200, 'application/json', JSON.stringify(await acao(corpo)));
+        } catch (erro) {
+          return enviar(400, 'application/json', JSON.stringify({ erro: erro.message }));
+        }
+      }
+      if (url.pathname === '/api/amigo' && acoes.amigoPerfil) {
+        try {
+          return enviar(200, 'application/json', JSON.stringify(await acoes.amigoPerfil({
+            nome: url.searchParams.get('nome'), tag: url.searchParams.get('tag'), forcar: url.searchParams.get('forcar') === '1',
+          })));
+        } catch (erro) {
+          return enviar(503, 'application/json', JSON.stringify({ erro: erro.message }));
+        }
+      }
+
       // Aplicar uma página da tela de builds: precisa do corpo e da resposta,
       // porque o botão tem que dizer se deu certo ou por que não deu.
       if (req.method === 'POST' && url.pathname === '/api/aplicar-runas') {
@@ -255,6 +278,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         ['/api/estatisticas', 'estatisticas'],
         ['/api/sugestoes', 'sugestoes'],
         ['/api/patch', 'patchLista'],
+        ['/api/amigos', 'amigos'],
       ]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         try {
