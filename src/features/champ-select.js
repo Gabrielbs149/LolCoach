@@ -139,8 +139,13 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
 
           setTimeout(async () => {
             try {
-              await lcu.patch(`/lol-champ-select/v1/session/actions/${minha.id}`,
-                { championId: escolha.id, completed: travar });
+              // Dois passos, como o client faz: o PATCH só DECLARA (deixa o
+              // campeão em cima do retrato); quem trava de verdade é o
+              // POST .../complete. Mandar `completed: true` no PATCH voltava
+              // 200 e o registro dizia "travou", mas o campeão ficava só
+              // declarado — foi o que ele viu na partida personalizada.
+              await lcu.patch(`/lol-champ-select/v1/session/actions/${minha.id}`, { championId: escolha.id });
+              if (travar) await lcu.post(`/lol-champ-select/v1/session/actions/${minha.id}/complete`);
               log(`${minha.type === 'ban' ? 'baniu' : (travar ? 'travou' : 'declarou')} ${escolha.nome}`);
               if (minha.type === 'pick' && !travar) {
                 log('travar o pick é com você (travarPick está desligado na configuração)');
