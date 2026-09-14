@@ -7,12 +7,17 @@ import { coletarPendentes } from './dados/coletor.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Liga tudo: aceitar fila, seleção de campeão, runas e coleta.
  * Recebe um `estado` (de src/ui/servidor.js) pra reportar o que está fazendo,
  * e devolve as alças pra quem chamou poder fechar depois.
  */
+async function versaoDoApp() {
+  try { return JSON.parse(await readFile(resolve(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version; } catch { return '?'; }
+}
+
 export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, aoFase } = {}) {
   const config = configDada ?? await carregarConfig();
   const lcu = new LcuClient();
@@ -114,7 +119,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   });
 
   const total = db.prepare('SELECT COUNT(*) n FROM partidas').get().n;
-  log(`banco com ${total} partidas`);
+  log(`LolCoach v${await versaoDoApp()} — banco com ${total} partidas`);
 
   /**
    * A conexão com o client NÃO pode bloquear a inicialização.

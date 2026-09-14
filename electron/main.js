@@ -36,7 +36,17 @@ function ligarAtualizacao() {
   autoUpdater.on('download-progress', (p) => { if (Math.round(p.percent) % 25 === 0) estado.set('atualizacao', { baixando: Math.round(p.percent) }); });
   autoUpdater.on('update-downloaded', (i) => {
     estado.set('atualizacao', { pronta: i.version });
-    estado.log(`atualização ${i.version} pronta — instala sozinha quando você fechar o LolCoach`);
+    estado.log(`atualização ${i.version} pronta — instalo assim que você não estiver em fila, seleção ou partida`);
+    // Quem deixa o app aberto pra sempre nunca fechava e ficava preso na
+    // versão velha. Instala sozinho no primeiro momento em que não atrapalha:
+    // client fechado, ou em None/Lobby/EndOfGame. Nunca com o jogo rodando.
+    const tranquilo = () => faseAtual == null || ['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(faseAtual);
+    const tentar = setInterval(() => {
+      if (!tranquilo()) return;
+      clearInterval(tentar);
+      estado.log(`instalando a ${i.version} e reabrindo…`);
+      setTimeout(() => autoUpdater.quitAndInstall(true, true), 1500);
+    }, 30_000);
   });
   autoUpdater.on('error', (e) => estado.log(`atualização: ${e?.message ?? e}`));
   autoUpdater.checkForUpdates().catch(() => {});

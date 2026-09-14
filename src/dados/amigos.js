@@ -152,7 +152,12 @@ export async function perfilDeAmigo(riotConfig, { nome, tag }, { forcar = false,
   try { conta = await riot.contaPorRiotId(nome, tag); }
   catch (erro) {
     if (cache) return { ...cache, doCache: true, desatualizado: true };
-    throw new Error(/404/.test(erro.message) ? `não achei ${nome}#${tag} — confere o nome e a tag` : erro.message);
+    throw new Error(erro.message);
+  }
+  // A Riot devolve 404 (aqui, null) pra conta que não existe: nome ou tag errados.
+  if (!conta?.puuid) {
+    if (cache) return { ...cache, doCache: true, desatualizado: true };
+    throw new Error(`não achei ${nome}#${tag} — confere o nome e a tag (a tag é o que vem depois do #, sem espaço)`);
   }
 
   const [invocador, elos, maestria] = await Promise.all([
