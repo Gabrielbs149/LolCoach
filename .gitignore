@@ -2,7 +2,7 @@
 config.json
 
 # dados de cada pessoa (banco, caches, arte)
-dados/
+/dados/
 relatorio-*.html
 relatorio-*.md
 padroes.md
