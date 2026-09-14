@@ -38,8 +38,23 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         await salvarConfig({ riot: { gameName: eu.gameName, tagLine: eu.tagLine } }).catch(() => {});
         log(`conta ${eu.gameName}#${eu.tagLine} gravada na configuração`);
       }
+      // Toda conta que já logou fica com a tag lembrada: o banco só guarda o
+      // nome, e a Riot exige nome#tag pra dar o elo de uma conta secundária.
+      lembrarTag(eu.gameName, eu.tagLine).catch(() => {});
     }
   });
+
+  const arquivoTags = () => resolve(pastaBase(), 'dados', 'contas.json');
+  async function tagsConhecidas() {
+    try { return JSON.parse(await readFile(arquivoTags(), 'utf8')); } catch { return {}; }
+  }
+  async function lembrarTag(nome, tag) {
+    if (!nome || !tag) return;
+    const tags = await tagsConhecidas();
+    if (tags[nome] === tag) return;
+    tags[nome] = tag;
+    await writeFile(arquivoTags(), JSON.stringify(tags, null, 2), 'utf8');
+  }
 
   lcu.on('desconectado', () => {
     estado?.set('conectado', false);
@@ -358,14 +373,40 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /* ------------------------------------------------- perfil e estatísticas */
 
   /** Elo, PDL, nível e maestria. Nunca lança: sem rede, devolve o último visto. */
-  async function perfil({ forcar = false } = {}) {
+  /**
+   * O perfil de UMA conta: a pedida pela tela, senão a logada no client, senão
+   * a do config. Cada pessoa (e cada conta dele) vê o próprio.
+   */
+  async function perfil({ forcar = false, conta = null } = {}) {
     const { perfilDaRiot } = await import('./dados/perfil-riot.js');
-    if (config.riot?.apiKey) {
-      return (await perfilDaRiot(config.riot, { forcar })) ?? { elos: [], maestria: [], erro: 'sem chave da Riot' };
+
+    const logada = estado?.instantaneo?.().conta ?? null;   // "nome#tag" ou null
+    const alvo = conta || (logada ? logada.split('#')[0] : null) || config.riot?.gameName || null;
+    const tagDaLogada = logada && logada.split('#')[0] === alvo ? logada.split('#')[1] : null;
+
+    // Se a conta pedida é a que está no client, o client responde sem chave.
+    if (logada && logada.split('#')[0] === alvo && lcu.conectado) {
+      const pc = await perfilPeloClient();
+      // Com chave, a Riot ainda complementa (maestria); sem, isto já é o perfil.
+      if (!config.riot?.apiKey) return pc;
+      const pr = await perfilDaRiot({ ...config.riot, gameName: alvo, tagLine: tagDaLogada ?? config.riot.tagLine }, { forcar });
+      return pr?.elos?.length ? pr : pc;
     }
-    // Sem chave da Riot (o normal pra quem instalou o app): o próprio client
-    // dá elo, PDL, nível e ícone. Só a maestria fica de fora.
-    return perfilPeloClient();
+
+    if (config.riot?.apiKey && alvo) {
+      // Tag: a do config se for a mesma conta; senão a que ficou lembrada de
+      // quando essa conta logou no client. Sem tag conhecida, a Riot não acha.
+      const tags = await tagsConhecidas();
+      const tag = alvo === config.riot.gameName ? config.riot.tagLine : (tags[alvo] ?? null);
+      if (!tag) {
+        return { elos: [], maestria: [], conta: { nome: alvo, tag: '' },
+          erro: `abra o League com a conta ${alvo} uma vez pra eu aprender a tag dela` };
+      }
+      return (await perfilDaRiot({ ...config.riot, gameName: alvo, tagLine: tag }, { forcar }))
+        ?? { elos: [], maestria: [], erro: `sem dados de ${alvo}` };
+    }
+    return { elos: [], maestria: [], conta: alvo ? { nome: alvo, tag: '' } : null,
+      erro: 'abra o League com essa conta pra ver o elo (ou coloque uma chave da Riot no config)' };
   }
 
   const TIER_PT = {

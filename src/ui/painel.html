@@ -51,6 +51,9 @@ aside{
   background:linear-gradient(90deg,var(--ouro-claro),var(--ouro));
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .marca .conta{font-size:12.5px;color:var(--apagado);margin-top:4px}
+.contaSel{margin-top:8px;width:100%;background:var(--f2);color:var(--ouro-claro);border:1px solid var(--borda);
+  border-radius:var(--r-s);padding:5px 8px;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
+.contaSel:focus{outline:none;border-color:var(--ouro)}
 
 nav{padding:6px 12px;flex:1}
 nav button{
@@ -625,6 +628,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <div class="marca">
     <h1>LolCoach</h1>
     <div class="conta" id="conta">—</div>
+    <select class="contaSel" id="contaSel" hidden title="qual conta as telas mostram"></select>
   </div>
   <nav>
     <button data-aba="visao" class="ativo"><span class="pt"></span>Perfil</button>
@@ -787,6 +791,39 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 <script>
 const $ = (s) => document.querySelector(s);
 const pegar = (u) => fetch(u).then(r => r.json());
+
+/**
+ * A conta que as telas mostram. Cada pessoa vê a sua; quem joga em mais de
+ * uma escolhe na barra lateral. Padrão: a que está logada no client; senão a do
+ * config; senão a com mais partidas.
+ */
+let contaAtual = null, contasConhecidas = [], contaEscolhidaPeloUsuario = false;
+const comConta = (u) => contaAtual ? u + (u.includes('?') ? '&' : '?') + 'conta=' + encodeURIComponent(contaAtual) : u;
+
+function desenharContaSel(){
+  const sel = $('#contaSel');
+  sel.hidden = contasConhecidas.length < 2;
+  sel.innerHTML = contasConhecidas.map(c =>
+    `<option value="${esc(c.nome)}" ${c.nome===contaAtual?'selected':''}>${esc(c.nome)} · ${c.jogos}</option>`).join('');
+}
+
+async function carregarContas(logada){
+  try { contasConhecidas = await pegar('/api/contas'); } catch { contasConhecidas = []; }
+  if(!contaEscolhidaPeloUsuario){
+    const nomeLogado = logada ? String(logada).split('#')[0] : null;
+    const doConfig = cfg?.riot?.gameName ?? null;
+    const existe = (n) => n && contasConhecidas.some(c => c.nome === n);
+    contaAtual = existe(nomeLogado) ? nomeLogado : existe(doConfig) ? doConfig : (contasConhecidas[0]?.nome ?? null);
+  }
+  desenharContaSel();
+}
+
+function trocarConta(nome){
+  contaAtual = nome; contaEscolhidaPeloUsuario = true;
+  desenharContaSel();
+  carregarVisao(); carregarPartidas(); carregarPadroes();
+  if(jaCarregou.has('estat')) carregarEstat();
+}
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mmss = (ms) => `${String(Math.floor(ms/60000)).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}`;
 const num = (n) => Number(n ?? 0).toLocaleString('pt-BR');
@@ -844,7 +881,7 @@ const idDoCampeao = (nome) => campeoesPorNome.get(String(nome).toLowerCase().rep
 
 async function carregarVisao(){
   const [r, ps, perfil] = await Promise.all([
-    pegar('/api/resumo'), pegar('/api/partidas'), pegar('/api/perfil').catch(() => null),
+    pegar(comConta('/api/resumo')), pegar(comConta('/api/partidas')), pegar(comConta('/api/perfil')).catch(() => null),
   ]);
   const g = r.geral, derrotas = g.n - g.v, taxa = Math.round(g.v/g.n*100);
 
@@ -943,7 +980,7 @@ async function carregarVisao(){
 async function atualizarPerfil(botao){
   botao.disabled = true;
   botao.textContent = 'atualizando…';
-  try { await pegar('/api/perfil?forcar=1'); } catch { /* o redesenho mostra o aviso */ }
+  try { await pegar(comConta('/api/perfil?forcar=1')); } catch { /* o redesenho mostra o aviso */ }
   await carregarVisao();   // redesenha o cabeçalho inteiro, botão incluído
 }
 
@@ -1025,7 +1062,7 @@ function desenharPartidas(){
 function maisPartidas(){ mostrando += POR_PAGINA; desenharPartidas(); }
 
 async function carregarPartidas(){
-  todasPartidas = await pegar('/api/partidas');
+  todasPartidas = await pegar(comConta('/api/partidas'));
   desenharPartidas();
 }
 
@@ -1197,19 +1234,12 @@ function colunas(itens, {minimo = 1} = {}){
   }).join('')}</div>`;
 }
 
-let contaEstat = '';
-function trocarContaEstat(c){ contaEstat = c; carregarEstat(); }
-
 async function carregarEstat(){
-  const e = await pegar('/api/estatisticas' + (contaEstat ? '?conta=' + encodeURIComponent(contaEstat) : ''));
+  const e = await pegar(comConta('/api/estatisticas'));
   if(e.erro){ $('#eGeral').innerHTML = `<div class="vazio">${esc(e.erro)}</div>`; return; }
   const g = e.geral;
 
-  // Ele joga em mais de uma conta: o seletor só aparece quando há mais de uma.
-  $('#eContas').innerHTML = (e.contas?.length ?? 0) > 1 ? `<div class="filtros">
-    <button class="${!contaEstat?'on':''}" onclick="trocarContaEstat('')">Todas as contas</button>
-    ${e.contas.map(c => `<button class="${contaEstat===c.nome?'on':''}" onclick="trocarContaEstat('${esc(c.nome)}')">${esc(c.nome)} <span style="color:var(--apagado)">${c.jogos}</span></button>`).join('')}
-  </div>` : '';
+  $('#eContas').innerHTML = contaAtual ? `<p class="dica" style="margin:0 0 var(--e2)">Conta: <b>${esc(contaAtual)}</b> — troque na barra lateral.</p>` : '';
 
   if(!g){ $('#eGeral').innerHTML = '<div class="vazio">sem partidas nesta conta</div>'; return; }
 
@@ -1479,7 +1509,7 @@ const NOME_TIPO = {
 };
 
 async function carregarPadroes(){
-  const r = await pegar('/api/padroes');
+  const r = await pegar(comConta('/api/padroes'));
 
   const plano = r.tipos.filter(t => TREINO[t.tipo] && t.jogos/r.total >= 0.25).slice(0,3);
   $('#treino').innerHTML = plano.length ? `<h2>Plano de treino</h2>${plano.map((t,i) => {
@@ -1728,6 +1758,11 @@ async function tick(){
     $('#luz').className = 'luz' + (e.conectado ? ' on' : '');
     $('#estClient').textContent = e.conectado ? 'client conectado' : 'client desconectado';
     $('#conta').textContent = e.conta ?? '—';
+    // Primeira vez que o client responde: as telas passam a seguir essa conta.
+    if (e.conta && !contaEscolhidaPeloUsuario && contaAtual !== String(e.conta).split('#')[0] && contasConhecidas.some(c => c.nome === String(e.conta).split('#')[0])) {
+      contaAtual = String(e.conta).split('#')[0]; desenharContaSel();
+      carregarVisao(); carregarPartidas(); carregarPadroes();
+    }
     $('#estFase').textContent = e.fase ?? '';
     // Atualização baixada: aviso discreto na barra lateral. Instala ao fechar.
     const at = e.atualizacao;
@@ -1788,6 +1823,11 @@ for(const el of ['#cartoes','#roles','#campeoes','#lista','#tipos','#elos','#mae
 
 (async () => {
   await carregarCampeoes();
+  try { cfg = await pegar('/api/config'); } catch { cfg = {}; }
+  let logada = null;
+  try { logada = (await pegar('/api/estado')).conta; } catch {}
+  await carregarContas(logada);
+  $('#contaSel').onchange = (ev) => trocarConta(ev.target.value);
   carregarVisao(); carregarPartidas(); carregarPadroes(); carregarConfig(); tick();
 })();
 

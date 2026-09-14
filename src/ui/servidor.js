@@ -10,30 +10,43 @@ const AQUI = dirname(fileURLToPath(import.meta.url));
  * Só escuta em 127.0.0.1 — nada disso deve sair da máquina.
  */
 export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
+  /**
+   * Filtro de conta pras rotas do banco. A conta de uma partida é o nome do
+   * jogador que é o "eu" dela. Sem `conta`, vem tudo — todas as contas dele.
+   */
+  const filtroConta = (conta) => conta
+    ? ` AND EXISTS (SELECT 1 FROM jogadores mc WHERE mc.gameId = p.gameId AND mc.participantId = p.meuId AND mc.nome = '${String(conta).replace(/'/g, "''")}')`
+    : '';
+
   const rotas = {
     '/api/estado': () => estado.instantaneo(),
 
-    '/api/resumo': () => {
+    '/api/contas': () => db.prepare(`
+      SELECT j.nome nome, COUNT(*) jogos, MAX(p.quando) ultima
+      FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
+      WHERE p.duracaoS >= 300 GROUP BY j.nome ORDER BY jogos DESC`).all(),
+
+    '/api/resumo': (q) => {
+      const fc = filtroConta(q.get('conta'));
       const g = db.prepare(`
-        SELECT COUNT(*) n, SUM(venci) v, SUM(duracaoS)/3600.0 horas,
-               MIN(quando) de, MAX(quando) ate
-        FROM partidas WHERE duracaoS >= 300`).get();
+        SELECT COUNT(*) n, SUM(p.venci) v, SUM(p.duracaoS)/3600.0 horas,
+               MIN(p.quando) de, MAX(p.quando) ate
+        FROM partidas p WHERE p.duracaoS >= 300${fc}`).get();
       const porRole = db.prepare(`
-        SELECT minhaRole role, COUNT(*) n, SUM(venci) v FROM partidas
-        WHERE duracaoS >= 300 GROUP BY minhaRole ORDER BY n DESC`).all();
+        SELECT p.minhaRole role, COUNT(*) n, SUM(p.venci) v FROM partidas p
+        WHERE p.duracaoS >= 300${fc} GROUP BY p.minhaRole ORDER BY n DESC`).all();
       const campeoes = db.prepare(`
-        SELECT meuCampeao campeao, COUNT(*) n, SUM(venci) v,
-          -- qualquer partida serve pra descobrir o id do campeão, é sempre o mesmo
+        SELECT p.meuCampeao campeao, COUNT(*) n, SUM(p.venci) v,
           (SELECT j.championId FROM jogadores j
            WHERE j.gameId = p.gameId AND j.participantId = p.meuId) championId,
           (SELECT COUNT(*) FROM achados a JOIN partidas p2 ON p2.gameId = a.gameId
            WHERE p2.meuCampeao = p.meuCampeao AND a.gravidade = 3) graves
-        FROM partidas p WHERE duracaoS >= 300
-        GROUP BY meuCampeao ORDER BY n DESC LIMIT 10`).all();
+        FROM partidas p WHERE p.duracaoS >= 300${fc}
+        GROUP BY p.meuCampeao ORDER BY n DESC LIMIT 10`).all();
       return { geral: g, porRole, campeoes };
     },
 
-    '/api/partidas': () => db.prepare(`
+    '/api/partidas': (q) => db.prepare(`
       SELECT p.gameId, p.quando, p.fila, p.duracaoS, p.meuCampeao, p.minhaRole, p.venci,
              (SELECT COUNT(*) FROM achados a WHERE a.gameId = p.gameId) achados,
              (SELECT COUNT(*) FROM achados a WHERE a.gameId = p.gameId AND a.gravidade = 3) graves,
@@ -43,13 +56,11 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
               WHERE j.gameId = p.gameId AND j.participantId = p.meuId) championId,
              (SELECT j.cs FROM jogadores j
               WHERE j.gameId = p.gameId AND j.participantId = p.meuId) cs,
-             -- participacao em abates: precisa do total do time dele
              (SELECT ROUND(100.0 * (j.kills + j.assists) /
                      NULLIF((SELECT SUM(t.kills) FROM jogadores t
                              WHERE t.gameId = p.gameId AND t.time = j.time), 0))
               FROM jogadores j
               WHERE j.gameId = p.gameId AND j.participantId = p.meuId) participacao,
-             -- adversario direto: mesmo papel, time contrario
              (SELECT r.campeao FROM jogadores r
               JOIN jogadores meu ON meu.gameId = p.gameId AND meu.participantId = p.meuId
               WHERE r.gameId = p.gameId AND r.time <> meu.time AND r.role = p.minhaRole
@@ -57,28 +68,30 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
              (SELECT r.championId FROM jogadores r
               JOIN jogadores meu ON meu.gameId = p.gameId AND meu.participantId = p.meuId
               WHERE r.gameId = p.gameId AND r.time <> meu.time AND r.role = p.minhaRole
-              LIMIT 1) rivalId
-      FROM partidas p WHERE p.duracaoS >= 300
+              LIMIT 1) rivalId,
+             (SELECT j.nome FROM jogadores j
+              WHERE j.gameId = p.gameId AND j.participantId = p.meuId) conta
+      FROM partidas p WHERE p.duracaoS >= 300${filtroConta(q.get('conta'))}
       ORDER BY p.quando DESC`).all(),
 
-    '/api/padroes': () => ({
-      tipos: db.prepare(`
-        SELECT tipo, COUNT(*) n, COUNT(DISTINCT gameId) jogos FROM achados
-        WHERE gameId IN (SELECT gameId FROM partidas WHERE duracaoS >= 300)
-        GROUP BY tipo ORDER BY n DESC`).all(),
-      zonas: db.prepare(`
-        SELECT zona, COUNT(*) n FROM achados
-        WHERE tipo = 'morte' AND zona IS NOT NULL
-        AND gameId IN (SELECT gameId FROM partidas WHERE duracaoS >= 300)
-        GROUP BY zona ORDER BY n DESC LIMIT 8`).all(),
-      faixas: db.prepare(`
-        SELECT CASE WHEN t < 600000 THEN '0-10' WHEN t < 1200000 THEN '10-20'
-                    WHEN t < 1800000 THEN '20-30' ELSE '30+' END faixa, COUNT(*) n
-        FROM achados WHERE tipo = 'morte'
-        AND gameId IN (SELECT gameId FROM partidas WHERE duracaoS >= 300)
-        GROUP BY faixa`).all(),
-      total: db.prepare('SELECT COUNT(*) n FROM partidas WHERE duracaoS >= 300').get().n,
-    }),
+    '/api/padroes': (q) => {
+      const fc = filtroConta(q.get('conta'));
+      const ids = `SELECT p.gameId FROM partidas p WHERE p.duracaoS >= 300${fc}`;
+      return {
+        tipos: db.prepare(`
+          SELECT tipo, COUNT(*) n, COUNT(DISTINCT gameId) jogos FROM achados
+          WHERE gameId IN (${ids}) GROUP BY tipo ORDER BY n DESC`).all(),
+        zonas: db.prepare(`
+          SELECT zona, COUNT(*) n FROM achados
+          WHERE tipo = 'morte' AND zona IS NOT NULL AND gameId IN (${ids})
+          GROUP BY zona ORDER BY n DESC LIMIT 8`).all(),
+        faixas: db.prepare(`
+          SELECT CASE WHEN t < 600000 THEN '0-10' WHEN t < 1200000 THEN '10-20'
+                      WHEN t < 1800000 THEN '20-30' ELSE '30+' END faixa, COUNT(*) n
+          FROM achados WHERE tipo = 'morte' AND gameId IN (${ids}) GROUP BY faixa`).all(),
+        total: db.prepare(`SELECT COUNT(*) n FROM partidas p WHERE p.duracaoS >= 300${fc}`).get().n,
+      };
+    },
   };
 
   const servidor = http.createServer(async (req, res) => {
@@ -253,7 +266,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       }
 
       if (rotas[url.pathname]) {
-        return enviar(200, 'application/json', JSON.stringify(rotas[url.pathname]()));
+        return enviar(200, 'application/json', JSON.stringify(rotas[url.pathname](url.searchParams)));
       }
 
       if (url.pathname === '/vivo') {
