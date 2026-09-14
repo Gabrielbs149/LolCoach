@@ -91,13 +91,11 @@ nav button.ativo::before{content:"";position:absolute;left:0;top:9px;bottom:9px;
 nav button svg{width:16px;height:16px;flex:0 0 16px;stroke:currentColor;fill:none;stroke-width:1.8;
   stroke-linecap:round;stroke-linejoin:round;opacity:.85}
 nav button.ativo svg{opacity:1}
-nav button .bolha{margin-left:auto;font-size:9.5px;font-weight:800;color:#0b1119;background:var(--ouro);
-  border-radius:99px;padding:1px 6px;line-height:1.4}
 body.recolhida nav{padding:4px 8px}
 body.recolhida nav .grupo{height:1px;padding:0;margin:8px 4px;background:var(--borda);overflow:hidden;color:transparent}
 body.recolhida nav .grupo:first-child{display:none}
 body.recolhida nav button{justify-content:center;padding:9px 0;gap:0}
-body.recolhida nav button .nome,body.recolhida nav button .bolha{display:none}
+body.recolhida nav button .nome{display:none}
 body.recolhida nav button.ativo::before{top:7px;bottom:7px}
 
 .estado{padding:13px 18px;border-top:1px solid var(--borda);font-size:12.5px;color:var(--apagado)}
@@ -275,11 +273,6 @@ h2:first-child{margin-top:0}
 
 .chip2 em{font-style:normal;font-weight:800;font-size:12px}
 .chip2 i{font-style:normal;color:var(--apagado);font-size:11.5px}
-.sugestao{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);
-  padding:11px 13px;margin-bottom:var(--e1)}
-.sugestao .cabS b{font-size:13px;font-weight:650}
-.sugestao .cabS span{display:block;color:var(--apagado);font-size:11px;margin-top:2px}
-.sugestao .chips2{display:flex;flex-wrap:wrap;gap:var(--e1);margin-top:var(--e2)}
 
 .notas{display:flex;flex-direction:column;gap:var(--e1)}
 .nota{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-s);
@@ -593,11 +586,6 @@ h2:first-child{margin-top:0}
   background:#6d7f96;transition:transform .18s,background .18s}
 .chave input:checked+.pino{background:#1e5c40;border-color:#2b8158}
 .chave input:checked+.pino::after{transform:translateX(16px);background:#4ed093}
-.opcoes{display:flex;gap:0;flex:0 0 auto;border:1px solid var(--borda);border-radius:var(--r-s);overflow:hidden}
-.opcoes button{background:var(--f2);border:0;border-right:1px solid var(--borda);color:var(--fraco);
-  padding:5px 10px;cursor:pointer;font-size:11.5px;font-family:inherit}
-.opcoes button:last-child{border-right:0}
-.opcoes button.on{color:var(--ouro-claro);background:#241f16}
 
 .abasRole{display:flex;gap:var(--e1);margin-bottom:var(--e2);flex-wrap:wrap}
 .abasRole button{background:var(--f1);border:1px solid var(--borda);color:var(--fraco);
@@ -623,11 +611,6 @@ h2:first-child{margin-top:0}
 .lupa div em{font-style:normal;color:var(--apagado);font-size:10.5px;margin-left:auto}
 .lupa div.on,.lupa div:hover{background:var(--f3);color:var(--ouro-claro)}
 .lupa .nadaL{color:var(--apagado);font-size:11.5px;padding:8px 10px}
-
-/* Sugestões saídas das partidas dele, embaixo de cada lista. */
-.sugere{margin-top:var(--e2)}
-.sugere .cabS{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700;margin-bottom:5px}
-.sugere .chips2{display:flex;flex-wrap:wrap;gap:var(--e1)}
 
 .avancado{margin-top:var(--e4);border:1px solid var(--borda);border-radius:var(--r-m);background:var(--f1)}
 .avancado summary{cursor:pointer;padding:10px 14px;font-size:12.5px;font-weight:650;color:var(--fraco);list-style:none;
@@ -752,16 +735,15 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
       <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="nome">Partidas</span></button>
     <button data-aba="estat" title="Estatísticas">
       <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg><span class="nome">Estatísticas</span></button>
+    <button data-aba="amigos" title="Amigos">
+      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c3 0 5 2 5 5"/></svg><span class="nome">Amigos</span></button>
     <div class="grupo">Jogo</div>
     <button data-aba="vivo" title="Ao vivo">
       <svg viewBox="0 0 24 24"><path d="M2 12h4l3-7 4 14 3-7h6"/></svg><span class="nome">Ao vivo</span></button>
     <button data-aba="builds" title="Builds">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
-    <button data-aba="patch" title="Atualização">
-      <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Atualização</span></button>
-    <div class="grupo">Galera</div>
-    <button data-aba="amigos" title="Amigos">
-      <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c3 0 5 2 5 5"/></svg><span class="nome">Amigos</span></button>
+    <button data-aba="patch" title="Patch">
+      <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
     <div class="grupo">App</div>
     <button data-aba="config" title="Configuração">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><span class="nome">Configuração</span></button>
@@ -799,7 +781,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div class="colunas2">
       <div><h2>Onde você joga</h2><div id="eRoles"></div>
            <h2>Tipo de campeão</h2><div id="eClasses"></div></div>
-      <div><h2>Perfil</h2><div id="eRadar"></div></div>
+      <div><h2>Radar</h2><div id="eRadar"></div></div>
     </div>
     <h2>Por dia da semana</h2><div id="eDias"></div>
     <h2>Por horário</h2><div id="eHoras"></div>
@@ -839,7 +821,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   </section>
 
   <section id="patch">
-    <div class="titulo">Atualização</div>
+    <div class="titulo">Patch</div>
     <div id="patchTopo"></div>
     <div class="colunas3">
       <div><h2>Notas</h2><div id="patchLista"></div></div>
@@ -854,7 +836,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   </section>
 
   <section id="detalhe">
-    <button class="voltar" onclick="abrirAba('partidas')">← voltar</button>
+    <button class="voltar" onclick="abrirAba(origemDetalhe)">← Voltar</button>
     <div id="det"></div>
   </section>
 
@@ -874,15 +856,15 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
       <div class="linhaCfg">
         <div class="txt"><b>Travar campeão</b></div>
         <div class="caixaCamp" id="cxPicks">
-          <img id="imgPicks" alt=""><input id="addPicks" placeholder="campeão" autocomplete="off" spellcheck="false">
+          <img id="imgPicks" alt=""><input id="addPicks" placeholder="nome do campeão" autocomplete="off" spellcheck="false">
           <div class="lupa" id="lupaPicks" hidden></div>
         </div>
         <label class="chave"><input type="checkbox" id="cChamp"><span class="pino"></span></label>
       </div>
       <div class="linhaCfg">
-        <div class="txt"><b>Banir</b></div>
+        <div class="txt"><b>Banir campeão</b></div>
         <div class="caixaCamp" id="cxBans">
-          <img id="imgBans" alt=""><input id="addBans" placeholder="campeão" autocomplete="off" spellcheck="false">
+          <img id="imgBans" alt=""><input id="addBans" placeholder="nome do campeão" autocomplete="off" spellcheck="false">
           <div class="lupa" id="lupaBans" hidden></div>
         </div>
         <label class="chave"><input type="checkbox" id="cBanir"><span class="pino"></span></label>
@@ -896,7 +878,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
         <button class="acao" data-acao="historico?quantas=250&fila=420">Puxar 250 solo</button>
         <button class="acao" data-acao="historico?quantas=700&fila=440">Puxar flex</button>
         <button class="acao" data-acao="reprocessar">Reprocessar detectores</button>
-        <button class="acao" data-acao="aplicarBuildsNoLol" title="grava na loja do jogo um conjunto de itens por campeão, vindo do op.gg. Precisa do League aberto. Leva uns 2 minutos.">Aplicar builds no LoL (todos)</button>
+        <button class="acao" data-acao="aplicarBuildsNoLol" title="grava na loja do jogo um conjunto de itens por campeão, vindo do op.gg. Precisa do League aberto. Leva uns 2 minutos.">Aplicar builds no LoL</button>
       </div>
       <pre class="log" id="log"></pre>
     </details>
@@ -955,9 +937,12 @@ const cartao = (rot,val,pe='') =>
   `<div class="cartao"><div class="rot">${esc(rot)}</div><div class="val">${val}</div>${pe?`<div class="pe">${esc(pe)}</div>`:''}</div>`;
 const carregando = (t='carregando…') => `<div class="vazio carregando">${esc(t)}</div>`;
 
+let abaAtual = 'visao';
 function abrirAba(nome){
+  if(nome !== 'detalhe') abaAtual = nome;
   document.querySelectorAll('main>section').forEach(s => s.classList.toggle('ativo', s.id === nome));
-  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === nome));
+  // No detalhe de uma partida a barra mantém acesa a aba de onde ela veio.
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('ativo', b.dataset.aba === (nome === 'detalhe' ? origemDetalhe : nome)));
   $('main').scrollTop = 0;
 }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => abrirAba(b.dataset.aba));
@@ -1107,6 +1092,7 @@ const nomeDoId = (id) => nomesPorId.get(Number(id)) ?? ('campeão ' + id);
 
 /* =============================================================== partidas */
 
+let origemDetalhe = 'partidas';
 const FILA_NOME = { 420: 'Ranqueada Solo', 440: 'Ranqueada Flex', 450: 'ARAM', 400: 'Normal' };
 
 /** "há 3 horas", "há 2 dias" — nos sites do ramo é assim, não data seca. */
@@ -1186,6 +1172,8 @@ async function carregarPartidas(){
 
 /* ======================================================== detalhe da partida */
 async function abrirPartida(gameId){
+  // Voltar leva pra onde a partida foi aberta: Perfil ou Partidas.
+  origemDetalhe = abaAtual;
   abrirAba('detalhe');
   $('#det').innerHTML = carregando('analisando a partida…');
 
@@ -1466,7 +1454,7 @@ function desenharBuild(){
         <span class="nome">${esc(o.secundaria.nome)}</span>
         <span style="width:8px"></span>${o.fragmentos.map(x=>imgRuna(x,'frag')).join('')}</div>
     </div>${estatB(o)}
-    <button onclick="aplicarRunasBuild(this,${i})" title="grava esta página no client, na página LolCoach">Aplicar</button></div>`).join('');
+    <button onclick="aplicarRunasBuild(this,${i})" title="grava estas runas no client, na página de runas que estiver selecionada">Aplicar</button></div>`).join('');
 
   const feiticos = b.feiticos.map((o,i) => `<div class="opcao">${numOpcao(i)}
     <div class="icones">${o.feiticos.map(imgFeitico).join('')}</div>${estatB(o)}</div>`).join('');
@@ -1484,7 +1472,7 @@ function desenharBuild(){
         <div class="sub">${esc(b.roleNome)} · ${num(r.jogos)} partidas no op.gg/${esc(b.fonte.split('/')[1])}${r.posicao?' · #'+r.posicao+' do elenco':''}</div></div>
       <div class="nums">
         <div><span>Vitória</span><b class="${r.taxa>=52?'v':r.taxa<=48?'d':''}">${r.taxa}%</b></div>
-        <div><span>Escolha</span><b>${r.escolha}%</b></div>
+        <div><span>Pick</span><b>${r.escolha}%</b></div>
         <div><span>Ban</span><b>${r.banimento}%</b></div></div>
     </div>
     ${roles}
@@ -1546,7 +1534,7 @@ async function abrirNota(slug){
   let n;
   try { n = await pegar('/api/patch/' + slug); } catch { n = null; }
   if(!n || n.erro){
-    $('#patchCorpo').innerHTML = `<div class="vazio">não consegui abrir esta atualização${n?.erro?': '+esc(n.erro):''}</div>`;
+    $('#patchCorpo').innerHTML = `<div class="vazio">não consegui abrir este patch${n?.erro?': '+esc(n.erro):''}</div>`;
     return;
   }
 
@@ -1569,7 +1557,7 @@ async function abrirNota(slug){
       ${fichas(n.contra)}</div>`);
   }
   if(!partes.length){
-    partes.push(`<div class="patchTopo"><b>Nada nesta atualização mexe com o seu jogo</b>
+    partes.push(`<div class="patchTopo"><b>Nada neste patch mexe com o seu jogo</b>
       <p>Nem campeão que você joga, nem campeão que costuma te ganhar.</p></div>`);
   }
   $('#patchTopo').innerHTML = partes.join('');
@@ -1756,8 +1744,8 @@ function cartaoDeAmigo(p, { eu = false } = {}){
     ${p.carregando ? '<div class="estadoA carregando">atualizando na Riot…</div>'
       : perfil ? `<div class="estadoA">atualizado ${haQuanto(new Date(perfil.em).toISOString())}${perfil.desatualizado ? ' · a Riot não respondeu agora' : ''}</div>` : ''}
     <div class="acoesA">
-      <button onclick="atualizarAmigo(event,'${esc(chave)}')" ${p.carregando?'disabled':''}>atualizar</button>
-      ${eu ? '' : `<button class="tirar" onclick="removerAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">tirar</button>`}
+      <button onclick="atualizarAmigo(event,'${esc(chave)}')" ${p.carregando?'disabled':''}>Atualizar</button>
+      ${eu ? '' : `<button class="tirar" onclick="removerAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">Tirar</button>`}
     </div>
   </div>`;
 }
@@ -1994,6 +1982,13 @@ document.querySelectorAll('button.acao[data-acao]').forEach(b => {
   };
 });
 
+// O nome interno da fase do client, como ele fala.
+const FASE_PT = {
+  None: 'fora de fila', Lobby: 'no lobby', Matchmaking: 'na fila', ReadyCheck: 'partida encontrada',
+  ChampSelect: 'na seleção', GameStart: 'carregando a partida', InProgress: 'em partida', Reconnect: 'reconectando',
+  WaitingForStats: 'fim de jogo', PreEndOfGame: 'fim de jogo', EndOfGame: 'fim de jogo',
+};
+
 async function tick(){
   try{
     const e = await pegar('/api/estado');
@@ -2006,11 +2001,11 @@ async function tick(){
       contaAtual = String(e.conta).split('#')[0]; desenharContaSel();
       carregarVisao(); carregarPartidas(); carregarPadroes();
     }
-    $('#estFase').textContent = e.fase ?? '';
+    $('#estFase').textContent = e.conectado ? (FASE_PT[e.fase] ?? '') : '';
     // Atualização baixada: aviso discreto na barra lateral. Instala ao fechar.
     const at = e.atualizacao;
     const el = $('#estAtualiza');
-    if (at?.pronta) { el.hidden = false; el.textContent = `v${at.pronta} pronta — fecha e abre o app`; }
+    if (at?.pronta) { el.hidden = false; el.textContent = `v${at.pronta} pronta — instala sozinha fora de partida`; }
     else if (at?.baixando != null) { el.hidden = false; el.textContent = `baixando atualização… ${at.baixando}%`; }
     else el.hidden = true;
     // O daemon guarda em ISO (UTC). Cortar a string mostrava 3h a mais que o

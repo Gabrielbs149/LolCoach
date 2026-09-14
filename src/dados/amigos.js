@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { resolve } from 'node:path';
 import { pastaBase } from '../caminhos.js';
 import { RiotApi } from './riot.js';
 
@@ -44,17 +44,8 @@ const TIER_PT = {
   IRON: 'Ferro', BRONZE: 'Bronze', SILVER: 'Prata', GOLD: 'Ouro', PLATINUM: 'Platina',
   EMERALD: 'Esmeralda', DIAMOND: 'Diamante', MASTER: 'Mestre', GRANDMASTER: 'Grão-Mestre', CHALLENGER: 'Desafiante',
 };
-const ORDEM_TIER = Object.keys(TIER_PT);
 const FILA_PT = { RANKED_SOLO_5x5: 'Solo/Duo', RANKED_FLEX_SR: 'Flex' };
 const ROLE_PT = { TOP: 'top', JUNGLE: 'jungle', MIDDLE: 'mid', BOTTOM: 'adc', UTILITY: 'sup' };
-
-/** Um número só pra ordenar elos: tier × 400 + divisão × 100 + PDL. */
-export function pontosDeElo(e) {
-  if (!e) return 0;
-  const t = ORDEM_TIER.indexOf(e.tier);
-  const div = { IV: 0, III: 1, II: 2, I: 3 }[e.rank] ?? 0;
-  return (t < 0 ? 0 : t) * 400 + div * 100 + (e.pdl ?? 0);
-}
 
 function arrumarElo(e) {
   const jogos = (e.wins ?? 0) + (e.losses ?? 0);

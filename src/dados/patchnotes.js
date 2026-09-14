@@ -1,5 +1,5 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
-import { resolve, dirname } from 'node:path';
+import { resolve } from 'node:path';
 import { pastaBase } from '../caminhos.js';
 
 /**

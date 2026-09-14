@@ -1,7 +1,7 @@
 # LolCoach
 
 Ferramenta de League of Legends que roda do lado do client: aceita a fila,
-bane e declara o campeão, aplica runas e builds do op.gg, e analisa as suas
+bane e trava o campeão, aplica runas e builds do op.gg, e analisa as suas
 partidas depois pra dizer o que você fez de errado — com mapa, e no linguajar
 de quem joga.
 
@@ -15,16 +15,17 @@ de quem joga.
 3. Abra o League. O LolCoach detecta o client sozinho e grava a sua conta.
 
 Atualizações são automáticas: o app checa ao abrir, baixa em segundo plano e
-instala quando você fecha.
+instala sozinho quando você não está em fila, seleção ou partida.
 
 ## O que faz
 
 - **Aceitar fila** sozinho.
-- **Seleção de campeão**: bane e declara pelas suas listas por role (monte na
-  aba Configuração). Travar o pick sozinho vem **desligado** — ligue sabendo
-  que automação do client é zona cinzenta na política da Riot.
-- **Runas e itens do op.gg** aplicados no client quando o campeão trava, e um
-  conjunto de itens na loja pra todos os campeões.
+- **Seleção de campeão**: bane e trava o campeão que você escolher na aba
+  Configuração. Automação do client é zona cinzenta na política da Riot —
+  use sabendo disso.
+- **Runas e itens do op.gg** aplicados no client quando o campeão trava (na
+  página de runas que estiver selecionada), e um conjunto de itens na loja
+  pros campeões que você joga.
 - **Ao vivo**: ficha de quem está contra você montada com as *suas* mortes
   passadas, onde cada inimigo apareceu por último (pelo feed de kills), avisos
   de item e nível.

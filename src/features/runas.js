@@ -41,15 +41,27 @@ export async function aplicarRunas(lcu, build, { paginaAlvo = null } = {}) {
   // pega a primeira editável e a renomeia pra "LolCoach"; daí em diante procura
   // por esse nome e sobrescreve sempre a mesma. As outras ficam intactas, e a
   // que é nossa fica com o nome na cara.
+  //
+  // Padrão (sem paginaAlvo): sobrescreve a página que está SELECIONADA no
+  // client — "a runa principal". Foi o que ele pediu pros amigos: criar página
+  // nova falhava em conta no limite, e a runa ficava a velha sem ninguém ver.
+  const paginas = await lcu.get('/lol-perks/v1/pages').catch(() => []);
+  const editaveis = paginas.filter((p) => p.isDeletable);
+  if (!paginaAlvo && editaveis.length) {
+    const atualId = (await lcu.get('/lol-perks/v1/currentpage').catch(() => null))?.id;
+    paginaAlvo = editaveis.find((p) => p.id === atualId) ? 'atual' : '*';
+  }
+
   if (paginaAlvo) {
-    const paginas = await lcu.get('/lol-perks/v1/pages').catch(() => []);
-    const editaveis = paginas.filter((p) => p.isDeletable);
-    const alvo = paginas.find((p) => p.name === NOME_PAGINA)
-      ?? (paginaAlvo === '*' ? editaveis[0] : paginas.find((p) => p.name === paginaAlvo));
+    const atualId = (await lcu.get('/lol-perks/v1/currentpage').catch(() => null))?.id;
+    const alvo = paginaAlvo === 'atual' ? editaveis.find((p) => p.id === atualId)
+      : paginas.find((p) => p.name === NOME_PAGINA)
+        ?? (paginaAlvo === '*' ? editaveis[0] : paginas.find((p) => p.name === paginaAlvo));
 
     if (!alvo) {
       throw new Error(paginaAlvo === '*'
         ? 'nenhuma página editável na conta pra sobrescrever'
+        : paginaAlvo === 'atual' ? 'a página selecionada no client não pode ser editada'
         : `não achei a página "${paginaAlvo}" pra sobrescrever`);
     }
     if (!alvo.isDeletable) throw new Error(`a página "${alvo.name}" é fixa e não pode ser editada`);

@@ -37,7 +37,7 @@
     "regiao": "br",
     "_aplicarSpells": "true faz ele trocar seus feitiços também. Cuidado: sobrescreve o que você escolheu.",
     "aplicarSpells": false,
-    "_paginaAlvo": "null = cria a página \"LolCoach\" se houver espaço. Conta no limite de páginas: coloque \"*\" (o app renomeia UMA das suas pra LolCoach e usa sempre essa) ou o nome exato de uma página.",
+    "_paginaAlvo": "null = sobrescreve a página de runas que estiver selecionada no client. \"*\" = usa sempre uma página chamada LolCoach (renomeia a primeira editável). Ou o nome exato de uma página.",
     "paginaAlvo": null
   },
   "coleta": {
