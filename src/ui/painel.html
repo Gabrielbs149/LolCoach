@@ -56,6 +56,10 @@ body.recolhida aside{width:56px;flex-basis:56px}
   background:linear-gradient(90deg,var(--ouro-claro),var(--ouro));
   -webkit-background-clip:text;background-clip:text;color:transparent}
 .marca h1 .curto{display:none}
+.marca h1 .versao{display:inline-block;margin-left:7px;font-size:9.5px;font-weight:700;letter-spacing:.3px;
+  color:var(--apagado);background:var(--f2);border:1px solid var(--borda);border-radius:99px;padding:1px 6px;
+  vertical-align:2px;-webkit-text-fill-color:var(--apagado)}
+body.recolhida .marca h1 .versao{display:none}
 .marca .conta{font-size:12.5px;color:var(--apagado);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .contaSel{margin-top:8px;width:100%;background:var(--f2);color:var(--ouro-claro);border:1px solid var(--borda);
   border-radius:var(--r-s);padding:5px 8px;font:inherit;font-size:12px;font-weight:650;cursor:pointer}
@@ -733,7 +737,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
 <aside>
   <div class="marca">
-    <h1><span class="longo">LolCoach</span><span class="curto">LC</span></h1>
+    <h1><span class="longo">LolCoach</span><span class="curto">LC</span><span class="versao" id="versao"></span></h1>
     <div class="conta" id="conta">—</div>
     <select class="contaSel" id="contaSel" hidden title="qual conta as telas mostram"></select>
     <button class="recolher" id="recolher" title="recolher a barra">
@@ -1996,6 +2000,7 @@ async function tick(){
     $('#luz').className = 'luz' + (e.conectado ? ' on' : '');
     $('#estClient').textContent = e.conectado ? 'client conectado' : 'client desconectado';
     $('#conta').textContent = e.conta ?? '—';
+    if (e.versao) $('#versao').textContent = 'v' + e.versao;
     // Primeira vez que o client responde: as telas passam a seguir essa conta.
     if (e.conta && !contaEscolhidaPeloUsuario && contaAtual !== String(e.conta).split('#')[0] && contasConhecidas.some(c => c.nome === String(e.conta).split('#')[0])) {
       contaAtual = String(e.conta).split('#')[0]; desenharContaSel();

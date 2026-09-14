@@ -5,6 +5,10 @@ import { dirname, join } from 'node:path';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
+// A versão do app, lida do package.json uma vez — vai na barra lateral.
+let VERSAO = '?';
+readFile(join(AQUI, '..', '..', 'package.json'), 'utf8').then((t) => { VERSAO = JSON.parse(t).version ?? '?'; }).catch(() => {});
+
 /**
  * Servidor local que serve o painel e a API de leitura do banco.
  * Só escuta em 127.0.0.1 — nada disso deve sair da máquina.
@@ -26,7 +30,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
   };
 
   const rotas = {
-    '/api/estado': () => { const e = estado.instantaneo(); return { ...e, config: semChave(e.config) }; },
+    '/api/estado': () => { const e = estado.instantaneo(); return { ...e, versao: VERSAO, config: semChave(e.config) }; },
 
     '/api/contas': () => db.prepare(`
       SELECT j.nome nome, COUNT(*) jogos, MAX(p.quando) ultima
