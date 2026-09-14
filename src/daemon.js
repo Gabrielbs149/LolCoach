@@ -60,6 +60,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     estado?.set('conectado', false);
     log('client fechou — esperando reabrir...');
   });
+  lcu.on('falha', (erro) => log(`client não respondeu (${erro.message}) — continuo tentando`));
 
   // Registrados sempre, lendo a configuração viva: ligar e desligar pela tela
   // não pode exigir reabrir o programa.

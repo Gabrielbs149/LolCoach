@@ -90,7 +90,29 @@ export class LcuClient extends EventEmitter {
    * Emite 'evento' com { tipo, caminho, dados } para cada mudanca interna do client,
    * e 'conectado' / 'desconectado' na troca de estado.
    */
+  /**
+   * Com `esperar`, NUNCA rejeita: fica tentando até o client responder. A
+   * versão anterior só reconectava depois de uma conexão que caiu — se a
+   * primeira tentativa falhava (lockfile velho, client ainda subindo,
+   * ECONNREFUSED), o app ficava a noite inteira "desconectado" com o League
+   * aberto do lado, sem aceitar fila nem travar campeão.
+   */
   async conectar({ esperar = true } = {}) {
+    let avisou = false;
+    for (;;) {
+      try {
+        return await this.#conectarUmaVez({ esperar });
+      } catch (erro) {
+        if (!esperar) throw erro;
+        if (!avisou) { avisou = true; this.emit('falha', erro); }
+        const espera = this.#esperaReconexao;
+        this.#esperaReconexao = Math.min(espera * 1.5, 30_000);
+        await new Promise((r) => setTimeout(r, espera));
+      }
+    }
+  }
+
+  async #conectarUmaVez({ esperar }) {
     this.#fechandoDeProposito = false;
     this.#cred = esperar ? await esperarClient() : await descobrirCredenciais();
 
