@@ -614,7 +614,7 @@ h2:first-child{margin-top:0}
 .lupa{position:absolute;left:-1px;right:-1px;top:calc(100% + 3px);z-index:5;background:var(--f2);
   border:1px solid var(--borda-forte);border-radius:var(--r-s);max-height:260px;overflow-y:auto;
   box-shadow:0 8px 24px rgba(0,0,0,.45)}
-.lupa div{display:flex;align-items:center;gap:8px;padding:5px 9px;cursor:pointer;font-size:12.5px}
+.lupa div{display:flex;align-items:center;gap:8px;padding:5px 9px;cursor:pointer;font-size:12.5px;white-space:nowrap}
 .lupa div img{width:24px;height:24px;border-radius:var(--r-s);background:var(--f3)}
 .lupa div em{font-style:normal;color:var(--apagado);font-size:10.5px;margin-left:auto}
 .lupa div.on,.lupa div:hover{background:var(--f3);color:var(--ouro-claro)}
@@ -1933,12 +1933,12 @@ function desenharLupa(tipo){
   const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
   const lupa = $(tipo === 'picks' ? '#lupaPicks' : '#lupaBans');
   if(document.activeElement !== input){ lupa.hidden = true; return; }
-  const { vis, prioridade } = resultadosDaLupa(tipo, input.value);
+  const { vis } = resultadosDaLupa(tipo, input.value);
   lupa.hidden = false;
   lupaSel[tipo] = Math.min(lupaSel[tipo], Math.max(0, vis.length - 1));
   lupa.innerHTML = vis.length
     ? vis.map((c,i) => `<div class="${i===lupaSel[tipo]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}',${c.id})">
-        ${icone(c.id)}${esc(c.nome)}${prioridade.has(c.id) ? `<em>${tipo==='bans'?'você enfrenta':'você joga'}</em>` : ''}</div>`).join('')
+        ${icone(c.id)}${esc(c.nome)}</div>`).join('')
     : `<div class="nadaL">${input.value.trim() ? 'nenhum campeão com esse nome' : 'digite o nome'}</div>`;
 }
 
