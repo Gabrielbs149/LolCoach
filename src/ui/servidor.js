@@ -18,8 +18,15 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     ? ` AND EXISTS (SELECT 1 FROM jogadores mc WHERE mc.gameId = p.gameId AND mc.participantId = p.meuId AND mc.nome = '${String(conta).replace(/'/g, "''")}')`
     : '';
 
+  // A chave da Riot nunca sai pro painel: nenhuma tela precisa dela, e o
+  // servidor é local mas a página tem iframe e fetch de sobra pra vazar.
+  const semChave = (cfg) => {
+    if (!cfg?.riot?.apiKey) return cfg;
+    return { ...cfg, riot: { ...cfg.riot, apiKey: '', temChave: true } };
+  };
+
   const rotas = {
-    '/api/estado': () => estado.instantaneo(),
+    '/api/estado': () => { const e = estado.instantaneo(); return { ...e, config: semChave(e.config) }; },
 
     '/api/contas': () => db.prepare(`
       SELECT j.nome nome, COUNT(*) jogos, MAX(p.quando) ultima
@@ -262,7 +269,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
 
       // Rotas que dependem do daemon (arquivo em disco ou client) são async.
       if (url.pathname === '/api/config' && acoes.lerConfig) {
-        return enviar(200, 'application/json', JSON.stringify(await acoes.lerConfig()));
+        return enviar(200, 'application/json', JSON.stringify(semChave(await acoes.lerConfig())));
       }
       if (url.pathname === '/api/vivo' && acoes.vivo) {
         return enviar(200, 'application/json', JSON.stringify(await acoes.vivo()));
