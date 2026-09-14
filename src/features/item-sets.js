@@ -56,13 +56,15 @@ const ehNosso = (s) => String(s?.title ?? '').startsWith(PREFIXO) || String(s?.u
  * Grava os conjuntos no client, preservando os que não são nossos.
  * `conjuntos` substitui os nossos de mesmo uid; os outros nossos ficam.
  */
-export async function gravarConjuntos(lcu, conjuntos) {
+export async function gravarConjuntos(lcu, conjuntos, { limparNossos = false } = {}) {
   const eu = await lcu.get('/lol-summoner/v1/current-summoner');
   const caminho = `/lol-item-sets/v1/item-sets/${eu.summonerId}/sets`;
   const atual = await lcu.get(caminho).catch(() => null) ?? { itemSets: [] };
 
   const novosPorUid = new Map(conjuntos.map((c) => [c.uid, c]));
-  const mantidos = (atual.itemSets ?? []).filter((s) => !ehNosso(s) || !novosPorUid.has(s.uid));
+  // `limparNossos`: começo de uma carga completa — os nossos antigos saem
+  // todos (o documento tem limite de tamanho no client); os dele ficam sempre.
+  const mantidos = (atual.itemSets ?? []).filter((s) => !ehNosso(s) || (!limparNossos && !novosPorUid.has(s.uid)));
   const itemSets = [...mantidos, ...conjuntos];
 
   await lcu.put(caminho, {
@@ -94,11 +96,18 @@ export async function aplicarConjunto(lcu, nome, championId, role = null, opcoes
  *
  * `rolesDele`: Map(championId -> ['jungle','mid']) das roles que ele joga.
  */
-export async function aplicarConjuntosDeTodos(lcu, { rolesDele = new Map(), pausaMs = 450, aoProgresso, opcoes = {}, podeContinuar = () => true } = {}) {
-  const elenco = await elencoCompleto();
+export async function aplicarConjuntosDeTodos(lcu, { rolesDele = new Map(), apenas = null, pausaMs = 450, aoProgresso, opcoes = {}, podeContinuar = () => true } = {}) {
+  // `apenas`: Set de championId. O client recusa o documento quando passa de
+  // umas centenas de conjuntos (HTTP 413) — então só os campeões que importam.
+  const elenco = (await elencoCompleto()).filter((c) => !apenas || apenas.has(c.id));
   const total = elenco.length;
   const conjuntos = [];
-  let feitos = 0, falhas = 0;
+  let feitos = 0, falhas = 0, primeiraGravacao = true;
+  const gravar = async (lote) => {
+    const r = await gravarConjuntos(lcu, lote, { limparNossos: primeiraGravacao });
+    primeiraGravacao = false;
+    return r;
+  };
 
   const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -123,9 +132,9 @@ export async function aplicarConjuntosDeTodos(lcu, { rolesDele = new Map(), paus
     aoProgresso?.({ feitos, total, campeao: c.nome, conjuntos: conjuntos.length, falhas });
 
     // Lote a cada 25 campeões: se cair no meio, o que já foi fica no client.
-    if (feitos % 25 === 0) await gravarConjuntos(lcu, conjuntos.splice(0)).catch(() => {});
+    if (feitos % 25 === 0) await gravar(conjuntos.splice(0)).catch(() => {});
   }
 
-  const r = conjuntos.length ? await gravarConjuntos(lcu, conjuntos) : { gravados: 0 };
+  const r = conjuntos.length ? await gravar(conjuntos) : { gravados: 0 };
   return { campeoes: feitos, falhas, ...r };
 }

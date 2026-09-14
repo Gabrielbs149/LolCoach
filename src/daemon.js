@@ -586,12 +586,23 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       rolesDele.set(r.id, [...(rolesDele.get(r.id) ?? []), role]);
     }
 
-    log(`aplicando builds no LoL: ${rolesDele.size} campeões seus com todas as roles, o resto na role principal…`);
+    // Só os campeões que ele joga (3+ partidas) e os das listas de pick: o
+    // elenco inteiro dava ~370 conjuntos e o client recusava com HTTP 413.
+    // Quem mais precisar ganha o conjunto na hora em que travar o campeão.
+    const { tabelaDeCampeoes } = await import('./features/champ-select.js');
+    const tabela = await tabelaDeCampeoes(lcu).catch(() => null);
+    const apenas = new Set(rolesDele.keys());
+    for (const nome of Object.values(config.champSelect?.picks ?? {}).flat()) {
+      const id = tabela?.porNome.get(String(nome).toLowerCase());
+      if (id) apenas.add(id);
+    }
+
+    log(`aplicando builds no LoL: ${apenas.size} campeões (os que você joga + os das listas)…`);
     const r = await aplicarConjuntosDeTodos(lcu, {
-      rolesDele,
+      rolesDele, apenas,
       opcoes: { regiao: config.runas?.regiao ?? 'br' },
       podeContinuar: () => estado?.instantaneo?.().fase !== 'InProgress',
-      aoProgresso: (p) => { if (p.feitos % 10 === 0 || p.feitos === p.total) log(`builds no LoL: ${p.feitos}/${p.total} campeões (${p.conjuntos} conjuntos prontos, ${p.falhas} falhas)`); },
+      aoProgresso: (p) => { if (p.feitos % 25 === 0) log(`builds no LoL: ${p.feitos}/${p.total} campeões…`); },
     });
     log(`builds no LoL: ${r.campeoes} campeões, ${r.total ?? '?'} conjuntos no client (${r.preservados ?? 0} seus preservados), ${r.falhas} falhas`);
     await writeFile(marcaBuilds(), JSON.stringify({ em: Date.now(), ...r }), 'utf8').catch(() => {});

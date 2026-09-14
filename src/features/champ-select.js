@@ -63,11 +63,11 @@ function primeiroLivre(nomes, tabela, fora, permitidos) {
 export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
   let tabela = null;
   let carregandoTabela = null;
-  let fase = { acaoFeita: null, runasDe: null, anunciou: false };
+  let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false };
   let sonda = null;
   let avaliando = false;
 
-  const zerarFase = () => { fase = { acaoFeita: null, runasDe: null, anunciou: false }; };
+  const zerarFase = () => { fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false }; };
   const pararSonda = () => { if (sonda) { clearInterval(sonda); sonda = null; } };
 
   /** Uma carga só, mesmo com vários eventos chegando juntos. */
@@ -87,6 +87,7 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
     const cfg = config.champSelect ?? {};
     await pegarTabela();
 
+    if ((sessao.localPlayerCellId ?? -1) < 0) return;   // sessão encerrando
     const meuCell = sessao.myTeam?.find((c) => c.cellId === sessao.localPlayerCellId);
     if (!meuCell) {
       if (!fase.anunciou) {
@@ -103,7 +104,7 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
       fase.anunciou = true;
       const picks = cfg.picks?.[role] ?? [];
       const bans = cfg.bans?.[role] ?? [];
-      log(`seleção aberta como ${role} — banir: ${bans.join(', ') || '(lista vazia)'} | pegar: ${picks.join(', ') || '(lista vazia)'}`);
+      log(`seleção aberta como ${role} (célula ${meuCell.cellId}, fase ${sessao.timer?.phase ?? '?'}) — banir: ${bans.join(', ') || '(lista vazia)'} | pegar: ${picks.join(', ') || '(lista vazia)'}`);
       if (cfg.ativo === false) log('agir na seleção está DESLIGADO na configuração');
     }
 
@@ -119,10 +120,34 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
         log(`${minha.type === 'ban' ? 'banir' : 'escolher'} está desligado na configuração — deixando com você`);
       }
 
-      if (minha && !desligada && fase.acaoFeita !== minha.id) {
+      // Na fase PLANNING (os primeiros segundos, "declare sua intenção") a ação
+      // de pick aparece em andamento mas não dá pra travar. Declara e espera.
+      const planejando = minha?.type === 'pick' && sessao.timer?.phase === 'PLANNING';
+
+      if (minha && !desligada && planejando && fase.declarou !== minha.id) {
+        fase.declarou = minha.id;
+        const escolha = primeiroLivre(cfg.picks?.[role], tabela, indisponiveis(sessao));
+        if (escolha) {
+          lcu.patch(`/lol-champ-select/v1/session/actions/${minha.id}`, { championId: escolha.id })
+            .then(() => log(`declarei ${escolha.nome} (fase de planejamento — travo quando chegar a minha vez)`))
+            .catch((erro) => log(`não consegui declarar ${escolha.nome}: ${erro.message}`));
+        }
+      }
+
+      if (minha && !desligada && !planejando && fase.acaoFeita !== minha.id) {
         const fora = indisponiveis(sessao);
         const lista = minha.type === 'ban' ? cfg.bans?.[role] : cfg.picks?.[role];
-        const escolha = primeiroLivre(lista, tabela, fora);
+        // O client diz o que esta conta pode escolher/banir: campeão que a conta
+        // não tem "trava" com HTTP 200 e não acontece nada.
+        const rota = minha.type === 'ban' ? 'bannable-champion-ids' : 'pickable-champion-ids';
+        const ids = await lcu.get(`/lol-champ-select/v1/${rota}`).catch(() => null);
+        const permitidos = Array.isArray(ids) && ids.length ? new Set(ids) : null;
+        const escolha = primeiroLivre(lista, tabela, fora, permitidos);
+        if (!escolha && permitidos && primeiroLivre(lista, tabela, fora)) {
+          fase.acaoFeita = minha.id;
+          log(`${(lista ?? []).join(', ')}: o client diz que esta conta não pode ${minha.type === 'ban' ? 'banir' : 'escolher'} (não tem o campeão?) — não agi`);
+          return;
+        }
 
         if (!escolha) {
           // Nenhuma preferência disponível: não inventa, deixa pra você.
@@ -138,21 +163,39 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
           log(`minha vez de ${minha.type === 'ban' ? 'banir' : 'escolher'} — ${escolha.nome} em ${espera}ms`);
 
           setTimeout(async () => {
+            const verbo = minha.type === 'ban' ? 'banir' : 'escolher';
+            const caminho = `/lol-champ-select/v1/session/actions/${minha.id}`;
+
+            /** Lê a sessão de novo e diz se a ação realmente fechou. */
+            const conferir = async () => {
+              const s2 = await lcu.get('/lol-champ-select/v1/session').catch(() => null);
+              const a = (s2?.actions ?? []).flat().find((x) => x.id === minha.id);
+              return a ? { championId: a.championId, completed: a.completed, emAndamento: a.isInProgress } : null;
+            };
+            const esperar = (ms) => new Promise((r) => setTimeout(r, ms));
+
             try {
-              // Dois passos, como o client faz: o PATCH só DECLARA (deixa o
-              // campeão em cima do retrato); quem trava de verdade é o
-              // POST .../complete. Mandar `completed: true` no PATCH voltava
-              // 200 e o registro dizia "travou", mas o campeão ficava só
-              // declarado — foi o que ele viu na partida personalizada.
-              await lcu.patch(`/lol-champ-select/v1/session/actions/${minha.id}`, { championId: escolha.id });
-              if (travar) await lcu.post(`/lol-champ-select/v1/session/actions/${minha.id}/complete`);
-              log(`${minha.type === 'ban' ? 'baniu' : (travar ? 'travou' : 'declarou')} ${escolha.nome}`);
-              if (minha.type === 'pick' && !travar) {
-                log('travar o pick é com você (travarPick está desligado na configuração)');
+              // Jeito 1, o do próprio client: PATCH declara, POST /complete trava.
+              await lcu.patch(caminho, { championId: escolha.id });
+              if (travar) await lcu.post(`${caminho}/complete`);
+              await esperar(700);
+              let v = await conferir();
+              log(`${verbo} ${escolha.nome}: client respondeu ok — ação ${minha.id} agora: campeão ${v?.championId ?? '?'}, fechada ${v?.completed ?? '?'}`);
+
+              // Não fechou? Jeito 2: PATCH com completed:true (versões antigas do client).
+              if (travar && v && !v.completed) {
+                await lcu.patch(caminho, { championId: escolha.id, completed: true });
+                await esperar(700);
+                v = await conferir();
+                log(`segunda tentativa (PATCH completed): campeão ${v?.championId ?? '?'}, fechada ${v?.completed ?? '?'}`);
               }
+
+              if (!travar) log(`declarou ${escolha.nome} — travar é com você`);
+              else if (v?.completed) log(`${minha.type === 'ban' ? 'baniu' : 'travou'} ${escolha.nome}`);
+              else if (v) { fase.acaoFeita = null; log(`não consegui ${verbo} ${escolha.nome} — o client não fechou a ação; tento de novo no próximo evento`); }
             } catch (erro) {
               fase.acaoFeita = null;   // deixa tentar de novo no próximo evento
-              log(`falhou ao ${minha.type === 'ban' ? 'banir' : 'escolher'} ${escolha.nome}: ${erro.message}`);
+              log(`falhou ao ${verbo} ${escolha.nome}: ${erro.message}`);
             }
           }, espera);
         }
