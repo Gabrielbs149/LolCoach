@@ -197,8 +197,7 @@ h2:first-child{margin-top:0}
 /* ------------------------------------------------------------- elo */
 .elo{display:flex;align-items:center;gap:11px;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r-m);padding:11px 13px;margin-bottom:var(--e1)}
-.elo .emblema{width:40px;height:40px;flex:0 0 40px;border-radius:50%;display:grid;place-items:center;
-  font-size:14px;font-weight:800;color:#0b1119;letter-spacing:-.4px}
+.elo .emblema{width:56px;height:56px;flex:0 0 56px;object-fit:contain;display:block;margin:-8px -4px -8px -6px}
 .elo .txt{flex:1;min-width:0}
 .elo .fila{font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado)}
 .elo .nome{font-size:15px;font-weight:700;margin-top:1px;letter-spacing:-.2px}
@@ -668,8 +667,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .amCartao .tagEu{position:absolute;top:8px;right:9px;font-size:9px;text-transform:uppercase;letter-spacing:.8px;
   color:var(--ouro);font-weight:800}
 .amCartao .eloL{display:flex;align-items:center;gap:8px;margin-top:10px}
-.amCartao .eloL .emblema{width:28px;height:28px;flex:0 0 28px;border-radius:50%;display:grid;place-items:center;
-  font-size:10.5px;font-weight:800;color:#0b1119}
+.amCartao .eloL .emblema{width:34px;height:34px;flex:0 0 34px;object-fit:contain;display:block;margin:-3px 0}
 .amCartao .eloL .n{font-size:12.5px;font-weight:700}
 .amCartao .eloL .p{font-size:11px;color:var(--ouro);font-weight:650}
 .amCartao .eloL .sem{font-size:11.5px;color:var(--apagado)}
@@ -700,6 +698,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .amTabela td.melhor{color:var(--ouro-claro);font-weight:700;background:#1a1911}
 .amTabela td.pior{color:var(--apagado)}
 .amTabela td img{width:22px;height:22px;border-radius:3px;vertical-align:middle;margin-right:6px;background:var(--f3)}
+.amTabela td img.emblemaMini{width:26px;height:26px;background:none;border-radius:0;margin:-4px 4px -4px 0}
 .amTabela .cab{display:flex;align-items:center;justify-content:flex-end;gap:7px}
 .amTabela .cab img{width:22px;height:22px;border-radius:50%;background:var(--f3)}
 .amRolagem{overflow-x:auto}
@@ -998,15 +997,9 @@ function barras(linhas, {verde=false, caixa=false, estreito=false} = {}){
 /* ============================================================ visão geral */
 // Cor do emblema de elo. As faixas do jogo têm cor própria e o jogador
 // reconhece antes de ler o nome — usar dourado pra tudo perderia essa leitura.
-const COR_TIER = {
-  IRON:'#6b625c', BRONZE:'#a06840', SILVER:'#9aa8b4', GOLD:'#e0b24a',
-  PLATINUM:'#4fbfa8', EMERALD:'#2fa96b', DIAMOND:'#6f9df0',
-  MASTER:'#a970d8', GRANDMASTER:'#d9584f', CHALLENGER:'#57c9e8',
-};
-const SIGLA_TIER = {
-  IRON:'FE', BRONZE:'BR', SILVER:'PR', GOLD:'OU', PLATINUM:'PL', EMERALD:'ES',
-  DIAMOND:'DI', MASTER:'ME', GRANDMASTER:'GM', CHALLENGER:'DE',
-};
+/** O emblema oficial do elo, recortado do client (src/ui/emblemas). */
+const emblema = (tier, cls = 'emblema') =>
+  `<img class="${cls}" src="/emblema/${String(tier ?? '').toLowerCase()}.png" alt="${esc(tier ?? '')}" title="${esc(tier ?? '')}">`;
 
 let campeoesPorNome = new Map();
 const idDoCampeao = (nome) => campeoesPorNome.get(String(nome).toLowerCase().replace(/[^a-z]/g,'')) ?? 0;
@@ -1035,7 +1028,7 @@ async function carregarVisao(){
   const elos = perfil?.elos ?? [];
   $('#elos').innerHTML = elos.length ? elos.map(e => `
     <div class="elo">
-      <span class="emblema" style="background:${COR_TIER[e.tier] ?? '#8a713f'}">${SIGLA_TIER[e.tier] ?? '?'}</span>
+      ${emblema(e.tier)}
       <div class="txt">
         <div class="fila">${esc(e.fila)}</div>
         <div class="nome">${esc(e.nome)}</div>
@@ -1761,7 +1754,7 @@ function cartaoDeAmigo(p, { eu = false } = {}){
         <span>#${esc(perfil?.conta?.tag ?? p.tag)}${perfil?.nivel ? ' · nível ' + num(perfil.nivel) : ''}</span></div>
     </div>
     <div class="eloL">${solo ? `
-      <span class="emblema" style="background:${COR_TIER[solo.tier] ?? '#8a713f'}">${SIGLA_TIER[solo.tier] ?? '?'}</span>
+      ${emblema(solo.tier)}
       <div><div class="n">${esc(solo.nome)}</div><div class="p">${num(solo.pdl)} PDL · ${solo.vitorias}V ${solo.derrotas}D</div></div>`
       : `<span class="sem">${perfil ? 'sem solo ranqueada' : (p.erro ? esc(p.erro) : 'ainda sem dados')}</span>`}</div>
     ${r ? `<div class="num3">
@@ -1813,7 +1806,7 @@ function desenharAmigos(){
   const rec = (p, f) => p.perfil.recente ? f(p.perfil.recente) : null;
   const pctV = (f) => (p) => rec(p, r => ({ num: Math.round(f(r)*100), html: Math.round(f(r)*100) + '%' }));
   const dec = (f, casas = 1) => (p) => rec(p, r => ({ num: +f(r).toFixed(casas), html: f(r).toFixed(casas) }));
-  const eloLinha = (pega) => (p) => { const e = pega(p.perfil); return e ? { num: pontosElo(e), html: `${esc(e.nome)} <span style="color:var(--apagado)">${num(e.pdl)} PDL</span>` } : { num: 0, html: '<span style="color:var(--apagado)">sem elo</span>' }; };
+  const eloLinha = (pega) => (p) => { const e = pega(p.perfil); return e ? { num: pontosElo(e), html: `${emblema(e.tier, 'emblemaMini')}${esc(e.nome)} <span style="color:var(--apagado)">${num(e.pdl)} PDL</span>` } : { num: 0, html: '<span style="color:var(--apagado)">sem elo</span>' }; };
 
   const linhas = [
     ['Solo/Duo', eloLinha(eloSolo)],
@@ -1847,7 +1840,7 @@ function detalheDeAmigo(p){
     <div class="colunas">
       <div>
         ${elos.length ? elos.map(e => `<div class="elo">
-          <span class="emblema" style="background:${COR_TIER[e.tier] ?? '#8a713f'}">${SIGLA_TIER[e.tier] ?? '?'}</span>
+          ${emblema(e.tier)}
           <div class="txt"><div class="fila">${esc(e.fila)}</div><div class="nome">${esc(e.nome)}</div><div class="pdl">${num(e.pdl)} PDL</div></div>
           <div class="placar"><b class="${e.taxa>=0.52?'v':e.taxa<=0.48?'d':''}">${Math.round(e.taxa*100)}%</b>${e.vitorias}V ${e.derrotas}D</div>
         </div>`).join('') : '<div class="semElo">sem ranqueada nesta temporada</div>'}

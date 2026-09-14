@@ -300,6 +300,15 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         return enviar(200, 'application/json', JSON.stringify(rotas[url.pathname](url.searchParams)));
       }
 
+      // Emblemas de elo recortados do client (scripts/emblemas.cjs), no pacote.
+      const em = url.pathname.match(/^\/emblema\/([a-z]+)\.png$/);
+      if (em) {
+        try {
+          const png = await readFile(join(AQUI, 'emblemas', `${em[1]}.png`));
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' });
+          return res.end(png);
+        } catch { return enviar(404, 'text/plain', 'sem emblema'); }
+      }
       if (url.pathname === '/vivo') {
         return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'vivo.html'), 'utf8'));
       }
