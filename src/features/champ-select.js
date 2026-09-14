@@ -1,5 +1,8 @@
 import { aplicarBuildDoOpgg } from './runas.js';
 import { aplicarConjunto } from './item-sets.js';
+import { writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { pastaBase } from '../caminhos.js';
 
 /** Mapa nome -> championId, direto dos dados do próprio client. */
 export async function tabelaDeCampeoes(lcu) {
@@ -63,11 +66,11 @@ function primeiroLivre(nomes, tabela, fora, permitidos) {
 export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
   let tabela = null;
   let carregandoTabela = null;
-  let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false };
+  let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false };
   let sonda = null;
   let avaliando = false;
 
-  const zerarFase = () => { fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false }; };
+  const zerarFase = () => { fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false }; };
   const pararSonda = () => { if (sonda) { clearInterval(sonda); sonda = null; } };
 
   /** Uma carga só, mesmo com vários eventos chegando juntos. */
@@ -180,6 +183,30 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
                 await esperar(700);
                 v = await conferir();
                 log(`segunda tentativa (PATCH completed): campeão ${v?.championId ?? '?'}, fechada ${v?.completed ?? '?'}`);
+              }
+
+              // Ainda não? Jeito 3: a ação inteira de volta, como o client manda.
+              if (travar && v && !v.completed) {
+                await lcu.patch(caminho, { ...minha, championId: escolha.id, completed: true });
+                await esperar(700);
+                v = await conferir();
+                log(`terceira tentativa (ação inteira): campeão ${v?.championId ?? '?'}, fechada ${v?.completed ?? '?'}`);
+              }
+
+              // Nada fechou: guarda o que o client estava dizendo, pra dar pra
+              // ler depois com calma em vez de adivinhar.
+              if (travar && v && !v.completed && !fase.diagnostico) {
+                fase.diagnostico = true;
+                const rota = minha.type === 'ban' ? 'bannable-champion-ids' : 'pickable-champion-ids';
+                const [s2, ids] = await Promise.all([
+                  lcu.get('/lol-champ-select/v1/session').catch(() => null),
+                  lcu.get(`/lol-champ-select/v1/${rota}`).catch(() => null),
+                ]);
+                const pode = Array.isArray(ids) ? (ids.includes(escolha.id) ? 'sim' : `NÃO (${ids.length} na lista)`) : 'não sei';
+                log(`diagnóstico: ${escolha.nome} pode ser ${minha.type === 'ban' ? 'banido' : 'escolhido'} nesta conta? ${pode}; fase ${s2?.timer?.phase}; ação ${JSON.stringify(minha)}`);
+                const arq = resolve(pastaBase(), 'dados', `selecao-${Date.now()}.json`);
+                writeFile(arq, JSON.stringify({ minha, escolha, pickable: ids, sessao: s2 }, null, 2), 'utf8')
+                  .then(() => log(`sessão gravada em ${arq}`)).catch(() => {});
               }
 
               if (!travar) log(`declarou ${escolha.nome} — travar é com você`);
