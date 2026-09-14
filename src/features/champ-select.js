@@ -112,7 +112,14 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
       const minha = (sessao.actions ?? []).flat().find(
         (a) => a.actorCellId === sessao.localPlayerCellId && !a.completed && a.isInProgress);
 
-      if (minha && fase.acaoFeita !== minha.id) {
+      // A tela tem um interruptor pra escolher e outro pra banir.
+      const desligada = minha && (minha.type === 'ban' ? cfg.banir === false : cfg.escolher === false);
+      if (minha && desligada && fase.acaoFeita !== minha.id) {
+        fase.acaoFeita = minha.id;
+        log(`${minha.type === 'ban' ? 'banir' : 'escolher'} está desligado na configuração — deixando com você`);
+      }
+
+      if (minha && !desligada && fase.acaoFeita !== minha.id) {
         const fora = indisponiveis(sessao);
         const lista = minha.type === 'ban' ? cfg.bans?.[role] : cfg.picks?.[role];
         const escolha = primeiroLivre(lista, tabela, fora);

@@ -65,7 +65,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   // não pode exigir reabrir o programa.
   autoAceitar(lcu, {
     ativo: () => config.autoAceitar.ativo !== false,
-    atrasoMs: () => config.autoAceitar.atrasoMs ?? 1500,
+    atrasoMs: () => config.autoAceitar.atrasoMs ?? 0,
     aoAceitar: (erro) => log(erro ? `falha ao aceitar: ${erro.message}` : 'partida aceita'),
     log,
   });

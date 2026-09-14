@@ -2,17 +2,17 @@
   "_leia": "Edite este arquivo pra mudar o comportamento. Nomes de campeão em português ou inglês, como aparecem no client.",
   "autoAceitar": {
     "ativo": true,
-    "atrasoMs": 1500
+    "atrasoMs": 0
   },
   "champSelect": {
     "ativo": true,
-    "_travarPick": "false = o app só DECLARA o campeão e você trava. true = trava sozinho. Automação do client é zona cinzenta na política da Riot — ligue sabendo o risco.",
-    "travarPick": false,
+    "_travarPick": "true = trava o campeão sozinho (é o que a tela faz). Automação do client é zona cinzenta na política da Riot — use sabendo o risco.",
+    "travarPick": true,
     "travarBan": true,
-    "atrasoPickMs": 1500,
-    "atrasoBanMs": 1500,
+    "atrasoPickMs": 400,
+    "atrasoBanMs": 400,
     "rolePadrao": "jungle",
-    "_picks": "Ordem de preferência por role. Monte na tela de Configuração do app.",
+    "_picks": "Um campeão por role. A tela grava o mesmo em todas.",
     "picks": {
       "jungle": [],
       "bottom": [],
@@ -20,14 +20,15 @@
       "middle": [],
       "utility": []
     },
-    "_bans": "Idem. A tela sugere quem mais te ganha, a partir das suas partidas.",
     "bans": {
       "jungle": [],
       "bottom": [],
       "top": [],
       "middle": [],
       "utility": []
-    }
+    },
+    "escolher": true,
+    "banir": true
   },
   "runas": {
     "ativo": true,

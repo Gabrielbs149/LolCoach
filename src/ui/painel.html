@@ -576,7 +576,7 @@ h2:first-child{margin-top:0}
    de ajustes que ele já usou. A versão anterior era um cartão por opção com
    o interruptor no meio do texto e a grade dos 173 campeões no fim da página. */
 .painelCfg{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m)}
-.linhaCfg{display:flex;align-items:center;gap:14px;padding:11px 14px;border-bottom:1px solid var(--borda)}
+.linhaCfg{display:flex;align-items:center;gap:14px;padding:9px 14px;border-bottom:1px solid var(--borda);min-height:52px}
 .linhaCfg:last-child{border-bottom:0}
 .linhaCfg .txt{flex:1;min-width:0}
 .linhaCfg b{display:block;font-weight:650;font-size:13px}
@@ -602,31 +602,16 @@ h2:first-child{margin-top:0}
 .abasRole button.on{border-color:var(--ouro);color:var(--ouro-claro);background:var(--f3)}
 .abasRole button .n{color:var(--apagado);font-weight:600;font-size:10.5px;margin-left:6px;font-variant-numeric:tabular-nums}
 
-.listas{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);align-items:start}
-@media (max-width:900px){.listas{grid-template-columns:1fr}}
-.lista{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:11px 13px}
-.lista .cab{display:flex;align-items:baseline;gap:8px;margin-bottom:var(--e2)}
-.lista .cab b{font-size:13px;font-weight:650}
-.lista .cab span{color:var(--apagado);font-size:11px}
-.chips{display:flex;flex-direction:column;gap:3px}
-.chip{display:flex;align-items:center;gap:8px;background:var(--f2);border:1px solid var(--borda);
-  border-radius:var(--r-s);padding:3px 5px 3px 4px}
-.chip img{width:26px;height:26px;border-radius:var(--r-s);flex:0 0 26px;background:var(--f3)}
-.chip .ord{color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums;width:20px;text-align:right}
-.chip .nome{flex:1;font-size:12.5px;font-weight:600}
-.chip button{background:none;border:0;color:var(--apagado);cursor:pointer;font-size:12px;
-  padding:3px 6px;border-radius:var(--r-s);line-height:1;font-family:inherit;opacity:.6}
-.chip:hover button{opacity:1}
-.chip button:hover{color:var(--texto);background:var(--f3)}
-.chip button.tirar:hover{color:var(--der)}
-.nada{color:var(--apagado);font-size:11.5px;padding:6px 2px 2px}
-
-/* Campo de adicionar com a lista de resultados por cima do que vem abaixo. */
-.addCamp{position:relative;margin-top:var(--e2)}
-.addCamp input{width:100%;background:var(--f0);border:1px dashed var(--borda-forte);color:var(--texto);
-  padding:7px 10px;border-radius:var(--r-s);font-size:12.5px;font-family:inherit}
-.addCamp input:focus{outline:none;border-style:solid;border-color:var(--ouro)}
-.lupa{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:5;background:var(--f2);
+/* Caixa de campeão: ícone + nome; clicou, vira busca com a lista por cima. */
+.caixaCamp{position:relative;display:flex;align-items:center;gap:8px;width:220px;background:var(--f0);
+  border:1px solid var(--borda-forte);border-radius:var(--r-s);padding:4px 8px 4px 4px}
+.caixaCamp:focus-within{border-color:var(--ouro)}
+.caixaCamp img{width:26px;height:26px;border-radius:var(--r-s);background:var(--f3);flex:0 0 26px}
+.caixaCamp img:not([src]),.caixaCamp img[src=""]{opacity:.25}
+.caixaCamp input{flex:1;min-width:0;background:none;border:0;color:var(--texto);font:inherit;font-size:12.5px;font-weight:600;padding:0}
+.caixaCamp input:focus{outline:none}
+.caixaCamp input::placeholder{color:var(--apagado);font-weight:400}
+.lupa{position:absolute;left:-1px;right:-1px;top:calc(100% + 3px);z-index:5;background:var(--f2);
   border:1px solid var(--borda-forte);border-radius:var(--r-s);max-height:260px;overflow-y:auto;
   box-shadow:0 8px 24px rgba(0,0,0,.45)}
 .lupa div{display:flex;align-items:center;gap:8px;padding:5px 9px;cursor:pointer;font-size:12.5px}
@@ -805,20 +790,19 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
   <section id="estat">
     <div class="titulo">Estatísticas</div>
-    <div id="eContas"></div>
     <div class="cartoes" id="eGeral"></div>
-    <h2>Você agora contra você de sempre</h2><div id="eForma"></div>
+    <h2>Últimas 20 contra o resto</h2><div id="eForma"></div>
     <div class="colunas2">
       <div><h2>Onde você joga</h2><div id="eRoles"></div>
-           <h2>Que tipo de campeão você joga</h2><div id="eClasses"></div></div>
-      <div><h2>Seu perfil em sete medidas</h2><div id="eRadar"></div></div>
+           <h2>Tipo de campeão</h2><div id="eClasses"></div></div>
+      <div><h2>Perfil</h2><div id="eRadar"></div></div>
     </div>
     <h2>Por dia da semana</h2><div id="eDias"></div>
     <h2>Por horário</h2><div id="eHoras"></div>
     <h2>Campeão por campeão</h2><div id="eCampeoes"></div>
     <div id="treino"></div>
     <div class="colunas2">
-      <div><h2>O que mais se repete nas suas mortes</h2><div id="tipos"></div></div>
+      <div><h2>Suas mortes</h2><div id="tipos"></div></div>
       <div><h2>Onde você morre</h2><div id="zonas"></div>
            <h2>Quando você morre</h2><div id="faixas"></div></div>
     </div>
@@ -837,8 +821,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div id="amDetalhe"></div>
     <h2>Comparativo — últimas 20 solo de cada um</h2>
     <div class="amRolagem" id="amCompara"></div>
-    <p class="dica">Tudo aqui vem da API da Riot, então vale pra qualquer conta — o amigo não precisa ter o LolCoach.
-    Cada perfil custa ~24 chamadas e a chave dá 100 a cada 2 minutos: com muita gente a atualização leva alguns minutos.</p>
   </section>
 
   <section id="builds">
@@ -880,43 +862,26 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="config">
     <div class="titulo">Configuração <span id="salvo" class="salvo"></span></div>
 
-    <h2>Automação no client</h2>
     <div class="painelCfg">
       <div class="linhaCfg">
-        <div class="txt"><b>Aceitar a fila sozinho</b><i>Você não precisa estar olhando pra tela.</i></div>
-        <div class="opcoes" id="cAtraso"></div>
+        <div class="txt"><b>Aceitar a fila</b></div>
         <label class="chave"><input type="checkbox" id="cAceitar"><span class="pino"></span></label>
       </div>
       <div class="linhaCfg">
-        <div class="txt"><b>Agir na seleção de campeão</b><i>Bane e escolhe pelas listas abaixo, na ordem, o primeiro que estiver livre.</i></div>
+        <div class="txt"><b>Travar campeão</b></div>
+        <div class="caixaCamp" id="cxPicks">
+          <img id="imgPicks" alt=""><input id="addPicks" placeholder="campeão" autocomplete="off" spellcheck="false">
+          <div class="lupa" id="lupaPicks" hidden></div>
+        </div>
         <label class="chave"><input type="checkbox" id="cChamp"><span class="pino"></span></label>
       </div>
       <div class="linhaCfg">
-        <div class="txt"><b>Travar o pick sozinho</b><i>Desligado, ele só declara e quem trava é você. Travar em ranqueada não tem volta.</i></div>
-        <label class="chave"><input type="checkbox" id="cTravar"><span class="pino"></span></label>
-      </div>
-    </div>
-
-    <h2>Picks e bans por role</h2>
-    <div class="abasRole" id="cRoles"></div>
-    <div class="listas">
-      <div class="lista" id="pnPicks">
-        <div class="cab"><b>Vou pegar</b><span>na ordem</span></div>
-        <div class="chips" id="lstPicks"></div>
-        <div class="addCamp">
-          <input id="addPicks" placeholder="+ adicionar campeão" autocomplete="off" spellcheck="false">
-          <div class="lupa" id="lupaPicks" hidden></div>
-        </div>
-        <div class="sugere" id="sugPicks"></div>
-      </div>
-      <div class="lista" id="pnBans">
-        <div class="cab"><b>Vou banir</b><span>na ordem</span></div>
-        <div class="chips" id="lstBans"></div>
-        <div class="addCamp">
-          <input id="addBans" placeholder="+ adicionar campeão" autocomplete="off" spellcheck="false">
+        <div class="txt"><b>Banir</b></div>
+        <div class="caixaCamp" id="cxBans">
+          <img id="imgBans" alt=""><input id="addBans" placeholder="campeão" autocomplete="off" spellcheck="false">
           <div class="lupa" id="lupaBans" hidden></div>
         </div>
-        <div class="sugere" id="sugBans"></div>
+        <label class="chave"><input type="checkbox" id="cBanir"><span class="pino"></span></label>
       </div>
     </div>
 
@@ -929,8 +894,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
         <button class="acao" data-acao="reprocessar">Reprocessar detectores</button>
         <button class="acao" data-acao="aplicarBuildsNoLol" title="grava na loja do jogo um conjunto de itens por campeão, vindo do op.gg. Precisa do League aberto. Leva uns 2 minutos.">Aplicar builds no LoL (todos)</button>
       </div>
-      <p class="dica">Puxar histórico leva minutos — a chave da Riot limita a 100 chamadas
-      a cada 2 minutos. O andamento aparece no registro.</p>
       <pre class="log" id="log"></pre>
     </details>
   </section>
@@ -1287,7 +1250,7 @@ async function abrirPartida(gameId){
     <span><i style="background:#c94f49"></i>inimigos</span>
     <span><i style="background:#e05252"></i>quem causou o dano</span>
     <span>✕ onde aconteceu</span></div>
-    <p class="dica">O mapa mostra as posições do minuto cheio mais próximo — a timeline da Riot só grava uma por minuto.</p>`);
+`);
 
   // Mapa e narrativa só nos graves: quinze blocos completos entulhavam a tela.
   for(const a of d.achados){
@@ -1390,7 +1353,6 @@ async function carregarEstat(){
   if(e.erro){ $('#eGeral').innerHTML = `<div class="vazio">${esc(e.erro)}</div>`; return; }
   const g = e.geral;
 
-  $('#eContas').innerHTML = contaAtual ? `<p class="dica" style="margin:0 0 var(--e2)">Conta: <b>${esc(contaAtual)}</b> — troque na barra lateral.</p>` : '';
 
   if(!g){ $('#eGeral').innerHTML = '<div class="vazio">sem partidas nesta conta</div>'; return; }
 
@@ -1410,8 +1372,7 @@ async function carregarEstat(){
     ${comparar('AMA', +f.recente.kda.toFixed(2), +f.resto.kda.toFixed(2), {formato:v=>v.toFixed(2)})}
     ${comparar('Participação em abates', Math.round(f.recente.participacao*100), Math.round(f.resto.participacao*100), {sufixo:'%'})}
     ${comparar('Duração média', Math.round(f.recente.duracaoMedia/60), Math.round(f.resto.duracaoMedia/60), {sufixo:' min', maiorMelhor:false})}
-  </div><p class="dica">Compara as suas <b>últimas ${f.recente.jogos} partidas</b> com as outras ${num(f.resto.jogos)}.
-  Serve pra dizer se você está melhor ou pior que o seu normal — não se você é bom.</p>` : '';
+  </div>` : '';
 
   $('#eRoles').innerHTML = barras(e.roles.filter(x=>x.jogos>=3).map(x => ({
     rotulo: role(x.role), valor: Math.round(x.taxa*100), destaque: Math.round(x.taxa*100)+'%',
@@ -1425,7 +1386,7 @@ async function carregarEstat(){
   })));
 
   $('#eRadar').innerHTML = desenharRadar(e.radar);
-  const legendaColunas = '<p class="dica">Altura da coluna = quantas partidas. Cor e número = taxa de vitória.</p>';
+  const legendaColunas = '';
   $('#eDias').innerHTML = colunas(e.atividade.dias, {minimo:5}) + legendaColunas;
   $('#eHoras').innerHTML = colunas(e.atividade.horas, {minimo:8}) + legendaColunas;
 
@@ -1889,10 +1850,9 @@ function detalheDeAmigo(p){
 }
 
 /* ============================================================ configuração */
-const ROLES_CFG =[['top','top'],['jungle','jungle'],['middle','mid'],['bottom','adc'],['utility','sup']];
-const ATRASOS = [[0,'instantâneo'],[1500,'1,5s'],[3000,'3s']];
+const ROLES_CFG = ['top', 'jungle', 'middle', 'bottom', 'utility'];
 
-let cfg = null, listaCampeoes = [], roleAtual = 'jungle', gravando = null;
+let cfg = null, listaCampeoes = [], gravando = null;
 
 function marcarSalvo(){
   const el = $('#salvo');
@@ -1903,21 +1863,24 @@ function marcarSalvo(){
 }
 
 /**
- * Salva SÓ os campos que esta tela edita. A versão anterior mandava o
- * `champSelect` inteiro que estava em memória — e como a tela carrega o config
- * uma vez, qualquer mudança feita no arquivo depois disso (travarPick, atraso)
- * era atropelada pelo valor velho no próximo clique. Foi assim que o "travar
- * pick" voltou pra false sozinho.
+ * Salva SÓ os campos que esta tela edita — mandar o config inteiro que estava
+ * em memória atropelava mudanças feitas no arquivo depois de abrir a tela.
+ *
+ * A tela é mínima de propósito: um campeão pra travar e um pra banir, iguais
+ * pra toda role (o daemon continua lendo lista por role — a tela grava o mesmo
+ * nome em todas). Fila aceita na hora e pick sempre travado: ele pediu assim.
  */
 function gravar(){
   clearTimeout(gravando);
   gravando = setTimeout(async () => {
     try {
       const corpo = {
-        autoAceitar: { ativo: cfg.autoAceitar.ativo, atrasoMs: cfg.autoAceitar.atrasoMs },
+        autoAceitar: { ativo: cfg.autoAceitar.ativo, atrasoMs: 0 },
         champSelect: {
-          ativo: cfg.champSelect.ativo,
-          travarPick: cfg.champSelect.travarPick,
+          ativo: cfg.champSelect.escolher !== false || cfg.champSelect.banir !== false,
+          escolher: cfg.champSelect.escolher !== false,
+          banir: cfg.champSelect.banir !== false,
+          travarPick: true,
           picks: cfg.champSelect.picks,
           bans: cfg.champSelect.bans,
         },
@@ -1929,45 +1892,26 @@ function gravar(){
   }, 450);
 }
 
-const listaDe = (tipo) => (cfg.champSelect[tipo][roleAtual] ??= []);
-const jaNaLista = (tipo, nome) => listaDe(tipo).some(n => String(n).toLowerCase() === String(nome).toLowerCase());
-const CHAVE_DB = { top:'TOP', jungle:'JUNGLE', middle:'MID', bottom:'ADC', utility:'SUPORTE' };
-
-function desenharChips(tipo){
-  const nomes = listaDe(tipo);
-  const el = $(tipo === 'picks' ? '#lstPicks' : '#lstBans');
-  if(!nomes.length){ el.innerHTML = `<div class="nada">${tipo==='picks' ? 'nenhum campeão — ele não vai escolher nada nesta role' : 'nenhum ban nesta role'}</div>`; return; }
-  el.innerHTML = nomes.map((nome,i) => {
-    const c = listaCampeoes.find(x => x.nome.toLowerCase() === String(nome).toLowerCase());
-    return `<div class="chip">
-      <span class="ord">${i+1}º</span>
-      <img src="${c?'/icone/'+c.id:''}" alt="">
-      <span class="nome">${esc(nome)}</span>
-      <button title="subir" onclick="moverChip('${tipo}',${i},-1)" ${i===0?'disabled':''}>▲</button>
-      <button title="descer" onclick="moverChip('${tipo}',${i},1)" ${i===nomes.length-1?'disabled':''}>▼</button>
-      <button class="tirar" title="tirar" onclick="tirarChip('${tipo}',${i})">✕</button></div>`;
-  }).join('');
+/** O campeão da caixa: o primeiro que aparecer em qualquer role. */
+function campeaoDe(tipo){
+  for (const r of ROLES_CFG) { const n = cfg.champSelect[tipo]?.[r]?.[0]; if (n) return n; }
+  return null;
+}
+function definirCampeao(tipo, nome){
+  cfg.champSelect[tipo] = Object.fromEntries(ROLES_CFG.map(r => [r, nome ? [nome] : []]));
+  desenharCaixa(tipo); gravar();
 }
 
-function moverChip(tipo,i,passo){
-  const l = listaDe(tipo), j = i+passo;
-  if(j<0 || j>=l.length) return;
-  [l[i],l[j]] = [l[j],l[i]];
-  desenharChips(tipo); gravar();
-}
-function tirarChip(tipo,i){ listaDe(tipo).splice(i,1); desenharChips(tipo); desenharSugestoes(); gravar(); }
-
-function adicionarPorNome(tipo, nome){
-  if(jaNaLista(tipo, nome)) return;
-  listaDe(tipo).push(nome);
-  desenharChips(tipo); desenharSugestoes(); gravar();
+function desenharCaixa(tipo){
+  const nome = campeaoDe(tipo);
+  const c = nome ? listaCampeoes.find(x => x.nome.toLowerCase() === nome.toLowerCase()) : null;
+  const img = $(tipo === 'picks' ? '#imgPicks' : '#imgBans');
+  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
+  img.src = c ? '/icone/' + c.id : '';
+  if (document.activeElement !== input) input.value = nome ?? '';
 }
 
-/**
- * Busca de campeão dentro de cada lista. Quem entra nas suas partidas aparece
- * primeiro (jogados pra pick, enfrentados na lane pra ban); o resto do elenco
- * vem depois — banir campeão que você nunca viu é decisão legítima.
- */
+/** Busca: quem você joga (pick) ou enfrenta (ban) vem primeiro. */
 let sugestoesCfg = null;
 let lupaSel = { picks: 0, bans: 0 };
 
@@ -1975,116 +1919,70 @@ function resultadosDaLupa(tipo, texto){
   const t = texto.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   const prioridade = new Set(tipo === 'bans' ? (sugestoesCfg?.enfrentados ?? []) : (sugestoesCfg?.jogados ?? []));
   const chave = (c) => c.nome.toLowerCase().replace(/[^a-z0-9]/g, '');
-  let vis = listaCampeoes.filter(c => !jaNaLista(tipo, c.nome));
-  // Sem texto não lista nada: os 100 que ele já jogou em ordem alfabética não ajudam ninguém.
-  vis = t ? vis.filter(c => chave(c).includes(t)) : [];
+  let vis = t ? listaCampeoes.filter(c => chave(c).includes(t)) : [];
   vis.sort((a,b) => {
     const pa = prioridade.has(a.id) ? 0 : 1, pb = prioridade.has(b.id) ? 0 : 1;
     if(pa !== pb) return pa - pb;
     const ia = chave(a).startsWith(t) ? 0 : 1, ib = chave(b).startsWith(t) ? 0 : 1;
     return ia - ib || a.nome.localeCompare(b.nome);
   });
-  return { vis: vis.slice(0, 12), prioridade };
+  return { vis: vis.slice(0, 10), prioridade };
 }
 
 function desenharLupa(tipo){
   const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
   const lupa = $(tipo === 'picks' ? '#lupaPicks' : '#lupaBans');
-  const { vis, prioridade } = resultadosDaLupa(tipo, input.value);
   if(document.activeElement !== input){ lupa.hidden = true; return; }
+  const { vis, prioridade } = resultadosDaLupa(tipo, input.value);
   lupa.hidden = false;
   lupaSel[tipo] = Math.min(lupaSel[tipo], Math.max(0, vis.length - 1));
   lupa.innerHTML = vis.length
     ? vis.map((c,i) => `<div class="${i===lupaSel[tipo]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}',${c.id})">
         ${icone(c.id)}${esc(c.nome)}${prioridade.has(c.id) ? `<em>${tipo==='bans'?'você enfrenta':'você joga'}</em>` : ''}</div>`).join('')
-    : `<div class="nadaL">${input.value.trim() ? 'nenhum campeão com esse nome' : 'digite o nome do campeão'}</div>`;
+    : `<div class="nadaL">${input.value.trim() ? 'nenhum campeão com esse nome' : 'digite o nome'}</div>`;
 }
 
 function escolherDaLupa(tipo, id){
   const c = listaCampeoes.find(x => x.id === id);
   if(!c) return;
-  adicionarPorNome(tipo, c.nome);
   const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
-  input.value = ''; lupaSel[tipo] = 0; desenharLupa(tipo);
+  input.blur();
+  definirCampeao(tipo, c.nome);
 }
 
 function ligarLupa(tipo){
   const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
   input.oninput = () => { lupaSel[tipo] = 0; desenharLupa(tipo); };
-  input.onfocus = () => desenharLupa(tipo);
-  input.onblur = () => setTimeout(() => desenharLupa(tipo), 120);
+  input.onfocus = () => { input.select(); desenharLupa(tipo); };
+  input.onblur = () => { desenharLupa(tipo); desenharCaixa(tipo); };
   input.onkeydown = (ev) => {
     const { vis } = resultadosDaLupa(tipo, input.value);
     if(ev.key === 'ArrowDown'){ ev.preventDefault(); lupaSel[tipo] = Math.min(lupaSel[tipo]+1, vis.length-1); desenharLupa(tipo); }
     else if(ev.key === 'ArrowUp'){ ev.preventDefault(); lupaSel[tipo] = Math.max(lupaSel[tipo]-1, 0); desenharLupa(tipo); }
     else if(ev.key === 'Enter'){ ev.preventDefault(); if(vis[lupaSel[tipo]]) escolherDaLupa(tipo, vis[lupaSel[tipo]].id); }
     else if(ev.key === 'Escape'){ input.blur(); }
+    else if(ev.key === 'Backspace' && !input.value){ definirCampeao(tipo, null); }
   };
 }
-
-/**
- * Sugestões tiradas das partidas dele, embaixo de cada lista.
- * Ban ordenado por `custo` — quantas vitórias aquele confronto já custou — e
- * não por taxa de vitória crua: 33% em 18 jogos dói mais que 0% em 3.
- */
-function desenharSugestoes(){
-  const chaveDb = CHAVE_DB[roleAtual];
-  const bloco = (el, titulo, itens, tipo) => {
-    itens = itens.filter(x => !jaNaLista(tipo, x.campeao)).slice(0, 6);
-    $(el).innerHTML = !itens.length ? '' : `<div class="cabS">${esc(titulo)}</div>
-      <div class="chips2">${itens.map(x => `
-        <span class="chip2" onclick="adicionarPorNome('${tipo}','${esc(x.campeao)}')" title="${x.jogos} jogos · clique pra adicionar">
-          ${icone(x.championId)}${esc(x.campeao)}
-          <em class="${tipo==='bans'?'d':'v'}">${Math.round(x.taxa*100)}%</em>
-          <i>${x.jogos}j</i></span>`).join('')}</div>`;
-  };
-  bloco('#sugPicks', 'Com quem você mais ganha', (sugestoesCfg?.picks?.[chaveDb] ?? []).filter(x => x.ganho > 0), 'picks');
-  bloco('#sugBans', 'Quem mais te ganha', (sugestoesCfg?.bans?.[chaveDb] ?? []).filter(x => x.custo > 0), 'bans');
-}
-
-function desenharRoles(){
-  $('#cRoles').innerHTML = ROLES_CFG.map(([k,nome]) => {
-    const np = (cfg.champSelect.picks[k] ?? []).length, nb = (cfg.champSelect.bans[k] ?? []).length;
-    return `<button class="${k===roleAtual?'on':''}" onclick="trocarRole('${k}')">${nome}${np||nb ? `<span class="n">${np}·${nb}</span>` : ''}</button>`;
-  }).join('');
-}
-function trocarRole(k){
-  roleAtual = k;
-  desenharRoles(); desenharChips('picks'); desenharChips('bans'); desenharSugestoes();
-}
-
-function desenharAtraso(){
-  $('#cAtraso').innerHTML = ATRASOS.map(([ms,rot]) =>
-    `<button class="${(cfg.autoAceitar.atrasoMs ?? 1500)===ms?'on':''}" onclick="mudarAtraso(${ms})">${rot}</button>`).join('');
-}
-function mudarAtraso(ms){ cfg.autoAceitar.atrasoMs = ms; desenharAtraso(); gravar(); }
 
 async function carregarConfig(){
   cfg = await pegar('/api/config');
   if(!listaCampeoes.length) await carregarCampeoes();
   cfg.champSelect ??= {}; cfg.champSelect.picks ??= {}; cfg.champSelect.bans ??= {}; cfg.autoAceitar ??= {};
 
-  // As sugestões saem das partidas dele; sem elas a tela ainda funciona.
-  pegar(comConta('/api/sugestoes'))
-    .then((s) => { sugestoesCfg = s; desenharSugestoes(); })
-    .catch(() => {});
+  // Só pra ordenar a busca: quem ele joga e quem enfrenta.
+  pegar(comConta('/api/sugestoes')).then((x) => { sugestoesCfg = x; }).catch(() => {});
 
   $('#cAceitar').checked = cfg.autoAceitar.ativo !== false;
-  $('#cChamp').checked = cfg.champSelect.ativo !== false;
-  $('#cTravar').checked = cfg.champSelect.travarPick === true;
+  $('#cChamp').checked = cfg.champSelect.ativo !== false && cfg.champSelect.escolher !== false;
+  $('#cBanir').checked = cfg.champSelect.ativo !== false && cfg.champSelect.banir !== false;
   $('#cAceitar').onchange = e => { cfg.autoAceitar.ativo = e.target.checked; gravar(); };
-  $('#cChamp').onchange = e => { cfg.champSelect.ativo = e.target.checked; gravar(); };
-  $('#cTravar').onchange = e => { cfg.champSelect.travarPick = e.target.checked; gravar(); };
+  $('#cChamp').onchange = e => { cfg.champSelect.escolher = e.target.checked; gravar(); };
+  $('#cBanir').onchange = e => { cfg.champSelect.banir = e.target.checked; gravar(); };
   ligarLupa('picks'); ligarLupa('bans');
-
-  desenharAtraso(); desenharRoles();
-  desenharChips('picks'); desenharChips('bans'); desenharSugestoes();
-  if(!listaCampeoes.length) $('#lstPicks').innerHTML = '<div class="nada">abra o League uma vez pra eu baixar a lista de campeões</div>';
+  desenharCaixa('picks'); desenharCaixa('bans');
+  if(!listaCampeoes.length) $('#addPicks').placeholder = 'abra o League uma vez';
 }
-
-// Gravar a lista redesenha as abas (os contadores mudam).
-const gravarOriginal = gravar;
-gravar = function(){ desenharRoles(); gravarOriginal(); };
 
 /* =============================================================== atividade */
 document.querySelectorAll('button.acao[data-acao]').forEach(b => {

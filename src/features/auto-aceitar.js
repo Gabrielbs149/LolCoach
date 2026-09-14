@@ -13,7 +13,7 @@
 // valha na hora, sem reiniciar o app.
 const valor = (v, padrao) => (typeof v === 'function' ? v() : v ?? padrao);
 
-export function autoAceitar(lcu, { atrasoMs = 1500, ativo = () => true, aoAceitar, log = () => {} } = {}) {
+export function autoAceitar(lcu, { atrasoMs = 0, ativo = () => true, aoAceitar, log = () => {} } = {}) {
   let jaRespondido = false;
   let sonda = null;
 
@@ -28,7 +28,7 @@ export function autoAceitar(lcu, { atrasoMs = 1500, ativo = () => true, aoAceita
     if (!valor(ativo, true)) { jaRespondido = true; log('fila achou partida — aceitar sozinho está desligado'); return; }
 
     jaRespondido = true;
-    const espera = valor(atrasoMs, 1500);
+    const espera = valor(atrasoMs, 0);
     log(`fila achou partida — aceitando em ${espera}ms`);
     if (espera > 0) await new Promise((r) => setTimeout(r, espera));
 

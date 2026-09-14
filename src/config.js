@@ -2,8 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { caminhoConfig, garantirConfig } from './caminhos.js';
 
 const PADRAO = {
-  autoAceitar: { ativo: true, atrasoMs: 1500 },
-  champSelect: { ativo: true, travarPick: false, travarBan: true, picks: {}, bans: {} },
+  autoAceitar: { ativo: true, atrasoMs: 0 },
+  champSelect: { ativo: true, escolher: true, banir: true, travarPick: true, travarBan: true, picks: {}, bans: {} },
   runas: { ativo: true, criterio: 'popular', regiao: 'br', aplicarSpells: false },
   coleta: { ativo: true },
 };
