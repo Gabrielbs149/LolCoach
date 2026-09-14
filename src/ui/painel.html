@@ -572,63 +572,89 @@ h2:first-child{margin-top:0}
 /* -------------------------------------------------------------- configuração */
 .salvo{font-size:11.5px;font-weight:400;color:var(--vit);margin-left:11px;opacity:0;transition:opacity .25s}
 .salvo.on{opacity:1}
-.cfg{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:2px 15px}
-.chave{display:flex;align-items:flex-start;gap:11px;padding:11px 0;cursor:pointer;
-  border-bottom:1px solid var(--borda)}
-.cfg .chave:last-child{border-bottom:0}
+/* Uma linha por opção: texto à esquerda, controle à direita — como toda tela
+   de ajustes que ele já usou. A versão anterior era um cartão por opção com
+   o interruptor no meio do texto e a grade dos 173 campeões no fim da página. */
+.painelCfg{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m)}
+.linhaCfg{display:flex;align-items:center;gap:14px;padding:11px 14px;border-bottom:1px solid var(--borda)}
+.linhaCfg:last-child{border-bottom:0}
+.linhaCfg .txt{flex:1;min-width:0}
+.linhaCfg b{display:block;font-weight:650;font-size:13px}
+.linhaCfg i{display:block;font-style:normal;color:var(--apagado);font-size:11.5px;margin-top:2px}
+.chave{display:inline-flex;cursor:pointer;flex:0 0 auto}
 .chave input{position:absolute;opacity:0;width:0;height:0}
-.pino{flex:0 0 34px;width:34px;height:19px;border-radius:99px;background:#232f3f;
-  border:1px solid var(--borda);position:relative;transition:background .18s;margin-top:1px}
-.pino::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;
+.pino{width:36px;height:20px;border-radius:99px;background:#232f3f;display:block;
+  border:1px solid var(--borda);position:relative;transition:background .18s}
+.pino::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
   background:#6d7f96;transition:transform .18s,background .18s}
 .chave input:checked+.pino{background:#1e5c40;border-color:#2b8158}
-.chave input:checked+.pino::after{transform:translateX(15px);background:#4ed093}
-.chave b{display:block;font-weight:650;font-size:13px}
-.chave i{display:block;font-style:normal;color:var(--apagado);font-size:11.5px;margin-top:2px;max-width:620px}
-.opcoes{display:flex;gap:var(--e1);padding:0 0 11px 45px;flex-wrap:wrap}
-.opcoes button{background:var(--f2);border:1px solid var(--borda);color:var(--fraco);
-  padding:4px 11px;border-radius:var(--r-s);cursor:pointer;font-size:11.5px;font-family:inherit}
-.opcoes button.on{border-color:var(--ouro);color:var(--ouro-claro);background:#241f16}
+.chave input:checked+.pino::after{transform:translateX(16px);background:#4ed093}
+.opcoes{display:flex;gap:0;flex:0 0 auto;border:1px solid var(--borda);border-radius:var(--r-s);overflow:hidden}
+.opcoes button{background:var(--f2);border:0;border-right:1px solid var(--borda);color:var(--fraco);
+  padding:5px 10px;cursor:pointer;font-size:11.5px;font-family:inherit}
+.opcoes button:last-child{border-right:0}
+.opcoes button.on{color:var(--ouro-claro);background:#241f16}
 
 .abasRole{display:flex;gap:var(--e1);margin-bottom:var(--e2);flex-wrap:wrap}
 .abasRole button{background:var(--f1);border:1px solid var(--borda);color:var(--fraco);
-  padding:6px 16px;border-radius:var(--r-s);cursor:pointer;font-size:12.5px;
+  padding:6px 14px;border-radius:var(--r-s);cursor:pointer;font-size:12.5px;
   font-family:inherit;font-weight:650}
 .abasRole button.on{border-color:var(--ouro);color:var(--ouro-claro);background:var(--f3)}
+.abasRole button .n{color:var(--apagado);font-weight:600;font-size:10.5px;margin-left:6px;font-variant-numeric:tabular-nums}
 
-.listas{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2)}
+.listas{display:grid;grid-template-columns:1fr 1fr;gap:var(--e2);align-items:start}
 @media (max-width:900px){.listas{grid-template-columns:1fr}}
-.lista{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);
-  padding:11px 13px;cursor:pointer;transition:border-color .15s}
-.lista.alvo{border-color:var(--ouro)}
+.lista{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:11px 13px}
+.lista .cab{display:flex;align-items:baseline;gap:8px;margin-bottom:var(--e2)}
 .lista .cab b{font-size:13px;font-weight:650}
-.lista .cab span{display:block;color:var(--apagado);font-size:11px;margin-top:2px}
-.chips{display:flex;flex-direction:column;gap:var(--e1);margin-top:var(--e2);min-height:36px}
-.chip{display:flex;align-items:center;gap:9px;background:var(--f2);border:1px solid var(--borda);
-  border-radius:var(--r-s);padding:4px 7px 4px 5px}
+.lista .cab span{color:var(--apagado);font-size:11px}
+.chips{display:flex;flex-direction:column;gap:3px}
+.chip{display:flex;align-items:center;gap:8px;background:var(--f2);border:1px solid var(--borda);
+  border-radius:var(--r-s);padding:3px 5px 3px 4px}
 .chip img{width:26px;height:26px;border-radius:var(--r-s);flex:0 0 26px;background:var(--f3)}
-.chip .nome{flex:1;font-size:12.5px}
-.chip .ord{color:var(--apagado);font-size:11.5px;font-variant-numeric:tabular-nums;
-  background:var(--f0);border-radius:5px;padding:2px 8px}
-.chip button{background:none;border:0;color:var(--apagado);cursor:pointer;font-size:13px;
-  padding:2px 5px;border-radius:var(--r-s);line-height:1;font-family:inherit}
+.chip .ord{color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums;width:20px;text-align:right}
+.chip .nome{flex:1;font-size:12.5px;font-weight:600}
+.chip button{background:none;border:0;color:var(--apagado);cursor:pointer;font-size:12px;
+  padding:3px 6px;border-radius:var(--r-s);line-height:1;font-family:inherit;opacity:.6}
+.chip:hover button{opacity:1}
 .chip button:hover{color:var(--texto);background:var(--f3)}
 .chip button.tirar:hover{color:var(--der)}
-.nada{color:var(--apagado);font-size:11.5px;padding:7px 2px}
+.nada{color:var(--apagado);font-size:11.5px;padding:6px 2px 2px}
+
+/* Campo de adicionar com a lista de resultados por cima do que vem abaixo. */
+.addCamp{position:relative;margin-top:var(--e2)}
+.addCamp input{width:100%;background:var(--f0);border:1px dashed var(--borda-forte);color:var(--texto);
+  padding:7px 10px;border-radius:var(--r-s);font-size:12.5px;font-family:inherit}
+.addCamp input:focus{outline:none;border-style:solid;border-color:var(--ouro)}
+.lupa{position:absolute;left:0;right:0;top:calc(100% + 3px);z-index:5;background:var(--f2);
+  border:1px solid var(--borda-forte);border-radius:var(--r-s);max-height:260px;overflow-y:auto;
+  box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.lupa div{display:flex;align-items:center;gap:8px;padding:5px 9px;cursor:pointer;font-size:12.5px}
+.lupa div img{width:24px;height:24px;border-radius:var(--r-s);background:var(--f3)}
+.lupa div em{font-style:normal;color:var(--apagado);font-size:10.5px;margin-left:auto}
+.lupa div.on,.lupa div:hover{background:var(--f3);color:var(--ouro-claro)}
+.lupa .nadaL{color:var(--apagado);font-size:11.5px;padding:8px 10px}
+
+/* Sugestões saídas das partidas dele, embaixo de cada lista. */
+.sugere{margin-top:var(--e2)}
+.sugere .cabS{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700;margin-bottom:5px}
+.sugere .chips2{display:flex;flex-wrap:wrap;gap:var(--e1)}
+
+.avancado{margin-top:var(--e4);border:1px solid var(--borda);border-radius:var(--r-m);background:var(--f1)}
+.avancado summary{cursor:pointer;padding:10px 14px;font-size:12.5px;font-weight:650;color:var(--fraco);list-style:none;
+  display:flex;align-items:center;gap:8px}
+.avancado summary::before{content:"";width:6px;height:6px;border-right:2px solid var(--apagado);border-bottom:2px solid var(--apagado);
+  transform:rotate(-45deg);transition:transform .15s;margin-left:2px}
+.avancado[open] summary::before{transform:rotate(45deg)}
+.avancado summary:hover{color:var(--texto)}
+.avancado>*:not(summary){margin-left:14px;margin-right:14px}
+.avancado .acoes{margin-top:var(--e1)}
+.avancado pre.log{margin:var(--e2) 14px 14px}
 
 .busca{width:100%;max-width:380px;background:var(--f1);border:1px solid var(--borda);
   color:var(--texto);padding:7px 11px;border-radius:var(--r-s);font-size:12.5px;
   font-family:inherit;margin-bottom:var(--e2)}
 .busca:focus{outline:none;border-color:var(--ouro)}
-.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:var(--e1)}
-.camp{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-s);
-  padding:6px 3px 5px;text-align:center;cursor:pointer;transition:border-color .12s}
-.camp:hover{border-color:var(--ouro);background:var(--f2)}
-.camp.usado{opacity:.28;pointer-events:none}
-.camp img{width:36px;height:36px;border-radius:50%;background:var(--f3)}
-.camp span{display:block;font-size:9.5px;color:var(--fraco);margin-top:4px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-
 /* --------------------------------------------------------------- atividade */
 .acoes{display:flex;flex-wrap:wrap;gap:var(--e1);margin-bottom:var(--e2)}
 button.acao{background:var(--f2);border:1px solid var(--borda);
@@ -853,60 +879,60 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
   <section id="config">
     <div class="titulo">Configuração <span id="salvo" class="salvo"></span></div>
-    <h2>Aceitar partida</h2>
-    <div class="cfg">
-      <label class="chave">
-        <input type="checkbox" id="cAceitar"><span class="pino"></span>
-        <div><b>Aceitar a fila sozinho</b><i>Você não precisa estar olhando pra tela.</i></div>
-      </label>
-      <div class="opcoes" id="cAtraso"></div>
+
+    <h2>Automação no client</h2>
+    <div class="painelCfg">
+      <div class="linhaCfg">
+        <div class="txt"><b>Aceitar a fila sozinho</b><i>Você não precisa estar olhando pra tela.</i></div>
+        <div class="opcoes" id="cAtraso"></div>
+        <label class="chave"><input type="checkbox" id="cAceitar"><span class="pino"></span></label>
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Agir na seleção de campeão</b><i>Bane e escolhe pelas listas abaixo, na ordem, o primeiro que estiver livre.</i></div>
+        <label class="chave"><input type="checkbox" id="cChamp"><span class="pino"></span></label>
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Travar o pick sozinho</b><i>Desligado, ele só declara e quem trava é você. Travar em ranqueada não tem volta.</i></div>
+        <label class="chave"><input type="checkbox" id="cTravar"><span class="pino"></span></label>
+      </div>
     </div>
 
-    <h2>Escolher e banir</h2>
-    <div class="cfg">
-      <label class="chave">
-        <input type="checkbox" id="cChamp"><span class="pino"></span>
-        <div><b>Agir na seleção de campeão</b><i>Bane e declara o campeão pra você.</i></div>
-      </label>
-      <label class="chave">
-        <input type="checkbox" id="cTravar"><span class="pino"></span>
-        <div><b>Travar o pick sozinho</b><i>Desligado, ele só declara e quem trava é você. Travar sozinho em ranqueada não tem volta.</i></div>
-      </label>
-    </div>
-
-    <h2>Suas listas por role</h2>
+    <h2>Picks e bans por role</h2>
     <div class="abasRole" id="cRoles"></div>
     <div class="listas">
       <div class="lista" id="pnPicks">
-        <div class="cab"><b>Vou pegar</b><span>na ordem — usa o primeiro que estiver livre</span></div>
+        <div class="cab"><b>Vou pegar</b><span>na ordem</span></div>
         <div class="chips" id="lstPicks"></div>
+        <div class="addCamp">
+          <input id="addPicks" placeholder="+ adicionar campeão" autocomplete="off" spellcheck="false">
+          <div class="lupa" id="lupaPicks" hidden></div>
+        </div>
+        <div class="sugere" id="sugPicks"></div>
       </div>
       <div class="lista" id="pnBans">
-        <div class="cab"><b>Vou banir</b><span>na ordem — bane o primeiro ainda disponível</span></div>
+        <div class="cab"><b>Vou banir</b><span>na ordem</span></div>
         <div class="chips" id="lstBans"></div>
+        <div class="addCamp">
+          <input id="addBans" placeholder="+ adicionar campeão" autocomplete="off" spellcheck="false">
+          <div class="lupa" id="lupaBans" hidden></div>
+        </div>
+        <div class="sugere" id="sugBans"></div>
       </div>
     </div>
 
-    <h2>Sugestões a partir das suas partidas</h2>
-    <div id="cSugestoes"></div>
-
-    <h2 id="tituloGrade">Adicionar campeão</h2>
-    <div class="filtros" id="cFiltro"></div>
-    <input class="busca" id="cBusca" placeholder="Buscar campeão… (a busca sempre olha o elenco inteiro)" autocomplete="off">
-    <div class="grade" id="cGrade"></div>
-
-    <h2>Manutenção</h2>
-    <div class="acoes">
-      <button class="acao" data-acao="coletar">Coletar agora</button>
-      <button class="acao" data-acao="historico?quantas=250&fila=420">Puxar 250 solo</button>
-      <button class="acao" data-acao="historico?quantas=700&fila=440">Puxar flex</button>
-      <button class="acao" data-acao="reprocessar">Reprocessar detectores</button>
-      <button class="acao" data-acao="aplicarBuildsNoLol" title="grava na loja do jogo um conjunto de itens por campeão, vindo do op.gg. Precisa do League aberto. Leva uns 2 minutos.">Aplicar builds no LoL (todos)</button>
-    </div>
-    <p class="dica">Puxar histórico leva minutos — a chave da Riot limita a 100 chamadas
-    a cada 2 minutos. O andamento aparece no registro abaixo.</p>
-    <h2>Registro</h2>
-    <pre class="log" id="log"></pre>
+    <details class="avancado">
+      <summary>Avançado — manutenção e registro</summary>
+      <div class="acoes">
+        <button class="acao" data-acao="coletar">Coletar agora</button>
+        <button class="acao" data-acao="historico?quantas=250&fila=420">Puxar 250 solo</button>
+        <button class="acao" data-acao="historico?quantas=700&fila=440">Puxar flex</button>
+        <button class="acao" data-acao="reprocessar">Reprocessar detectores</button>
+        <button class="acao" data-acao="aplicarBuildsNoLol" title="grava na loja do jogo um conjunto de itens por campeão, vindo do op.gg. Precisa do League aberto. Leva uns 2 minutos.">Aplicar builds no LoL (todos)</button>
+      </div>
+      <p class="dica">Puxar histórico leva minutos — a chave da Riot limita a 100 chamadas
+      a cada 2 minutos. O andamento aparece no registro.</p>
+      <pre class="log" id="log"></pre>
+    </details>
   </section>
 </main>
 
@@ -1866,7 +1892,7 @@ function detalheDeAmigo(p){
 const ROLES_CFG =[['top','top'],['jungle','jungle'],['middle','mid'],['bottom','adc'],['utility','sup']];
 const ATRASOS = [[0,'instantâneo'],[1500,'1,5s'],[3000,'3s']];
 
-let cfg = null, listaCampeoes = [], roleAtual = 'jungle', alvo = 'picks', gravando = null;
+let cfg = null, listaCampeoes = [], roleAtual = 'jungle', gravando = null;
 
 function marcarSalvo(){
   const el = $('#salvo');
@@ -1904,18 +1930,21 @@ function gravar(){
 }
 
 const listaDe = (tipo) => (cfg.champSelect[tipo][roleAtual] ??= []);
+const jaNaLista = (tipo, nome) => listaDe(tipo).some(n => String(n).toLowerCase() === String(nome).toLowerCase());
+const CHAVE_DB = { top:'TOP', jungle:'JUNGLE', middle:'MID', bottom:'ADC', utility:'SUPORTE' };
 
 function desenharChips(tipo){
   const nomes = listaDe(tipo);
   const el = $(tipo === 'picks' ? '#lstPicks' : '#lstBans');
-  if(!nomes.length){ el.innerHTML = '<div class="nada">vazio — clique num campeão embaixo</div>'; return; }
+  if(!nomes.length){ el.innerHTML = `<div class="nada">${tipo==='picks' ? 'nenhum campeão — ele não vai escolher nada nesta role' : 'nenhum ban nesta role'}</div>`; return; }
   el.innerHTML = nomes.map((nome,i) => {
     const c = listaCampeoes.find(x => x.nome.toLowerCase() === String(nome).toLowerCase());
     return `<div class="chip">
+      <span class="ord">${i+1}º</span>
       <img src="${c?'/icone/'+c.id:''}" alt="">
-      <span class="ord">${i+1}º</span><span class="nome">${esc(nome)}</span>
-      <button title="subir" onclick="moverChip('${tipo}',${i},-1)">↑</button>
-      <button title="descer" onclick="moverChip('${tipo}',${i},1)">↓</button>
+      <span class="nome">${esc(nome)}</span>
+      <button title="subir" onclick="moverChip('${tipo}',${i},-1)" ${i===0?'disabled':''}>▲</button>
+      <button title="descer" onclick="moverChip('${tipo}',${i},1)" ${i===nomes.length-1?'disabled':''}>▼</button>
       <button class="tirar" title="tirar" onclick="tirarChip('${tipo}',${i})">✕</button></div>`;
   }).join('');
 }
@@ -1926,114 +1955,102 @@ function moverChip(tipo,i,passo){
   [l[i],l[j]] = [l[j],l[i]];
   desenharChips(tipo); gravar();
 }
-function tirarChip(tipo,i){ listaDe(tipo).splice(i,1); desenharChips(tipo); desenharGrade(); gravar(); }
+function tirarChip(tipo,i){ listaDe(tipo).splice(i,1); desenharChips(tipo); desenharSugestoes(); gravar(); }
 
-function escolherAlvo(tipo){
-  alvo = tipo;
-  $('#pnPicks').classList.toggle('alvo', tipo==='picks');
-  $('#pnBans').classList.toggle('alvo', tipo==='bans');
-  const nomeRole = ROLES_CFG.find(([k]) => k === roleAtual)[1];
-  $('#tituloGrade').textContent = `Adicionar campeão — ${tipo==='picks'?'PICKS':'BANS'} de ${nomeRole}`;
-  desenharGrade();
+function adicionarPorNome(tipo, nome){
+  if(jaNaLista(tipo, nome)) return;
+  listaDe(tipo).push(nome);
+  desenharChips(tipo); desenharSugestoes(); gravar();
 }
 
 /**
- * Filtro da grade.
- *
- * Mostrar os 173 campeões de uma vez é o que ele pediu pra tirar. O padrão
- * passa a ser só quem entra nas partidas dele — os que ele joga (pra pick) e
- * os que ele enfrenta na lane (pra ban). O elenco inteiro continua a um clique,
- * porque banir campeão que você nunca viu é uma decisão legítima.
+ * Busca de campeão dentro de cada lista. Quem entra nas suas partidas aparece
+ * primeiro (jogados pra pick, enfrentados na lane pra ban); o resto do elenco
+ * vem depois — banir campeão que você nunca viu é decisão legítima.
  */
-let filtroGrade = 'meus';
 let sugestoesCfg = null;
+let lupaSel = { picks: 0, bans: 0 };
 
-function campeoesRelevantes(){
-  const s = sugestoesCfg;
-  if(!s) return null;
-  // Pra pick, quem ele já jogou. Pra ban, quem já apareceu na lane contra ele.
-  return new Set(alvo === 'bans' ? (s.enfrentados ?? []) : (s.jogados ?? []));
+function resultadosDaLupa(tipo, texto){
+  const t = texto.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const prioridade = new Set(tipo === 'bans' ? (sugestoesCfg?.enfrentados ?? []) : (sugestoesCfg?.jogados ?? []));
+  const chave = (c) => c.nome.toLowerCase().replace(/[^a-z0-9]/g, '');
+  let vis = listaCampeoes.filter(c => !jaNaLista(tipo, c.nome));
+  // Sem texto não lista nada: os 100 que ele já jogou em ordem alfabética não ajudam ninguém.
+  vis = t ? vis.filter(c => chave(c).includes(t)) : [];
+  vis.sort((a,b) => {
+    const pa = prioridade.has(a.id) ? 0 : 1, pb = prioridade.has(b.id) ? 0 : 1;
+    if(pa !== pb) return pa - pb;
+    const ia = chave(a).startsWith(t) ? 0 : 1, ib = chave(b).startsWith(t) ? 0 : 1;
+    return ia - ib || a.nome.localeCompare(b.nome);
+  });
+  return { vis: vis.slice(0, 12), prioridade };
 }
 
-function desenharGrade(){
-  const busca = $('#cBusca').value.trim().toLowerCase();
-  const jaTem = new Set(listaDe(alvo).map(n => String(n).toLowerCase()));
-  const relevantes = campeoesRelevantes();
-
-  let vis = listaCampeoes;
-  if(filtroGrade === 'meus' && relevantes?.size) vis = vis.filter(c => relevantes.has(c.id));
-  if(busca) vis = listaCampeoes.filter(c => c.nome.toLowerCase().includes(busca));  // busca sempre vê tudo
-
-  $('#cFiltro').innerHTML = ['meus','todos'].map(k =>
-    `<button class="${filtroGrade===k?'on':''}" onclick="trocarFiltroGrade('${k}')">${
-      k==='meus' ? (alvo==='bans' ? 'Quem você enfrenta' : 'Quem você joga') : `Todos os ${listaCampeoes.length}`
-    }</button>`).join('');
-
-  $('#cGrade').innerHTML = vis.length
-    ? vis.map(c => `<div class="camp ${jaTem.has(c.nome.toLowerCase())?'usado':''}"
-        onclick="adicionar(${c.id})" title="${esc(c.nome)}">
-        <img src="/icone/${c.id}" alt="" loading="lazy"><span>${esc(c.nome)}</span></div>`).join('')
-    : `<div class="vazio">${busca ? 'nenhum campeão com esse nome' : 'nada aqui — use "Todos"'}</div>`;
+function desenharLupa(tipo){
+  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
+  const lupa = $(tipo === 'picks' ? '#lupaPicks' : '#lupaBans');
+  const { vis, prioridade } = resultadosDaLupa(tipo, input.value);
+  if(document.activeElement !== input){ lupa.hidden = true; return; }
+  lupa.hidden = false;
+  lupaSel[tipo] = Math.min(lupaSel[tipo], Math.max(0, vis.length - 1));
+  lupa.innerHTML = vis.length
+    ? vis.map((c,i) => `<div class="${i===lupaSel[tipo]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}',${c.id})">
+        ${icone(c.id)}${esc(c.nome)}${prioridade.has(c.id) ? `<em>${tipo==='bans'?'você enfrenta':'você joga'}</em>` : ''}</div>`).join('')
+    : `<div class="nadaL">${input.value.trim() ? 'nenhum campeão com esse nome' : 'digite o nome do campeão'}</div>`;
 }
 
-function trocarFiltroGrade(k){ filtroGrade = k; desenharGrade(); }
+function escolherDaLupa(tipo, id){
+  const c = listaCampeoes.find(x => x.id === id);
+  if(!c) return;
+  adicionarPorNome(tipo, c.nome);
+  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
+  input.value = ''; lupaSel[tipo] = 0; desenharLupa(tipo);
+}
+
+function ligarLupa(tipo){
+  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
+  input.oninput = () => { lupaSel[tipo] = 0; desenharLupa(tipo); };
+  input.onfocus = () => desenharLupa(tipo);
+  input.onblur = () => setTimeout(() => desenharLupa(tipo), 120);
+  input.onkeydown = (ev) => {
+    const { vis } = resultadosDaLupa(tipo, input.value);
+    if(ev.key === 'ArrowDown'){ ev.preventDefault(); lupaSel[tipo] = Math.min(lupaSel[tipo]+1, vis.length-1); desenharLupa(tipo); }
+    else if(ev.key === 'ArrowUp'){ ev.preventDefault(); lupaSel[tipo] = Math.max(lupaSel[tipo]-1, 0); desenharLupa(tipo); }
+    else if(ev.key === 'Enter'){ ev.preventDefault(); if(vis[lupaSel[tipo]]) escolherDaLupa(tipo, vis[lupaSel[tipo]].id); }
+    else if(ev.key === 'Escape'){ input.blur(); }
+  };
+}
 
 /**
- * Sugestões tiradas das partidas dele.
- *
+ * Sugestões tiradas das partidas dele, embaixo de cada lista.
  * Ban ordenado por `custo` — quantas vitórias aquele confronto já custou — e
  * não por taxa de vitória crua: 33% em 18 jogos dói mais que 0% em 3.
  */
 function desenharSugestoes(){
-  if(!sugestoesCfg) return;
-  const nomeRole = ROLES_CFG.find(([k]) => k === roleAtual)?.[1] ?? roleAtual;
-  const chaveDb = { top:'TOP', jungle:'JUNGLE', middle:'MID', bottom:'ADC', utility:'SUPORTE' }[roleAtual];
-
-  const bans = (sugestoesCfg.bans?.[chaveDb] ?? []).filter(x => x.custo > 0).slice(0,6);
-  const picks = (sugestoesCfg.picks?.[chaveDb] ?? []).filter(x => x.ganho > 0).slice(0,6);
-
-  const bloco = (titulo, itens, tipo, texto) => !itens.length ? '' : `
-    <div class="sugestao">
-      <div class="cabS"><b>${esc(titulo)}</b><span>${esc(texto)}</span></div>
+  const chaveDb = CHAVE_DB[roleAtual];
+  const bloco = (el, titulo, itens, tipo) => {
+    itens = itens.filter(x => !jaNaLista(tipo, x.campeao)).slice(0, 6);
+    $(el).innerHTML = !itens.length ? '' : `<div class="cabS">${esc(titulo)}</div>
       <div class="chips2">${itens.map(x => `
-        <span class="chip2" onclick="adicionarPorNome('${tipo}','${esc(x.campeao)}')" title="clique pra adicionar">
+        <span class="chip2" onclick="adicionarPorNome('${tipo}','${esc(x.campeao)}')" title="${x.jogos} jogos · clique pra adicionar">
           ${icone(x.championId)}${esc(x.campeao)}
           <em class="${tipo==='bans'?'d':'v'}">${Math.round(x.taxa*100)}%</em>
-          <i>${x.jogos}j</i></span>`).join('')}</div>
-    </div>`;
-
-  $('#cSugestoes').innerHTML =
-    bloco(`Quem mais te ganha de ${nomeRole}`, bans, 'bans',
-      'ordenado pelo estrago: partidas enfrentadas × o quanto sua taxa cai') +
-    bloco(`Com quem você mais ganha de ${nomeRole}`, picks, 'picks',
-      'ordenado por vitórias acima da média que o campeão te deu') ||
-    '<div class="nada">poucos jogos nesta role pra sugerir algo com confiança</div>';
-}
-
-function adicionarPorNome(tipo, nome){
-  const l = (cfg.champSelect[tipo][roleAtual] ??= []);
-  if(l.some(n => String(n).toLowerCase() === nome.toLowerCase())) return;
-  l.push(nome);
-  desenharChips(tipo); desenharGrade(); gravar();
-}
-
-function adicionar(id){
-  const c = listaCampeoes.find(x => x.id === id);
-  if(!c) return;
-  const l = listaDe(alvo);
-  if(l.some(n => String(n).toLowerCase() === c.nome.toLowerCase())) return;
-  l.push(c.nome);
-  desenharChips(alvo); desenharGrade(); gravar();
+          <i>${x.jogos}j</i></span>`).join('')}</div>`;
+  };
+  bloco('#sugPicks', 'Com quem você mais ganha', (sugestoesCfg?.picks?.[chaveDb] ?? []).filter(x => x.ganho > 0), 'picks');
+  bloco('#sugBans', 'Quem mais te ganha', (sugestoesCfg?.bans?.[chaveDb] ?? []).filter(x => x.custo > 0), 'bans');
 }
 
 function desenharRoles(){
-  $('#cRoles').innerHTML = ROLES_CFG.map(([k,nome]) =>
-    `<button class="${k===roleAtual?'on':''}" onclick="trocarRole('${k}')">${nome}</button>`).join('');
+  $('#cRoles').innerHTML = ROLES_CFG.map(([k,nome]) => {
+    const np = (cfg.champSelect.picks[k] ?? []).length, nb = (cfg.champSelect.bans[k] ?? []).length;
+    return `<button class="${k===roleAtual?'on':''}" onclick="trocarRole('${k}')">${nome}${np||nb ? `<span class="n">${np}·${nb}</span>` : ''}</button>`;
+  }).join('');
 }
 function trocarRole(k){
   roleAtual = k;
-  desenharRoles(); desenharChips('picks'); desenharChips('bans');
-  desenharSugestoes(); escolherAlvo(alvo);
+  desenharRoles(); desenharChips('picks'); desenharChips('bans'); desenharSugestoes();
 }
 
 function desenharAtraso(){
@@ -2049,7 +2066,7 @@ async function carregarConfig(){
 
   // As sugestões saem das partidas dele; sem elas a tela ainda funciona.
   pegar(comConta('/api/sugestoes'))
-    .then((s) => { sugestoesCfg = s; desenharSugestoes(); desenharGrade(); })
+    .then((s) => { sugestoesCfg = s; desenharSugestoes(); })
     .catch(() => {});
 
   $('#cAceitar').checked = cfg.autoAceitar.ativo !== false;
@@ -2058,14 +2075,16 @@ async function carregarConfig(){
   $('#cAceitar').onchange = e => { cfg.autoAceitar.ativo = e.target.checked; gravar(); };
   $('#cChamp').onchange = e => { cfg.champSelect.ativo = e.target.checked; gravar(); };
   $('#cTravar').onchange = e => { cfg.champSelect.travarPick = e.target.checked; gravar(); };
-  $('#cBusca').oninput = desenharGrade;
-  $('#pnPicks').onclick = e => { if(!e.target.closest('.chip button')) escolherAlvo('picks'); };
-  $('#pnBans').onclick = e => { if(!e.target.closest('.chip button')) escolherAlvo('bans'); };
+  ligarLupa('picks'); ligarLupa('bans');
 
   desenharAtraso(); desenharRoles();
-  desenharChips('picks'); desenharChips('bans'); escolherAlvo('picks');
-  if(!listaCampeoes.length) $('#cGrade').innerHTML = '<div class="vazio">abra o League uma vez pra eu baixar a lista de campeões</div>';
+  desenharChips('picks'); desenharChips('bans'); desenharSugestoes();
+  if(!listaCampeoes.length) $('#lstPicks').innerHTML = '<div class="nada">abra o League uma vez pra eu baixar a lista de campeões</div>';
 }
+
+// Gravar a lista redesenha as abas (os contadores mudam).
+const gravarOriginal = gravar;
+gravar = function(){ desenharRoles(); gravarOriginal(); };
 
 /* =============================================================== atividade */
 document.querySelectorAll('button.acao[data-acao]').forEach(b => {
