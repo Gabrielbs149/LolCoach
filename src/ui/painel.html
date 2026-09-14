@@ -1912,21 +1912,18 @@ function desenharCaixa(tipo){
 }
 
 /** Busca: quem você joga (pick) ou enfrenta (ban) vem primeiro. */
-let sugestoesCfg = null;
+let sugestoesCfg = null;   // a tela de Builds usa pra marcar os seus campeões
 let lupaSel = { picks: 0, bans: 0 };
 
 function resultadosDaLupa(tipo, texto){
   const t = texto.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
-  const prioridade = new Set(tipo === 'bans' ? (sugestoesCfg?.enfrentados ?? []) : (sugestoesCfg?.jogados ?? []));
   const chave = (c) => c.nome.toLowerCase().replace(/[^a-z0-9]/g, '');
-  let vis = t ? listaCampeoes.filter(c => chave(c).includes(t)) : [];
-  vis.sort((a,b) => {
-    const pa = prioridade.has(a.id) ? 0 : 1, pb = prioridade.has(b.id) ? 0 : 1;
-    if(pa !== pb) return pa - pb;
-    const ia = chave(a).startsWith(t) ? 0 : 1, ib = chave(b).startsWith(t) ? 0 : 1;
-    return ia - ib || a.nome.localeCompare(b.nome);
-  });
-  return { vis: vis.slice(0, 10), prioridade };
+  if(!t) return { vis: [] };
+  // Quem começa com o que foi digitado vem primeiro, em ordem alfabética;
+  // quem só contém, depois. Digitar "e" mostra Ekko, Elise… antes de Ashe.
+  const comeca = listaCampeoes.filter(c => chave(c).startsWith(t)).sort((x,y) => x.nome.localeCompare(y.nome));
+  const contem = listaCampeoes.filter(c => !chave(c).startsWith(t) && chave(c).includes(t)).sort((x,y) => x.nome.localeCompare(y.nome));
+  return { vis: [...comeca, ...contem].slice(0, 10) };
 }
 
 function desenharLupa(tipo){
@@ -1969,9 +1966,8 @@ async function carregarConfig(){
   cfg = await pegar('/api/config');
   if(!listaCampeoes.length) await carregarCampeoes();
   cfg.champSelect ??= {}; cfg.champSelect.picks ??= {}; cfg.champSelect.bans ??= {}; cfg.autoAceitar ??= {};
-
-  // Só pra ordenar a busca: quem ele joga e quem enfrenta.
   pegar(comConta('/api/sugestoes')).then((x) => { sugestoesCfg = x; }).catch(() => {});
+
 
   $('#cAceitar').checked = cfg.autoAceitar.ativo !== false;
   $('#cChamp').checked = cfg.champSelect.ativo !== false && cfg.champSelect.escolher !== false;
