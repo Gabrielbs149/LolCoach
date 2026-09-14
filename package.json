@@ -1,0 +1,84 @@
+{
+  "name": "lolcoach",
+  "version": "2.6.0",
+  "private": true,
+  "type": "module",
+  "description": "LolCoach: automação do client de LoL + análise das suas partidas + builds do op.gg",
+  "scripts": {
+    "auto": "node scripts/auto.js",
+    "conectar": "node scripts/testar-conexao.js",
+    "analisar": "node scripts/analisar.js",
+    "padroes": "node scripts/padroes.js",
+    "coletar": "node scripts/coletar.js",
+    "app": "electron .",
+    "empacotar": "electron-builder --win nsis",
+    "ver": "node scripts/ver.js",
+    "historico": "node scripts/historico.js",
+    "reprocessar": "node scripts/reprocessar.js",
+    "portatil": "electron-builder --win portable",
+    "publicar": "node scripts/publicar.js"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "main": "electron/main.js",
+  "build": {
+    "appId": "com.gabriel.lolcoach",
+    "productName": "LolCoach",
+    "files": [
+      "electron/**",
+      "src/**",
+      "package.json",
+      "!**/*.map"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "directories": {
+      "output": "build"
+    },
+    "extraResources": [
+      {
+        "from": "config.exemplo.json",
+        "to": "config.exemplo.json"
+      }
+    ],
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "artifactName": "LolCoach-Setup-${version}.exe",
+      "shortcutName": "LolCoach",
+      "deleteAppDataOnUninstall": false
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Gabrielbs149",
+        "repo": "LolCoach",
+        "releaseType": "release"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Gabrielbs149/LolCoach.git"
+  }
+}

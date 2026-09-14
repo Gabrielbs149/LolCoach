@@ -1,0 +1,24 @@
+# NUNCA: contém a chave da API da Riot e a conta
+config.json
+
+# dados de cada pessoa (banco, caches, arte)
+dados/
+relatorio-*.html
+relatorio-*.md
+padroes.md
+
+# saída de build
+build/
+dist/
+*.exe
+*.blockmap
+
+# dependências
+node_modules/
+
+# sistema
+.DS_Store
+Thumbs.db
+
+# relatorios gerados pelos scripts
+padroes-*.md
