@@ -11,6 +11,11 @@ export async function tabelaDeCampeoes(lcu) {
   const porId = new Map();
   for (const c of lista) {
     if (c.id <= 0) continue;
+    // A lista do client traz variantes de modo com o MESMO nome e id alto
+    // (60081 "Ezreal" alias Jade_Ezreal, por exemplo). Elas vinham depois e
+    // atropelavam o id real: o app mandava 60081 e o client ignorava em
+    // silêncio — pick "travado" que nunca travava. Só o id de verdade vale.
+    if (c.id >= 10000 || /^[A-Za-z]+_/.test(c.alias ?? '')) continue;
     porNome.set(c.name.toLowerCase(), c.id);
     if (c.alias) porNome.set(c.alias.toLowerCase(), c.id);
     porId.set(c.id, c.name);
