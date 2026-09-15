@@ -918,6 +918,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
     <div class="painelCfg">
       <div class="linhaCfg">
+        <div class="txt"><b>Versão</b></div>
+        <span class="sub" id="cfgVersao" style="color:var(--fraco);font-size:12.5px"></span>
+        <button class="acao" onclick="atualizarAgora(this)">Atualizar agora</button>
+      </div>
+      <div class="linhaCfg">
         <div class="txt"><b>Aceitar a fila</b></div>
         <label class="chave"><input type="checkbox" id="cAceitar"><span class="pino"></span></label>
       </div>
@@ -2005,6 +2010,19 @@ function desenharAdmin(){
 }
 
 /* ============================================================ configuração */
+/** Botão de atualizar: pergunta ao app e mostra a resposta no próprio botão. */
+async function atualizarAgora(botao){
+  const rot = botao.textContent;
+  botao.disabled = true; botao.textContent = 'procurando…';
+  let r;
+  try { r = await fetch('/api/atualizar', { method: 'POST' }).then(x => x.json()); } catch { r = { erro: 'sem resposta do app' }; }
+  botao.textContent = r.instalando ? `instalando v${r.instalando}…`
+    : r.baixando ? `baixando v${r.baixando}… instala sozinho`
+    : r.atual ? `já está na mais nova (v${r.atual})`
+    : (r.erro ?? 'não deu');
+  setTimeout(() => { botao.disabled = false; botao.textContent = rot; }, r.instalando ? 60000 : 4000);
+}
+
 const ROLES_CFG = ['top', 'jungle', 'middle', 'bottom', 'utility'];
 
 let cfg = null, listaCampeoes = [], gravando = null;
@@ -2173,7 +2191,7 @@ async function tick(){
     $('#luz').className = 'luz' + (e.conectado ? ' on' : '');
     $('#estClient').textContent = e.conectado ? 'client conectado' : 'client desconectado';
     $('#conta').textContent = e.conta ?? '—';
-    if (e.versao) $('#versao').textContent = 'v' + e.versao;
+    if (e.versao) { $('#versao').textContent = 'v' + e.versao; $('#cfgVersao').textContent = 'v' + e.versao; }
     // Painel de controle: bloqueio cobre tudo; aviso e "atualize" vão na barra.
     const ctl = e.controle ?? {};
     $('#bloqueio').hidden = !ctl.bloqueado;

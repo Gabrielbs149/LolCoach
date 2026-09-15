@@ -26,6 +26,32 @@ if (app.isPackaged && !process.env.PORTABLE_EXECUTABLE_DIR) {
  * vai pro painel e pra Atividade.
  */
 const { autoUpdater } = electronUpdater;
+let baixada = null;
+let pedidoManual = false;   // ele clicou em Atualizar agora: instala assim que baixar
+
+/**
+ * O botão "Atualizar agora" da Configuração. Procura; se já estiver baixada,
+ * instala e reabre — nunca com a partida rodando (a regra da casa).
+ */
+async function atualizarAgora() {
+  if (!app.isPackaged) return { erro: 'rodando do código — sem atualização automática' };
+  if (faseAtual === 'InProgress' || faseAtual === 'ChampSelect') return { erro: 'espera acabar a partida' };
+  if (baixada) {
+    estado.log(`instalando a ${baixada} e reabrindo…`);
+    setTimeout(() => autoUpdater.quitAndInstall(true, true), 800);
+    return { instalando: baixada };
+  }
+  try {
+    const r = await autoUpdater.checkForUpdates();
+    const nova = r?.updateInfo?.version;
+    if (!nova || nova === app.getVersion()) return { atual: app.getVersion() };
+    pedidoManual = true;
+    return { baixando: nova };   // o 'update-downloaded' instala na sequência
+  } catch (e) {
+    return { erro: e?.message ?? String(e) };
+  }
+}
+
 function ligarAtualizacao() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
@@ -35,12 +61,17 @@ function ligarAtualizacao() {
   autoUpdater.on('update-not-available', () => estado.log(`você está na versão mais recente (${app.getVersion()})`));
   autoUpdater.on('download-progress', (p) => { if (Math.round(p.percent) % 25 === 0) estado.set('atualizacao', { baixando: Math.round(p.percent) }); });
   autoUpdater.on('update-downloaded', (i) => {
+    baixada = i.version;
     estado.set('atualizacao', { pronta: i.version });
     estado.log(`atualização ${i.version} pronta — instalo assim que você não estiver em fila, seleção ou partida`);
     // Quem deixa o app aberto pra sempre nunca fechava e ficava preso na
     // versão velha. Instala sozinho no primeiro momento em que não atrapalha:
     // client fechado, ou em None/Lobby/EndOfGame. Nunca com o jogo rodando.
     const tranquilo = () => faseAtual == null || ['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(faseAtual);
+    if (pedidoManual && tranquilo()) {
+      estado.log(`instalando a ${i.version} e reabrindo…`);
+      return setTimeout(() => autoUpdater.quitAndInstall(true, true), 1500);
+    }
     const tentar = setInterval(() => {
       if (!tranquilo()) return;
       clearInterval(tentar);
@@ -198,7 +229,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: daemon.acoes,
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.

@@ -198,6 +198,10 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      if (req.method === 'POST' && url.pathname === '/api/atualizar' && acoes.atualizar) {
+        return enviar(200, 'application/json', JSON.stringify(await acoes.atualizar()));
+      }
+
       if (req.method === 'POST') {
         const nome = url.pathname.replace('/api/', '');
         const acao = acoes[nome];
