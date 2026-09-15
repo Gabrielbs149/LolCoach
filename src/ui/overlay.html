@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>LolCoach — overlay</title>
+<style>
+/* Janela transparente, sempre por cima, que não aceita clique nem foco. Só
+   mostra o que importa no segundo: timers, flashes marcados e a última
+   fala. Fundo escuro translúcido pra ler em cima de qualquer mapa. */
+:root{--ouro:#c8aa6e;--ouro-claro:#f0d9a8;--texto:#eef3f8;--fraco:#b7c3d0;--vit:#4ed093;--der:#f07a7a;--g2:#e0a03f}
+*{box-sizing:border-box}
+html,body{margin:0;background:transparent;overflow:hidden}
+body{font:13px/1.35 "Segoe UI",system-ui,sans-serif;color:var(--texto);-webkit-font-smoothing:antialiased;padding:6px}
+.caixa{background:rgba(7,10,15,.78);border:1px solid rgba(200,170,110,.35);border-radius:6px;padding:8px 10px;
+  text-shadow:0 1px 2px #000;box-shadow:0 4px 14px rgba(0,0,0,.5);max-width:340px}
+.topo{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
+.topo b{color:var(--ouro);font-size:15px;font-variant-numeric:tabular-nums}
+.topo span{color:var(--fraco);font-size:10.5px;text-transform:uppercase;letter-spacing:.8px}
+.objs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+.obj{background:rgba(255,255,255,.06);border-radius:4px;padding:2px 7px;font-size:12px;font-variant-numeric:tabular-nums}
+.obj b{color:var(--fraco);font-weight:600;margin-right:4px}
+.obj.vivo{background:rgba(200,170,110,.25);color:var(--ouro-claro)}
+.flashes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:5px}
+.fl{background:rgba(224,85,85,.25);border-radius:4px;padding:2px 7px;font-size:12px;font-variant-numeric:tabular-nums}
+.fl.voltou{background:rgba(78,208,147,.25)}
+.fala{font-size:12.5px;color:var(--texto);border-top:1px solid rgba(255,255,255,.12);padding-top:5px;margin-top:2px}
+.fala.u3{color:var(--der)} .fala.u2{color:var(--g2)}
+.dica{font-size:10px;color:var(--fraco);margin-top:4px}
+.oculto{display:none}
+</style>
+</head>
+<body>
+<div class="caixa" id="caixa"></div>
+<script>
+const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const mmss = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+let ultimaFala = null, ultimaFalaEm = 0, ultimoJson = '';
+function desenhar(d){
+  const caixa = document.getElementById('caixa');
+  if(!d.emJogo){ caixa.classList.add('oculto'); return; }
+  caixa.classList.remove('oculto');
+  const e = d.estado;
+  const objs = (d.objetivos ?? []).map(o => `<span class="obj ${o.vivo?'vivo':''}"><b>${esc(o.nome)}</b>${o.vivo ? 'no mapa' : esc(o.quando.replace('em ',''))}</span>`).join('');
+  const fls = (d.flashes ?? []).map(f => `<span class="fl ${f.em>0?'':'voltou'}">${esc(f.campeao)} ${f.em>0 ? 'F ' + mmss(f.em) : 'F ✓'}</span>`).join('');
+  // A última fala fica 12s na tela.
+  const ultima = (d.falas ?? []).at(-1);
+  if (ultima && ultima.seq !== ultimaFala?.seq) { ultimaFala = ultima; ultimaFalaEm = Date.now(); }
+  const mostraFala = ultimaFala && Date.now() - ultimaFalaEm < 12000;
+  const urgente = (d.conselhos ?? []).find(c => c.urgencia === 3);
+  caixa.innerHTML = `<div class="topo"><b>${mmss(e.tempo)}</b><span>${esc(e.eu.campeao)} · ${e.eu.kills}/${e.eu.mortes}/${e.eu.assists}</span></div>
+    ${objs ? `<div class="objs">${objs}</div>` : ''}
+    ${fls ? `<div class="flashes">${fls}</div>` : ''}
+    ${mostraFala ? `<div class="fala u${ultimaFala.prioridade ?? 1}">${esc(ultimaFala.serio)}</div>` : (urgente ? `<div class="fala u3">${esc(urgente.titulo)}</div>` : '')}
+    <div class="dica">Ctrl+Alt+1..5 marca flash · Ctrl+Shift+O esconde</div>`;
+}
+async function tick(){
+  try {
+    const d = await fetch('/api/vivo').then(r => r.json());
+    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.flashes, d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes]);
+    if (json === ultimoJson && Date.now() - ultimaFalaEm > 13000) return;
+    ultimoJson = json;
+    desenhar(d);
+  } catch {}
+}
+tick(); setInterval(tick, 1000);
+</script>
+</body>
+</html>

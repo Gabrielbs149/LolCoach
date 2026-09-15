@@ -254,6 +254,37 @@ function posicionarNaTela(j, tela) {
   j.setBounds({ x: a.x, y: a.y, width: a.width, height: a.height });
 }
 
+/**
+ * Overlay em cima do jogo: janela transparente, sempre por cima, que NÃO
+ * aceita foco nem clique (passa direto pro jogo) — por isso não minimiza o
+ * LoL. Mostra timers, flashes marcados e a última fala, com dados da API
+ * pública do jogo. Só aparece com o LoL em "sem bordas" ou janela: em tela
+ * cheia exclusiva nada fica por cima (e é assim que a Riot quer).
+ */
+let janelaOverlay = null;
+let overlayLigado = true;
+function abrirOverlay() {
+  if (!overlayLigado || !endereco) return;
+  if (janelaOverlay && !janelaOverlay.isDestroyed()) { if (!janelaOverlay.isVisible()) janelaOverlay.showInactive(); return; }
+  const tela = screen.getPrimaryDisplay().workArea;
+  janelaOverlay = new BrowserWindow({
+    width: 360, height: 220, x: tela.x + 12, y: tela.y + Math.round(tela.height * 0.32),
+    transparent: true, frame: false, alwaysOnTop: true, skipTaskbar: true, focusable: false,
+    resizable: false, hasShadow: false, show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
+  });
+  janelaOverlay.setAlwaysOnTop(true, 'screen-saver');
+  janelaOverlay.setIgnoreMouseEvents(true);
+  janelaOverlay.setVisibleOnAllWorkspaces(true);
+  janelaOverlay.loadURL(`${endereco}/overlay`);
+  janelaOverlay.once('ready-to-show', () => { if (janelaOverlay && !janelaOverlay.isDestroyed()) janelaOverlay.showInactive(); });
+  janelaOverlay.on('closed', () => { janelaOverlay = null; });
+}
+function fecharOverlay() {
+  if (janelaOverlay && !janelaOverlay.isDestroyed()) janelaOverlay.close();
+  janelaOverlay = null;
+}
+
 function criarBandeja() {
   const icone = nativeImage.createFromPath(join(AQUI, 'icone-bandeja.png'));
   bandeja = new Tray(icone.isEmpty() ? nativeImage.createEmpty() : icone);
@@ -261,6 +292,7 @@ function criarBandeja() {
   bandeja.setContextMenu(Menu.buildFromTemplate([
     { label: 'Abrir painel', click: () => (janela ? janela.show() : criarJanela()) },
     { label: 'Abrir tela ao vivo', click: () => abrirVivo() },
+    { label: 'Overlay no jogo (Ctrl+Shift+O)', type: 'checkbox', checked: true, click: (item) => { overlayLigado = item.checked; if (!overlayLigado) fecharOverlay(); else if (faseAtual === 'InProgress') abrirOverlay(); } },
     { type: 'separator' },
     { label: 'Sair', click: () => { app.saindo = true; app.quit(); } },
   ]));
@@ -291,6 +323,9 @@ app.whenReady().then(async () => {
         faseAtual = fase;
         // Saiu da partida: se o painel estava esperando pra aparecer, agora pode.
         if (fase !== 'InProgress') mostrarPainelSeSeguro();
+        // Overlay: nasce quando o jogo carrega e some quando acaba.
+        if (fase === 'InProgress' || fase === 'GameStart') abrirOverlay();
+        else if (antes === 'InProgress' || antes === 'GameStart') fecharOverlay();
         // Acabou uma partida: boa hora pra procurar (e instalar) atualização.
         if (antes === 'InProgress' && fase !== 'InProgress' && app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
       },
@@ -320,6 +355,12 @@ app.whenReady().then(async () => {
       fetch(`${endereco}/api/flash?posicao=${n}`, { method: 'POST' }).catch(() => {});
     });
   }
+  // Ctrl+Shift+O liga/desliga o overlay (sem tirar o foco do jogo).
+  globalShortcut.register('Control+Shift+O', () => {
+    overlayLigado = !overlayLigado;
+    if (overlayLigado && (faseAtual === 'InProgress' || faseAtual === 'GameStart')) abrirOverlay(); else fecharOverlay();
+    estado.log(`overlay ${overlayLigado ? 'ligado' : 'desligado'}`);
+  });
   globalShortcut.register('Control+Shift+L', () => {
     if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
     if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }

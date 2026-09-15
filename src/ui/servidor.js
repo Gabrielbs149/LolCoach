@@ -366,6 +366,9 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
           return res.end(png);
         } catch { return enviar(404, 'text/plain', 'sem emblema'); }
       }
+      if (url.pathname === '/overlay') {
+        return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'overlay.html'), 'utf8'));
+      }
       if (url.pathname === '/vivo') {
         return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'vivo.html'), 'utf8'));
       }
