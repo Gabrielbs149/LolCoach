@@ -313,6 +313,11 @@ function prepararCorpo(bruto, elenco = []) {
     .replace(/<blockquote[^>]*class="[^"]*\bcontext\b[^"]*"[^>]*>[\s\S]*?<\/blockquote>/gi, '')
     .replace(/<div[^>]*class="[^"]*context-designers[^"]*"[^>]*>[\s\S]*?<\/div>/gi, '');
 
+  // "80/90/100 ⇒ 70/80/90" vira antes riscado e depois em destaque — o que
+  // mudou salta aos olhos sem ler o parágrafo.
+  corpo = corpo.replace(/([^<>⇒:]{1,60}?)\s*⇒\s*(?:<strong>)?([^<>]{1,60}?)(?:<\/strong>)?(?=<|$)/g,
+    (m, antes, depois) => `<span class="antes"> ${antes.trim()}</span> ⇒ <span class="depois">${depois.trim()}</span>`);
+
   return {
     corpo: higienizar(corpo),
     blocos: achados.map(({ nome, chave, chaveTexto, secao, ancora }) =>
@@ -326,7 +331,7 @@ function prepararCorpo(bruto, elenco = []) {
  */
 // Sobe quando a forma do que é guardado muda: o cache em disco é pra sempre, e
 // sem isto uma nota lida por uma versão antiga ficaria velha para sempre também.
-const FORMATO = 3;   // 3: sem o preâmbulo da Riot
+const FORMATO = 5;   // 4: antes ⇒ depois destacado
 
 export async function lerAtualizacao(slug, { elenco = [] } = {}) {
   const limpo = String(slug).replace(/[^a-zA-Z0-9-]/g, '');

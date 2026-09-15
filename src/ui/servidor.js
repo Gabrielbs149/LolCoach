@@ -202,6 +202,12 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      if (req.method === 'POST' && (url.pathname === '/api/backup' || url.pathname === '/api/restaurar')) {
+        const fn = acoes[url.pathname.slice(5)];
+        if (!fn) return enviar(404, 'application/json', JSON.stringify({ erro: 'só no app instalado' }));
+        try { return enviar(200, 'application/json', JSON.stringify(await fn())); }
+        catch (erro) { return enviar(500, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       if (req.method === 'POST' && url.pathname === '/api/atualizar' && acoes.atualizar) {
         return enviar(200, 'application/json', JSON.stringify(await acoes.atualizar()));
       }

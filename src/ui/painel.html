@@ -125,6 +125,8 @@ body.editando [data-editavel]:hover{outline-color:var(--ouro);background:rgba(20
 body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:#2a2415;color:var(--texto)}
 .bloqueio{position:fixed;inset:0;z-index:50;background:rgba(7,10,15,.96);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
 .bloqueio h1{font-size:22px;margin:0 0 10px;color:var(--der)}
+.bloqueio.popup{background:rgba(7,10,15,.85);cursor:pointer} .bloqueio.popup h1{color:var(--ouro-claro)}
+.bloqueio.popup p{font-size:16px;color:var(--texto);white-space:pre-wrap}
 .bloqueio p{color:var(--fraco);font-size:14px;max-width:420px;margin:0 auto}
 .campoAdm{width:360px;max-width:50%;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);padding:6px 10px;border-radius:var(--r-s);font:inherit;font-size:12.5px}
 .campoAdm.curto{width:120px}
@@ -312,6 +314,8 @@ h2:first-child{margin-top:0}
 .patchTopo{background:var(--f1);border:1px solid var(--borda);
   border-left:3px solid var(--ouro);border-radius:var(--r-m);padding:12px 15px;margin-bottom:var(--e2)}
 .patchTopo.contra{border-left-color:var(--der)}
+.patch .antes,.nota-corpo .antes{color:var(--apagado);text-decoration:line-through}
+.patch .depois,.nota-corpo .depois{color:var(--ouro-claro);font-weight:700}
 .patchTopo.contra .chip2{border-color:#5c2226}
 .patchTopo.contra .chip2:hover{border-color:var(--der);background:#241618}
 .patchTopo b{font-size:14px;font-weight:700}
@@ -728,6 +732,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .amCartao .quem span{font-size:11px;color:var(--apagado)}
 .amCartao .tagEu{position:absolute;top:8px;right:9px;font-size:9px;text-transform:uppercase;letter-spacing:.8px;
   color:var(--ouro);font-weight:800}
+.amCartao .tagEu.chat{color:var(--vit)} .amCartao .tagEu.dnd{color:var(--g2)} .amCartao .tagEu.away{color:var(--apagado)}
 .amCartao .eloL{display:flex;align-items:center;gap:8px;margin-top:10px}
 .amCartao .eloL .emblema{width:34px;height:34px;flex:0 0 34px;object-fit:contain;display:block;margin:-3px 0}
 .amCartao .eloL .n{font-size:12.5px;font-weight:700}
@@ -844,6 +849,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   </div>
 </div>
 
+<!-- Recado do admin, uma vez. -->
+<div class="bloqueio popup" id="popup" hidden onclick="fecharPopup()">
+  <div><h1>Recado</h1><p id="popupTexto"></p><p class="dica" style="margin-top:14px;text-align:center">clique pra fechar</p></div>
+</div>
+
 <!-- Acesso desligado pelo painel: cobre tudo. -->
 <div class="bloqueio" id="bloqueio" hidden>
   <div>
@@ -876,6 +886,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="estat">
     <div class="titulo">Estatísticas</div>
     <div class="cartoes" id="eGeral"></div>
+    <h2>Meta</h2><div id="eMeta"></div>
     <h2>Últimas 20 contra o resto</h2><div id="eForma"></div>
     <div class="colunas2">
       <div><h2>Onde você joga</h2><div id="eRoles"></div>
@@ -961,6 +972,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
         <input class="campoAdm" id="admAvisoGlobal" placeholder="vazio = sem aviso" onchange="salvarControle({ aviso: this.value.trim() })">
       </div>
       <div class="linhaCfg">
+        <div class="txt"><b>Recado em pop-up</b><i>aparece uma vez pra cada um; vazio = tira</i></div>
+        <input class="campoAdm" id="admPopup" placeholder="escreve e dá Enter" onchange="popupMandar(this.value)">
+      </div>
+      <div class="linhaCfg">
         <div class="txt"><b>Versão mínima</b><i>abaixo disso aparece "atualize" na barra</i></div>
         <input class="campoAdm curto" id="admVersaoMinima" placeholder="ex.: 2.7.16" onchange="salvarControle({ versaoMinima: this.value.trim() || null })">
       </div>
@@ -1015,6 +1030,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
         <button class="acao" data-acao="historico?quantas=250&fila=420">Puxar 250 solo</button>
         <button class="acao" data-acao="historico?quantas=700&fila=440">Puxar flex</button>
         <button class="acao" data-acao="reprocessar">Reprocessar detectores</button>
+        <button class="acao" onclick="backupApp(this, 'backup')">Fazer backup</button>
+        <button class="acao" onclick="backupApp(this, 'restaurar')">Restaurar backup</button>
         <button class="acao" data-acao="aplicarBuildsNoLol" title="grava na loja do jogo um conjunto de itens por campeão, vindo do op.gg. Precisa do League aberto. Leva uns 2 minutos.">Aplicar builds no LoL</button>
       </div>
       <pre class="log" id="log"></pre>
@@ -1546,6 +1563,7 @@ async function carregarEstat(){
       `${Math.round(g.campeoes/173*100)}% do elenco`),
   ].join('');
 
+  desenharMeta(g);
   const f = e.forma;
   $('#eForma').innerHTML = f?.recente && f?.resto ? `<div class="compara">
     ${comparar('Taxa de vitória', Math.round(f.recente.taxa*100), Math.round(f.resto.taxa*100), {sufixo:'%'})}
@@ -1577,6 +1595,24 @@ async function carregarEstat(){
       <span class="wr ${t>=53?'v':t<=47?'d':''}">${t}%</span>
       <span class="kda">${c.kda.toFixed(2)}:1 · ${c.jogos}j · ${c.csm.toFixed(1)} cs/min</span></div>`;
   }).join('')}</div>`;
+}
+
+/* ---- meta de elo: onde quer chegar e quantas partidas faltam no ritmo atual ---- */
+const TIERS_META = [['IRON','Ferro'],['BRONZE','Bronze'],['SILVER','Prata'],['GOLD','Ouro'],['PLATINUM','Platina'],['EMERALD','Esmeralda'],['DIAMOND','Diamante'],['MASTER','Mestre']];
+async function desenharMeta(g){
+  let meta = null; try { meta = localStorage.getItem('metaElo'); } catch {}
+  let s; try { s = await pegar(comConta('/api/sessao')); } catch { s = null; }
+  const atual = s?.curva?.at(-1) ?? null;
+  const ptsDe = (tier, rank = 'IV', pdl = 0) => TIERS_META.findIndex(([t]) => t === tier) * 400 + ({IV:0,III:1,II:2,I:3}[rank] ?? 0) * 100 + pdl;
+  const sel = `<select class="contaSel" style="margin:0;width:180px" onchange="localStorage.setItem('metaElo', this.value); carregarEstat()">
+    <option value="">escolher meta…</option>${TIERS_META.map(([t, n]) => `<option value="${t}" ${meta===t?'selected':''}>${n}</option>`).join('')}</select>`;
+  if(!meta || !atual){ $('#eMeta').innerHTML = `<div class="forma">${sel}<span class="resumo">${atual ? 'escolhe onde quer chegar' : 'joga uma solo pra eu saber seu elo'}</span></div>`; return; }
+  const falta = ptsDe(meta) - atual.pontos;
+  const taxa = g?.taxa ?? 0.5;
+  const porJogo = (2 * taxa - 1) * 20;   // ~20 PDL por partida, líquido pela taxa de vitória
+  const texto = falta <= 0 ? 'meta batida — sobe a meta' : porJogo <= 0.5 ? `faltam ${falta} PDL, mas com ${Math.round(taxa*100)}% de vitória você não chega — precisa passar de 50%`
+    : `faltam ${falta} PDL ≈ ${Math.ceil(falta / porJogo)} partidas no ritmo atual (${Math.round(taxa*100)}% de vitória)`;
+  $('#eMeta').innerHTML = `<div class="forma">${sel}<span class="resumo" style="margin-left:12px">${texto}</span></div>`;
 }
 
 /* ================================================================ builds */
@@ -1915,7 +1951,7 @@ function cartaoDeAmigo(p, { eu = false } = {}){
   const perfil = p.perfil, r = perfil?.recente, solo = eloSolo(perfil), chave = chaveAm(p);
   const taxa = r ? Math.round(r.taxa*100) : null;
   return `<div class="amCartao ${eu?'eu':''} ${amAberto===chave?'aberto':''}" onclick="abrirAmigo('${esc(chave)}')">
-    ${eu ? '<span class="tagEu">você</span>' : ''}
+    ${eu ? '<span class="tagEu">você</span>' : (p.online ? `<span class="tagEu ${p.online}" title="${esc(p.online)}">${({chat:'online',away:'ausente',dnd:'jogando',mobile:'no celular'})[p.online] ?? p.online}</span>` : '')}
     <div class="topo">
       <img class="retrato" src="${perfil?.icone != null ? '/iconeperfil/'+perfil.icone : ''}" alt="">
       <div class="quem"><b>${esc(perfil?.conta?.nome ?? p.nome)}</b>
@@ -2302,6 +2338,11 @@ async function esquecerUsuario(id){
   if(r.erro){ $('#admAviso').innerHTML = `<div class="aviso amAviso">${esc(r.erro)}</div>`; return; }
   admDados.usuarios = admDados.usuarios.filter(u => u.id !== id); desenharAdmin();
 }
+function fecharPopup(){ try { localStorage.setItem('popupVisto', $('#popup').dataset.id ?? ''); } catch {} $('#popup').hidden = true; }
+async function popupMandar(texto){
+  texto = texto.trim();
+  await salvarControle({ popup: texto ? { id: Date.now(), texto } : null });
+}
 function verRegistro(id){ const tr = document.getElementById('reg-' + id); if(tr) tr.hidden = !tr.hidden; }
 function alternarFuncao(f){
   const d = new Set(admDados.controle.desligadas ?? []);
@@ -2313,6 +2354,7 @@ function desenharAdmin(){
   const { usuarios, controle, eu } = admDados;
   if(document.activeElement !== $('#admAvisoGlobal')) $('#admAvisoGlobal').value = controle.aviso ?? '';
   if(document.activeElement !== $('#admVersaoMinima')) $('#admVersaoMinima').value = controle.versaoMinima ?? '';
+  if(document.activeElement !== $('#admPopup')) $('#admPopup').value = controle.popup?.texto ?? '';
   $('#admSomente').checked = !!controle.somenteLiberados;
   const desligadas = new Set(controle.desligadas ?? []);
   $('#admFuncoes').innerHTML = FUNCOES_ADM.map(([k, nome]) =>
@@ -2353,6 +2395,12 @@ function desenharAdmin(){
 }
 
 /* ============================================================ configuração */
+async function backupApp(botao, qual){
+  const rot = botao.textContent; botao.disabled = true; botao.textContent = '…';
+  let r; try { r = await fetch('/api/' + qual, { method: 'POST' }).then(x => x.json()); } catch { r = { erro: 'sem resposta' }; }
+  botao.textContent = r.ok ? (qual === 'backup' ? `salvo (${r.arquivos} arquivos)` : 'restaurado — reabrindo') : r.cancelado ? rot : (r.erro ?? 'não deu');
+  setTimeout(() => { botao.disabled = false; botao.textContent = rot; }, 4000);
+}
 /** Botão de atualizar: pergunta ao app e mostra a resposta no próprio botão. */
 async function atualizarAgora(botao){
   const rot = botao.textContent;
@@ -2576,6 +2624,10 @@ async function tick(){
     if (mostrarPatch) $('#estPatch').textContent = `patch novo: ${pn.meus} seu${pn.meus===1?'':'s'}, ${pn.contra} contra`;
     $('#navAdmin').hidden = e.config?.admin !== true;
     aplicarControleVisual(ctl);
+    // Recado do admin: uma vez por id.
+    const pp = ctl.popup;
+    let vistoPopup = null; try { vistoPopup = localStorage.getItem('popupVisto'); } catch {}
+    if (pp?.id && pp.texto && vistoPopup !== String(pp.id) && $('#popup').hidden) { $('#popupTexto').textContent = pp.texto; $('#popup').hidden = false; $('#popup').dataset.id = pp.id; }
     // Primeira vez que o client responde: as telas passam a seguir essa conta.
     if (e.conta && !contaEscolhidaPeloUsuario && contaAtual !== String(e.conta).split('#')[0] && contasConhecidas.some(c => c.nome === String(e.conta).split('#')[0])) {
       contaAtual = String(e.conta).split('#')[0]; desenharContaSel();

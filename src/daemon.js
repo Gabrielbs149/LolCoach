@@ -109,7 +109,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       estado?.set('controle', {
         bloqueado: avaliacao.bloqueado, aviso: avaliacao.aviso, desligadas: avaliacao.desligadas,
         desatualizado: avaliacao.desatualizado, versaoMinima: avaliacao.versaoMinima,
-        textos: avaliacao.textos, tema: avaliacao.tema, estilos: avaliacao.estilos,
+        textos: avaliacao.textos, tema: avaliacao.tema, estilos: avaliacao.estilos, popup: avaliacao.popup,
       });
       if (avaliacao.bloqueado && !antes.bloqueado) log('acesso desligado pelo painel de controle');
       if (!avaliacao.bloqueado && antes.bloqueado) log('acesso liberado pelo painel de controle');
@@ -403,6 +403,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         .catch((erro) => { log(`ficha dos adversários falhou: ${erro.message}`); partidaVivo.fichas = []; });
     }
 
+    const { objetivos } = await import('./vivo/objetivos.js');
     const rastreio = R.rastrear(estado, partidaVivo.memoria);
     const conselhos = [...rastreio.avisos, ...montarConselhos(estado, perfil)]
       .sort((a, b) => b.urgencia - a.urgencia);
@@ -411,6 +412,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       emJogo: true, estado, perfil, conselhos,
       contra: partidaVivo.fichas ?? [],
       vistos: rastreio.vistos,
+      objetivos: objetivos(estado),
     };
   }
 
@@ -834,6 +836,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const eu = meuNome && minhaTag
       ? { nome: meuNome, tag: minhaTag, perfil: await perfilDeAmigo(soDisco, { nome: meuNome, tag: minhaTag }, {}).catch(() => null) }
       : { nome: meuNome, tag: null, perfil: null };
+
+    // Quem está online no client agora (lista de amigos do LoL, só disponibilidade).
+    let online = new Map();
+    if (lcu.conectado) {
+      const amigosLol = await lcu.get('/lol-chat/v1/friends').catch(() => []);
+      for (const f of amigosLol ?? []) online.set(`${f.gameName}#${f.gameTag}`.toLowerCase(), f.availability);
+    }
+    for (const a of lista) a.online = online.get(`${a.nome}#${a.tag}`.toLowerCase()) ?? null;
 
     // Jogos em comum: as últimas dele que também estão no meu banco.
     const meusIds = new Set(db.prepare('SELECT gameId FROM partidas').all().map((r) => r.gameId));

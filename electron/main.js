@@ -1,4 +1,5 @@
-import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut } from 'electron';
+import { cp, mkdir, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import electronUpdater from 'electron-updater';
@@ -57,6 +58,43 @@ async function atualizarAgora() {
   } catch (e) {
     return { erro: e?.message ?? String(e) };
   }
+}
+
+/**
+ * Backup: copia config.json, dados/partidas.db e dados/contas.json pra uma
+ * pasta que ele escolhe. Restaurar faz o caminho inverso e reabre o app.
+ * Nunca com partida rodando (a caixa de diálogo rouba foco).
+ */
+const pastaDados = () => process.env.LOLCOACH_DIR ?? process.env.PORTABLE_EXECUTABLE_DIR ?? process.cwd();
+const ARQUIVOS_BACKUP = ['config.json', 'dados/partidas.db', 'dados/contas.json', 'dados/uso.json'];
+async function backup() {
+  if (faseAtual === 'InProgress') return { erro: 'espera acabar a partida' };
+  const r = await dialog.showOpenDialog(janela, { title: 'Onde guardar o backup', properties: ['openDirectory', 'createDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return { cancelado: true };
+  const carimbo = new Date().toISOString().slice(0, 10);
+  const destino = join(r.filePaths[0], `LolCoach-backup-${carimbo}`);
+  await mkdir(join(destino, 'dados'), { recursive: true });
+  let n = 0;
+  for (const a of ARQUIVOS_BACKUP) {
+    try { await cp(join(pastaDados(), a), join(destino, a)); n++; } catch { /* arquivo que não existe */ }
+  }
+  estado.log(`backup: ${n} arquivos em ${destino}`);
+  return { ok: true, pasta: destino, arquivos: n };
+}
+async function restaurar() {
+  if (faseAtual === 'InProgress') return { erro: 'espera acabar a partida' };
+  const r = await dialog.showOpenDialog(janela, { title: 'Pasta do backup (LolCoach-backup-…)', properties: ['openDirectory'] });
+  if (r.canceled || !r.filePaths[0]) return { cancelado: true };
+  const origem = r.filePaths[0];
+  const tem = (await readdir(origem).catch(() => [])).includes('config.json');
+  if (!tem) return { erro: 'essa pasta não tem um backup do LolCoach' };
+  let n = 0;
+  for (const a of ARQUIVOS_BACKUP) {
+    try { await cp(join(origem, a), join(pastaDados(), a)); n++; } catch { /* não tinha */ }
+  }
+  estado.log(`restaurado: ${n} arquivos de ${origem} — reabrindo`);
+  setTimeout(() => { app.relaunch(); app.exit(0); }, 800);
+  return { ok: true, arquivos: n };
 }
 
 function ligarAtualizacao() {
@@ -237,7 +275,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: { ...daemon.acoes, atualizar: atualizarAgora },
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.
@@ -250,6 +288,12 @@ app.whenReady().then(async () => {
   criarJanela({ esconder: true });
   criarBandeja();
   ligarAtualizacao();
+  // Ctrl+Shift+L abre/fecha o painel — fora de partida (mostrar janela com o
+  // jogo rodando minimiza o LoL).
+  globalShortcut.register('Control+Shift+L', () => {
+    if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
+    if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
+  });
   setTimeout(() => {
     if (!painelPendente) return;
     if (faseAtual === 'InProgress') {
@@ -260,6 +304,7 @@ app.whenReady().then(async () => {
   }, 4000);
 });
 
+app.on('will-quit', () => globalShortcut.unregisterAll());
 app.on('window-all-closed', (e) => e.preventDefault());  // vive na bandeja
 app.on('before-quit', () => {
   app.saindo = true;

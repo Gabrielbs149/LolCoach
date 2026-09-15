@@ -31,6 +31,7 @@ export const CONTROLE_PADRAO = {
   textos: {},                // { "texto original": "texto novo" } — modo edição do admin
   tema: {},                  // { ouro, fonte, raio, largura } — idem
   estilos: {},               // { "seletor": { cor, tamanho, esconder } } — idem
+  popup: null,               // { id, texto } — aparece uma vez pra cada um
 };
 
 function cabecalhos(token) {
@@ -120,6 +121,7 @@ export function avaliar(controle, { id, conta, versao } = {}) {
     textos: controle.textos ?? {},
     tema: controle.tema ?? {},
     estilos: controle.estilos ?? {},
+    popup: controle.popup ?? null,
   };
 }
 
