@@ -660,7 +660,17 @@ h2:first-child{margin-top:0}
 .rotas .lista3 .caixaCamp .tirar{background:none;border:0;color:var(--apagado);cursor:pointer;font-size:12px;padding:0 4px}
 .rotas .lista3 .caixaCamp .tirar:hover{color:var(--der)}
 .rotas .feiticos{display:flex;gap:4px;width:150px;flex:0 0 150px}
-.rotas .feiticos select{flex:1;min-width:0;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);font:inherit;font-size:12px;padding:5px 4px;border-radius:var(--r-s)}
+.rotas .feiticos{position:relative}
+.feitBt{width:36px;height:36px;padding:0;background:var(--f0);border:1px solid var(--borda-forte);border-radius:var(--r-s);cursor:pointer;
+  display:grid;place-items:center;color:var(--apagado);font-size:18px;overflow:hidden}
+.feitBt:hover{border-color:var(--ouro)}
+.feitBt img{width:100%;height:100%;object-fit:cover;display:block}
+.feitMenu{position:absolute;right:0;top:calc(100% + 4px);z-index:6;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;
+  background:var(--f2);border:1px solid var(--borda-forte);border-radius:var(--r-m);padding:6px;box-shadow:0 8px 24px rgba(0,0,0,.45);width:210px}
+.feitMenu button{display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:1px solid transparent;border-radius:var(--r-s);
+  padding:4px 2px;cursor:pointer;color:var(--fraco);font:inherit;font-size:10.5px}
+.feitMenu button img{width:32px;height:32px;border-radius:var(--r-s);background:var(--f3)}
+.feitMenu button:hover{background:var(--f3);color:var(--texto)} .feitMenu button.on{border-color:var(--ouro);color:var(--ouro-claro)}
 .rotas .cab span.fe{width:150px}
 .rotas .cab span{width:200px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700}
 .caixaCamp{position:relative;display:flex;align-items:center;gap:8px;width:220px;background:var(--f0);
@@ -2478,10 +2488,25 @@ function definirCampeao(tipo, rota, i, nome){
 }
 const FEITICOS = [[4,'Flash'],[14,'Ignite'],[11,'Smite'],[12,'TP'],[3,'Exhaust'],[7,'Heal'],[21,'Barrier'],[1,'Cleanse'],[6,'Ghost']];
 function feiticoMudar(rota, i, valor){
-  const f = ((cfg.champSelect.feiticos ??= {})[rota] ??= [4, 14]);
+  const f = ((cfg.champSelect.feiticos ??= {})[rota] ??= [0, 0]);
   f[i] = Number(valor);
-  gravar();
+  // Mesmo feitiço nos dois? Tira do outro lado.
+  if (f[1 - i] === f[i]) f[1 - i] = 0;
+  gravar(); fecharFeiticos(); desenharRotas();
 }
+/* Escolha de feitiço: ícones num balão em cima do botão. */
+function abrirFeiticos(ev, rota, i){
+  ev.stopPropagation();
+  fecharFeiticos();
+  const atual = (cfg.champSelect.feiticos?.[rota] ?? [])[i];
+  const menu = document.createElement('div');
+  menu.className = 'feitMenu';
+  menu.innerHTML = FEITICOS.map(([id, nome]) => `<button type="button" class="${atual===id?'on':''}" title="${nome}" onclick="feiticoMudar('${rota}',${i},${id})"><img src="/feitico/${id}" alt=""><span>${nome}</span></button>`).join('');
+  ev.currentTarget.parentElement.appendChild(menu);
+}
+function fecharFeiticos(){ document.querySelectorAll('.feitMenu').forEach(m => m.remove()); }
+document.addEventListener('click', (ev) => { if(!ev.target.closest('.feitMenu')) fecharFeiticos(); });
+document.addEventListener('keydown', (ev) => { if(ev.key === 'Escape') fecharFeiticos(); });
 
 function desenharRotas(){
   const foco = document.activeElement?.id;
@@ -2495,8 +2520,8 @@ function desenharRotas(){
         ${l[i] ? `<button class="tirar" title="tirar" onclick="definirCampeao('${tipo}','${r}',${i},null)">✕</button>` : ''}
         <div class="lupa" id="lupa-${caixaId(tipo, r, i)}" hidden></div>
       </div>`).join('')}</div>`; }).join('')}
-    <div class="feiticos">${[0,1].map(i => { const atual = (cfg.champSelect.feiticos?.[r] ?? [])[i];
-      return `<select onchange="feiticoMudar('${r}',${i},this.value)" title="feitiço ${i+1}"><option value="">—</option>${FEITICOS.map(([id, nome]) => `<option value="${id}" ${atual===id?'selected':''}>${nome}</option>`).join('')}</select>`; }).join('')}</div>
+    <div class="feiticos">${[0,1].map(i => { const atual = (cfg.champSelect.feiticos?.[r] ?? [])[i]; const nome = FEITICOS.find(([id]) => id === atual)?.[1];
+      return `<button class="feitBt" type="button" title="${nome ?? 'feitiço ' + (i+1)}" onclick="abrirFeiticos(event,'${r}',${i})">${atual ? `<img src="/feitico/${atual}" alt="">` : '<span>+</span>'}</button>`; }).join('')}</div>
   </div>`).join('');
   for (const r of ROLES_CFG) for (const tipo of ['picks','bans']) {
     const n = Math.min(listaDe(tipo, r).length + 1, MAX_POR_ROTA);

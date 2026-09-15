@@ -236,7 +236,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
 
     /* ---- feitiços por rota, uma vez por seleção ---- */
     const feiticos = cfg.feiticos?.[role];
-    if (Array.isArray(feiticos) && feiticos.length === 2 && !fase.feiticosFeitos && permite('escolher')) {
+    if (Array.isArray(feiticos) && feiticos.length === 2 && feiticos.every((f) => Number(f) > 0) && !fase.feiticosFeitos && permite('escolher')) {
       fase.feiticosFeitos = true;
       aplicarSpells(lcu, feiticos.map(Number))
         .then(() => log(`feitiços de ${role} aplicados`))
