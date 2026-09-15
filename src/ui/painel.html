@@ -683,7 +683,8 @@ h2:first-child{margin-top:0}
 .teclas5 .tecla::before{content:attr(data-n) " ";color:var(--apagado);font-weight:400}
 .tecla{background:var(--f0);border:1px solid var(--borda-forte);color:var(--ouro-claro);font:inherit;font-size:12.5px;font-weight:700;
   padding:6px 12px;border-radius:var(--r-s);cursor:pointer;min-width:150px;letter-spacing:.3px}
-.tecla:hover{border-color:var(--ouro)} .tecla.gravando{border-color:var(--ouro);color:var(--apagado);font-weight:400}
+.tecla:hover{border-color:var(--ouro)}
+.tecla.falhou{border-color:#5c2226;color:var(--der)} .tecla.falhou::after{content:" — não registrou";font-weight:400;font-size:10.5px} .tecla.gravando{border-color:var(--ouro);color:var(--apagado);font-weight:400}
 .caixaCamp{position:relative;display:flex;align-items:center;gap:8px;width:220px;background:var(--f0);
   border:1px solid var(--borda-forte);border-radius:var(--r-s);padding:4px 8px 4px 4px}
 .caixaCamp:focus-within{border-color:var(--ouro)}
@@ -2624,9 +2625,9 @@ const teclaBonita = (a) => String(a ?? '').replace('Control', 'Ctrl').replace(/\
 function desenharTeclas(){
   const at = { ...ATALHO_PADRAO, ...(cfg.atalhos ?? {}) };
   const fl = Array.isArray(at.flashes) && at.flashes.length === 5 ? at.flashes : ATALHO_PADRAO.flashes;
-  fl.forEach((a, i) => { const b = $('#tFlash' + i); b.textContent = teclaBonita(a); b.dataset.n = (i + 1) + 'º'; });
-  $('#tOverlay').textContent = teclaBonita(at.overlay);
-  $('#tPainel').textContent = teclaBonita(at.painel);
+  fl.forEach((a, i) => { const b = $('#tFlash' + i); b.textContent = teclaBonita(a); b.dataset.n = (i + 1) + 'º'; b.dataset.acel = a; });
+  $('#tOverlay').textContent = teclaBonita(at.overlay); $('#tOverlay').dataset.acel = at.overlay;
+  $('#tPainel').textContent = teclaBonita(at.painel); $('#tPainel').dataset.acel = at.painel;
 }
 function capturarTecla(qual, botao){
   botao.classList.add('gravando'); botao.textContent = 'aperta a combinação… (Esc cancela)';
@@ -2694,6 +2695,9 @@ async function tick(){
     $('#estClient').textContent = e.conectado ? 'client conectado' : 'client desconectado';
     $('#conta').textContent = e.conta ?? '—';
     if (e.versao) { $('#versao').textContent = 'v' + e.versao; $('#cfgVersao').textContent = 'v' + e.versao; }
+    // Tecla que não registrou fica vermelha na Configuração.
+    const reg = e.atalhos ?? {};
+    document.querySelectorAll('.tecla').forEach((b) => { const acel = b.dataset.acel; if (acel && acel in reg) b.classList.toggle('falhou', !reg[acel]); });
     // Painel de controle: bloqueio cobre tudo; aviso e "atualize" vão na barra.
     const ctl = e.controle ?? {};
     $('#bloqueio').hidden = !ctl.bloqueado;

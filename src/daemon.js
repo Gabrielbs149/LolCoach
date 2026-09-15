@@ -424,6 +424,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       objetivos: objs,
       falas: partidaVivo.falas.slice(-12),
       flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
+      // Pro overlay: cada inimigo com a tecla que marca o flash dele.
+      inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
+        const f = partidaVivo.flashes.get(j.nome);
+        return { posicao: i + 1, campeao: j.campeao, role: j.role, morto: j.morto, nivel: j.nivel,
+          tecla: config.atalhos?.flashes?.[i] ?? null, flashEm: f ? Math.max(0, Math.round(f.volta - estado.tempo)) : null, flashMarcado: !!f };
+      }),
     };
   }
 
@@ -433,7 +439,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * janela ao vivo). Flash volta em 5:00 — 4:28 com bota da Ionia.
    */
   const IONIA = 3158;
-  function marcarFlash({ posicao, nome } = {}) {
+  async function marcarFlash({ posicao, nome } = {}) {
+    if (!partidaVivo?.ultimoEstado) await vivo().catch(() => null);
     if (!partidaVivo?.ultimoEstado) throw new Error('sem partida rodando');
     const e = partidaVivo.ultimoEstado;
     const inimigos = e.jogadores.filter((j) => j.time !== e.eu.time);

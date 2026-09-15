@@ -268,7 +268,7 @@ function abrirOverlay() {
   if (janelaOverlay && !janelaOverlay.isDestroyed()) { if (!janelaOverlay.isVisible()) janelaOverlay.showInactive(); return; }
   const tela = screen.getPrimaryDisplay().workArea;
   janelaOverlay = new BrowserWindow({
-    width: 360, height: 220, x: tela.x + 12, y: tela.y + Math.round(tela.height * 0.32),
+    width: 344, height: 330, x: tela.x + 10, y: tela.y + Math.round(tela.height * 0.28),
     transparent: true, frame: false, alwaysOnTop: true, skipTaskbar: true, focusable: false,
     resizable: false, hasShadow: false, show: false,
     webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
@@ -302,7 +302,14 @@ function variantesDoFlash(acelerador) {
 function registrarAtalhos(cfg) {
   globalShortcut.unregisterAll();
   const at = { overlay: 'Control+Shift+O', painel: 'Control+Shift+L', ...(cfg?.atalhos ?? {}) };
-  const tenta = (acel, fn) => { try { if (acel) globalShortcut.register(acel, fn); } catch { estado.log(`atalho inválido: ${acel}`); } };
+  const resultado = {};
+  const tenta = (acel, fn) => {
+    if (!acel) return;
+    let ok = false;
+    try { ok = globalShortcut.register(acel, fn); } catch { ok = false; }
+    resultado[acel] = ok;
+    if (!ok) estado.log(`não consegui registrar a tecla ${acel} (outro programa usa? NumLock desligado?)`);
+  };
   // Uma tecla por inimigo (1º ao 5º). Config antigo com `flash` único: deriva.
   const flashes = Array.isArray(at.flashes) && at.flashes.length ? at.flashes : variantesDoFlash(at.flash);
   flashes.slice(0, 5).forEach((acel, i) => tenta(acel, () => {
@@ -318,6 +325,8 @@ function registrarAtalhos(cfg) {
     if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
     if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
   });
+  estado.set('atalhos', resultado);
+  estado.log(`teclas: ${Object.entries(resultado).map(([k, v]) => `${k} ${v ? 'ok' : 'FALHOU'}`).join(', ')}`);
 }
 
 function criarBandeja() {

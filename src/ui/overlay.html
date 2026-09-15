@@ -4,59 +4,85 @@
 <meta charset="utf-8">
 <title>LolCoach — overlay</title>
 <style>
-/* Janela transparente, sempre por cima, que não aceita clique nem foco. Só
-   mostra o que importa no segundo: timers, flashes marcados e a última
-   fala. Fundo escuro translúcido pra ler em cima de qualquer mapa. */
-:root{--ouro:#c8aa6e;--ouro-claro:#f0d9a8;--texto:#eef3f8;--fraco:#b7c3d0;--vit:#4ed093;--der:#f07a7a;--g2:#e0a03f}
+/* Janela transparente, sempre por cima, sem clique nem foco. Um painel de
+   HUD: relógio e placar em cima, objetivos, os cinco inimigos com a tecla
+   que marca o flash de cada um, e a última fala da voz. */
+:root{--ouro:#c8aa6e;--ouro-claro:#f0d9a8;--texto:#f2f6fa;--fraco:#aab8c6;--apagado:#7a8a9a;--vit:#4ed093;--der:#f07a7a;--g2:#e0a03f;--fundo:rgba(6,9,14,.82)}
 *{box-sizing:border-box}
 html,body{margin:0;background:transparent;overflow:hidden}
-body{font:13px/1.35 "Segoe UI",system-ui,sans-serif;color:var(--texto);-webkit-font-smoothing:antialiased;padding:6px}
-.caixa{background:rgba(7,10,15,.78);border:1px solid rgba(200,170,110,.35);border-radius:6px;padding:8px 10px;
-  text-shadow:0 1px 2px #000;box-shadow:0 4px 14px rgba(0,0,0,.5);max-width:340px}
-.topo{display:flex;align-items:baseline;gap:8px;margin-bottom:4px}
-.topo b{color:var(--ouro);font-size:15px;font-variant-numeric:tabular-nums}
-.topo span{color:var(--fraco);font-size:10.5px;text-transform:uppercase;letter-spacing:.8px}
-.objs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:5px}
-.obj{background:rgba(255,255,255,.06);border-radius:4px;padding:2px 7px;font-size:12px;font-variant-numeric:tabular-nums}
-.obj b{color:var(--fraco);font-weight:600;margin-right:4px}
-.obj.vivo{background:rgba(200,170,110,.25);color:var(--ouro-claro)}
-.flashes{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:5px}
-.fl{background:rgba(224,85,85,.25);border-radius:4px;padding:2px 7px;font-size:12px;font-variant-numeric:tabular-nums}
-.fl.voltou{background:rgba(78,208,147,.25)}
-.fala{font-size:12.5px;color:var(--texto);border-top:1px solid rgba(255,255,255,.12);padding-top:5px;margin-top:2px}
+body{font:12.5px/1.3 "Segoe UI",system-ui,sans-serif;color:var(--texto);-webkit-font-smoothing:antialiased;padding:4px}
+.hud{width:332px;background:var(--fundo);border:1px solid rgba(200,170,110,.5);border-radius:8px;overflow:hidden;
+  box-shadow:0 6px 18px rgba(0,0,0,.55);text-shadow:0 1px 1px rgba(0,0,0,.8)}
+.hud.oculto{display:none}
+.topo{display:flex;align-items:center;gap:10px;padding:7px 10px;background:linear-gradient(90deg,rgba(200,170,110,.18),transparent);border-bottom:1px solid rgba(255,255,255,.08)}
+.topo img{width:26px;height:26px;border-radius:5px;border:1px solid var(--ouro)}
+.topo .t{font-size:17px;font-weight:800;color:var(--ouro-claro);font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.topo .kda{margin-left:auto;font-weight:700;font-variant-numeric:tabular-nums}
+.topo .kda span{color:var(--fraco);font-weight:500;font-size:11px;margin-left:5px}
+.objs{display:grid;grid-template-columns:repeat(3,1fr);border-bottom:1px solid rgba(255,255,255,.08)}
+.obj{padding:6px 8px;border-right:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:7px}
+.obj:last-child{border-right:0}
+.obj i{width:8px;height:8px;border-radius:50%;flex:0 0 8px}
+.obj.dragao i{background:#e0a03f} .obj.arauto i{background:#a970d8} .obj.barao i{background:#c8aa6e}
+.obj b{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--apagado);font-weight:700}
+.obj span{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.obj.vivo span{color:var(--ouro-claro)} .obj.perto span{color:var(--g2)}
+.cab{display:flex;align-items:center;justify-content:space-between;padding:5px 10px 2px;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700}
+.ini{display:grid;grid-template-columns:22px 1fr auto 70px;align-items:center;gap:7px;padding:3px 10px}
+.ini img{width:22px;height:22px;border-radius:4px;background:#1a2230}
+.ini.morto img{filter:grayscale(1);opacity:.5}
+.ini .n{font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ini .n small{color:var(--apagado);font-weight:500;margin-left:4px}
+.ini kbd{font:700 10px/1 "Segoe UI",system-ui;color:var(--fraco);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:2px 5px;white-space:nowrap}
+.ini .f{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:12px}
+.ini .f .bar{display:block;height:3px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:3px;overflow:hidden}
+.ini .f .bar i{display:block;height:100%;background:var(--der)}
+.ini .f.usado{color:var(--der)} .ini .f.voltou{color:var(--vit)} .ini .f.livre{color:var(--apagado);font-weight:500}
+.fala{display:flex;gap:8px;align-items:flex-start;padding:7px 10px 8px;margin-top:3px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;color:var(--texto)}
+.fala::before{content:"🔊";font-size:12px;opacity:.8}
 .fala.u3{color:var(--der)} .fala.u2{color:var(--g2)}
-.dica{font-size:10px;color:var(--fraco);margin-top:4px}
-.oculto{display:none}
 </style>
 </head>
 <body>
-<div class="caixa" id="caixa"></div>
+<div class="hud oculto" id="hud"></div>
 <script>
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const mmss = (s) => `${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`;
-let ultimaFala = null, ultimaFalaEm = 0, ultimoJson = '';
+const tecla = (a) => String(a ?? '').replace('Control', 'Ctrl').replace(/^num(\d)$/, 'Num $1');
+let porNome = new Map(), ultimaFala = null, ultimaFalaEm = 0, ultimoJson = '';
+fetch('/api/campeoes').then(r => r.json()).then(l => { porNome = new Map(l.map(c => [c.nome.toLowerCase().replace(/[^a-z]/g,''), c.id])); }).catch(() => {});
+const icone = (nome) => { const id = porNome.get(String(nome ?? '').toLowerCase().replace(/[^a-z]/g,'')); return id ? `<img src="/icone/${id}" alt="">` : '<span></span>'; };
+const CLS = { 'Dragão': 'dragao', 'Arauto': 'arauto', 'Barão': 'barao' };
+
 function desenhar(d){
-  const caixa = document.getElementById('caixa');
-  if(!d.emJogo){ caixa.classList.add('oculto'); return; }
-  caixa.classList.remove('oculto');
-  const e = d.estado;
-  const objs = (d.objetivos ?? []).map(o => `<span class="obj ${o.vivo?'vivo':''}"><b>${esc(o.nome)}</b>${o.vivo ? 'no mapa' : esc(o.quando.replace('em ',''))}</span>`).join('');
-  const fls = (d.flashes ?? []).map(f => `<span class="fl ${f.em>0?'':'voltou'}">${esc(f.campeao)} ${f.em>0 ? 'F ' + mmss(f.em) : 'F ✓'}</span>`).join('');
-  // A última fala fica 12s na tela.
+  const hud = document.getElementById('hud');
+  if(!d.emJogo){ hud.classList.add('oculto'); return; }
+  hud.classList.remove('oculto');
+  const e = d.estado, eu = e.eu;
+  const objs = (d.objetivos ?? []).map(o => `<div class="obj ${CLS[o.nome] ?? ''} ${o.vivo ? 'vivo' : (o.em <= 60 ? 'perto' : '')}"><i></i><div><b>${esc(o.nome)}</b><span>${o.vivo ? 'no mapa' : mmss(o.em)}</span></div></div>`).join('');
+  const inis = (d.inimigos ?? []).map(j => {
+    const f = j.flashMarcado ? (j.flashEm > 0 ? 'usado' : 'voltou') : 'livre';
+    const txt = j.flashMarcado ? (j.flashEm > 0 ? mmss(j.flashEm) : 'flash ✓') : 'flash?';
+    const pct = j.flashMarcado && j.flashEm > 0 ? Math.round(j.flashEm / 300 * 100) : 0;
+    return `<div class="ini ${j.morto ? 'morto' : ''}">${icone(j.campeao)}<span class="n">${esc(j.campeao)}<small>${esc(j.role ?? '')}</small></span>
+      ${j.tecla ? `<kbd>${esc(tecla(j.tecla))}</kbd>` : '<span></span>'}
+      <span class="f ${f}">${txt}${pct ? `<span class="bar"><i style="width:${pct}%"></i></span>` : ''}</span></div>`;
+  }).join('');
   const ultima = (d.falas ?? []).at(-1);
   if (ultima && ultima.seq !== ultimaFala?.seq) { ultimaFala = ultima; ultimaFalaEm = Date.now(); }
   const mostraFala = ultimaFala && Date.now() - ultimaFalaEm < 12000;
   const urgente = (d.conselhos ?? []).find(c => c.urgencia === 3);
-  caixa.innerHTML = `<div class="topo"><b>${mmss(e.tempo)}</b><span>${esc(e.eu.campeao)} · ${e.eu.kills}/${e.eu.mortes}/${e.eu.assists}</span></div>
-    ${objs ? `<div class="objs">${objs}</div>` : ''}
-    ${fls ? `<div class="flashes">${fls}</div>` : ''}
-    ${mostraFala ? `<div class="fala u${ultimaFala.prioridade ?? 1}">${esc(ultimaFala.serio)}</div>` : (urgente ? `<div class="fala u3">${esc(urgente.titulo)}</div>` : '')}
-    <div class="dica">Ctrl+Alt+1..5 marca flash · Ctrl+Shift+O esconde</div>`;
+  hud.innerHTML = `<div class="topo">${icone(eu.campeao)}<span class="t">${mmss(e.tempo)}</span>
+      <span class="kda">${eu.kills}/${eu.mortes}/${eu.assists}<span>${eu.cs ?? 0} cs</span></span></div>
+    <div class="objs">${objs}</div>
+    <div class="cab"><span>Inimigos</span><span>tecla = flash usado</span></div>
+    ${inis}
+    ${mostraFala ? `<div class="fala u${ultimaFala.prioridade ?? 1}">${esc(ultimaFala.serio)}</div>` : (urgente ? `<div class="fala u3">${esc(urgente.titulo)}</div>` : '')}`;
 }
 async function tick(){
   try {
     const d = await fetch('/api/vivo').then(r => r.json());
-    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.flashes, d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes]);
+    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos, d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
     if (json === ultimoJson && Date.now() - ultimaFalaEm > 13000) return;
     ultimoJson = json;
     desenhar(d);
