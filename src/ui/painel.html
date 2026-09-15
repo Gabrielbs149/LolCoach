@@ -905,7 +905,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     </div>
 
     <h2>Quem usa <span id="admQuantos" style="text-transform:none;letter-spacing:0"></span></h2>
-    <div class="acoes"><button class="acao" onclick="carregarAdmin(true)">Atualizar</button></div>
+    <div class="acoes"><button class="acao" onclick="carregarAdmin(true)">Atualizar</button><span class="dica" id="admDownloads" style="margin:0;align-self:center"></span></div>
     <div class="amRolagem" id="admUsuarios"></div>
   </section>
 
@@ -1972,6 +1972,11 @@ function desenharAdmin(){
     `<button class="${desligadas.has(k)?'on':''}" onclick="alternarFuncao('${k}')" title="${desligadas.has(k)?'desligada pra todos — clique pra ligar':'ligada — clique pra desligar pra todos'}">${desligadas.has(k)?'✕ ':''}${nome}</button>`).join('');
 
   $('#admQuantos').textContent = `· ${usuarios.length}`;
+  // Quem baixou o instalador (contagem do GitHub) — nomes só aparecem depois
+  // que o app da pessoa se apresenta, o que começou na 2.8.0.
+  const dl = admDados.downloads ?? [];
+  const total = dl.reduce((s, d) => s + d.downloads, 0);
+  $('#admDownloads').textContent = dl.length ? `instalador baixado ${total}× · ${dl.filter(d => d.downloads).slice(0, 4).map(d => `v${d.versao}: ${d.downloads}`).join(' · ')} · quem está antes da 2.8.0 aparece quando atualizar` : '';
   if(!usuarios.length){ $('#admUsuarios').innerHTML = '<div class="vazio">ninguém se apresentou ainda</div>'; return; }
   const ESTADO = { liberado: ['ok','liberado'], bloqueado: ['nao','bloqueado'], esperando: ['esperando','esperando'] };
   $('#admUsuarios').innerHTML = `<table class="admTabela">

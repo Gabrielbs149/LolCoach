@@ -1,3 +1,4 @@
+process.env.LOLCOACH_DEV = '1';   // não se apresenta no painel de controle
 import { iniciarDaemon } from '../src/daemon.js';
 import { criarServidor, criarEstado } from '../src/ui/servidor.js';
 

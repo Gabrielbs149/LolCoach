@@ -111,7 +111,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
   async function apresentar() {
     const token = tokenControle();
-    if (!token) return;
+    if (!token || process.env.LOLCOACH_DEV) return;   // o dev server não é um usuário
     try {
       const tags = await tagsConhecidas();
       const partidas = db.prepare('SELECT COUNT(*) n FROM partidas').get().n;
@@ -140,8 +140,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   };
   async function adminUsuarios() {
     const token = exigirAdmin();
-    const [usuarios, controle] = await Promise.all([Controle.listarUsuarios(token), Controle.lerControle(token)]);
-    return { usuarios, controle, eu: quemSou() };
+    const [usuarios, controle, downloads] = await Promise.all([
+      Controle.listarUsuarios(token), Controle.lerControle(token), Controle.downloadsDoInstalador().catch(() => []),
+    ]);
+    return { usuarios, controle, downloads, eu: quemSou() };
   }
   async function adminEsquecer({ id } = {}) {
     const token = exigirAdmin();

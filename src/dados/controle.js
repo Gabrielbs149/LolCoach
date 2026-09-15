@@ -134,3 +134,17 @@ export async function esquecerUsuario(token, id) {
   }).then((r) => { if (!r.ok) throw new Error(`GitHub DELETE → HTTP ${r.status}`); });
   return true;
 }
+
+/** Quantas vezes cada instalador foi baixado — releases públicas, sem token. */
+export async function downloadsDoInstalador() {
+  const r = await fetch('https://api.github.com/repos/Gabrielbs149/LolCoach/releases?per_page=50', {
+    headers: { 'User-Agent': 'LolCoach', Accept: 'application/vnd.github+json' }, signal: AbortSignal.timeout(15_000),
+  });
+  if (!r.ok) return [];
+  const lista = await r.json();
+  return lista.map((rel) => ({
+    versao: String(rel.tag_name ?? '').replace(/^v/, ''),
+    downloads: (rel.assets ?? []).filter((a) => a.name.endsWith('.exe')).reduce((s, a) => s + (a.download_count ?? 0), 0),
+    em: rel.published_at,
+  })).filter((x) => x.versao);
+}
