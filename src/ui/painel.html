@@ -722,8 +722,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   padding:11px 13px;font-size:11px;line-height:1.75;max-height:520px;overflow:auto;margin:0;
   color:var(--fraco);white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace}
 
-#quadroVivo{width:100%;height:calc(100vh - 110px);border:1px solid var(--borda);
-  border-radius:var(--r-m);background:var(--f0)}
 
 .vazio{color:var(--apagado);font-size:12px;padding:30px;text-align:center;background:var(--f1);
   border:1px solid var(--borda);border-radius:var(--r-m)}
@@ -822,8 +820,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <button data-aba="amigos" title="Amigos">
       <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c3 0 5 2 5 5"/></svg><span class="nome">Amigos</span></button>
     <div class="grupo">Jogo</div>
-    <button data-aba="vivo" title="Ao vivo">
-      <svg viewBox="0 0 24 24"><path d="M2 12h4l3-7 4 14 3-7h6"/></svg><span class="nome">Ao vivo</span></button>
     <button data-aba="builds" title="Builds">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
     <button data-aba="patch" title="Patch">
@@ -967,11 +963,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="detalhe">
     <button class="voltar" onclick="abrirAba(origemDetalhe)">← Voltar</button>
     <div id="det"></div>
-  </section>
-
-  <section id="vivo">
-    <div class="titulo">Partida ao vivo</div>
-    <iframe id="quadroVivo" data-src="/vivo" title="Partida ao vivo"></iframe>
   </section>
 
   <section id="admin">
@@ -2695,9 +2686,6 @@ async function tick(){
  */
 const CARREGADORES = {
   estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin,
-  // O iframe do ao vivo só nasce quando a aba é aberta: antes ele ficava
-  // consultando a API do jogo a cada 2s mesmo com o painel escondido.
-  vivo: () => { const q = document.getElementById('quadroVivo'); if (!q.src) q.src = q.dataset.src; },
 };
 const jaCarregou = new Set();
 

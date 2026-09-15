@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut, screen } from 'electron';
 import { cp, mkdir, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -210,8 +210,24 @@ let janelaVivo = null;
  * e ali roubar foco não custa nada — e sem ativar (`showInactive`). Quando o
  * jogo começa, ela já está aberta onde ele a deixou.
  */
+/**
+ * A segunda tela: qualquer monitor que não seja o principal (onde o jogo
+ * roda). Com um monitor só, null — e a janela abre pequena, sem foco.
+ */
+function segundaTela() {
+  const principal = screen.getPrimaryDisplay();
+  return screen.getAllDisplays().find((d) => d.id !== principal.id) ?? null;
+}
+
+/**
+ * A tela ao vivo é uma janela própria, aberta na seleção de campeão e SEMPRE
+ * na segunda tela, ocupando ela inteira. Nunca rouba o foco: showInactive.
+ * Com um monitor só, abre do lado, pequena, também sem foco.
+ */
 function abrirVivo({ focar = true } = {}) {
+  const tela = segundaTela();
   if (janelaVivo && !janelaVivo.isDestroyed()) {
+    if (tela) posicionarNaTela(janelaVivo, tela);
     if (focar) { janelaVivo.show(); janelaVivo.focus(); }
     else if (!janelaVivo.isVisible()) janelaVivo.showInactive();
     return;
@@ -222,14 +238,20 @@ function abrirVivo({ focar = true } = {}) {
     title: 'LolCoach — ao vivo',
     autoHideMenuBar: true,
     show: false,
+    ...(tela ? { x: tela.workArea.x, y: tela.workArea.y, width: tela.workArea.width, height: tela.workArea.height } : {}),
     webPreferences: { nodeIntegration: false, contextIsolation: true },
   });
   janelaVivo.loadURL(endereco ? `${endereco}/vivo` : PAGINA_DE_ERRO('o painel local não subiu.'));
   janelaVivo.once('ready-to-show', () => {
     if (janelaVivo?.isDestroyed()) return;
+    if (tela) posicionarNaTela(janelaVivo, tela);
     if (focar) janelaVivo.show(); else janelaVivo.showInactive();
   });
   janelaVivo.on('closed', () => { janelaVivo = null; });
+}
+function posicionarNaTela(j, tela) {
+  const a = tela.workArea;
+  j.setBounds({ x: a.x, y: a.y, width: a.width, height: a.height });
 }
 
 function criarBandeja() {
