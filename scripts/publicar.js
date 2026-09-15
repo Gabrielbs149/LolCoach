@@ -29,24 +29,28 @@ if (!token) {
 }
 
 /**
- * A chave da Riot vai junto no pacote (resources/chave.json) pra ninguém
- * precisar de chave própria. Sai do config do Gabriel, nunca do git.
+ * As chaves vão junto no pacote (resources/chave.json): a da Riot, pra
+ * ninguém precisar de chave própria, e o token do GitHub do repositório
+ * privado de controle (painel admin). Saem do config do Gabriel, nunca do git.
  */
 const { writeFileSync, readFileSync: ler } = await import('node:fs');
-function chaveDaRiot() {
-  if (process.env.RIOT_KEY) return process.env.RIOT_KEY;
+function doConfig(pega) {
   for (const arq of [
     new URL('../config.json', import.meta.url),
     `${process.env.APPDATA}\\LolCoach\\config.json`,
   ]) {
-    try { const k = JSON.parse(ler(arq, 'utf8')).riot?.apiKey; if (k) return k; } catch { /* próximo */ }
+    try { const v = pega(JSON.parse(ler(arq, 'utf8'))); if (v) return v; } catch { /* próximo */ }
   }
   return null;
 }
-const chave = chaveDaRiot();
+const chave = process.env.RIOT_KEY ?? doConfig((c) => c.riot?.apiKey);
 if (!chave) { console.error('sem chave da Riot pra embutir: preencha riot.apiKey no config.json ou defina RIOT_KEY'); process.exit(1); }
-writeFileSync(new URL('../chave-embutida.json', import.meta.url), JSON.stringify({ apiKey: chave }) + '\n', 'utf8');
-console.log('chave da Riot embutida');
+// Sem o token o app continua funcionando, só não se apresenta nem obedece ao painel.
+const githubToken = process.env.LOLCOACH_GH_TOKEN ?? doConfig((c) => c.controle?.githubToken);
+if (!githubToken) console.warn('AVISO: sem controle.githubToken no config.json — o painel admin não vai funcionar nesta versão');
+writeFileSync(new URL('../chave-embutida.json', import.meta.url),
+  JSON.stringify({ apiKey: chave, ...(githubToken ? { githubToken } : {}) }) + '\n', 'utf8');
+console.log(`chave da Riot embutida${githubToken ? ' + token do controle' : ''}`);
 
 const { owner, repo } = pkg.build.publish[0];
 const tag = `v${pkg.version}`;

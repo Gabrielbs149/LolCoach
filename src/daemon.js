@@ -8,6 +8,9 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { randomUUID } from 'node:crypto';
+import { release as versaoDoWindows } from 'node:os';
+import * as Controle from './dados/controle.js';
 
 /**
  * Liga tudo: aceitar fila, seleção de campeão, runas e coleta.
@@ -67,16 +70,105 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   });
   lcu.on('falha', (erro) => log(`client não respondeu (${erro.message}) — continuo tentando`));
 
+  /* ----------------------------------------------------------- controle */
+  /**
+   * O painel admin do Gabriel: um repositório privado no GitHub diz quem
+   * pode usar e o que está desligado. Este app lê isso ao abrir e a cada 10
+   * minutos, e se apresenta (check-in) ao abrir e a cada hora. Sem token
+   * (versão sem chave embutida) nada disso roda e tudo fica liberado.
+   */
+  const versao = await versaoDoApp();
+  const tokenControle = () => config.controle?.githubToken ?? null;
+  let avaliacao = Controle.avaliar(Controle.CONTROLE_PADRAO, {});
+  const permite = (funcao) => avaliacao.permite(funcao);
+
+  // Id da instalação: nasce uma vez e fica no config, pra bloquear/liberar
+  // alguém mesmo antes de ele logar no client.
+  if (!config.instalacaoId) {
+    config.instalacaoId = randomUUID().slice(0, 8);
+    await salvarConfig({ instalacaoId: config.instalacaoId }).catch(() => {});
+  }
+  const quemSou = () => ({ id: config.instalacaoId, conta: estado?.instantaneo?.().conta ?? null, versao });
+
+  async function sincronizarControle() {
+    const token = tokenControle();
+    if (!token) return;
+    try {
+      const controle = await Controle.lerControle(token);
+      const antes = avaliacao;
+      avaliacao = Controle.avaliar(controle, quemSou());
+      estado?.set('controle', {
+        bloqueado: avaliacao.bloqueado, aviso: avaliacao.aviso, desligadas: avaliacao.desligadas,
+        desatualizado: avaliacao.desatualizado, versaoMinima: avaliacao.versaoMinima,
+      });
+      if (avaliacao.bloqueado && !antes.bloqueado) log('acesso desligado pelo painel de controle');
+      if (!avaliacao.bloqueado && antes.bloqueado) log('acesso liberado pelo painel de controle');
+      if (avaliacao.desligadas.join() !== antes.desligadas.join()) log(avaliacao.desligadas.length ? `desligado pelo painel: ${avaliacao.desligadas.join(', ')}` : 'painel: tudo ligado de novo');
+    } catch (erro) {
+      log(`controle: não consegui ler (${erro.message})`);
+    }
+  }
+
+  async function apresentar() {
+    const token = tokenControle();
+    if (!token) return;
+    try {
+      const tags = await tagsConhecidas();
+      const partidas = db.prepare('SELECT COUNT(*) n FROM partidas').get().n;
+      const eu = quemSou();
+      await Controle.checkIn(token, eu.id, {
+        conta: eu.conta, versao, vistoEm: new Date().toISOString(),
+        contas: [...new Set([eu.conta, ...Object.entries(tags).map(([n, tg]) => `${n}#${tg}`)].filter(Boolean))],
+        so: Number(versaoDoWindows().split('.')[2]) >= 22000 ? 'Windows 11' : 'Windows 10', partidas,
+      });
+    } catch (erro) {
+      log(`controle: não consegui me apresentar (${erro.message})`);
+    }
+  }
+
+  sincronizarControle().then(apresentar);
+  setInterval(sincronizarControle, 10 * 60 * 1000);
+  setInterval(apresentar, 60 * 60 * 1000);
+  // Logou no client: agora sei a conta — reavalia e apresenta de novo.
+  lcu.on('conectado', () => setTimeout(() => sincronizarControle().then(apresentar), 5_000));
+
+  /* ---- painel admin (só pra quem tem admin: true no config) ---- */
+  const exigirAdmin = () => {
+    if (config.admin !== true) throw new Error('só o admin pode fazer isto');
+    if (!tokenControle()) throw new Error('sem token do controle nesta versão');
+    return tokenControle();
+  };
+  async function adminUsuarios() {
+    const token = exigirAdmin();
+    const [usuarios, controle] = await Promise.all([Controle.listarUsuarios(token), Controle.lerControle(token)]);
+    return { usuarios, controle, eu: quemSou() };
+  }
+  async function adminEsquecer({ id } = {}) {
+    const token = exigirAdmin();
+    if (!id || id === config.instalacaoId) throw new Error('id inválido');
+    await Controle.esquecerUsuario(token, String(id).replace(/[^a-zA-Z0-9_-]/g, ''));
+    return { ok: true };
+  }
+  async function adminGravarControle(novo) {
+    const token = exigirAdmin();
+    const atual = await Controle.lerControle(token);
+    const controle = { ...atual, ...novo };
+    await Controle.gravarControle(token, controle);
+    log('painel: controle gravado');
+    await sincronizarControle();
+    return controle;
+  }
+
   // Registrados sempre, lendo a configuração viva: ligar e desligar pela tela
   // não pode exigir reabrir o programa.
   autoAceitar(lcu, {
-    ativo: () => config.autoAceitar.ativo !== false,
+    ativo: () => config.autoAceitar.ativo !== false && permite('aceitar'),
     atrasoMs: () => config.autoAceitar.atrasoMs ?? 0,
     aoAceitar: (erro) => log(erro ? `falha ao aceitar: ${erro.message}` : 'partida aceita'),
     log,
   });
 
-  autoChampSelect(lcu, config, { log });
+  autoChampSelect(lcu, config, { log, permite });
 
   /* ------------------------------------------------------------- coleta */
   let coletando = false;
@@ -625,6 +717,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (!lcu.conectado || ocupado) return;
       const marca = await readFile(marcaBuilds(), 'utf8').then(JSON.parse).catch(() => null);
       if (marca && Date.now() - marca.em < 24 * 60 * 60 * 1000) return;
+      if (!permite('builds')) return;
       log('builds no LoL: primeira vez hoje, começando em segundo plano…');
       aplicarBuildsNoLol().catch((erro) => log(`builds no LoL não rodou: ${erro.message}`));
     }, 30_000);
@@ -664,6 +757,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /** Perfil de uma conta (amigo ou você mesmo), buscando na Riot se precisar. */
   async function amigoPerfil({ nome, tag, forcar = false } = {}) {
     if (!nome || !tag) throw new Error('faltou nome#tag');
+    if (!permite('amigos')) throw new Error('a aba Amigos está desligada pelo painel de controle');
     const { perfilDeAmigo } = await import('./dados/amigos.js');
     log(`buscando perfil de ${nome}#${tag} na Riot…`);
     const p = await perfilDeAmigo(config.riot, { nome, tag }, { forcar });
@@ -698,6 +792,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo,
+    adminUsuarios, adminGravarControle, adminEsquecer,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -744,4 +839,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer',
 ];

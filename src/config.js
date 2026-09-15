@@ -7,20 +7,19 @@ import { caminhoConfig, garantirConfig } from './caminhos.js';
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
 /**
- * A chave da Riot do Gabriel vai dentro do pacote (chave.json em resources,
- * gerado por scripts/publicar.js a partir do config dele — nunca entra no
- * git). Quem não tem chave própria usa essa: ninguém dos amigos precisa
- * criar conta de desenvolvedor pra ver a aba Amigos e puxar histórico.
+ * As chaves do Gabriel vão dentro do pacote (chave.json em resources, gerado
+ * por scripts/publicar.js a partir do config dele — nunca entra no git):
+ * a da Riot, pra ninguém precisar de chave própria, e o token do GitHub do
+ * repositório privado de controle (quem usa, bloqueios, avisos).
  */
-function chaveEmbutida() {
+function chavesEmbutidas() {
   for (const arq of [join(process.resourcesPath ?? '', 'chave.json'), join(AQUI, '..', 'chave-embutida.json')]) {
     try {
       if (!existsSync(arq)) continue;
-      const { apiKey } = JSON.parse(readFileSync(arq, 'utf8'));
-      if (apiKey) return apiKey;
+      return JSON.parse(readFileSync(arq, 'utf8'));
     } catch { /* arquivo estragado: segue sem */ }
   }
-  return null;
+  return {};
 }
 
 const PADRAO = {
@@ -47,10 +46,13 @@ export async function carregarConfig(caminho = null) {
     const a = PADRAO[chave], b = doUsuario[chave];
     final[chave] = (a && typeof a === 'object' && !Array.isArray(a)) ? { ...a, ...(b ?? {}) } : (b ?? a);
   }
-  // Só em memória: o config.json de quem instalou continua sem a chave.
-  if (!final.riot?.apiKey) {
-    const chave = chaveEmbutida();
-    if (chave) final.riot = { ...(final.riot ?? {}), apiKey: chave, chaveEmbutida: true };
+  // Só em memória: o config.json de quem instalou continua sem as chaves.
+  const embutidas = chavesEmbutidas();
+  if (!final.riot?.apiKey && embutidas.apiKey) {
+    final.riot = { ...(final.riot ?? {}), apiKey: embutidas.apiKey, chaveEmbutida: true };
   }
+  final.controle = { ...(final.controle ?? {}) };
+  if (!final.controle.githubToken && embutidas.githubToken) final.controle.githubToken = embutidas.githubToken;
+  if (!final.controle.githubToken && process.env.LOLCOACH_GH_TOKEN) final.controle.githubToken = process.env.LOLCOACH_GH_TOKEN;   // desenvolvimento
   return final;
 }

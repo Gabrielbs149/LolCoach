@@ -68,7 +68,7 @@ function primeiroLivre(nomes, tabela, fora, permitidos) {
  *    também é consultada de segundo em segundo. Se um evento do client se
  *    perder, a janela de ~30s do ban continua sendo pega.
  */
-export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
+export function autoChampSelect(lcu, config, { log = () => {}, permite = () => true } = {}) {
   let tabela = null;
   let carregandoTabela = null;
   let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false };
@@ -122,7 +122,7 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
         (a) => a.actorCellId === sessao.localPlayerCellId && !a.completed && a.isInProgress);
 
       // A tela tem um interruptor pra escolher e outro pra banir.
-      const desligada = minha && (minha.type === 'ban' ? cfg.banir === false : cfg.escolher === false);
+      const desligada = minha && (minha.type === 'ban' ? (cfg.banir === false || !permite('banir')) : (cfg.escolher === false || !permite('escolher')));
       if (minha && desligada && fase.acaoFeita !== minha.id) {
         fase.acaoFeita = minha.id;
         log(`${minha.type === 'ban' ? 'banir' : 'escolher'} está desligado na configuração — deixando com você`);
@@ -228,7 +228,7 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
 
     /* ---- runas, assim que o campeão estiver definido ---- */
     const meuCampeaoId = meuCell.championId || 0;
-    if (config.runas?.ativo !== false && meuCampeaoId > 0 && fase.runasDe !== meuCampeaoId) {
+    if (config.runas?.ativo !== false && permite('runas') && meuCampeaoId > 0 && fase.runasDe !== meuCampeaoId) {
       fase.runasDe = meuCampeaoId;
       const nome = tabela.porId.get(meuCampeaoId);
       try {
@@ -241,7 +241,7 @@ export function autoChampSelect(lcu, config, { log = () => {} } = {}) {
         log(`runas de ${nome} ${build.role} aplicadas (${build.runas.estatistica}, ${build.fonte})`);
         // O conjunto de itens da loja pra este campeão nesta role — usa o mesmo
         // cache do op.gg, então quase sempre é instantâneo.
-        aplicarConjunto(lcu, nome, meuCampeaoId, role, { regiao: config.runas?.regiao ?? 'br' })
+        if (permite('builds')) aplicarConjunto(lcu, nome, meuCampeaoId, role, { regiao: config.runas?.regiao ?? 'br' })
           .then((r) => log(`itens de ${r.campeao} ${r.role} gravados na loja (${r.blocos} blocos)`))
           .catch((erro) => log(`não consegui gravar os itens de ${nome}: ${erro.message}`));
       } catch (erro) {

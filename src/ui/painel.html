@@ -30,6 +30,8 @@
   --e1:4px; --e2:8px; --e3:14px; --e4:22px;
 }
 *{box-sizing:border-box}
+/* hidden vence qualquer display: sem isto um .l{display:flex} escondido continuava ocupando linha. */
+[hidden]{display:none!important}
 html,body{height:100%}
 body{
   margin:0;background:var(--f0);color:var(--texto);display:flex;overflow:hidden;
@@ -104,6 +106,28 @@ body.recolhida nav button.ativo::before{top:7px;bottom:7px}
 .luz{width:8px;height:8px;border-radius:50%;background:var(--der);flex:0 0 8px}
 .luz.on{background:var(--vit);box-shadow:0 0 8px #31b07399}
 .estado .atualiza{color:var(--ouro);font-weight:650}
+.estado .avisoAdm{color:var(--g2);font-weight:650;white-space:normal;line-height:1.4}
+.bloqueio{position:fixed;inset:0;z-index:50;background:rgba(7,10,15,.96);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
+.bloqueio h1{font-size:22px;margin:0 0 10px;color:var(--der)}
+.bloqueio p{color:var(--fraco);font-size:14px;max-width:420px;margin:0 auto}
+.campoAdm{width:360px;max-width:50%;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);padding:6px 10px;border-radius:var(--r-s);font:inherit;font-size:12.5px}
+.campoAdm.curto{width:120px}
+.campoAdm:focus{outline:none;border-color:var(--ouro)}
+.admTabela{width:100%;border-collapse:collapse;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden;font-size:12.5px}
+.admTabela th,.admTabela td{padding:8px 10px;border-bottom:1px solid var(--borda);text-align:left;white-space:nowrap;vertical-align:middle}
+.admTabela th{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700;background:var(--f2)}
+.admTabela tr:last-child td{border-bottom:0}
+.admTabela td.sub{color:var(--apagado);font-size:11.5px}
+.admTabela .estadoU{font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;padding:2px 8px;border-radius:99px}
+.admTabela .estadoU.ok{background:#123a28;color:#4ed093} .admTabela .estadoU.nao{background:#3a1618;color:#f07a7a}
+.admTabela .estadoU.esperando{background:#241f14;color:var(--g2)}
+.admTabela .acoesU{display:flex;gap:4px;align-items:center}
+.admTabela .acoesU button{background:var(--f2);border:1px solid var(--borda);color:var(--fraco);font:inherit;font-size:11px;padding:4px 9px;border-radius:var(--r-s);cursor:pointer}
+.admTabela .acoesU button:hover{color:var(--texto);border-color:var(--borda-forte)}
+.admTabela .acoesU button.perigo:hover{color:var(--der);border-color:#5c2226}
+.admTabela .acoesU input{width:170px;background:var(--f0);border:1px solid var(--borda);color:var(--texto);padding:4px 8px;border-radius:var(--r-s);font:inherit;font-size:11.5px}
+.admTabela .acoesU input:focus{outline:none;border-color:var(--ouro)}
+.admTabela td.eu{color:var(--ouro-claro)}
 body.recolhida .estado{padding:12px 0;display:grid;place-items:center}
 body.recolhida .estado .l{margin:0}
 body.recolhida .estado .l span:not(.luz),body.recolhida .estado #estFase,body.recolhida .estado #estAtualiza{display:none}
@@ -745,6 +769,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <button data-aba="patch" title="Patch">
       <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
     <div class="grupo">App</div>
+    <button data-aba="admin" title="Admin" id="navAdmin" hidden>
+      <svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="nome">Admin</span></button>
     <button data-aba="config" title="Configuração">
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><span class="nome">Configuração</span></button>
   </nav>
@@ -752,8 +778,17 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div class="l"><span class="luz" id="luz"></span><span id="estClient">client…</span></div>
     <div class="l" id="estFase"></div>
     <div class="l atualiza" id="estAtualiza" hidden></div>
+    <div class="l avisoAdm" id="estAviso" hidden></div>
   </div>
 </aside>
+
+<!-- Acesso desligado pelo painel: cobre tudo. -->
+<div class="bloqueio" id="bloqueio" hidden>
+  <div>
+    <h1>LolCoach desligado pra você</h1>
+    <p id="bloqueioTexto">O Gabriel desligou o seu acesso. Fala com ele.</p>
+  </div>
+</div>
 
 <main>
   <section id="visao" class="ativo">
@@ -843,6 +878,35 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="vivo">
     <div class="titulo">Partida ao vivo</div>
     <iframe id="quadroVivo" data-src="/vivo" title="Partida ao vivo"></iframe>
+  </section>
+
+  <section id="admin">
+    <div class="titulo">Admin <span id="admSalvo" class="salvo"></span></div>
+    <div id="admAviso"></div>
+
+    <h2>Pra todo mundo</h2>
+    <div class="painelCfg">
+      <div class="linhaCfg">
+        <div class="txt"><b>Aviso na barra de todos</b></div>
+        <input class="campoAdm" id="admAvisoGlobal" placeholder="vazio = sem aviso" onchange="salvarControle({ aviso: this.value.trim() })">
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Versão mínima</b><i>abaixo disso aparece "atualize" na barra</i></div>
+        <input class="campoAdm curto" id="admVersaoMinima" placeholder="ex.: 2.7.16" onchange="salvarControle({ versaoMinima: this.value.trim() || null })">
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Só quem está liberado usa</b><i>desligado: todo mundo usa, menos os bloqueados</i></div>
+        <label class="chave"><input type="checkbox" id="admSomente" onchange="salvarControle({ somenteLiberados: this.checked })"><span class="pino"></span></label>
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Funções desligadas pra todos</b></div>
+        <div class="filtros" id="admFuncoes" style="margin:0"></div>
+      </div>
+    </div>
+
+    <h2>Quem usa <span id="admQuantos" style="text-transform:none;letter-spacing:0"></span></h2>
+    <div class="acoes"><button class="acao" onclick="carregarAdmin(true)">Atualizar</button></div>
+    <div class="amRolagem" id="admUsuarios"></div>
   </section>
 
   <section id="config">
@@ -1841,6 +1905,98 @@ function detalheDeAmigo(p){
   </div>`;
 }
 
+/* ================================================================== admin */
+/**
+ * O painel do Gabriel: quem usa (check-ins no repositório privado) e o que
+ * vale pra todos. Só aparece pra quem tem admin: true no config.
+ */
+let admDados = null;
+const FUNCOES_ADM = [['aceitar','Aceitar fila'],['escolher','Travar campeão'],['banir','Banir'],['runas','Runas'],['builds','Builds'],['amigos','Amigos']];
+
+async function carregarAdmin(forcar = false){
+  if(!admDados || forcar) $('#admUsuarios').innerHTML = carregando('lendo o repositório de controle…');
+  const r = await pegar('/api/admin/usuarios');
+  if(r.erro){ $('#admUsuarios').innerHTML = `<div class="vazio">${esc(r.erro)}</div>`; return; }
+  admDados = r;
+  desenharAdmin();
+}
+
+async function salvarControle(parcial){
+  const r = await fetch('/api/admin/controle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(parcial) }).then(x => x.json());
+  if(r.erro){ $('#admAviso').innerHTML = `<div class="aviso amAviso">${esc(r.erro)}</div>`; return; }
+  $('#admAviso').innerHTML = '';
+  admDados.controle = r;
+  const el = $('#admSalvo'); el.textContent = 'salvo'; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1700);
+  desenharAdmin();
+}
+
+const chaveAdm = (x) => String(x ?? '').trim().toLowerCase();
+function estadoDoUsuario(u){
+  const c = admDados.controle;
+  const minhas = [u.id, u.conta, ...(u.contas ?? [])].map(chaveAdm).filter(Boolean);
+  const em = (lista) => (lista ?? []).some(x => minhas.includes(chaveAdm(x)));
+  if(em(c.bloqueados)) return 'bloqueado';
+  if(c.somenteLiberados) return em(c.liberados) ? 'liberado' : 'esperando';
+  return 'liberado';
+}
+function mexerLista(lista, valor, colocar){
+  const l = (admDados.controle[lista] ?? []).filter(x => chaveAdm(x) !== chaveAdm(valor));
+  if(colocar) l.push(valor);
+  return { [lista]: l };
+}
+function bloquear(id){ salvarControle({ ...mexerLista('bloqueados', id, true), ...mexerLista('liberados', id, false) }); }
+function liberar(id){ salvarControle({ ...mexerLista('bloqueados', id, false), ...mexerLista('liberados', id, true) }); }
+function avisoPessoal(id, texto){
+  const avisos = { ...(admDados.controle.avisos ?? {}) };
+  if(texto.trim()) avisos[id] = texto.trim(); else delete avisos[id];
+  salvarControle({ avisos });
+}
+async function esquecerUsuario(id){
+  const r = await fetch('/api/admin/esquecer', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ id }) }).then(x => x.json());
+  if(r.erro){ $('#admAviso').innerHTML = `<div class="aviso amAviso">${esc(r.erro)}</div>`; return; }
+  admDados.usuarios = admDados.usuarios.filter(u => u.id !== id); desenharAdmin();
+}
+function alternarFuncao(f){
+  const d = new Set(admDados.controle.desligadas ?? []);
+  d.has(f) ? d.delete(f) : d.add(f);
+  salvarControle({ desligadas: [...d] });
+}
+
+function desenharAdmin(){
+  const { usuarios, controle, eu } = admDados;
+  if(document.activeElement !== $('#admAvisoGlobal')) $('#admAvisoGlobal').value = controle.aviso ?? '';
+  if(document.activeElement !== $('#admVersaoMinima')) $('#admVersaoMinima').value = controle.versaoMinima ?? '';
+  $('#admSomente').checked = !!controle.somenteLiberados;
+  const desligadas = new Set(controle.desligadas ?? []);
+  $('#admFuncoes').innerHTML = FUNCOES_ADM.map(([k, nome]) =>
+    `<button class="${desligadas.has(k)?'on':''}" onclick="alternarFuncao('${k}')" title="${desligadas.has(k)?'desligada pra todos — clique pra ligar':'ligada — clique pra desligar pra todos'}">${desligadas.has(k)?'✕ ':''}${nome}</button>`).join('');
+
+  $('#admQuantos').textContent = `· ${usuarios.length}`;
+  if(!usuarios.length){ $('#admUsuarios').innerHTML = '<div class="vazio">ninguém se apresentou ainda</div>'; return; }
+  const ESTADO = { liberado: ['ok','liberado'], bloqueado: ['nao','bloqueado'], esperando: ['esperando','esperando'] };
+  $('#admUsuarios').innerHTML = `<table class="admTabela">
+    <thead><tr><th>Conta</th><th>Outras contas</th><th>Versão</th><th>Visto</th><th>Partidas</th><th>Sistema</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${usuarios.map(u => {
+      const st = estadoDoUsuario(u), [cls, rot] = ESTADO[st];
+      const souEu = u.id === eu.id;
+      const outras = (u.contas ?? []).filter(c => c !== u.conta);
+      return `<tr>
+        <td class="${souEu?'eu':''}"><b>${esc(u.conta ?? '—')}</b>${souEu?' (você)':''}<div class="sub">${esc(u.id)}</div></td>
+        <td class="sub">${esc(outras.join(', ') || '—')}</td>
+        <td>${esc(u.versao ?? '?')}</td>
+        <td class="sub" title="${esc(u.vistoEm ?? '')}">${u.vistoEm ? haQuanto(u.vistoEm) : '—'}</td>
+        <td>${num(u.partidas ?? 0)}</td>
+        <td class="sub">${esc(u.so ?? '—')}</td>
+        <td><span class="estadoU ${cls}">${rot}</span></td>
+        <td><div class="acoesU">
+          ${st === 'bloqueado' ? `<button onclick="liberar('${esc(u.id)}')">Liberar</button>`
+            : `${st === 'esperando' ? `<button onclick="liberar('${esc(u.id)}')">Liberar</button>` : ''}<button class="perigo" onclick="bloquear('${esc(u.id)}')" ${souEu?'disabled title="não dá pra se bloquear"':''}>Bloquear</button>`}
+          <input placeholder="aviso só pra essa pessoa" value="${esc(controle.avisos?.[u.id] ?? '')}" onchange="avisoPessoal('${esc(u.id)}', this.value)">
+          ${souEu ? '' : `<button class="perigo" onclick="esquecerUsuario('${esc(u.id)}')" title="tira da lista; volta se o app dele se apresentar de novo">Esquecer</button>`}
+        </div></td>
+      </tr>`; }).join('')}</tbody></table>`;
+}
+
 /* ============================================================ configuração */
 const ROLES_CFG = ['top', 'jungle', 'middle', 'bottom', 'utility'];
 
@@ -1996,6 +2152,13 @@ async function tick(){
     $('#estClient').textContent = e.conectado ? 'client conectado' : 'client desconectado';
     $('#conta').textContent = e.conta ?? '—';
     if (e.versao) $('#versao').textContent = 'v' + e.versao;
+    // Painel de controle: bloqueio cobre tudo; aviso e "atualize" vão na barra.
+    const ctl = e.controle ?? {};
+    $('#bloqueio').hidden = !ctl.bloqueado;
+    if (ctl.bloqueado && ctl.aviso) $('#bloqueioTexto').textContent = ctl.aviso;
+    const av = [ctl.aviso, ctl.desatualizado ? `atualize pra v${ctl.versaoMinima}` : ''].filter(Boolean).join(' · ');
+    $('#estAviso').hidden = !av; $('#estAviso').textContent = av;
+    $('#navAdmin').hidden = e.config?.admin !== true;
     // Primeira vez que o client responde: as telas passam a seguir essa conta.
     if (e.conta && !contaEscolhidaPeloUsuario && contaAtual !== String(e.conta).split('#')[0] && contasConhecidas.some(c => c.nome === String(e.conta).split('#')[0])) {
       contaAtual = String(e.conta).split('#')[0]; desenharContaSel();
@@ -2027,7 +2190,7 @@ async function tick(){
  * abertura do app atrasaria a única tela que a maioria quer ver.
  */
 const CARREGADORES = {
-  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos,
+  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin,
   // O iframe do ao vivo só nasce quando a aba é aberta: antes ele ficava
   // consultando a API do jogo a cada 2s mesmo com o painel escondido.
   vivo: () => { const q = document.getElementById('quadroVivo'); if (!q.src) q.src = q.dataset.src; },

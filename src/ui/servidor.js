@@ -25,8 +25,12 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
   // A chave da Riot nunca sai pro painel: nenhuma tela precisa dela, e o
   // servidor é local mas a página tem iframe e fetch de sobra pra vazar.
   const semChave = (cfg) => {
-    if (!cfg?.riot?.apiKey) return cfg;
-    return { ...cfg, riot: { ...cfg.riot, apiKey: '', temChave: true } };
+    if (!cfg) return cfg;
+    return {
+      ...cfg,
+      riot: { ...(cfg.riot ?? {}), apiKey: '', temChave: !!cfg.riot?.apiKey },
+      controle: { ...(cfg.controle ?? {}), githubToken: '', temToken: !!cfg.controle?.githubToken },
+    };
   };
 
   const rotas = {
@@ -125,9 +129,36 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         for await (const p of req) pedacos.push(p);
         try {
           const corpo = JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}');
-          return enviar(200, 'application/json', JSON.stringify(await acoes.salvarConfig(corpo)));
+          return enviar(200, 'application/json', JSON.stringify(semChave(await acoes.salvarConfig(corpo))));
         } catch (erro) {
           return enviar(400, 'application/json', JSON.stringify({ erro: erro.message }));
+        }
+      }
+
+      // Painel admin: quem usa e o controle. Só responde pra quem é admin
+      // (o daemon confere) — pra todo o resto é 403.
+      if (url.pathname === '/api/admin/usuarios' && acoes.adminUsuarios) {
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.adminUsuarios())); }
+        catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
+      if (req.method === 'POST' && url.pathname === '/api/admin/esquecer' && acoes.adminEsquecer) {
+        const pedacos = [];
+        for await (const p of req) pedacos.push(p);
+        try {
+          const corpo = JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}');
+          return enviar(200, 'application/json', JSON.stringify(await acoes.adminEsquecer(corpo)));
+        } catch (erro) {
+          return enviar(403, 'application/json', JSON.stringify({ erro: erro.message }));
+        }
+      }
+      if (req.method === 'POST' && url.pathname === '/api/admin/controle' && acoes.adminGravarControle) {
+        const pedacos = [];
+        for await (const p of req) pedacos.push(p);
+        try {
+          const corpo = JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}');
+          return enviar(200, 'application/json', JSON.stringify(await acoes.adminGravarControle(corpo)));
+        } catch (erro) {
+          return enviar(403, 'application/json', JSON.stringify({ erro: erro.message }));
         }
       }
 
