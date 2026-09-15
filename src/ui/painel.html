@@ -2563,10 +2563,21 @@ function desenharCaixa(tipo, rota, i){
 let sugestoesCfg = null;   // a tela de Builds usa pra marcar os seus campeões
 let lupaSel = {};
 
-function resultadosDaLupa(tipo, texto){
+const ROTA_DB = { top: 'TOP', jungle: 'JUNGLE', middle: 'MID', bottom: 'ADC', utility: 'SUPORTE' };
+/** Caixa vazia em foco: os seus mais jogados na rota (pick) ou quem mais te ganha nela (ban). */
+function sugeridosDaRota(tipo, rota){
+  const lista = (tipo === 'bans' ? sugestoesCfg?.bans : sugestoesCfg?.picks)?.[ROTA_DB[rota]] ?? [];
+  const ordenada = [...lista].sort((a, b) => (tipo === 'bans' ? b.custo - a.custo : b.jogos - a.jogos)).slice(0, 8);
+  return ordenada.map(x => {
+    const c = listaCampeoes.find(c => c.id === x.championId) ?? listaCampeoes.find(c => c.nome === x.campeao);
+    return c ? { ...c, nota: `${x.jogos}j · ${Math.round(x.taxa*100)}%` } : null;
+  }).filter(Boolean);
+}
+
+function resultadosDaLupa(tipo, texto, rota){
   const t = texto.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
   const chave = (c) => c.nome.toLowerCase().replace(/[^a-z0-9]/g, '');
-  if(!t) return { vis: [] };
+  if(!t) return { vis: rota ? sugeridosDaRota(tipo, rota) : [] };
   // Quem começa com o que foi digitado vem primeiro, em ordem alfabética;
   // quem só contém, depois. Digitar "e" mostra Ekko, Elise… antes de Ashe.
   const comeca = listaCampeoes.filter(c => chave(c).startsWith(t)).sort((x,y) => x.nome.localeCompare(y.nome));
@@ -2579,12 +2590,12 @@ function desenharLupa(tipo, rota, i){
   const input = $('#add-' + k);
   const lupa = $('#lupa-' + k);
   if(document.activeElement !== input){ lupa.hidden = true; return; }
-  const { vis } = resultadosDaLupa(tipo, input.value);
+  const { vis } = resultadosDaLupa(tipo, input.value, rota);
   lupa.hidden = false;
   lupaSel[k] = Math.min(lupaSel[k] ?? 0, Math.max(0, vis.length - 1));
   lupa.innerHTML = vis.length
-    ? vis.map((c,i) => `<div class="${i===lupaSel[k]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}','${rota}',${i},${c.id})">
-        ${icone(c.id)}${esc(c.nome)}</div>`).join('')
+    ? (input.value.trim() ? '' : `<div class="nadaL">${tipo === 'bans' ? 'quem mais te ganha de ' : 'seus mais jogados de '}${ROTA_NOME[rota]}</div>`) + vis.map((c,i) => `<div class="${i===lupaSel[k]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}','${rota}',${i},${c.id})">
+        ${icone(c.id)}${esc(c.nome)}${c.nota ? `<em>${esc(c.nota)}</em>` : ''}</div>`).join('')
     : `<div class="nadaL">${input.value.trim() ? 'nenhum campeão com esse nome' : 'digite o nome'}</div>`;
 }
 
@@ -2603,7 +2614,7 @@ function ligarLupa(tipo, rota, i){
   input.onfocus = () => { input.select(); desenharLupa(tipo, rota, i); };
   input.onblur = () => { desenharLupa(tipo, rota, i); desenharCaixa(tipo, rota, i); };
   input.onkeydown = (ev) => {
-    const { vis } = resultadosDaLupa(tipo, input.value);
+    const { vis } = resultadosDaLupa(tipo, input.value, rota);
     const sel = lupaSel[k] ?? 0;
     if(ev.key === 'ArrowDown'){ ev.preventDefault(); lupaSel[k] = Math.min(sel+1, vis.length-1); desenharLupa(tipo, rota, i); }
     else if(ev.key === 'ArrowUp'){ ev.preventDefault(); lupaSel[k] = Math.max(sel-1, 0); desenharLupa(tipo, rota, i); }
