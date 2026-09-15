@@ -64,6 +64,15 @@ CREATE TABLE IF NOT EXISTS achados (
   PRIMARY KEY (gameId, t, tipo, titulo)
 );
 
+-- Elo a cada leitura que mudou: dá a curva de PDL e o "+34 hoje".
+CREATE TABLE IF NOT EXISTS elo_hist (
+  conta TEXT, fila TEXT, tier TEXT, rank TEXT, pdl INTEGER,
+  vitorias INTEGER, derrotas INTEGER, em TEXT,
+  PRIMARY KEY (conta, fila, em)
+);
+-- Partidas que ele marcou pra "estudar depois".
+CREATE TABLE IF NOT EXISTS marcadas (gameId INTEGER PRIMARY KEY, em TEXT);
+
 CREATE INDEX IF NOT EXISTS idx_frames_jogador ON frames (gameId, participantId);
 CREATE INDEX IF NOT EXISTS idx_eventos_tipo   ON eventos (tipo, gameId);
 CREATE INDEX IF NOT EXISTS idx_achados_tipo   ON achados (tipo);

@@ -135,6 +135,10 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      // Marcar/desmarcar partida pra estudar depois.
+      const mk = req.method === 'POST' && url.pathname.match(/^\/api\/marcar\/(\d+)$/);
+      if (mk && acoes.marcar) return enviar(200, 'application/json', JSON.stringify(acoes.marcar(Number(mk[1]))));
+
       // Painel admin: quem usa e o controle. Só responde pra quem é admin
       // (o daemon confere) — pra todo o resto é 403.
       if (url.pathname === '/api/admin/usuarios' && acoes.adminUsuarios) {
@@ -325,6 +329,8 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         ['/api/sugestoes', 'sugestoes'],
         ['/api/patch', 'patchLista'],
         ['/api/amigos', 'amigos'],
+        ['/api/sessao', 'sessao'],
+        ['/api/marcadas', 'marcadas'],
       ]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         try {

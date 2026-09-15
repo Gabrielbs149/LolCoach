@@ -171,6 +171,17 @@ h2:first-child{margin-top:0}
 .cartao .pe{font-size:11.5px;color:var(--apagado);margin-top:3px}
 .v{color:var(--vit)} .d{color:var(--der)} .o{color:var(--ouro)}
 
+/* ---------------------------------------------------------------- hoje */
+.hoje{display:grid;grid-template-columns:repeat(3,1fr);gap:var(--e2);margin-bottom:var(--e2)}
+.hoje .cartao .val small{font-size:12px;color:var(--apagado);font-weight:500;margin-left:4px}
+.tilt{grid-column:1/-1;background:#3a1618;border:1px solid #5c2226;color:#f07a7a;border-radius:var(--r-m);padding:9px 13px;font-size:12.5px;font-weight:650}
+.curva{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:10px 12px 6px;margin-bottom:var(--e1)}
+.curva svg{width:100%;height:auto;display:block}
+.curva .rot{font-size:10px;text-transform:uppercase;letter-spacing:.9px;color:var(--apagado);margin-bottom:4px}
+.cartaoP .marca{position:absolute;top:6px;right:8px;background:none;border:0;cursor:pointer;font-size:14px;color:var(--apagado);opacity:.5}
+.cartaoP .marca:hover,.cartaoP .marca.on{opacity:1;color:var(--ouro)}
+.cartaoP{position:relative}
+
 /* --------------------------------------------------------------- forma */
 .forma{display:flex;align-items:center;gap:11px;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r-m);padding:9px 13px;margin-top:var(--e2);flex-wrap:wrap}
@@ -502,7 +513,7 @@ h2:first-child{margin-top:0}
 /* Coluna estreita (o resumo no Perfil): cai pro essencial. */
 .listaP.compacta .cartaoP{grid-template-columns:84px 40px minmax(0,1fr) 78px;
   min-height:72px;gap:10px}
-.listaP.compacta .cartaoP .nums,.listaP.compacta .cartaoP .gr{display:none}
+.listaP.compacta .cartaoP .nums,.listaP.compacta .cartaoP .gr,.listaP.compacta .cartaoP .marca{display:none}
 .listaP.compacta .cartaoP .arte{width:40px;height:40px}
 @media (max-width:1080px){
   .cartaoP{grid-template-columns:96px 44px minmax(0,1fr) 88px}
@@ -846,11 +857,13 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div class="colunas">
       <div>
         <h2>Elo</h2><div id="elos"></div>
+        <div id="curvaPdl"></div>
         <h2>Papel preferido</h2><div id="roles"></div>
         <h2>Maestria</h2><div id="maestria"></div>
       </div>
       <div>
         <div class="cartoes" id="cartoes"></div>
+        <div id="hoje"></div>
         <div id="forma"></div>
         <h2>Últimas partidas</h2><div id="recentes"></div>
         <h2>Campeões das últimas 20</h2><div id="camp20"></div>
@@ -916,6 +929,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
   <section id="partidas">
     <div class="titulo">Partidas</div>
+    <div class="amForma" style="margin-bottom:var(--e2)">
+      <input class="busca" id="pBusca" placeholder="campeão ou rival…" autocomplete="off" oninput="mostrando = POR_PAGINA; desenharPartidas()">
+      <select class="contaSel" id="pCamp" style="margin:0;width:180px" onchange="mostrando = POR_PAGINA; desenharPartidas()"></select>
+    </div>
     <div class="filtros" id="filtros"></div>
     <div id="lista"></div>
   </section>
@@ -1159,6 +1176,7 @@ async function carregarVisao(){
     cartao('Período', `${dia(g.de).slice(3)}`, `até ${dia(g.ate)}`),
   ].join('');
 
+  desenharHoje();
   const ult = ps.slice(0,10);
   const vit = ult.filter(p => p.venci).length;
   $('#forma').innerHTML = `<div class="forma">
@@ -1195,6 +1213,34 @@ async function carregarVisao(){
       <div class="info"><div class="nome">${esc(x.campeao)}</div>
       <div class="sub">${x.n} jogos · ${(x.graves/x.n).toFixed(1)} graves por jogo</div></div></div>`;
   }).join('')}</div>`;
+}
+
+/** O dia de hoje (vira às 6h) e a curva de PDL da solo. */
+async function desenharHoje(){
+  let s; try { s = await pegar(comConta('/api/sessao')); } catch { return; }
+  const h = s.hoje, d = h.jogos - h.vitorias;
+  const saldo = h.saldoPdl;
+  $('#hoje').innerHTML = `<div class="hoje">
+    ${cartao('Hoje', h.jogos ? `<span class="${h.vitorias>d?'v':h.vitorias<d?'d':''}">${h.vitorias}V ${d}D</span>` : '—', h.jogos ? `${h.jogos} partidas` : 'nenhuma partida ainda')}
+    ${cartao('PDL hoje', saldo == null ? '—' : `<span class="${saldo>0?'v':saldo<0?'d':''}">${saldo>0?'+':''}${saldo}</span>`, saldo == null ? 'solo/duo' : 'solo/duo')}
+    ${cartao('Seguidas', h.seguidas ? `<span class="d">${h.seguidas} derrotas</span>` : (h.jogos ? '<span class="v">ok</span>' : '—'), h.seguidas >= 3 ? 'para por hoje' : '')}
+    ${h.seguidas >= 3 ? `<div class="tilt">${h.seguidas} derrotas seguidas — respira, volta amanhã. Tilt custa mais PDL que qualquer erro de jogo.</div>` : ''}
+  </div>`;
+  $('#curvaPdl').innerHTML = curvaPdl(s.curva);
+}
+function curvaPdl(curva){
+  const pts = (curva ?? []).filter(x => x.pontos > 0);
+  if(pts.length < 2) return '';
+  const W = 330, H = 90, m = 8;
+  const ys = pts.map(x => x.pontos), min = Math.min(...ys), max = Math.max(...ys), amp = Math.max(max - min, 40);
+  const X = (i) => m + i * (W - 2*m) / (pts.length - 1), Y = (v) => H - m - (v - min) / amp * (H - 2*m);
+  const linha = pts.map((x, i) => `${X(i).toFixed(1)},${Y(x.pontos).toFixed(1)}`).join(' ');
+  const ult = pts.at(-1), delta = ult.pontos - pts[0].pontos;
+  return `<div class="curva"><div class="rot">PDL na solo · últimas ${pts.length} leituras <b class="${delta>=0?'v':'d'}" style="float:right">${delta>=0?'+':''}${delta}</b></div>
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <polyline points="${linha}" fill="none" stroke="#c8aa6e" stroke-width="2" vector-effect="non-scaling-stroke"/>
+      ${pts.map((x, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(x.pontos).toFixed(1)}" r="2.2" fill="#f0d9a8"><title>${x.tier} ${x.rank} ${x.pdl} PDL · ${dia(x.em)}</title></circle>`).join('')}
+    </svg></div>`;
 }
 
 /** Ignora o cache de 10 minutos e pergunta o elo à Riot de novo. */
@@ -1245,6 +1291,7 @@ function cartaoDePartida(p){
       ${csMin ? `<span>CS</span> ${p.cs} (${csMin})<br>` : ''}
       ${p.participacao != null ? `<span>Part.</span> ${p.participacao}%` : ''}</div>
     <div class="gr"><span class="selo ${p.graves?'tem':'zero'}">${p.graves}</span><span class="rotp">graves</span></div>
+    <button class="marca ${marcadasIds.has(p.gameId)?'on':''}" title="marcar pra estudar depois" onclick="marcarPartida(event, ${p.gameId})">${marcadasIds.has(p.gameId)?'★':'☆'}</button>
   </div>`;
 }
 
@@ -1252,13 +1299,32 @@ const POR_PAGINA = 50;
 let todasPartidas = [], mostrando = POR_PAGINA, filtro = 'todas';
 
 const FILTROS = [['todas','Todas'],['v','Vitórias'],['d','Derrotas'],
-  ['jungle','jungle'],['mid','mid'],['adc','adc'],['top','top'],['sup','sup']];
+  ['jungle','jungle'],['mid','mid'],['adc','adc'],['top','top'],['sup','sup'],['marcadas','★ Estudar']];
 
+let marcadasIds = new Set();
 function filtrar(){
-  if(filtro === 'todas') return todasPartidas;
-  if(filtro === 'v') return todasPartidas.filter(p => p.venci);
-  if(filtro === 'd') return todasPartidas.filter(p => !p.venci);
-  return todasPartidas.filter(p => role(p.minhaRole) === filtro);
+  let ps = todasPartidas;
+  const busca = ($('#pBusca')?.value ?? '').trim().toLowerCase();
+  const camp = $('#pCamp')?.value ?? '';
+  if(busca) ps = ps.filter(p => String(p.meuCampeao).toLowerCase().includes(busca) || String(p.rival ?? '').toLowerCase().includes(busca));
+  if(camp) ps = ps.filter(p => p.meuCampeao === camp);
+  if(filtro === 'todas') return ps;
+  if(filtro === 'v') return ps.filter(p => p.venci);
+  if(filtro === 'd') return ps.filter(p => !p.venci);
+  if(filtro === 'marcadas') return ps.filter(p => marcadasIds.has(p.gameId));
+  return ps.filter(p => role(p.minhaRole) === filtro);
+}
+async function marcarPartida(ev, gameId){
+  ev.stopPropagation();
+  const r = await fetch('/api/marcar/' + gameId, { method: 'POST' }).then(x => x.json());
+  if(r.marcada) marcadasIds.add(gameId); else marcadasIds.delete(gameId);
+  desenharPartidas();
+}
+function desenharSeletorCamp(){
+  const sel = $('#pCamp'); if(!sel) return;
+  const atual = sel.value;
+  const nomes = [...new Set(todasPartidas.map(p => p.meuCampeao))].sort((a,b) => a.localeCompare(b));
+  sel.innerHTML = '<option value="">todos os campeões</option>' + nomes.map(n => `<option value="${esc(n)}" ${n===atual?'selected':''}>${esc(n)}</option>`).join('');
 }
 
 function trocarFiltro(f){ filtro = f; mostrando = POR_PAGINA; desenharPartidas(); }
@@ -1284,7 +1350,9 @@ function desenharPartidas(){
 function maisPartidas(){ mostrando += POR_PAGINA; desenharPartidas(); }
 
 async function carregarPartidas(){
-  todasPartidas = await pegar(comConta('/api/partidas'));
+  const [ps, m] = await Promise.all([pegar(comConta('/api/partidas')), pegar('/api/marcadas').catch(() => [])]);
+  todasPartidas = ps; marcadasIds = new Set(m);
+  desenharSeletorCamp();
   desenharPartidas();
 }
 

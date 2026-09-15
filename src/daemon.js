@@ -188,6 +188,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const salvos = await coletarPendentes(lcu, db, { quantas: 20 });
         if (salvos.length) {
           for (const s of salvos) log(`coletada ${s.gameId}: ${s.campeao} ${s.role} ${s.venci ? 'V' : 'D'} — ${s.achados} achados (${s.graves} graves)`);
+          // O elo mudou: relê agora, pra curva de PDL e o saldo do dia.
+          setTimeout(() => perfil({ forcar: true }).catch(() => {}), 8_000);
           return salvos;
         }
         if (i < tentativas) await new Promise((r) => setTimeout(r, esperaMs));
@@ -478,7 +480,59 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * O perfil de UMA conta: a pedida pela tela, senão a logada no client, senão
    * a do config. Cada pessoa (e cada conta dele) vê o próprio.
    */
-  async function perfil({ forcar = false, conta = null } = {}) {
+  /** Guarda o elo quando ele muda — uma linha por (conta, fila) por mudança. */
+  function anotarElo(perfilObj) {
+    try {
+      const nome = perfilObj?.conta?.nome; if (!nome) return;
+      for (const e of perfilObj.elos ?? []) {
+        const chave = e.chave ?? e.fila;
+        const ult = db.prepare('SELECT tier, rank, pdl, vitorias, derrotas FROM elo_hist WHERE conta = ? AND fila = ? ORDER BY em DESC LIMIT 1').get(nome, chave);
+        if (ult && ult.tier === e.tier && ult.rank === e.rank && ult.pdl === e.pdl && ult.vitorias === e.vitorias && ult.derrotas === e.derrotas) continue;
+        db.prepare('INSERT OR IGNORE INTO elo_hist (conta, fila, tier, rank, pdl, vitorias, derrotas, em) VALUES (?,?,?,?,?,?,?,?)')
+          .run(nome, chave, e.tier ?? null, e.rank ?? ({ '4': 'IV', '3': 'III', '2': 'II', '1': 'I' }[String(e.nome ?? '').trim().slice(-1)] ?? null), e.pdl ?? 0, e.vitorias ?? 0, e.derrotas ?? 0, new Date().toISOString());
+      }
+    } catch (erro) { log(`histórico de elo: ${erro.message}`); }
+  }
+
+  async function perfil(opcoes = {}) {
+    const p = await perfilBruto(opcoes);
+    anotarElo(p);
+    return p;
+  }
+
+  /** Curva de PDL e o dia de hoje: partidas, saldo e sequência de derrotas. */
+  function sessao({ conta = null } = {}) {
+    const logada = estado?.instantaneo?.().conta ?? null;
+    const nome = conta || (logada ? logada.split('#')[0] : null) || config.riot?.gameName || null;
+    const hoje = new Date(); hoje.setHours(6, 0, 0, 0);   // o "dia" de quem joga vira às 6h
+    if (hoje > new Date()) hoje.setDate(hoje.getDate() - 1);
+    const desde = hoje.toISOString();
+    const fc = nome ? " AND EXISTS (SELECT 1 FROM jogadores mc WHERE mc.gameId = p.gameId AND mc.participantId = p.meuId AND mc.nome = '" + String(nome).replace(/'/g, "''") + "')" : '';
+    const deHoje = db.prepare(`SELECT p.venci, p.quando, p.meuCampeao FROM partidas p WHERE p.duracaoS >= 300 AND p.quando >= ?${fc} ORDER BY p.quando DESC`).all(desde);
+    let seguidas = 0; for (const p of deHoje) { if (p.venci) break; seguidas++; }
+    const curva = nome ? db.prepare('SELECT tier, rank, pdl, vitorias, derrotas, em FROM elo_hist WHERE conta = ? AND fila = ? ORDER BY em ASC').all(nome, 'RANKED_SOLO_5x5') : [];
+    const pontos = (h) => (['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'].indexOf(h.tier)) * 400 + ({ IV: 0, III: 1, II: 2, I: 3 }[h.rank] ?? 0) * 100 + (h.pdl ?? 0);
+    const primeiroHoje = curva.find((h) => h.em >= desde);
+    const antesDeHoje = [...curva].reverse().find((h) => h.em < desde) ?? primeiroHoje;
+    const ultimo = curva.at(-1);
+    return {
+      conta: nome, desde,
+      hoje: { jogos: deHoje.length, vitorias: deHoje.filter((p) => p.venci).length, seguidas,
+        saldoPdl: antesDeHoje && ultimo ? pontos(ultimo) - pontos(antesDeHoje) : null },
+      curva: curva.slice(-60).map((h) => ({ em: h.em, pontos: pontos(h), tier: h.tier, rank: h.rank, pdl: h.pdl })),
+    };
+  }
+
+  const marcadas = () => db.prepare('SELECT gameId FROM marcadas').all().map((r) => r.gameId);
+  function marcar(gameId) {
+    const id = Number(gameId); if (!id) throw new Error('gameId inválido');
+    const tem = db.prepare('SELECT 1 FROM marcadas WHERE gameId = ?').get(id);
+    if (tem) db.prepare('DELETE FROM marcadas WHERE gameId = ?').run(id);
+    else db.prepare('INSERT INTO marcadas (gameId, em) VALUES (?, ?)').run(id, new Date().toISOString());
+    return { gameId: id, marcada: !tem };
+  }
+
+  async function perfilBruto({ forcar = false, conta = null } = {}) {
     const { perfilDaRiot } = await import('./dados/perfil-riot.js');
 
     const logada = estado?.instantaneo?.().conta ?? null;   // "nome#tag" ou null
@@ -795,7 +849,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo,
-    adminUsuarios, adminGravarControle, adminEsquecer,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -842,5 +896,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar',
 ];
