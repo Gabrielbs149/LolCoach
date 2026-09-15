@@ -312,6 +312,14 @@ app.whenReady().then(async () => {
   ligarAtualizacao();
   // Ctrl+Shift+L abre/fecha o painel — fora de partida (mostrar janela com o
   // jogo rodando minimiza o LoL).
+  // Ctrl+Alt+1..5 marca o flash do inimigo na posição N (ordem da tela ao
+  // vivo). Só escuta a tecla, como o push-to-talk do Discord — nada entra no jogo.
+  for (let n = 1; n <= 5; n++) {
+    globalShortcut.register(`Control+Alt+${n}`, () => {
+      if (!endereco) return;
+      fetch(`${endereco}/api/flash?posicao=${n}`, { method: 'POST' }).catch(() => {});
+    });
+  }
   globalShortcut.register('Control+Shift+L', () => {
     if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
     if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }

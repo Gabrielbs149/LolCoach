@@ -393,7 +393,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
     if (!partidaVivo || estado.tempo < partidaVivo.memoria.ultimoTempo - 5) {
       const { novaMemoriaFalas } = await import('./vivo/falas.js');
-      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0 };
+      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null };
     }
 
     // As fichas dependem de rede (op.gg, Data Dragon) e do banco: montam uma
@@ -412,7 +412,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     // A voz: só o que é novo desde a última leitura, numerado pra tela
     // falar uma vez só.
     const { falasNovas } = await import('./vivo/falas.js');
-    for (const f of falasNovas({ estado, rastreio, objetivos: objs, conselhos }, partidaVivo.memFalas)) {
+    partidaVivo.ultimoEstado = estado;
+    for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       partidaVivo.falas.push({ ...f, seq: ++partidaVivo.seq, t: estado.tempo });
     }
 
@@ -422,7 +423,39 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       vistos: rastreio.vistos,
       objetivos: objs,
       falas: partidaVivo.falas.slice(-12),
+      flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
     };
+  }
+
+  /**
+   * Timer de flash: a API do jogo não diz quando alguém usou, então é você
+   * quem marca (Ctrl+Alt+1..5 pela ordem dos inimigos na tela, ou botão na
+   * janela ao vivo). Flash volta em 5:00 — 4:28 com bota da Ionia.
+   */
+  const IONIA = 3158;
+  function marcarFlash({ posicao, nome } = {}) {
+    if (!partidaVivo?.ultimoEstado) throw new Error('sem partida rodando');
+    const e = partidaVivo.ultimoEstado;
+    const inimigos = e.jogadores.filter((j) => j.time !== e.eu.time);
+    const alvo = nome ? inimigos.find((j) => j.nome === nome || j.campeao === nome) : inimigos[Number(posicao) - 1];
+    if (!alvo) throw new Error('inimigo não achado');
+    const temIonia = (alvo.itens ?? []).some((i) => i.id === IONIA);
+    const volta = e.tempo + (temIonia ? 268 : 300);
+    partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
+    partidaVivo.falas.push({ seq: ++partidaVivo.seq, t: e.tempo, modulo: 'flash', prioridade: 2,
+      serio: `Flash do ${alvo.campeao} marcado. Volta em ${temIonia ? 'quatro e meio' : 'cinco'} minutos.`,
+      divertido: `${alvo.campeao} sem flash. Cinco minutos de temporada de caça.` });
+    log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')}`);
+    return { ok: true, campeao: alvo.campeao, volta };
+  }
+  function falasDeFlash(tempo) {
+    const novas = [];
+    for (const f of partidaVivo.flashes.values()) {
+      const em = f.volta - tempo;
+      if (!f.avisado60 && em <= 60 && em > 0) { f.avisado60 = true; novas.push({ modulo: 'flash', prioridade: 1, serio: `Flash do ${f.campeao} volta em um minuto.`, divertido: `Um minuto e o ${f.campeao} tem flash de novo. Aproveita agora.` }); }
+      if (!f.avisadoVolta && em <= 0) { f.avisadoVolta = true; novas.push({ modulo: 'flash', prioridade: 2, serio: `Flash do ${f.campeao} está de volta.`, divertido: `${f.campeao} tem flash de novo. Acabou a farra.` }); }
+    }
+    return novas;
   }
 
   /**
@@ -942,7 +975,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo,
-    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -989,5 +1022,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash',
 ];

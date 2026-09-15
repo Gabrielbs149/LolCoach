@@ -135,6 +135,12 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      // Marcar flash de um inimigo (posição 1..5 ou nome).
+      if (req.method === 'POST' && url.pathname === '/api/flash' && acoes.marcarFlash) {
+        try { return enviar(200, 'application/json', JSON.stringify(acoes.marcarFlash({ posicao: url.searchParams.get('posicao'), nome: url.searchParams.get('nome') }))); }
+        catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
+
       // Marcar/desmarcar partida pra estudar depois.
       const mk = req.method === 'POST' && url.pathname.match(/^\/api\/marcar\/(\d+)$/);
       if (mk && acoes.marcar) return enviar(200, 'application/json', JSON.stringify(acoes.marcar(Number(mk[1]))));

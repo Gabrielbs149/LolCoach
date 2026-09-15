@@ -128,6 +128,11 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 .obj span{display:block;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;margin-top:2px}
 .obj.vivo span{color:var(--ouro)}
 .obj i{display:block;font-style:normal;font-size:10.5px;color:var(--apagado)}
+.linha .flash{margin-left:6px;white-space:nowrap;background:var(--f2);border:1px solid var(--borda-forte);color:var(--fraco);font:inherit;font-size:10.5px;font-weight:700;padding:2px 7px;border-radius:var(--r-s);cursor:pointer;font-variant-numeric:tabular-nums}
+.linha .flash:hover{border-color:var(--ouro);color:var(--ouro-claro)}
+.linha .flash.usado{background:#3a1618;border-color:#5c2226;color:#f07a7a}
+.linha .flash.voltou{background:#123a28;border-color:#1e5c40;color:#4ed093}
+.time h3 small{font-weight:400;color:var(--apagado);font-size:9.5px;text-transform:none;letter-spacing:0;margin-left:6px}
 .vistos{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden}
 .visto{display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;
   padding:5px 10px;border-bottom:1px solid #161f2b;font-size:11.5px}
@@ -152,7 +157,7 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
   color:var(--apagado);font-weight:700;padding:5px 10px;background:var(--f0);
   border-bottom:1px solid var(--borda)}
 .time.deles h3{color:#c98a8a}
-.linha{display:grid;grid-template-columns:22px minmax(0,1fr) 58px 46px;align-items:center;
+.linha{display:grid;grid-template-columns:22px minmax(0,1fr) 58px 46px auto;align-items:center;
   gap:7px;padding:4px 10px;font-size:11.5px;border-bottom:1px solid #161f2b}
 .linha:last-child{border-bottom:0}
 .linha img{width:22px;height:22px;border-radius:var(--r-s);background:var(--f3)}
@@ -198,7 +203,7 @@ const $ = (s) => document.querySelector(s);
  * Fala com a voz do Windows (SpeechSynthesis, pt-BR). Como o Discord: som,
  * nunca tela por cima do jogo. Preferências ficam neste PC (localStorage).
  */
-const MODULOS = [['timers','Timers'],['kills','Kills e mortes'],['jungler','Jungler'],['spikes','Itens e nível'],['economia','Gold'],['lane','Lane'],['selecao','Seleção']];
+const MODULOS = [['timers','Timers'],['flash','Flash'],['kills','Kills e mortes'],['jungler','Jungler'],['spikes','Itens e nível'],['economia','Gold'],['lane','Lane'],['selecao','Seleção']];
 let voz = { ligada: true, modo: 'serio', volume: 0.9, modulos: Object.fromEntries(MODULOS.map(([k]) => [k, true])) };
 try { voz = { ...voz, ...JSON.parse(localStorage.getItem('voz') ?? '{}') }; } catch {}
 const vozSalvar = () => { try { localStorage.setItem('voz', JSON.stringify(voz)); } catch {} };
@@ -257,11 +262,15 @@ const icone = (campeao, id) => {
 const URGENTE = { 3: 'agora', 2: 'atenção', 1: 'lembrete' };
 const ROLE_NOME = { top:'top', jungle:'jungle', mid:'mid', adc:'adc', sup:'sup', middle:'mid', bottom:'adc', utility:'sup' };
 
-const linhaJogador = (j, souEu) => `
+const mmssF = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+/* Inimigo ganha o botão F: marca o flash dele (ou Ctrl+Alt+N pela posição). */
+const linhaJogador = (j, souEu, posicao = 0, flash = null) => `
   <div class="linha ${j.morto ? 'morto' : ''} ${souEu ? 'eu' : ''}">
     ${icone(j.campeao)}<span class="n">${esc(j.campeao)}</span>
     <span class="kda">${j.kills}/${j.mortes}/${j.assists}</span>
-    <span class="cs">${j.cs} cs</span></div>`;
+    <span class="cs">${j.cs} cs</span>
+    ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash (Ctrl+Alt+${posicao})" onclick="marcarFlash(${posicao})">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}</div>`;
+async function marcarFlash(posicao){ try { await fetch('/api/flash?posicao=' + posicao, { method: 'POST' }); } catch {} }
 
 /** A ficha de um adversário: seu histórico contra ele, o que dele te mata, e como jogar. */
 function fichaContra(f, eu){
@@ -381,7 +390,7 @@ function desenhar(d){
       <h2 class="sec">Placar</h2>
       <div class="placar">
         <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador(j, j.souEu)).join('')}</div>
-        <div class="time deles"><h3>Inimigos</h3>${deles.map(j => linhaJogador(j, false)).join('')}</div>
+        <div class="time deles"><h3>Inimigos <small>F = flash usado · Ctrl+Alt+1..5</small></h3>${deles.map((j, i) => linhaJogador(j, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
       </div>
 
       <div class="aviso">Leitura da API que o próprio jogo abre — nada é injetado e nada olha a tela.<br>
