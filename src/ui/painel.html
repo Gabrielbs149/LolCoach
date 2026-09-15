@@ -638,7 +638,16 @@ h2:first-child{margin-top:0}
 .rotas .linhaCfg{min-height:48px;padding:6px 14px}
 .rotas .linhaCfg .txt b{text-transform:uppercase;letter-spacing:.6px;font-size:12px}
 .rotas .cab{min-height:0;padding:6px 14px;background:var(--f2)}
-.rotas .cab span{width:220px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700}
+.rotas .lista3{display:flex;flex-direction:column;gap:4px;width:200px;flex:0 0 200px}
+.rotas .linhaCfg .txt{flex:0 0 64px}
+.rotas .lista3 .caixaCamp{width:100%}
+.rotas .lista3 .caixaCamp .ord{color:var(--apagado);font-size:10.5px;width:14px;text-align:right;flex:0 0 14px}
+.rotas .lista3 .caixaCamp .tirar{background:none;border:0;color:var(--apagado);cursor:pointer;font-size:12px;padding:0 4px}
+.rotas .lista3 .caixaCamp .tirar:hover{color:var(--der)}
+.rotas .feiticos{display:flex;gap:4px;width:150px;flex:0 0 150px}
+.rotas .feiticos select{flex:1;min-width:0;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);font:inherit;font-size:12px;padding:5px 4px;border-radius:var(--r-s)}
+.rotas .cab span.fe{width:150px}
+.rotas .cab span{width:200px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700}
 .caixaCamp{position:relative;display:flex;align-items:center;gap:8px;width:220px;background:var(--f0);
   border:1px solid var(--borda-forte);border-radius:var(--r-s);padding:4px 8px 4px 4px}
 .caixaCamp:focus-within{border-color:var(--ouro)}
@@ -976,7 +985,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
     <h2>Por rota</h2>
     <div class="painelCfg rotas">
-      <div class="linhaCfg cab"><div class="txt"></div><span>Travar</span><span>Banir</span></div>
+      <div class="linhaCfg cab"><div class="txt"></div><span>Travar (na ordem)</span><span>Banir (na ordem)</span><span class="fe">Feitiços</span></div>
       <div id="cRotas"></div>
     </div>
 
@@ -2305,6 +2314,7 @@ function gravar(){
           travarPick: true,
           picks: cfg.champSelect.picks,
           bans: cfg.champSelect.bans,
+          feiticos: cfg.champSelect.feiticos ?? {},
         },
       };
       await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'},
@@ -2321,29 +2331,54 @@ function gravar(){
  * Sem rota (personalizada, blind) ele usa a de jungle (rolePadrao).
  */
 const ROTA_NOME = { top: 'top', jungle: 'jungle', middle: 'mid', bottom: 'adc', utility: 'sup' };
-const caixaId = (tipo, rota) => `${tipo}-${rota}`;
-const campeaoDe = (tipo, rota) => cfg.champSelect[tipo]?.[rota]?.[0] ?? null;
-function definirCampeao(tipo, rota, nome){
-  (cfg.champSelect[tipo] ??= {})[rota] = nome ? [nome] : [];
-  desenharCaixa(tipo, rota); gravar();
+const MAX_POR_ROTA = 3;
+// Uma caixa = (tipo, rota, posição na lista). A última caixa é sempre vazia,
+// pra adicionar a reserva: se o 1º for banido, o daemon vai pro 2º, 3º.
+const caixaId = (tipo, rota, i) => `${tipo}-${rota}-${i}`;
+const listaDe = (tipo, rota) => ((cfg.champSelect[tipo] ??= {})[rota] ??= []);
+const campeaoDe = (tipo, rota, i) => listaDe(tipo, rota)[i] ?? null;
+function definirCampeao(tipo, rota, i, nome){
+  const l = listaDe(tipo, rota);
+  if (nome) { if (l.some((n, j) => j !== i && n.toLowerCase() === nome.toLowerCase())) return; l[i] = nome; }
+  else l.splice(i, 1);
+  cfg.champSelect[tipo][rota] = l.filter(Boolean);
+  desenharRotas(); gravar();
+}
+const FEITICOS = [[4,'Flash'],[14,'Ignite'],[11,'Smite'],[12,'TP'],[3,'Exhaust'],[7,'Heal'],[21,'Barrier'],[1,'Cleanse'],[6,'Ghost']];
+function feiticoMudar(rota, i, valor){
+  const f = ((cfg.champSelect.feiticos ??= {})[rota] ??= [4, 14]);
+  f[i] = Number(valor);
+  gravar();
 }
 
 function desenharRotas(){
+  const foco = document.activeElement?.id;
   $('#cRotas').innerHTML = ROLES_CFG.map(r => `<div class="linhaCfg">
     <div class="txt"><b>${ROTA_NOME[r]}</b></div>
-    ${['picks','bans'].map(tipo => `<div class="caixaCamp" id="cx-${caixaId(tipo, r)}">
-      <img id="img-${caixaId(tipo, r)}" alt=""><input id="add-${caixaId(tipo, r)}" placeholder="nome do campeão" autocomplete="off" spellcheck="false">
-      <div class="lupa" id="lupa-${caixaId(tipo, r)}" hidden></div>
-    </div>`).join('')}
+    ${['picks','bans'].map(tipo => {
+      const l = listaDe(tipo, r);
+      const n = Math.min(l.length + 1, MAX_POR_ROTA);
+      return `<div class="lista3">${Array.from({ length: n }, (_, i) => `<div class="caixaCamp" id="cx-${caixaId(tipo, r, i)}">
+        ${n > 1 ? `<span class="ord">${i+1}º</span>` : ''}<img id="img-${caixaId(tipo, r, i)}" alt=""><input id="add-${caixaId(tipo, r, i)}" placeholder="${i ? 'reserva' : 'nome do campeão'}" autocomplete="off" spellcheck="false">
+        ${l[i] ? `<button class="tirar" title="tirar" onclick="definirCampeao('${tipo}','${r}',${i},null)">✕</button>` : ''}
+        <div class="lupa" id="lupa-${caixaId(tipo, r, i)}" hidden></div>
+      </div>`).join('')}</div>`; }).join('')}
+    <div class="feiticos">${[0,1].map(i => { const atual = (cfg.champSelect.feiticos?.[r] ?? [])[i];
+      return `<select onchange="feiticoMudar('${r}',${i},this.value)" title="feitiço ${i+1}"><option value="">—</option>${FEITICOS.map(([id, nome]) => `<option value="${id}" ${atual===id?'selected':''}>${nome}</option>`).join('')}</select>`; }).join('')}</div>
   </div>`).join('');
-  for (const r of ROLES_CFG) for (const tipo of ['picks','bans']) { ligarLupa(tipo, r); desenharCaixa(tipo, r); }
+  for (const r of ROLES_CFG) for (const tipo of ['picks','bans']) {
+    const n = Math.min(listaDe(tipo, r).length + 1, MAX_POR_ROTA);
+    for (let i = 0; i < n; i++) { ligarLupa(tipo, r, i); desenharCaixa(tipo, r, i); }
+  }
+  if (foco && document.getElementById(foco)) document.getElementById(foco).focus();
 }
 
-function desenharCaixa(tipo, rota){
-  const nome = campeaoDe(tipo, rota);
+function desenharCaixa(tipo, rota, i){
+  const nome = campeaoDe(tipo, rota, i);
   const c = nome ? listaCampeoes.find(x => x.nome.toLowerCase() === nome.toLowerCase()) : null;
-  const img = $('#img-' + caixaId(tipo, rota));
-  const input = $('#add-' + caixaId(tipo, rota));
+  const img = $('#img-' + caixaId(tipo, rota, i));
+  const input = $('#add-' + caixaId(tipo, rota, i));
+  if (!img || !input) return;
   img.src = c ? '/icone/' + c.id : '';
   if (document.activeElement !== input) input.value = nome ?? '';
 }
@@ -2363,8 +2398,8 @@ function resultadosDaLupa(tipo, texto){
   return { vis: [...comeca, ...contem].slice(0, 10) };
 }
 
-function desenharLupa(tipo, rota){
-  const k = caixaId(tipo, rota);
+function desenharLupa(tipo, rota, i){
+  const k = caixaId(tipo, rota, i);
   const input = $('#add-' + k);
   const lupa = $('#lupa-' + k);
   if(document.activeElement !== input){ lupa.hidden = true; return; }
@@ -2372,32 +2407,33 @@ function desenharLupa(tipo, rota){
   lupa.hidden = false;
   lupaSel[k] = Math.min(lupaSel[k] ?? 0, Math.max(0, vis.length - 1));
   lupa.innerHTML = vis.length
-    ? vis.map((c,i) => `<div class="${i===lupaSel[k]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}','${rota}',${c.id})">
+    ? vis.map((c,i) => `<div class="${i===lupaSel[k]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}','${rota}',${i},${c.id})">
         ${icone(c.id)}${esc(c.nome)}</div>`).join('')
     : `<div class="nadaL">${input.value.trim() ? 'nenhum campeão com esse nome' : 'digite o nome'}</div>`;
 }
 
-function escolherDaLupa(tipo, rota, id){
+function escolherDaLupa(tipo, rota, i, id){
   const c = listaCampeoes.find(x => x.id === id);
   if(!c) return;
-  $('#add-' + caixaId(tipo, rota)).blur();
-  definirCampeao(tipo, rota, c.nome);
+  $('#add-' + caixaId(tipo, rota, i))?.blur();
+  definirCampeao(tipo, rota, i, c.nome);
 }
 
-function ligarLupa(tipo, rota){
-  const k = caixaId(tipo, rota);
+function ligarLupa(tipo, rota, i){
+  const k = caixaId(tipo, rota, i);
   const input = $('#add-' + k);
-  input.oninput = () => { lupaSel[k] = 0; desenharLupa(tipo, rota); };
-  input.onfocus = () => { input.select(); desenharLupa(tipo, rota); };
-  input.onblur = () => { desenharLupa(tipo, rota); desenharCaixa(tipo, rota); };
+  if (!input) return;
+  input.oninput = () => { lupaSel[k] = 0; desenharLupa(tipo, rota, i); };
+  input.onfocus = () => { input.select(); desenharLupa(tipo, rota, i); };
+  input.onblur = () => { desenharLupa(tipo, rota, i); desenharCaixa(tipo, rota, i); };
   input.onkeydown = (ev) => {
     const { vis } = resultadosDaLupa(tipo, input.value);
-    const i = lupaSel[k] ?? 0;
-    if(ev.key === 'ArrowDown'){ ev.preventDefault(); lupaSel[k] = Math.min(i+1, vis.length-1); desenharLupa(tipo, rota); }
-    else if(ev.key === 'ArrowUp'){ ev.preventDefault(); lupaSel[k] = Math.max(i-1, 0); desenharLupa(tipo, rota); }
-    else if(ev.key === 'Enter'){ ev.preventDefault(); if(vis[i]) escolherDaLupa(tipo, rota, vis[i].id); }
+    const sel = lupaSel[k] ?? 0;
+    if(ev.key === 'ArrowDown'){ ev.preventDefault(); lupaSel[k] = Math.min(sel+1, vis.length-1); desenharLupa(tipo, rota, i); }
+    else if(ev.key === 'ArrowUp'){ ev.preventDefault(); lupaSel[k] = Math.max(sel-1, 0); desenharLupa(tipo, rota, i); }
+    else if(ev.key === 'Enter'){ ev.preventDefault(); if(vis[sel]) escolherDaLupa(tipo, rota, i, vis[sel].id); }
     else if(ev.key === 'Escape'){ input.blur(); }
-    else if(ev.key === 'Backspace' && !input.value){ definirCampeao(tipo, rota, null); }
+    else if(ev.key === 'Backspace' && !input.value && campeaoDe(tipo, rota, i)){ definirCampeao(tipo, rota, i, null); }
   };
 }
 

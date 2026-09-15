@@ -1,4 +1,4 @@
-import { aplicarBuildDoOpgg } from './runas.js';
+import { aplicarBuildDoOpgg, aplicarSpells } from './runas.js';
 import { aplicarConjunto } from './item-sets.js';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -71,11 +71,11 @@ function primeiroLivre(nomes, tabela, fora, permitidos) {
 export function autoChampSelect(lcu, config, { log = () => {}, permite = () => true } = {}) {
   let tabela = null;
   let carregandoTabela = null;
-  let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false };
+  let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false, feiticosFeitos: false };
   let sonda = null;
   let avaliando = false;
 
-  const zerarFase = () => { fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false }; };
+  const zerarFase = () => { fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false, feiticosFeitos: false }; };
   const pararSonda = () => { if (sonda) { clearInterval(sonda); sonda = null; } };
 
   /** Uma carga só, mesmo com vários eventos chegando juntos. */
@@ -147,6 +147,14 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
       if (minha && !desligada && !planejando && fase.acaoFeita !== minha.id) {
         const fora = indisponiveis(sessao);
         const lista = minha.type === 'ban' ? cfg.bans?.[role] : cfg.picks?.[role];
+        // Ban esperto: campeão que um aliado declarou (intenção ou já
+        // escolhido) sai da lista de ban — banir o pick do seu jungle dá briga.
+        if (minha.type === 'ban') {
+          for (const c of sessao.myTeam ?? []) {
+            if (c.cellId === meuCell.cellId) continue;
+            for (const id of [c.championPickIntent, c.championId]) if (id > 0) fora.add(id);
+          }
+        }
         const escolha = primeiroLivre(lista, tabela, fora);
 
         if (!escolha) {
@@ -224,6 +232,15 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
           }, espera);
         }
       }
+    }
+
+    /* ---- feitiços por rota, uma vez por seleção ---- */
+    const feiticos = cfg.feiticos?.[role];
+    if (Array.isArray(feiticos) && feiticos.length === 2 && !fase.feiticosFeitos && permite('escolher')) {
+      fase.feiticosFeitos = true;
+      aplicarSpells(lcu, feiticos.map(Number))
+        .then(() => log(`feitiços de ${role} aplicados`))
+        .catch((erro) => log(`não consegui trocar os feitiços: ${erro.message}`));
     }
 
     /* ---- runas, assim que o campeão estiver definido ---- */
