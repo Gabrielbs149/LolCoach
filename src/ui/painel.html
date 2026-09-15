@@ -803,6 +803,25 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .carregando::before{content:"";width:14px;height:14px;border:2px solid var(--borda);
   border-top-color:var(--ouro);border-radius:50%;animation:gira .8s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
+
+/* ---------------------------------------------------- acabamento geral */
+/* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
+   contorno e o mesmo brilho no topo, linha que responde ao mouse, botão que
+   acende. Nada de sombra pesada. */
+.cartao,.painelCfg,.elo,.compara .cmp,.curva,.radar,.blocoBarras,.amCartao,.forma,.lista,.hoje .cartao,.sugestao,.patchTopo{
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.035)}
+.cartao{transition:border-color .12s} .cartao:hover{border-color:var(--borda-forte)}
+.linhaCfg{transition:background .12s} .linhaCfg:hover{background:rgba(255,255,255,.015)}
+.miniLinha,.mLinha{transition:border-color .12s} .miniLinha:hover,.mLinha:hover{border-color:var(--borda-forte)}
+.amTabela tbody tr{transition:background .12s} .amTabela tbody tr:hover td{background:rgba(255,255,255,.02)}
+.admTabela tbody tr:hover td{background:rgba(255,255,255,.02)}
+button.acao{box-shadow:0 1px 0 rgba(0,0,0,.35)} button.acao:hover:not(:disabled){box-shadow:0 0 0 1px var(--ouro-escuro),0 1px 0 rgba(0,0,0,.35)}
+.cartaoP{transition:transform .12s,border-color .12s} .cartaoP:hover{transform:translateY(-1px)}
+.titulo{display:flex;align-items:center;gap:10px}
+.titulo::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--borda),transparent)}
+h2{letter-spacing:1px}
+.vazio{border-style:dashed}
+::selection{background:#3a3220;color:var(--ouro-claro)}
 </style>
 </head>
 <body>
@@ -838,7 +857,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
       <svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 12h3M11 12h9M4 17h12M20 17h0"/><circle cx="16" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="18" cy="17" r="2"/></svg><span class="nome">Configuração</span></button>
   </nav>
   <div class="estado">
-    <div class="l"><span class="luz" id="luz"></span><span id="estClient">client…</span></div>
+    <div class="l"><span class="luz" id="luz"></span><span id="estClient">conectando…</span></div>
     <div class="l" id="estFase"></div>
     <div class="l atualiza" id="estAtualiza" hidden></div>
     <div class="l avisoAdm" id="estAviso" hidden></div>
@@ -849,7 +868,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 <!-- Modo edição (admin): clica em qualquer texto e muda; tema ao lado. -->
 <div class="edicao" id="edicao" hidden>
   <b>Modo edição</b>
-  <span>clique no texto pra mudar · Enter salva · Esc cancela · na barra lateral é duplo clique · Ctrl+clique usa o botão</span>
+  <span>clique no texto · Enter salva · Esc cancela · barra lateral: duplo clique · Ctrl+clique usa o botão</span>
   <label>Destaque <input type="color" id="edCor" onchange="temaMudar('ouro', this.value)"></label>
   <label>Fonte <input type="range" min="11" max="16" step="0.5" id="edFonte" onchange="temaMudar('fonte', Number(this.value))"></label>
   <label>Cantos <input type="range" min="0" max="14" step="1" id="edRaio" onchange="temaMudar('raio', Number(this.value))"></label>
@@ -876,7 +895,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 <div class="bloqueio" id="bloqueio" hidden>
   <div>
     <h1>LolCoach desligado pra você</h1>
-    <p id="bloqueioTexto">O Gabriel desligou o seu acesso. Fala com ele.</p>
+    <p id="bloqueioTexto">Acesso desligado. Fala com o Gabriel.</p>
   </div>
 </div>
 
@@ -904,7 +923,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="estat">
     <div class="titulo">Estatísticas</div>
     <div class="cartoes" id="eGeral"></div>
-    <h2>Últimas 20 contra o resto</h2><div id="eForma"></div>
+    <h2>Últimas 20 × o resto</h2><div id="eForma"></div>
     <div class="colunas2">
       <div><h2>Onde você joga</h2><div id="eRoles"></div>
            <h2>Tipo de campeão</h2><div id="eClasses"></div></div>
@@ -933,7 +952,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div class="amGrade" id="amGrade"></div>
     <div id="amDetalhe"></div>
     <div id="amSemana"></div>
-    <h2>Comparativo — últimas 20 solo de cada um</h2>
+    <h2>Comparativo · últimas 20 solo</h2>
     <div class="amRolagem" id="amCompara"></div>
   </section>
 
@@ -944,7 +963,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
         <input class="busca" id="bBusca" placeholder="Buscar campeão…" autocomplete="off" style="max-width:none">
         <div class="listaCamp" id="bLista"></div>
       </div>
-      <div id="bCorpo"><div class="vazio">escolha um campeão à esquerda</div></div>
+      <div id="bCorpo"><div class="vazio">escolha um campeão</div></div>
     </div>
   </section>
 
@@ -977,22 +996,22 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div class="acoes"><button class="acao" onclick="modoEdicao(true)">Entrar no modo edição</button></div>
     <div id="admAviso"></div>
 
-    <h2>Pra todo mundo</h2>
+    <h2>Todo mundo</h2>
     <div class="painelCfg">
       <div class="linhaCfg">
         <div class="txt"><b>Aviso na barra de todos</b></div>
         <input class="campoAdm" id="admAvisoGlobal" placeholder="vazio = sem aviso" onchange="salvarControle({ aviso: this.value.trim() })">
       </div>
       <div class="linhaCfg">
-        <div class="txt"><b>Recado em pop-up</b><i>aparece uma vez pra cada um; vazio = tira</i></div>
+        <div class="txt"><b>Recado em pop-up</b><i>cada um vê uma vez</i></div>
         <input class="campoAdm" id="admPopup" placeholder="escreve e dá Enter" onchange="popupMandar(this.value)">
       </div>
       <div class="linhaCfg">
-        <div class="txt"><b>Versão mínima</b><i>abaixo disso aparece "atualize" na barra</i></div>
+        <div class="txt"><b>Versão mínima</b></div>
         <input class="campoAdm curto" id="admVersaoMinima" placeholder="ex.: 2.7.16" onchange="salvarControle({ versaoMinima: this.value.trim() || null })">
       </div>
       <div class="linhaCfg">
-        <div class="txt"><b>Só quem está liberado usa</b><i>desligado: todo mundo usa, menos os bloqueados</i></div>
+        <div class="txt"><b>Só quem está liberado usa</b></div>
         <label class="chave"><input type="checkbox" id="admSomente" onchange="salvarControle({ somenteLiberados: this.checked })"><span class="pino"></span></label>
       </div>
       <div class="linhaCfg">
@@ -1032,7 +1051,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <h2>Teclas</h2>
     <div class="painelCfg">
       <div class="linhaCfg">
-        <div class="txt"><b>Marcar flash</b><i>uma tecla por inimigo, na ordem da tela ao vivo</i></div>
+        <div class="txt"><b>Marcar flash</b><i>1º ao 5º inimigo</i></div>
         <div class="teclas5"><button class="tecla" id="tFlash0" onclick="capturarTecla(0, this)"></button><button class="tecla" id="tFlash1" onclick="capturarTecla(1, this)"></button><button class="tecla" id="tFlash2" onclick="capturarTecla(2, this)"></button><button class="tecla" id="tFlash3" onclick="capturarTecla(3, this)"></button><button class="tecla" id="tFlash4" onclick="capturarTecla(4, this)"></button></div>
       </div>
       <div class="linhaCfg">
@@ -1047,12 +1066,12 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
     <h2>Por rota</h2>
     <div class="painelCfg rotas">
-      <div class="linhaCfg cab"><div class="txt"></div><span>Travar (na ordem)</span><span>Banir (na ordem)</span><span class="fe">Feitiços</span></div>
+      <div class="linhaCfg cab"><div class="txt"></div><span>Travar</span><span>Banir</span><span class="fe">Feitiços</span></div>
       <div id="cRotas"></div>
     </div>
 
     <details class="avancado">
-      <summary>Avançado — manutenção e registro</summary>
+      <summary>Avançado</summary>
       <div class="acoes">
         <button class="acao" data-acao="coletar">Coletar agora</button>
         <button class="acao" data-acao="historico?quantas=250&fila=420">Puxar 250 solo</button>
@@ -1179,7 +1198,7 @@ async function carregarVisao(){
       <div class="sub">${perfil?.nivel ? 'nível ' + num(perfil.nivel) + ' · ' : ''}${num(g.n)} partidas analisadas aqui</div>
     </div>
     <div class="acoesP">
-      ${perfil?.desatualizado ? '<span class="aviso">elo pode estar velho — a Riot não respondeu agora</span>' : ''}
+      ${perfil?.desatualizado ? '<span class="aviso">Riot não respondeu — elo pode estar velho</span>' : ''}
       <button class="acao" onclick="atualizarPerfil(this)">Atualizar</button>
     </div>
   </div>`;
@@ -1279,8 +1298,9 @@ function curvaPdl(curva){
   const pts = (curva ?? []).filter(x => x.pontos > 0);
   if(pts.length < 2) return '';
   const W = 330, H = 90, m = 8;
-  const ys = pts.map(x => x.pontos), min = Math.min(...ys), max = Math.max(...ys), amp = Math.max(max - min, 40);
-  const X = (i) => m + i * (W - 2*m) / (pts.length - 1), Y = (v) => H - m - (v - min) / amp * (H - 2*m);
+  const ys = pts.map(x => x.pontos), min = Math.min(...ys), max = Math.max(...ys), amp = Math.max(max - min, 40), meio = (min + max) / 2;
+  // Curva centrada: sem mudança de PDL a linha fica no meio, não colada embaixo.
+  const X = (i) => m + i * (W - 2*m) / (pts.length - 1), Y = (v) => H / 2 - (v - meio) / amp * (H - 2*m);
   const linha = pts.map((x, i) => `${X(i).toFixed(1)},${Y(x.pontos).toFixed(1)}`).join(' ');
   const ult = pts.at(-1), delta = ult.pontos - pts[0].pontos;
   return `<div class="curva"><div class="rot">PDL na solo · últimas ${pts.length} leituras <b class="${delta>=0?'v':'d'}" style="float:right">${delta>=0?'+':''}${delta}</b></div>
@@ -1714,7 +1734,7 @@ function desenharBuild(){
       <div class="bloco"><h4>Itens principais</h4>${itens(b.itens.principais)}</div>
       <div class="bloco"><h4>Início de jogo</h4>${itens(b.itens.iniciais)}
         <h4 style="margin-top:12px">Botas</h4>${itens(b.itens.botas,'item')}</div>
-      <div class="bloco"><h4>Itens finais — opções de 4º, 5º e 6º</h4>${itens(b.itens.finais,'item')}</div>
+      <div class="bloco"><h4>Itens finais</h4>${itens(b.itens.finais,'item')}</div>
       <div class="bloco"><h4>Feitiços</h4>${feiticos}</div>
       <div class="bloco"><h4>Habilidades</h4>${habilidades}</div>
     </div>
@@ -1782,17 +1802,16 @@ async function abrirNota(slug){
   if(n.meus?.length){
     partes.push(`<div class="patchTopo">
       <b>${n.meus.length} ${n.meus.length===1?'campeão seu mudou':'campeões seus mudaram'}</b>
-      <p>Clique pra pular direto pra mudança.</p>${fichas(n.meus)}</div>`);
+      ${fichas(n.meus)}</div>`);
   }
   if(n.contra?.length){
     partes.push(`<div class="patchTopo contra">
       <b>${n.contra.length} ${n.contra.length===1?'campeão que te ganha mudou':'campeões que te ganham mudaram'}</b>
-      <p>São confrontos que já te custaram vitórias — vale ver o que mudou neles.</p>
       ${fichas(n.contra)}</div>`);
   }
   if(!partes.length){
     partes.push(`<div class="patchTopo"><b>Nada neste patch mexe com o seu jogo</b>
-      <p>Nem campeão que você joga, nem campeão que costuma te ganhar.</p></div>`);
+      </div>`);
   }
   $('#patchTopo').innerHTML = partes.join('');
 
@@ -1917,7 +1936,7 @@ async function atualizarAmigos(fila, forcar){
 async function adicionarAmigo(){
   const texto = $('#amNome').value.trim();
   const [nome, tag] = texto.split('#').map(s => s.trim());
-  if(!nome || !tag){ $('#amAviso').innerHTML = '<div class="aviso amAviso">escreva no formato nome#tag, com a tag depois do #</div>'; return; }
+  if(!nome || !tag){ $('#amAviso').innerHTML = '<div class="aviso amAviso">formato: nome#tag</div>'; return; }
   const b = $('#amAdicionar'); b.disabled = true; b.textContent = 'procurando…';
   $('#amAviso').innerHTML = '';
   try {
@@ -1990,13 +2009,13 @@ function desenharAmigos(){
   const eu = d.eu?.nome ? d.eu : null;
 
   $('#amAviso').innerHTML = d.semChave
-    ? '<div class="aviso amAviso">Sem chave da Riot nesta versão — só aparece o que já foi baixado antes.</div>'
-    : (eu && !eu.tag ? '<div class="aviso amAviso">Ainda não sei a sua tag — abre o League uma vez logado nessa conta e você entra na comparação.</div>' : '');
+    ? '<div class="aviso amAviso">Sem chave da Riot: só o que já foi baixado.</div>'
+    : (eu && !eu.tag ? '<div class="aviso amAviso">Abre o League com essa conta uma vez pra entrar na comparação.</div>' : '');
 
   const todos = [...(eu ? [eu] : []), ...d.amigos];
   $('#amGrade').innerHTML = todos.length
     ? todos.map(p => cartaoDeAmigo(p, { eu: p === eu })).join('')
-    : '<div class="vazio">adicione alguém pelo nome#tag ali em cima</div>';
+    : '<div class="vazio">ninguém ainda</div>';
 
   /* ---- detalhe de quem está aberto ---- */
   const aberto = todos.find(p => p.tag && chaveAm(p) === amAberto && p.perfil);
@@ -2013,7 +2032,7 @@ function desenharAmigos(){
   /* ---- comparativo ---- */
   const cols = todos.filter(p => p.perfil);
   if(cols.length < 2){
-    $('#amCompara').innerHTML = `<div class="vazio">${cols.length ? 'adicione mais alguém pra comparar' : 'esperando os dados chegarem…'}</div>`;
+    $('#amCompara').innerHTML = `<div class="vazio">${cols.length ? 'adicione mais alguém' : 'carregando…'}</div>`;
     return;
   }
   const linha = (rot, vals, { maiorMelhor = true, ranquear = true, formato = (v) => v } = {}) => {

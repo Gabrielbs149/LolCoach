@@ -75,7 +75,7 @@ function desenhar(d){
   hud.innerHTML = `<div class="topo">${icone(eu.campeao)}<span class="t">${mmss(e.tempo)}</span>
       <span class="kda">${eu.kills}/${eu.mortes}/${eu.assists}<span>${eu.cs ?? 0} cs</span></span></div>
     <div class="objs">${objs}</div>
-    <div class="cab"><span>Inimigos</span><span>tecla = flash usado</span></div>
+    <div class="cab"><span>Inimigos</span><span>flash</span></div>
     ${inis}
     ${mostraFala ? `<div class="fala u${ultimaFala.prioridade ?? 1}">${esc(ultimaFala.serio)}</div>` : (urgente ? `<div class="fala u3">${esc(urgente.titulo)}</div>` : '')}`;
 }

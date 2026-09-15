@@ -192,7 +192,7 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 </div>
 <div id="tudo" style="display:flex;flex-direction:column;height:100%">
   <div class="vazio"><div class="anel"></div><b>Esperando a partida</b>
-    <p>Esta tela acende sozinha assim que o jogo carregar.</p></div>
+    <p>acende sozinha quando o jogo carregar</p></div>
 </div>
 
 <script>
@@ -332,10 +332,7 @@ function desenhar(d){
   if (!d.emJogo && d.selecao) { desenharSelecao(d.selecao); falarNovas(d.selecao.falas); return; }
   if (!d.emJogo) {
     $('#tudo').innerHTML = `<div class="vazio"><div class="anel"></div><b>Esperando a partida</b>
-      <p>Esta tela acende sozinha assim que o jogo carregar.</p>
-      <ul><li>ficha de quem está contra você, com as suas mortes</li>
-          <li>onde cada inimigo apareceu por último</li>
-          <li>avisos de item, nível e objetivo</li></ul></div>`;
+      <p>acende sozinha quando o jogo carregar</p></div>`;
     return;
   }
 
@@ -378,7 +375,7 @@ function desenhar(d){
       <h2 class="sec">Objetivos</h2>
       <div class="objetivos">${(d.objetivos ?? []).map(o => `<div class="obj ${o.vivo?'vivo':''}"><b>${esc(o.nome)}</b><span>${esc(o.quando)}</span><i>${esc(o.detalhe)}</i></div>`).join('')}</div>
 
-      <h2 class="sec">Onde estão — pelo que apareceu no feed</h2>
+      <h2 class="sec">Onde estão</h2>
       <div class="vistos">${vistos}</div>
       </div>
 
@@ -392,11 +389,9 @@ function desenhar(d){
       <h2 class="sec">Placar</h2>
       <div class="placar">
         <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador(j, j.souEu)).join('')}</div>
-        <div class="time deles"><h3>Inimigos <small>F = flash usado · Ctrl+Alt+1..5</small></h3>${deles.map((j, i) => linhaJogador(j, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
+        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${deles.map((j, i) => linhaJogador(j, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
       </div>
 
-      <div class="aviso">Leitura da API que o próprio jogo abre — nada é injetado e nada olha a tela.<br>
-      "Onde estão" sai do feed de kills e objetivos, que todo mundo vê. Posição real ninguém dá.</div>
       </div>
     </main>`;
 }
