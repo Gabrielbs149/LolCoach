@@ -659,11 +659,15 @@ h2:first-child{margin-top:0}
 .rotas .lista3 .caixaCamp .ord{color:var(--apagado);font-size:10.5px;width:14px;text-align:right;flex:0 0 14px}
 .rotas .lista3 .caixaCamp .tirar{background:none;border:0;color:var(--apagado);cursor:pointer;font-size:12px;padding:0 4px}
 .rotas .lista3 .caixaCamp .tirar:hover{color:var(--der)}
-.rotas .feiticos{display:flex;gap:4px;width:150px;flex:0 0 150px}
+.rotas .feiticos{display:flex;gap:2px;width:150px;flex:0 0 150px;align-items:flex-start}
 .rotas .feiticos{position:relative}
 .feitBt{width:36px;height:36px;padding:0;background:var(--f0);border:1px solid var(--borda-forte);border-radius:var(--r-s);cursor:pointer;
   display:grid;place-items:center;color:var(--apagado);font-size:18px;overflow:hidden}
 .feitBt:hover{border-color:var(--ouro)}
+.feitCol{display:flex;flex-direction:column;align-items:center;gap:1px}
+.feitCol em{font-style:normal;font-size:9.5px;font-weight:800;color:var(--apagado);letter-spacing:.5px}
+.trocaDF{background:none;border:0;color:var(--apagado);cursor:pointer;font-size:14px;padding:0 2px;margin-top:10px}
+.trocaDF:hover{color:var(--ouro)}
 .feitBt.fixo{cursor:default;opacity:.85} .feitBt.fixo:hover{border-color:var(--borda-forte)}
 .feitBt img{width:100%;height:100%;object-fit:cover;display:block}
 .feitMenu{position:absolute;right:0;top:calc(100% + 4px);z-index:6;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;
@@ -2490,7 +2494,7 @@ function definirCampeao(tipo, rota, i, nome){
 const FEITICOS = [[4,'Flash'],[14,'Ignite'],[11,'Smite'],[12,'TP'],[3,'Exhaust'],[7,'Heal'],[21,'Barrier'],[1,'Cleanse'],[6,'Ghost']];
 function feiticoMudar(rota, i, valor){
   const f = ((cfg.champSelect.feiticos ??= {})[rota] ??= (rota === 'jungle' ? [11, 0] : [0, 0]));
-  if (rota === 'jungle') { f[0] = 11; if (Number(valor) === 11) return fecharFeiticos(); }
+  if (rota === 'jungle' && Number(valor) === 11) return fecharFeiticos();
   f[i] = Number(valor);
   // Mesmo feitiço nos dois? Tira do outro lado.
   if (f[1 - i] === f[i]) f[1 - i] = 0;
@@ -2505,6 +2509,12 @@ function abrirFeiticos(ev, rota, i){
   menu.className = 'feitMenu';
   menu.innerHTML = FEITICOS.filter(([id]) => !(rota === 'jungle' && id === 11)).map(([id, nome]) => `<button type="button" class="${atual===id?'on':''}" title="${nome}" onclick="feiticoMudar('${rota}',${i},${id})"><img src="/feitico/${id}" alt=""><span>${nome}</span></button>`).join('');
   ev.currentTarget.parentElement.appendChild(menu);
+}
+/* D ⇄ F: o primeiro vai pra tecla D e o segundo pra F no client (spell1/spell2). */
+function trocarDF(rota){
+  const f = ((cfg.champSelect.feiticos ??= {})[rota] ??= (rota === 'jungle' ? [11, 0] : [0, 0]));
+  [f[0], f[1]] = [f[1], f[0]];
+  gravar(); desenharRotas();
 }
 function fecharFeiticos(){ document.querySelectorAll('.feitMenu').forEach(m => m.remove()); }
 document.addEventListener('click', (ev) => { if(!ev.target.closest('.feitMenu')) fecharFeiticos(); });
@@ -2523,10 +2533,12 @@ function desenharRotas(){
         <div class="lupa" id="lupa-${caixaId(tipo, r, i)}" hidden></div>
       </div>`).join('')}</div>`; }).join('')}
     <div class="feiticos">${[0,1].map(i => {
-      // Jungle: Smite é obrigatório — o primeiro botão fica travado nele.
-      if (r === 'jungle' && i === 0) return '<button class="feitBt fixo" type="button" title="Smite (obrigatório no jungle)" disabled><img src="/feitico/11" alt=""></button>';
-      const atual = (cfg.champSelect.feiticos?.[r] ?? [])[i]; const nome = FEITICOS.find(([id]) => id === atual)?.[1];
-      return `<button class="feitBt" type="button" title="${nome ?? 'feitiço ' + (i+1)}" onclick="abrirFeiticos(event,'${r}',${i})">${atual ? `<img src="/feitico/${atual}" alt="">` : '<span>+</span>'}</button>`; }).join('')}</div>
+      const lista = cfg.champSelect.feiticos?.[r] ?? (r === 'jungle' ? [11, 0] : [0, 0]);
+      const atual = lista[i]; const nome = FEITICOS.find(([id]) => id === atual)?.[1];
+      const tecla = `<em>${i === 0 ? 'D' : 'F'}</em>`;
+      // Jungle: Smite é obrigatório — fica travado no lado em que está (⇄ troca de lado).
+      if (r === 'jungle' && atual === 11) return `<div class="feitCol"><button class="feitBt fixo" type="button" title="Smite (obrigatório no jungle)" disabled><img src="/feitico/11" alt=""></button>${tecla}</div>`;
+      return `<div class="feitCol"><button class="feitBt" type="button" title="${nome ?? 'feitiço na tecla ' + (i === 0 ? 'D' : 'F')}" onclick="abrirFeiticos(event,'${r}',${i})">${atual ? `<img src="/feitico/${atual}" alt="">` : '<span>+</span>'}</button>${tecla}</div>`; }).join(`<button class="trocaDF" type="button" title="trocar D e F" onclick="trocarDF('${r}')">⇄</button>`)}</div>
   </div>`).join('');
   for (const r of ROLES_CFG) for (const tipo of ['picks','bans']) {
     const n = Math.min(listaDe(tipo, r).length + 1, MAX_POR_ROTA);
