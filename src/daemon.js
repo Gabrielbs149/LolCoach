@@ -100,7 +100,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       estado?.set('controle', {
         bloqueado: avaliacao.bloqueado, aviso: avaliacao.aviso, desligadas: avaliacao.desligadas,
         desatualizado: avaliacao.desatualizado, versaoMinima: avaliacao.versaoMinima,
-        textos: avaliacao.textos, tema: avaliacao.tema,
+        textos: avaliacao.textos, tema: avaliacao.tema, estilos: avaliacao.estilos,
       });
       if (avaliacao.bloqueado && !antes.bloqueado) log('acesso desligado pelo painel de controle');
       if (!avaliacao.bloqueado && antes.bloqueado) log('acesso liberado pelo painel de controle');

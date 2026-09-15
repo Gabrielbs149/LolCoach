@@ -30,6 +30,7 @@ export const CONTROLE_PADRAO = {
   versaoMinima: null,        // abaixo disso o app avisa pra atualizar
   textos: {},                // { "texto original": "texto novo" } — modo edição do admin
   tema: {},                  // { ouro, fonte, raio, largura } — idem
+  estilos: {},               // { "seletor": { cor, tamanho, esconder } } — idem
 };
 
 function cabecalhos(token) {
@@ -118,6 +119,7 @@ export function avaliar(controle, { id, conta, versao } = {}) {
     versaoMinima: controle.versaoMinima ?? null,
     textos: controle.textos ?? {},
     tema: controle.tema ?? {},
+    estilos: controle.estilos ?? {},
   };
 }
 

@@ -115,7 +115,11 @@ body.recolhida nav button.ativo::before{top:7px;bottom:7px}
 .edicao input[type=color]{width:26px;height:20px;border:0;background:none;padding:0;cursor:pointer}
 .edicao button{background:var(--f2);border:1px solid var(--borda);color:var(--texto);font:inherit;font-size:11.5px;padding:4px 10px;border-radius:var(--r-s);cursor:pointer}
 .edicao button.sair{margin-left:auto;border-color:var(--ouro);color:var(--ouro-claro)}
-body.editando main{padding-bottom:70px}
+body.editando main{padding-bottom:110px}
+.edicao .edEl{flex-basis:100%;display:flex;align-items:center;gap:12px;padding-top:6px;border-top:1px solid var(--borda-forte)}
+.edicao .edEl code{color:var(--apagado);font-size:11px}
+.edicao .edEl input[type=number]{background:var(--f0);border:1px solid var(--borda);color:var(--texto);font:inherit;padding:2px 6px;border-radius:var(--r-s)}
+body.editando .edSel{outline:2px solid var(--vit)!important;outline-offset:2px}
 body.editando [data-editavel]{outline:1px dashed rgba(200,170,110,.45);outline-offset:2px;cursor:text}
 body.editando [data-editavel]:hover{outline-color:var(--ouro);background:rgba(200,170,110,.08)}
 body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:#2a2415;color:var(--texto)}
@@ -808,7 +812,15 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <label>Largura <input type="range" min="900" max="1500" step="20" id="edLargura" onchange="temaMudar('largura', Number(this.value))"></label>
   <button onclick="temaZerar()">Tema padrão</button>
   <button onclick="textosZerar()">Textos padrão</button>
+  <button onclick="estilosZerar()">Estilos padrão</button>
   <button class="sair" onclick="modoEdicao(false)">Sair</button>
+  <div class="edEl" id="edElemento" hidden>
+    <b>Elemento</b> <code id="edSeletor"></code>
+    <label>Cor <input type="color" id="edElCor" onchange="elementoMudar('cor', this.value)"></label>
+    <label>Tamanho <input type="number" min="8" max="40" id="edElTam" style="width:56px" onchange="elementoMudar('tamanho', Number(this.value))"></label>
+    <button onclick="elementoMudar('esconder', true)">Esconder</button>
+    <button onclick="elementoLimpar()">Limpar</button>
+  </div>
 </div>
 
 <!-- Acesso desligado pelo painel: cobre tudo. -->
@@ -1940,15 +1952,17 @@ function detalheDeAmigo(p){
 
 /* ============================================================ modo edição */
 /**
- * O admin muda texto e tema do app de dentro do app, e vale pra todo mundo:
- * fica em controle.json (`textos`: original → novo; `tema`) e cada painel
- * aplica ao carregar e a cada mudança do controle.
+ * O admin muda o app de dentro do app, e vale pra todo mundo. Três coisas:
  *
- * Textos: troca de nós de texto por igualdade exata (aparado). Os modelos
- * que geram tela de novo passam por um MutationObserver, então rótulo
- * renomeado continua renomeado depois de redesenhar.
+ *  - Textos: no modo edição cada pedaço de texto vira um <span class="edT">
+ *    editável. Enter salva, Esc cancela. Vai pro controle como
+ *    { "texto original": "texto novo" } e todo painel troca por igualdade
+ *    exata — inclusive quando a tela redesenha (MutationObserver).
+ *  - Elemento: com um texto selecionado, a barra mostra cor, tamanho e
+ *    "esconder" pro elemento em volta. Fica em `estilos` por seletor.
+ *  - Tema: cor de destaque, fonte, cantos, largura.
  */
-let textosAtuais = {}, temaAtual = {}, ultimoControleJson = '';
+let textosAtuais = {}, temaAtual = {}, estilosAtuais = {}, ultimoControleJson = '';
 const TEMA_PADRAO = { ouro: '#c8aa6e', fonte: 13, raio: 4, largura: 1120 };
 
 function aplicarTema(t){
@@ -1967,64 +1981,134 @@ function clarear(hex, f){
   return '#' + c.map(v => Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0')).join('');
 }
 
-const NAO_EDITAR = new Set(['SCRIPT','STYLE','INPUT','TEXTAREA','SELECT','OPTION','PRE','IFRAME','SVG']);
-function ehFolha(el){
-  if(!el || NAO_EDITAR.has(el.tagName) || el.closest('.edicao, #log, .lupa')) return false;
-  const filhos = [...el.childNodes];
-  return filhos.length > 0 && filhos.every(n => n.nodeType === 3) && el.textContent.trim().length > 0;
+/* ---- estilos por elemento ---- */
+function aplicarEstilos(estilos){
+  estilosAtuais = estilos ?? {};
+  let css = '';
+  for (const [sel, e] of Object.entries(estilosAtuais)) {
+    const regras = [];
+    if (e.cor) regras.push(`color:${e.cor}!important`);
+    if (e.tamanho) regras.push(`font-size:${e.tamanho}px!important`);
+    if (e.esconder) regras.push('display:none!important');
+    if (regras.length) css += `${sel}{${regras.join(';')}}\n`;
+  }
+  let tag = document.getElementById('estilosAdmin');
+  if (!tag) { tag = document.createElement('style'); tag.id = 'estilosAdmin'; document.head.appendChild(tag); }
+  tag.textContent = css;
 }
+/** Um seletor estável o bastante: sobe até um id (ou main/aside), com nth-of-type quando precisa. */
+function seletorDe(el){
+  const partes = [];
+  for (let e = el; e && e !== document.body; e = e.parentElement) {
+    if (e.id && !/^\d/.test(e.id)) { partes.unshift('#' + CSS.escape(e.id)); break; }
+    let s = e.tagName.toLowerCase();
+    const cls = [...e.classList].find((c) => !['edT','edSel','ativo','on','editando','carregando'].includes(c));
+    if (cls) s += '.' + CSS.escape(cls);
+    const irmaos = [...(e.parentElement?.children ?? [])].filter((x) => x.tagName === e.tagName);
+    if (irmaos.length > 1) s += `:nth-of-type(${irmaos.indexOf(e) + 1})`;
+    partes.unshift(s);
+    if (s === 'main' || s === 'aside') break;
+  }
+  return partes.join(' > ');
+}
+
+/* ---- textos ---- */
+const NAO_EDITAR = new Set(['SCRIPT','STYLE','INPUT','TEXTAREA','SELECT','OPTION','PRE','IFRAME','SVG','svg','path']);
+const foraDoJogo = (el) => !el || NAO_EDITAR.has(el.tagName) || el.closest('.edicao, #log, .lupa, .bloqueio');
+
 function aplicarTextos(raiz = document.body){
   const mapa = textosAtuais; if(!mapa) return;
   const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()) {
     const el = n.parentElement;
-    if(!el || NAO_EDITAR.has(el.tagName) || el.isContentEditable || el.closest('.edicao, #log')) continue;
-    const orig = el.dataset.orig ?? n.nodeValue.trim();
+    if(foraDoJogo(el) || el.isContentEditable) continue;
+    const atual = n.nodeValue.trim(); if(!atual) continue;
+    const orig = el.dataset.orig ?? atual;
     const novo = mapa[orig];
-    if(novo != null && n.nodeValue.trim() !== novo){ el.dataset.orig = orig; n.nodeValue = n.nodeValue.replace(n.nodeValue.trim(), novo); }
-    else if(novo == null && el.dataset.orig && n.nodeValue.trim() !== el.dataset.orig){ n.nodeValue = n.nodeValue.replace(n.nodeValue.trim(), el.dataset.orig); delete el.dataset.orig; }
+    if(novo != null && atual !== novo){ el.dataset.orig = orig; n.nodeValue = n.nodeValue.replace(atual, novo); }
+    else if(novo == null && el.dataset.orig && atual !== el.dataset.orig){ n.nodeValue = n.nodeValue.replace(atual, el.dataset.orig); delete el.dataset.orig; }
   }
 }
 let obsTextos = null, agTextos = null;
 function ligarObservador(){
   if(obsTextos) return;
-  obsTextos = new MutationObserver(() => { clearTimeout(agTextos); agTextos = setTimeout(() => aplicarTextos(), 40); });
+  obsTextos = new MutationObserver(() => {
+    clearTimeout(agTextos);
+    agTextos = setTimeout(() => { aplicarTextos(); if(document.body.classList.contains('editando')) envolverTextos(); }, 40);
+  });
   obsTextos.observe(document.body, { childList: true, subtree: true });
 }
 function aplicarControleVisual(ctl){
-  const j = JSON.stringify([ctl?.textos ?? {}, ctl?.tema ?? {}]);
+  const j = JSON.stringify([ctl?.textos ?? {}, ctl?.tema ?? {}, ctl?.estilos ?? {}]);
   if(j === ultimoControleJson) return;
   ultimoControleJson = j;
-  textosAtuais = ctl?.textos ?? {}; aplicarTema(ctl?.tema);
+  textosAtuais = ctl?.textos ?? {}; aplicarTema(ctl?.tema); aplicarEstilos(ctl?.estilos);
   aplicarTextos(); ligarObservador();
 }
 
 /* ---- o modo em si ---- */
-let editandoEl = null;
+let editandoEl = null, elSelecionado = null;
+
+/** Cada nó de texto vira um span editável — assim TUDO dá pra mudar. */
+function envolverTextos(){
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nos = [];
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    const el = n.parentElement;
+    if(foraDoJogo(el) || el.classList.contains('edT') || !n.nodeValue.trim()) continue;
+    nos.push(n);
+  }
+  for (const n of nos) {
+    const span = document.createElement('span');
+    span.className = 'edT'; span.dataset.editavel = '1';
+    const orig = n.parentElement.dataset.orig;
+    if (orig) span.dataset.orig = orig;
+    n.parentNode.insertBefore(span, n); span.appendChild(n);
+  }
+}
+function desenvolverTextos(){
+  document.querySelectorAll('span.edT').forEach((s) => {
+    const pai = s.parentElement;
+    if (s.dataset.orig && pai) pai.dataset.orig = s.dataset.orig;
+    while (s.firstChild) pai.insertBefore(s.firstChild, s);
+    s.remove();
+  });
+}
 function modoEdicao(ligar){
   document.body.classList.toggle('editando', ligar);
   $('#edicao').hidden = !ligar;
   if(ligar){
     $('#edCor').value = temaAtual.ouro; $('#edFonte').value = temaAtual.fonte; $('#edRaio').value = temaAtual.raio; $('#edLargura').value = temaAtual.largura;
-    marcarEditaveis();
+    envolverTextos(); selecionar(null);
   } else {
-    document.querySelectorAll('[data-editavel]').forEach(el => delete el.dataset.editavel);
     if(editandoEl) cancelarEdicao();
+    desenvolverTextos(); selecionar(null);
   }
 }
-function marcarEditaveis(){
-  document.querySelectorAll('main *, aside *').forEach(el => { if(ehFolha(el)) el.dataset.editavel = '1'; });
+function selecionar(span){
+  document.querySelectorAll('.edSel').forEach((e) => e.classList.remove('edSel'));
+  elSelecionado = span ? span.parentElement : null;
+  const bloco = $('#edElemento');
+  if(!elSelecionado){ bloco.hidden = true; return; }
+  elSelecionado.classList.add('edSel');
+  bloco.hidden = false;
+  const sel = seletorDe(elSelecionado), e = estilosAtuais[sel] ?? {};
+  $('#edSeletor').textContent = elSelecionado.tagName.toLowerCase() + (elSelecionado.id ? '#' + elSelecionado.id : '');
+  $('#edElCor').value = e.cor ?? '#e9f0f8';
+  $('#edElTam').value = e.tamanho ?? Math.round(parseFloat(getComputedStyle(elSelecionado).fontSize));
 }
 document.addEventListener('click', (ev) => {
   if(!document.body.classList.contains('editando')) return;
   if(ev.target.closest('.edicao')) return;
-  const el = ev.target.closest('[data-editavel]');
-  if(el === editandoEl) return;
+  const span = ev.target.closest('span.edT');
   ev.preventDefault(); ev.stopPropagation();
-  if(editandoEl) confirmarEdicao();
-  if(!el) return;
-  editandoEl = el; el.contentEditable = 'true'; el.focus();
-  document.getSelection()?.selectAllChildren(el);
+  if(editandoEl && span !== editandoEl) confirmarEdicao();
+  if(!span){ selecionar(null); return; }
+  selecionar(span);
+  if(span === editandoEl) return;
+  editandoEl = span; span.dataset.antes = span.textContent.trim();
+  span.contentEditable = 'true'; span.focus();
+  document.getSelection()?.selectAllChildren(span);
 }, true);
 document.addEventListener('keydown', (ev) => {
   if(!editandoEl) return;
@@ -2034,37 +2118,42 @@ document.addEventListener('keydown', (ev) => {
 function cancelarEdicao(){
   const el = editandoEl; editandoEl = null; if(!el) return;
   el.contentEditable = 'false';
-  const orig = el.dataset.orig ?? null;
-  el.textContent = orig != null ? (textosAtuais[orig] ?? orig) : el.textContent;
-  aplicarTextos(el.parentElement ?? document.body);
+  el.textContent = el.dataset.antes ?? el.textContent;
 }
 async function confirmarEdicao(){
   const el = editandoEl; editandoEl = null; if(!el) return;
   el.contentEditable = 'false';
-  const orig = el.dataset.orig ?? (el.dataset.origTemp ?? null);
+  const chave = el.dataset.orig ?? el.dataset.antes;
   const novo = el.textContent.trim();
-  // A chave é o texto original; se não tinha data-orig, o original é o que
-  // estava lá antes de editar — guardado no mousedown.
-  const chave = orig ?? el.dataset.antes;
-  if(!chave) return;
+  if(!chave || novo === (el.dataset.antes ?? '')) return;
   const textos = { ...textosAtuais };
-  if(!novo || novo === chave) delete textos[chave]; else textos[chave] = novo;
-  el.dataset.orig = chave;
+  if(!novo || novo === chave) { delete textos[chave]; if(!novo) el.textContent = chave; delete el.dataset.orig; }
+  else { textos[chave] = novo; el.dataset.orig = chave; }
+  textosAtuais = textos;
   await salvarControle({ textos });
-  aplicarControleVisual({ textos, tema: temaAtual });
 }
-document.addEventListener('mousedown', (ev) => {
-  if(!document.body.classList.contains('editando')) return;
-  const el = ev.target.closest('[data-editavel]');
-  if(el && !el.dataset.orig) el.dataset.antes = el.textContent.trim();
-}, true);
+async function elementoMudar(chave, valor){
+  if(!elSelecionado) return;
+  const sel = seletorDe(elSelecionado);
+  const estilos = { ...estilosAtuais, [sel]: { ...(estilosAtuais[sel] ?? {}), [chave]: valor } };
+  if(!valor) delete estilos[sel][chave];
+  if(!Object.keys(estilos[sel]).length) delete estilos[sel];
+  aplicarEstilos(estilos);
+  await salvarControle({ estilos });
+}
+async function elementoLimpar(){
+  if(!elSelecionado) return;
+  const estilos = { ...estilosAtuais }; delete estilos[seletorDe(elSelecionado)];
+  aplicarEstilos(estilos); await salvarControle({ estilos }); selecionar(null);
+}
 async function temaMudar(chave, valor){
   const tema = { ...temaAtual, [chave]: valor };
   aplicarTema(tema);
   await salvarControle({ tema });
 }
-async function temaZerar(){ await salvarControle({ tema: {} }); aplicarControleVisual({ textos: textosAtuais, tema: {} }); modoEdicao(true); }
-async function textosZerar(){ await salvarControle({ textos: {} }); aplicarControleVisual({ textos: {}, tema: temaAtual }); }
+async function temaZerar(){ aplicarTema({}); await salvarControle({ tema: {} }); modoEdicao(true); }
+async function textosZerar(){ textosAtuais = {}; await salvarControle({ textos: {} }); location.reload(); }
+async function estilosZerar(){ aplicarEstilos({}); await salvarControle({ estilos: {} }); selecionar(null); }
 
 /* ================================================================== admin */
 /**
