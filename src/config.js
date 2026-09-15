@@ -24,7 +24,7 @@ function chavesEmbutidas() {
 
 const PADRAO = {
   autoAceitar: { ativo: true, atrasoMs: 0 },
-  atalhos: { flash: 'Control+Alt+1', overlay: 'Control+Shift+O', painel: 'Control+Shift+L' },
+  atalhos: { flashes: ['Control+Alt+1', 'Control+Alt+2', 'Control+Alt+3', 'Control+Alt+4', 'Control+Alt+5'], overlay: 'Control+Shift+O', painel: 'Control+Shift+L' },
   champSelect: { ativo: true, escolher: true, banir: true, travarPick: true, travarBan: true, picks: {}, bans: {} },
   runas: { ativo: true, criterio: 'popular', regiao: 'br', aplicarSpells: false },
   coleta: { ativo: true },

@@ -678,6 +678,9 @@ h2:first-child{margin-top:0}
 .feitMenu button:hover{background:var(--f3);color:var(--texto)} .feitMenu button.on{border-color:var(--ouro);color:var(--ouro-claro)}
 .rotas .cab span.fe{width:150px}
 .rotas .cab span{width:200px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700}
+.teclas5{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.teclas5 .tecla{min-width:0;padding:5px 9px;font-size:11.5px}
+.teclas5 .tecla::before{content:attr(data-n) " ";color:var(--apagado);font-weight:400}
 .tecla{background:var(--f0);border:1px solid var(--borda-forte);color:var(--ouro-claro);font:inherit;font-size:12.5px;font-weight:700;
   padding:6px 12px;border-radius:var(--r-s);cursor:pointer;min-width:150px;letter-spacing:.3px}
 .tecla:hover{border-color:var(--ouro)} .tecla.gravando{border-color:var(--ouro);color:var(--apagado);font-weight:400}
@@ -1028,8 +1031,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <h2>Teclas</h2>
     <div class="painelCfg">
       <div class="linhaCfg">
-        <div class="txt"><b>Marcar flash</b><i>essa tecla marca o 1º inimigo; as seguintes marcam o 2º ao 5º</i></div>
-        <button class="tecla" id="tFlash" onclick="capturarTecla('flash', this)"></button>
+        <div class="txt"><b>Marcar flash</b><i>uma tecla por inimigo, na ordem da tela ao vivo</i></div>
+        <div class="teclas5"><button class="tecla" id="tFlash0" onclick="capturarTecla(0, this)"></button><button class="tecla" id="tFlash1" onclick="capturarTecla(1, this)"></button><button class="tecla" id="tFlash2" onclick="capturarTecla(2, this)"></button><button class="tecla" id="tFlash3" onclick="capturarTecla(3, this)"></button><button class="tecla" id="tFlash4" onclick="capturarTecla(4, this)"></button></div>
       </div>
       <div class="linhaCfg">
         <div class="txt"><b>Overlay no jogo</b></div>
@@ -2616,19 +2619,14 @@ function ligarLupa(tipo, rota, i){
 }
 
 /* ---- teclas: clica, aperta a combinação, pronto ---- */
-const ATALHO_PADRAO = { flash: 'Control+Alt+1', overlay: 'Control+Shift+O', painel: 'Control+Shift+L' };
-const teclaBonita = (a) => String(a ?? '').replace('Control', 'Ctrl').replace(/\+/g, ' + ');
+const ATALHO_PADRAO = { flashes: ['Control+Alt+1','Control+Alt+2','Control+Alt+3','Control+Alt+4','Control+Alt+5'], overlay: 'Control+Shift+O', painel: 'Control+Shift+L' };
+const teclaBonita = (a) => String(a ?? '').replace('Control', 'Ctrl').replace(/\+/g, '+').replace('num', 'Num ');
 function desenharTeclas(){
   const at = { ...ATALHO_PADRAO, ...(cfg.atalhos ?? {}) };
-  $('#tFlash').textContent = teclaBonita(at.flash) + ' … ' + teclaBonita(variantesTexto(at.flash));
+  const fl = Array.isArray(at.flashes) && at.flashes.length === 5 ? at.flashes : ATALHO_PADRAO.flashes;
+  fl.forEach((a, i) => { const b = $('#tFlash' + i); b.textContent = teclaBonita(a); b.dataset.n = (i + 1) + 'º'; });
   $('#tOverlay').textContent = teclaBonita(at.overlay);
   $('#tPainel').textContent = teclaBonita(at.painel);
-}
-function variantesTexto(a){
-  const partes = String(a).split('+'), ultima = partes.pop();
-  if(/^\d$/.test(ultima)) return '5';
-  const f = ultima.match(/^F(\d{1,2})$/i); if(f) return 'F' + Math.min(24, Number(f[1]) + 4);
-  return ultima;
 }
 function capturarTecla(qual, botao){
   botao.classList.add('gravando'); botao.textContent = 'aperta a combinação… (Esc cancela)';
@@ -2641,9 +2639,15 @@ function capturarTecla(qual, botao){
     const mods = [ev.ctrlKey && 'Control', ev.altKey && 'Alt', ev.shiftKey && 'Shift'].filter(Boolean);
     let tecla = ev.key.length === 1 ? ev.key.toUpperCase() : ev.key;
     if(/^Digit\d$/.test(ev.code)) tecla = ev.code.slice(5);
-    if(!/^([A-Z0-9]|F\d{1,2}|Space|Tab|Insert|Delete|Home|End|PageUp|PageDown)$/.test(tecla)){ desenharTeclas(); return; }
-    if(!mods.length && !/^F\d/.test(tecla)){ botao.textContent = 'usa Ctrl, Alt ou Shift junto'; setTimeout(desenharTeclas, 1500); return; }
-    (cfg.atalhos ??= {})[qual] = [...mods, tecla].join('+');
+    if(/^Numpad\d$/.test(ev.code)) tecla = 'num' + ev.code.slice(6);
+    if(!/^([A-Z0-9]|F\d{1,2}|num\d|Space|Tab|Insert|Delete|Home|End|PageUp|PageDown)$/.test(tecla)){ desenharTeclas(); return; }
+    // Tecla solta é engolida pelo app e SOME do jogo (a tecla 1 é o item 1).
+    // Só F-teclas e o teclado numérico podem ir sozinhas.
+    if(!mods.length && !/^(F\d|num\d)/.test(tecla)){ botao.textContent = 'sozinha só F-tecla ou numérico'; setTimeout(desenharTeclas, 1800); return; }
+    const acel = [...mods, tecla].join('+');
+    cfg.atalhos ??= {};
+    if(typeof qual === 'number'){ const fl = [...(Array.isArray(cfg.atalhos.flashes) && cfg.atalhos.flashes.length === 5 ? cfg.atalhos.flashes : ATALHO_PADRAO.flashes)]; fl[qual] = acel; cfg.atalhos.flashes = fl; delete cfg.atalhos.flash; }
+    else cfg.atalhos[qual] = acel;
     gravar(); desenharTeclas();
   };
   document.addEventListener('keydown', ouvir, true);

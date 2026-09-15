@@ -301,9 +301,11 @@ function variantesDoFlash(acelerador) {
 }
 function registrarAtalhos(cfg) {
   globalShortcut.unregisterAll();
-  const at = { flash: 'Control+Alt+1', overlay: 'Control+Shift+O', painel: 'Control+Shift+L', ...(cfg?.atalhos ?? {}) };
+  const at = { overlay: 'Control+Shift+O', painel: 'Control+Shift+L', ...(cfg?.atalhos ?? {}) };
   const tenta = (acel, fn) => { try { if (acel) globalShortcut.register(acel, fn); } catch { estado.log(`atalho inválido: ${acel}`); } };
-  variantesDoFlash(at.flash).forEach((acel, i) => tenta(acel, () => {
+  // Uma tecla por inimigo (1º ao 5º). Config antigo com `flash` único: deriva.
+  const flashes = Array.isArray(at.flashes) && at.flashes.length ? at.flashes : variantesDoFlash(at.flash);
+  flashes.slice(0, 5).forEach((acel, i) => tenta(acel, () => {
     if (!endereco) return;
     fetch(`${endereco}/api/flash?posicao=${i + 1}`, { method: 'POST' }).catch(() => {});
   }));
