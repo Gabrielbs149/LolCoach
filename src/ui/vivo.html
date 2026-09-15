@@ -203,7 +203,7 @@ const $ = (s) => document.querySelector(s);
  * Fala com a voz do Windows (SpeechSynthesis, pt-BR). Como o Discord: som,
  * nunca tela por cima do jogo. Preferências ficam neste PC (localStorage).
  */
-const MODULOS = [['timers','Timers'],['flash','Flash'],['kills','Kills e mortes'],['jungler','Jungler'],['spikes','Itens e nível'],['economia','Gold'],['lane','Lane'],['selecao','Seleção']];
+const MODULOS = [['timers','Timers'],['flash','Flash'],['kills','Kills e mortes'],['jungler','Jungler'],['spikes','Itens e nível'],['economia','Gold'],['lane','Lane'],['mapa','Mapa'],['selecao','Seleção']];
 let voz = { ligada: true, modo: 'serio', volume: 0.9, modulos: Object.fromEntries(MODULOS.map(([k]) => [k, true])) };
 try { voz = { ...voz, ...JSON.parse(localStorage.getItem('voz') ?? '{}') }; } catch {}
 const vozSalvar = () => { try { localStorage.setItem('voz', JSON.stringify(voz)); } catch {} };

@@ -22,7 +22,7 @@ const DRAGAO = {
 };
 
 export function novaMemoriaFalas() {
-  return { ditas: new Set(), vistos: new Set(), ultimoTempo: 0, farmDito: new Set(), mortesPor: new Map(), meusKills: 0 };
+  return { ditas: new Set(), vistos: new Set(), ultimoTempo: 0, farmDito: new Set(), mortesPor: new Map(), meusKills: 0, meusItens: new Set(), mortosAntes: new Set(), nivelAntes: 0 };
 }
 
 /**
@@ -30,7 +30,7 @@ export function novaMemoriaFalas() {
  * `objetivos`: de objetivos.js; `conselhos`: de conselhos.js.
  * Devolve só as falas NOVAS desde a última chamada.
  */
-export function falasNovas({ estado, rastreio, objetivos, conselhos }, mem) {
+export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, mem) {
   const { tempo, eu, jogadores, eventos } = estado;
   const novas = [];
   const dizer = (id, modulo, serio, divertido, prioridade = 1) => {
@@ -58,6 +58,8 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos }, mem) {
     if (o.em > 55 && o.em <= 62) {
       if (o.nome === 'Dragão') dizer(`t60-${chave}`, 'timers', `Dragão em um minuto. ${minhaRole === 'top' ? 'Puxa a wave e prepara o TP.' : 'Empurra a wave, limpa e vem controlar o rio.'}`, `Dragão em um minuto. Larga esse minion e vai pro rio, campeão.`, 2);
       else if (o.nome === 'Barão') dizer(`t60-${chave}`, 'timers', 'Barão em um minuto. Visão no pit e agrupa.', 'Barão em um minuto. Junta o time, quem chegar depois nem vai.', 2);
+      else if (o.nome === 'Ancião') dizer(`t60-${chave}`, 'timers', 'Um minuto pro Ancião. Esse dragão é game over: time inteiro no pit.', 'Ancião em um minuto. Quem pegar ganha, simples assim.', 3);
+      else if (o.nome === 'Vastilarvas') dizer(`t60-${chave}`, 'timers', minhaRole === 'jungle' ? 'Vastilarvas em um minuto. Vai pro pit e disputa esse campo.' : 'Vastilarvas em um minuto. Top e jungle: prio nesse campo.', 'Vastilarvas daqui a um minuto. Campo limpo é torre caindo.', 1);
       else dizer(`t60-${chave}`, 'timers', `${o.nome} em um minuto. Prepara visão.`, `${o.nome} daqui a um minuto.`, 2);
     } else if (o.em > 25 && o.em <= 32) {
       dizer(`t30-${chave}`, 'timers', `Trinta segundos pro ${o.nome}. Time no pit agora.`, `Trinta segundos pro ${o.nome}. Se chegar depois, nem vai.`, 3);
@@ -70,6 +72,11 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos }, mem) {
 
   /* ---- farm a cada 5 minutos (não pro jungle/suporte) ---- */
   const marco = Math.floor(tempo / 300);
+  if (marco >= 1 && marco <= 5 && !mem.farmDito.has(marco) && tempo % 300 < 8 && minhaRole === 'jungle') {
+    mem.farmDito.add(marco);
+    const csm = eu.cs / (tempo / 60);
+    dizer(`farmjg-${marco}`, 'lane', `${marco * 5} minutos, ${csm.toFixed(1)} de farm por minuto. Farma os camps entre os ganks e não deixa ouro no mato.`, `${marco * 5} minutos. Camps parados são gold jogado fora, vai limpar.`, 1);
+  }
   if (marco >= 1 && marco <= 5 && !mem.farmDito.has(marco) && tempo % 300 < 8 && ['top', 'mid', 'adc'].includes(minhaRole)) {
     mem.farmDito.add(marco);
     const csm = eu.cs / (tempo / 60);
@@ -140,6 +147,71 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos }, mem) {
     if (e.tipo === 'InhibKilled') dizer(`ik-${e.id}`, 'timers', ehAliado(e.autor) ? 'Inibidor deles caiu. Super minions empurram sozinhos: usa isso pra pegar Barão ou outra lane.' : 'Perdemos um inibidor. Alguém precisa segurar a super wave.', ehAliado(e.autor) ? 'Inibidor deles no chão. Agora o mapa é nosso.' : 'Inibidor nosso caiu. Vai ter super minion na base, cuidado.', 2);
   }
 
+  /* ---- extras: build, dano deles, mains ---- */
+  let jaFalouDoGold = false;
+  if (extras) {
+    if (extras.dano && tempo > 20) {
+      const { ap, ad } = extras.dano;
+      if (ad >= 4) dizer('dano', 'lane', 'Time inimigo é quase todo AD. Prioriza armadura.', 'Eles são tudo AD. Armadura neles.', 1);
+      else if (ap >= 3) dizer('dano', 'lane', 'Time inimigo tem muito AP. Resistência mágica vale mais que armadura.', 'Time deles é de mago. Resistência mágica, hein.', 1);
+    }
+    for (const m of extras.mains ?? []) {
+      if (m.pontos >= 150000) dizer(`main-${m.nome}`, 'lane', `${m.campeao} é main ${m.role === 'jungle' ? 'do jungler' : 'do seu oponente'}: ${Math.round(m.pontos / 1000)} mil pontos. Fica esperto.`, `${m.campeao} é main, ${Math.round(m.pontos / 1000)} mil pontos. O cara sabe o que faz.`, 1);
+      else if (m.pontos > 0 && m.pontos < 25000) dizer(`main-${m.nome}`, 'lane', `${m.campeao} não é main ${m.role === 'jungle' ? 'do jungler' : 'do seu oponente'}: ${Math.round(m.pontos / 1000)} mil pontos. Dá pra explorar.`, `${m.campeao} não é o main dele. Abusa cedo.`, 1);
+    }
+    // Build: fechou item da build → próximo; gold pra fechar → volta.
+    const b = extras.build;
+    if (b?.ordem?.length) {
+      const tenho = new Set((eu.itens ?? []).map((i) => i.id));
+      for (const it of b.ordem) {
+        if (tenho.has(it.id) && !mem.meusItens.has(it.id)) {
+          mem.meusItens.add(it.id);
+          const prox = b.ordem.find((x) => !tenho.has(x.id));
+          const cedo = tempo < 8 * 60 && b.principais?.[0]?.id === it.id;
+          dizer(`item-${it.id}`, 'economia', `${it.nome} fechado${cedo ? ' antes da hora. Aproveita a vantagem agora' : ''}.${prox ? ` Próximo: ${prox.nome}.` : ''}`, `${it.nome} na mão${cedo ? ', cedo demais, o cara não vai aguentar' : ''}.${prox ? ` Agora junta pro ${prox.nome}.` : ''}`, 1);
+        }
+      }
+      const prox = b.ordem.find((x) => !tenho.has(x.id));
+      if (prox?.preco && eu.ouro >= prox.preco && !eu.morto) { jaFalouDoGold = true; dizer(`gold-item-${prox.id}`, 'economia', `Tem gold pro ${prox.nome}. Empurra a wave e volta.`, `Dá pra comprar ${prox.nome}. Volta e fecha, não fica de enfeite com o gold.`, 2); }
+    }
+  }
+
+  /* ---- você × seu oponente direto, a cada 3 minutos depois dos 6 ---- */
+  const rival = inimigos.find((j) => j.role && j.role === minhaRole && minhaRole !== 'sup');
+  if (rival && tempo >= 360 && tempo % 180 < 8) {
+    const k = Math.floor(tempo / 180);
+    const vant = (eu.nivel - rival.nivel) + (eu.cs - rival.cs) / 25 + (eu.kills - rival.kills) * 0.7 - (eu.mortes - rival.mortes) * 0.5;
+    if (vant >= 2) dizer(`rival-${k}`, 'lane', `Você está mais forte que o ${rival.campeao}. Pressiona a vantagem.`, `Tá ganhando do ${rival.campeao}. Bora ser agressivo, você é mais forte.`, 1);
+    else if (vant <= -2) dizer(`rival-${k}`, 'lane', `${rival.campeao} está na frente. Não force trade: farma seguro e espera o jungler.`, `${rival.campeao} tá na sua frente. Sem heroísmo, farma de longe.`, 2);
+  }
+  const itensRival = rival ? (rival.itens ?? []).filter((i) => i.preco >= 2000).length : 0;
+  if (rival && itensRival >= 2) dizer(`rival-itens-${itensRival}`, 'spikes', `${rival.campeao} fechou o ${itensRival}º item. Tá ficando perigoso, não force trade.`, `${rival.campeao} com ${itensRival} itens. Respeita.`, 2);
+
+  /* ---- seu nível 6 ---- */
+  if (eu.nivel >= 6 && mem.nivelAntes < 6 && mem.nivelAntes > 0) dizer('meu-6', 'lane', 'Nível 6. Ult disponível, procura a jogada.', 'Level 6, ult na mão. Alguém vai chorar.', 1);
+  mem.nivelAntes = eu.nivel;
+
+  /* ---- inimigo nasceu ---- */
+  for (const j of inimigos) {
+    if (j.morto) mem.mortosAntes.add(j.nome);
+    else if (mem.mortosAntes.has(j.nome)) { mem.mortosAntes.delete(j.nome); if (tempo > 60) dizer(`nasceu-${j.nome}-${Math.floor(tempo)}`, 'mapa', `${j.campeao} nasceu. Olho no mapa.`, `${j.campeao} voltou. Olha o mapa.`, 0); }
+  }
+
+  /* ---- lembrete de mapa (laner), a cada 2 min ---- */
+  if (minhaRole !== 'jungle' && tempo >= 240 && tempo % 120 < 8) {
+    const k = Math.floor(tempo / 120);
+    const frases = [['Olha o minimapa.', 'Você já olhou o mapa hoje?'], ['Check minimapa.', 'Mapa. Mapa. Mapa.'], ['Confere o mapa antes de avançar.', 'Olha o mapa antes de andar pra frente, por favor.']];
+    const [s, d] = frases[k % frases.length];
+    dizer(`mapa-${k}`, 'mapa', s, d, 0);
+  }
+
+  /* ---- torres: vantagem ---- */
+  const torres = eventos.filter((e) => e.tipo === 'TurretKilled' && e.torre);
+  const minhasT = torres.filter((e) => Number(String(e.torre).match(/Turret_T(\d)/)?.[1]) !== (eu.time === 100 ? 1 : 2)).length;
+  const delasT = torres.length - minhasT;
+  if (minhasT - delasT >= 3) dizer(`torres-${minhasT - delasT}`, 'timers', `Vantagem de ${minhasT - delasT} torres. O mapa é nosso: foca nos objetivos e fecha.`, `${minhasT - delasT} torres na frente. O mapa é nosso, vai lá acabar.`, 1);
+  else if (delasT - minhasT >= 3) dizer(`torres--${delasT - minhasT}`, 'timers', 'Eles têm três torres a mais. Farma, defende torre e espera a oportunidade. Paciência.', 'Estamos atrás em torre. Segura, farma e espera eles errarem.', 1);
+
   /* ---- jungler deles morto: janela ---- */
   if (jgDeles?.morto && jgDeles.renasceEm > 20) dizer(`jgbase-${Math.floor(tempo / 60)}`, 'jungler', `${jgDeles.campeao} está na base esperando o respawn. Aproveita pra punir.`, `${jgDeles.campeao} tá morto. Rouba o jungle dele, vai.`, 1);
 
@@ -159,7 +231,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos }, mem) {
   /* ---- economia ---- */
   const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
   if (!eu.morto && eu.ouro >= 1000 && vidaPct < 0.4) dizer(`base-${Math.floor(tempo / 45)}`, 'economia', 'Vida baixa e gold sobrando. Volta pra base agora.', 'Vida baixa e gold no bolso. Volta antes de morrer de graça.', 2);
-  else if (!eu.morto && eu.ouro >= 1600) dizer(`gold-${Math.floor(tempo / 180)}`, 'economia', `${eu.ouro} de gold parado. Volta rápido e compra, não perde tempo na lane sem item.`, `${eu.ouro} de gold no bolso e nada na mão. Volta e compra, mano.`, 1);
+  else if (!eu.morto && eu.ouro >= 1600 && !jaFalouDoGold) dizer(`gold-${Math.floor(tempo / 180)}`, 'economia', `${eu.ouro} de gold parado. Volta rápido e compra, não perde tempo na lane sem item.`, `${eu.ouro} de gold no bolso e nada na mão. Volta e compra, mano.`, 1);
 
   /* ---- estado do jogo ---- */
   const nossosKills = aliados.reduce((s, j) => s + j.kills, 0), delesKills = inimigos.reduce((s, j) => s + j.kills, 0);

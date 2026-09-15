@@ -102,6 +102,9 @@ export class RiotApi {
   timeline(matchId) { return this.#pedir(this.#rota, `/lol/match/v5/matches/${matchId}/timeline`); }
   elo(puuid) { return this.#pedir(this.#regiao, `/lol/league/v4/entries/by-puuid/${puuid}`); }
   summonerPorPuuid(puuid) { return this.#pedir(this.#regiao, `/lol/summoner/v4/summoners/by-puuid/${puuid}`); }
+  maestriaDoCampeao(puuid, championId) {
+    return this.#pedir(this.#regiao, `/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/by-champion/${championId}`);
+  }
   maestriaTop(puuid, quantos = 5) {
     return this.#pedir(this.#regiao, `/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=${quantos}`);
   }

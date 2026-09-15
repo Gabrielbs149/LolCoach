@@ -406,7 +406,27 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
     if (!partidaVivo || estado.tempo < partidaVivo.memoria.ultimoTempo - 5) {
       const { novaMemoriaFalas } = await import('./vivo/falas.js');
-      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null };
+      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null, extras: null, montandoExtras: null };
+    }
+
+    // Extras da voz (build, tipo de dano deles, quem está de main): uma vez
+    // por partida, em segundo plano.
+    if (!partidaVivo.extras && !partidaVivo.montandoExtras) {
+      partidaVivo.montandoExtras = (async () => {
+        const X = await import('./vivo/extras.js');
+        const inimigos = estado.jogadores.filter((j) => j.time !== estado.eu.time);
+        const role = estado.eu.role || 'jungle';
+        const [build, dano] = await Promise.all([
+          X.buildDaPartida(estado.eu.campeao, role, { regiao: config.runas?.regiao ?? 'br' }),
+          X.perfilDeDano(inimigos),
+        ]);
+        partidaVivo.extras = { build, dano, mains: [] };
+        // Mains: só sua lane e o jungler, pra não gastar chave à toa.
+        const { tabelaDeCampeoes } = await import('./features/champ-select.js');
+        const tabela = await tabelaDeCampeoes(lcu).catch(() => null);
+        const alvos = inimigos.filter((j) => j.role === role || j.role === 'jungle');
+        partidaVivo.extras.mains = await X.mainsDosInimigos(config.riot, alvos, tabela).catch(() => []);
+      })().catch((erro) => { log(`extras da voz falharam: ${erro.message}`); partidaVivo.extras = { build: null, dano: null, mains: [] }; });
     }
 
     // As fichas dependem de rede (op.gg, Data Dragon) e do banco: montam uma
@@ -426,7 +446,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     // falar uma vez só.
     const { falasNovas } = await import('./vivo/falas.js');
     partidaVivo.ultimoEstado = estado;
-    for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
+    for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       partidaVivo.falas.push({ ...f, seq: ++seqFalas, t: estado.tempo });
     }
 
