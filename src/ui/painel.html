@@ -619,6 +619,10 @@ h2:first-child{margin-top:0}
 .abasRole button .n{color:var(--apagado);font-weight:600;font-size:10.5px;margin-left:6px;font-variant-numeric:tabular-nums}
 
 /* Caixa de campeão: ícone + nome; clicou, vira busca com a lista por cima. */
+.rotas .linhaCfg{min-height:48px;padding:6px 14px}
+.rotas .linhaCfg .txt b{text-transform:uppercase;letter-spacing:.6px;font-size:12px}
+.rotas .cab{min-height:0;padding:6px 14px;background:var(--f2)}
+.rotas .cab span{width:220px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700}
 .caixaCamp{position:relative;display:flex;align-items:center;gap:8px;width:220px;background:var(--f0);
   border:1px solid var(--borda-forte);border-radius:var(--r-s);padding:4px 8px 4px 4px}
 .caixaCamp:focus-within{border-color:var(--ouro)}
@@ -919,20 +923,18 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
       </div>
       <div class="linhaCfg">
         <div class="txt"><b>Travar campeão</b></div>
-        <div class="caixaCamp" id="cxPicks">
-          <img id="imgPicks" alt=""><input id="addPicks" placeholder="nome do campeão" autocomplete="off" spellcheck="false">
-          <div class="lupa" id="lupaPicks" hidden></div>
-        </div>
         <label class="chave"><input type="checkbox" id="cChamp"><span class="pino"></span></label>
       </div>
       <div class="linhaCfg">
         <div class="txt"><b>Banir campeão</b></div>
-        <div class="caixaCamp" id="cxBans">
-          <img id="imgBans" alt=""><input id="addBans" placeholder="nome do campeão" autocomplete="off" spellcheck="false">
-          <div class="lupa" id="lupaBans" hidden></div>
-        </div>
         <label class="chave"><input type="checkbox" id="cBanir"><span class="pino"></span></label>
       </div>
+    </div>
+
+    <h2>Por rota</h2>
+    <div class="painelCfg rotas">
+      <div class="linhaCfg cab"><div class="txt"></div><span>Travar</span><span>Banir</span></div>
+      <div id="cRotas"></div>
     </div>
 
     <details class="avancado">
@@ -2019,9 +2021,8 @@ function marcarSalvo(){
  * Salva SÓ os campos que esta tela edita — mandar o config inteiro que estava
  * em memória atropelava mudanças feitas no arquivo depois de abrir a tela.
  *
- * A tela é mínima de propósito: um campeão pra travar e um pra banir, iguais
- * pra toda role (o daemon continua lendo lista por role — a tela grava o mesmo
- * nome em todas). Fila aceita na hora e pick sempre travado: ele pediu assim.
+ * A tela é mínima de propósito: um campeão pra travar e um pra banir por
+ * rota. Fila aceita na hora e pick sempre travado: ele pediu assim.
  */
 function gravar(){
   clearTimeout(gravando);
@@ -2046,27 +2047,42 @@ function gravar(){
 }
 
 /** O campeão da caixa: o primeiro que aparecer em qualquer role. */
-function campeaoDe(tipo){
-  for (const r of ROLES_CFG) { const n = cfg.champSelect[tipo]?.[r]?.[0]; if (n) return n; }
-  return null;
-}
-function definirCampeao(tipo, nome){
-  cfg.champSelect[tipo] = Object.fromEntries(ROLES_CFG.map(r => [r, nome ? [nome] : []]));
-  desenharCaixa(tipo); gravar();
+/**
+ * Um campeão pra travar e um pra banir POR ROTA — o daemon lê
+ * champSelect.picks[rota][0] / bans[rota][0] pela rota que o client deu.
+ * Sem rota (personalizada, blind) ele usa a de jungle (rolePadrao).
+ */
+const ROTA_NOME = { top: 'top', jungle: 'jungle', middle: 'mid', bottom: 'adc', utility: 'sup' };
+const caixaId = (tipo, rota) => `${tipo}-${rota}`;
+const campeaoDe = (tipo, rota) => cfg.champSelect[tipo]?.[rota]?.[0] ?? null;
+function definirCampeao(tipo, rota, nome){
+  (cfg.champSelect[tipo] ??= {})[rota] = nome ? [nome] : [];
+  desenharCaixa(tipo, rota); gravar();
 }
 
-function desenharCaixa(tipo){
-  const nome = campeaoDe(tipo);
+function desenharRotas(){
+  $('#cRotas').innerHTML = ROLES_CFG.map(r => `<div class="linhaCfg">
+    <div class="txt"><b>${ROTA_NOME[r]}</b></div>
+    ${['picks','bans'].map(tipo => `<div class="caixaCamp" id="cx-${caixaId(tipo, r)}">
+      <img id="img-${caixaId(tipo, r)}" alt=""><input id="add-${caixaId(tipo, r)}" placeholder="nome do campeão" autocomplete="off" spellcheck="false">
+      <div class="lupa" id="lupa-${caixaId(tipo, r)}" hidden></div>
+    </div>`).join('')}
+  </div>`).join('');
+  for (const r of ROLES_CFG) for (const tipo of ['picks','bans']) { ligarLupa(tipo, r); desenharCaixa(tipo, r); }
+}
+
+function desenharCaixa(tipo, rota){
+  const nome = campeaoDe(tipo, rota);
   const c = nome ? listaCampeoes.find(x => x.nome.toLowerCase() === nome.toLowerCase()) : null;
-  const img = $(tipo === 'picks' ? '#imgPicks' : '#imgBans');
-  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
+  const img = $('#img-' + caixaId(tipo, rota));
+  const input = $('#add-' + caixaId(tipo, rota));
   img.src = c ? '/icone/' + c.id : '';
   if (document.activeElement !== input) input.value = nome ?? '';
 }
 
 /** Busca: quem você joga (pick) ou enfrenta (ban) vem primeiro. */
 let sugestoesCfg = null;   // a tela de Builds usa pra marcar os seus campeões
-let lupaSel = { picks: 0, bans: 0 };
+let lupaSel = {};
 
 function resultadosDaLupa(tipo, texto){
   const t = texto.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -2079,39 +2095,41 @@ function resultadosDaLupa(tipo, texto){
   return { vis: [...comeca, ...contem].slice(0, 10) };
 }
 
-function desenharLupa(tipo){
-  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
-  const lupa = $(tipo === 'picks' ? '#lupaPicks' : '#lupaBans');
+function desenharLupa(tipo, rota){
+  const k = caixaId(tipo, rota);
+  const input = $('#add-' + k);
+  const lupa = $('#lupa-' + k);
   if(document.activeElement !== input){ lupa.hidden = true; return; }
   const { vis } = resultadosDaLupa(tipo, input.value);
   lupa.hidden = false;
-  lupaSel[tipo] = Math.min(lupaSel[tipo], Math.max(0, vis.length - 1));
+  lupaSel[k] = Math.min(lupaSel[k] ?? 0, Math.max(0, vis.length - 1));
   lupa.innerHTML = vis.length
-    ? vis.map((c,i) => `<div class="${i===lupaSel[tipo]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}',${c.id})">
+    ? vis.map((c,i) => `<div class="${i===lupaSel[k]?'on':''}" onmousedown="event.preventDefault();escolherDaLupa('${tipo}','${rota}',${c.id})">
         ${icone(c.id)}${esc(c.nome)}</div>`).join('')
     : `<div class="nadaL">${input.value.trim() ? 'nenhum campeão com esse nome' : 'digite o nome'}</div>`;
 }
 
-function escolherDaLupa(tipo, id){
+function escolherDaLupa(tipo, rota, id){
   const c = listaCampeoes.find(x => x.id === id);
   if(!c) return;
-  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
-  input.blur();
-  definirCampeao(tipo, c.nome);
+  $('#add-' + caixaId(tipo, rota)).blur();
+  definirCampeao(tipo, rota, c.nome);
 }
 
-function ligarLupa(tipo){
-  const input = $(tipo === 'picks' ? '#addPicks' : '#addBans');
-  input.oninput = () => { lupaSel[tipo] = 0; desenharLupa(tipo); };
-  input.onfocus = () => { input.select(); desenharLupa(tipo); };
-  input.onblur = () => { desenharLupa(tipo); desenharCaixa(tipo); };
+function ligarLupa(tipo, rota){
+  const k = caixaId(tipo, rota);
+  const input = $('#add-' + k);
+  input.oninput = () => { lupaSel[k] = 0; desenharLupa(tipo, rota); };
+  input.onfocus = () => { input.select(); desenharLupa(tipo, rota); };
+  input.onblur = () => { desenharLupa(tipo, rota); desenharCaixa(tipo, rota); };
   input.onkeydown = (ev) => {
     const { vis } = resultadosDaLupa(tipo, input.value);
-    if(ev.key === 'ArrowDown'){ ev.preventDefault(); lupaSel[tipo] = Math.min(lupaSel[tipo]+1, vis.length-1); desenharLupa(tipo); }
-    else if(ev.key === 'ArrowUp'){ ev.preventDefault(); lupaSel[tipo] = Math.max(lupaSel[tipo]-1, 0); desenharLupa(tipo); }
-    else if(ev.key === 'Enter'){ ev.preventDefault(); if(vis[lupaSel[tipo]]) escolherDaLupa(tipo, vis[lupaSel[tipo]].id); }
+    const i = lupaSel[k] ?? 0;
+    if(ev.key === 'ArrowDown'){ ev.preventDefault(); lupaSel[k] = Math.min(i+1, vis.length-1); desenharLupa(tipo, rota); }
+    else if(ev.key === 'ArrowUp'){ ev.preventDefault(); lupaSel[k] = Math.max(i-1, 0); desenharLupa(tipo, rota); }
+    else if(ev.key === 'Enter'){ ev.preventDefault(); if(vis[i]) escolherDaLupa(tipo, rota, vis[i].id); }
     else if(ev.key === 'Escape'){ input.blur(); }
-    else if(ev.key === 'Backspace' && !input.value){ definirCampeao(tipo, null); }
+    else if(ev.key === 'Backspace' && !input.value){ definirCampeao(tipo, rota, null); }
   };
 }
 
@@ -2128,9 +2146,8 @@ async function carregarConfig(){
   $('#cAceitar').onchange = e => { cfg.autoAceitar.ativo = e.target.checked; gravar(); };
   $('#cChamp').onchange = e => { cfg.champSelect.escolher = e.target.checked; gravar(); };
   $('#cBanir').onchange = e => { cfg.champSelect.banir = e.target.checked; gravar(); };
-  ligarLupa('picks'); ligarLupa('bans');
-  desenharCaixa('picks'); desenharCaixa('bans');
-  if(!listaCampeoes.length) $('#addPicks').placeholder = 'abra o League uma vez';
+  desenharRotas();
+  if(!listaCampeoes.length) document.querySelectorAll('.rotas input').forEach(i => i.placeholder = 'abra o League uma vez');
 }
 
 /* =============================================================== atividade */
