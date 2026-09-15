@@ -28,6 +28,8 @@ export const CONTROLE_PADRAO = {
   aviso: '',                 // mensagem que aparece na barra de todo mundo
   avisos: {},                // { "nome#tag" ou id: "mensagem só pra essa pessoa" }
   versaoMinima: null,        // abaixo disso o app avisa pra atualizar
+  textos: {},                // { "texto original": "texto novo" } — modo edição do admin
+  tema: {},                  // { ouro, fonte, raio, largura } — idem
 };
 
 function cabecalhos(token) {
@@ -114,6 +116,8 @@ export function avaliar(controle, { id, conta, versao } = {}) {
     aviso: [controle.aviso, avisoPessoal].filter(Boolean).join(' — '),
     desatualizado,
     versaoMinima: controle.versaoMinima ?? null,
+    textos: controle.textos ?? {},
+    tema: controle.tema ?? {},
   };
 }
 

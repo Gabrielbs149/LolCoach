@@ -107,6 +107,18 @@ body.recolhida nav button.ativo::before{top:7px;bottom:7px}
 .luz.on{background:var(--vit);box-shadow:0 0 8px #31b07399}
 .estado .atualiza{color:var(--ouro);font-weight:650}
 .estado .avisoAdm{color:var(--g2);font-weight:650;white-space:normal;line-height:1.4}
+.edicao{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  padding:8px 16px;background:#241f16;border-top:2px solid var(--ouro);font-size:12px;color:var(--fraco)}
+.edicao b{color:var(--ouro-claro)}
+.edicao label{display:flex;align-items:center;gap:6px;color:var(--fraco)}
+.edicao input[type=range]{width:90px;accent-color:var(--ouro)}
+.edicao input[type=color]{width:26px;height:20px;border:0;background:none;padding:0;cursor:pointer}
+.edicao button{background:var(--f2);border:1px solid var(--borda);color:var(--texto);font:inherit;font-size:11.5px;padding:4px 10px;border-radius:var(--r-s);cursor:pointer}
+.edicao button.sair{margin-left:auto;border-color:var(--ouro);color:var(--ouro-claro)}
+body.editando main{padding-bottom:70px}
+body.editando [data-editavel]{outline:1px dashed rgba(200,170,110,.45);outline-offset:2px;cursor:text}
+body.editando [data-editavel]:hover{outline-color:var(--ouro);background:rgba(200,170,110,.08)}
+body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:#2a2415;color:var(--texto)}
 .bloqueio{position:fixed;inset:0;z-index:50;background:rgba(7,10,15,.96);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
 .bloqueio h1{font-size:22px;margin:0 0 10px;color:var(--der)}
 .bloqueio p{color:var(--fraco);font-size:14px;max-width:420px;margin:0 auto}
@@ -791,6 +803,19 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   </div>
 </aside>
 
+<!-- Modo edição (admin): clica em qualquer texto e muda; tema ao lado. -->
+<div class="edicao" id="edicao" hidden>
+  <b>Modo edição</b>
+  <span>clique em qualquer texto pra mudar · Enter salva · Esc cancela</span>
+  <label>Destaque <input type="color" id="edCor" onchange="temaMudar('ouro', this.value)"></label>
+  <label>Fonte <input type="range" min="11" max="16" step="0.5" id="edFonte" onchange="temaMudar('fonte', Number(this.value))"></label>
+  <label>Cantos <input type="range" min="0" max="14" step="1" id="edRaio" onchange="temaMudar('raio', Number(this.value))"></label>
+  <label>Largura <input type="range" min="900" max="1500" step="20" id="edLargura" onchange="temaMudar('largura', Number(this.value))"></label>
+  <button onclick="temaZerar()">Tema padrão</button>
+  <button onclick="textosZerar()">Textos padrão</button>
+  <button class="sair" onclick="modoEdicao(false)">Sair</button>
+</div>
+
 <!-- Acesso desligado pelo painel: cobre tudo. -->
 <div class="bloqueio" id="bloqueio" hidden>
   <div>
@@ -897,6 +922,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
   <section id="admin">
     <div class="titulo">Admin <span id="admSalvo" class="salvo"></span></div>
+    <div class="acoes"><button class="acao" onclick="modoEdicao(true)">Entrar no modo edição</button></div>
     <div id="admAviso"></div>
 
     <h2>Pra todo mundo</h2>
@@ -1923,6 +1949,134 @@ function detalheDeAmigo(p){
   </div>`;
 }
 
+/* ============================================================ modo edição */
+/**
+ * O admin muda texto e tema do app de dentro do app, e vale pra todo mundo:
+ * fica em controle.json (`textos`: original → novo; `tema`) e cada painel
+ * aplica ao carregar e a cada mudança do controle.
+ *
+ * Textos: troca de nós de texto por igualdade exata (aparado). Os modelos
+ * que geram tela de novo passam por um MutationObserver, então rótulo
+ * renomeado continua renomeado depois de redesenhar.
+ */
+let textosAtuais = {}, temaAtual = {}, ultimoControleJson = '';
+const TEMA_PADRAO = { ouro: '#c8aa6e', fonte: 13, raio: 4, largura: 1120 };
+
+function aplicarTema(t){
+  temaAtual = { ...TEMA_PADRAO, ...(t ?? {}) };
+  const r = document.documentElement.style;
+  r.setProperty('--ouro', temaAtual.ouro);
+  r.setProperty('--ouro-claro', clarear(temaAtual.ouro, .35));
+  r.setProperty('--ouro-escuro', clarear(temaAtual.ouro, -.35));
+  document.body.style.fontSize = temaAtual.fonte + 'px';
+  r.setProperty('--r-s', temaAtual.raio + 'px'); r.setProperty('--r-m', (temaAtual.raio + 2) + 'px'); r.setProperty('--r-g', (temaAtual.raio + 4) + 'px');
+  r.setProperty('--largura', temaAtual.largura + 'px');
+}
+function clarear(hex, f){
+  const n = parseInt(String(hex).replace('#',''), 16); if(Number.isNaN(n)) return hex;
+  const c = [n>>16&255, n>>8&255, n&255].map(v => Math.round(f > 0 ? v + (255-v)*f : v*(1+f)));
+  return '#' + c.map(v => Math.max(0,Math.min(255,v)).toString(16).padStart(2,'0')).join('');
+}
+
+const NAO_EDITAR = new Set(['SCRIPT','STYLE','INPUT','TEXTAREA','SELECT','OPTION','PRE','IFRAME','SVG']);
+function ehFolha(el){
+  if(!el || NAO_EDITAR.has(el.tagName) || el.closest('.edicao, #log, .lupa')) return false;
+  const filhos = [...el.childNodes];
+  return filhos.length > 0 && filhos.every(n => n.nodeType === 3) && el.textContent.trim().length > 0;
+}
+function aplicarTextos(raiz = document.body){
+  const mapa = textosAtuais; if(!mapa) return;
+  const w = document.createTreeWalker(raiz, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    const el = n.parentElement;
+    if(!el || NAO_EDITAR.has(el.tagName) || el.isContentEditable || el.closest('.edicao, #log')) continue;
+    const orig = el.dataset.orig ?? n.nodeValue.trim();
+    const novo = mapa[orig];
+    if(novo != null && n.nodeValue.trim() !== novo){ el.dataset.orig = orig; n.nodeValue = n.nodeValue.replace(n.nodeValue.trim(), novo); }
+    else if(novo == null && el.dataset.orig && n.nodeValue.trim() !== el.dataset.orig){ n.nodeValue = n.nodeValue.replace(n.nodeValue.trim(), el.dataset.orig); delete el.dataset.orig; }
+  }
+}
+let obsTextos = null, agTextos = null;
+function ligarObservador(){
+  if(obsTextos) return;
+  obsTextos = new MutationObserver(() => { clearTimeout(agTextos); agTextos = setTimeout(() => aplicarTextos(), 40); });
+  obsTextos.observe(document.body, { childList: true, subtree: true });
+}
+function aplicarControleVisual(ctl){
+  const j = JSON.stringify([ctl?.textos ?? {}, ctl?.tema ?? {}]);
+  if(j === ultimoControleJson) return;
+  ultimoControleJson = j;
+  textosAtuais = ctl?.textos ?? {}; aplicarTema(ctl?.tema);
+  aplicarTextos(); ligarObservador();
+}
+
+/* ---- o modo em si ---- */
+let editandoEl = null;
+function modoEdicao(ligar){
+  document.body.classList.toggle('editando', ligar);
+  $('#edicao').hidden = !ligar;
+  if(ligar){
+    $('#edCor').value = temaAtual.ouro; $('#edFonte').value = temaAtual.fonte; $('#edRaio').value = temaAtual.raio; $('#edLargura').value = temaAtual.largura;
+    marcarEditaveis();
+  } else {
+    document.querySelectorAll('[data-editavel]').forEach(el => delete el.dataset.editavel);
+    if(editandoEl) cancelarEdicao();
+  }
+}
+function marcarEditaveis(){
+  document.querySelectorAll('main *, aside *').forEach(el => { if(ehFolha(el)) el.dataset.editavel = '1'; });
+}
+document.addEventListener('click', (ev) => {
+  if(!document.body.classList.contains('editando')) return;
+  if(ev.target.closest('.edicao')) return;
+  const el = ev.target.closest('[data-editavel]');
+  if(el === editandoEl) return;
+  ev.preventDefault(); ev.stopPropagation();
+  if(editandoEl) confirmarEdicao();
+  if(!el) return;
+  editandoEl = el; el.contentEditable = 'true'; el.focus();
+  document.getSelection()?.selectAllChildren(el);
+}, true);
+document.addEventListener('keydown', (ev) => {
+  if(!editandoEl) return;
+  if(ev.key === 'Enter'){ ev.preventDefault(); confirmarEdicao(); }
+  else if(ev.key === 'Escape'){ ev.preventDefault(); cancelarEdicao(); }
+});
+function cancelarEdicao(){
+  const el = editandoEl; editandoEl = null; if(!el) return;
+  el.contentEditable = 'false';
+  const orig = el.dataset.orig ?? null;
+  el.textContent = orig != null ? (textosAtuais[orig] ?? orig) : el.textContent;
+  aplicarTextos(el.parentElement ?? document.body);
+}
+async function confirmarEdicao(){
+  const el = editandoEl; editandoEl = null; if(!el) return;
+  el.contentEditable = 'false';
+  const orig = el.dataset.orig ?? (el.dataset.origTemp ?? null);
+  const novo = el.textContent.trim();
+  // A chave é o texto original; se não tinha data-orig, o original é o que
+  // estava lá antes de editar — guardado no mousedown.
+  const chave = orig ?? el.dataset.antes;
+  if(!chave) return;
+  const textos = { ...textosAtuais };
+  if(!novo || novo === chave) delete textos[chave]; else textos[chave] = novo;
+  el.dataset.orig = chave;
+  await salvarControle({ textos });
+  aplicarControleVisual({ textos, tema: temaAtual });
+}
+document.addEventListener('mousedown', (ev) => {
+  if(!document.body.classList.contains('editando')) return;
+  const el = ev.target.closest('[data-editavel]');
+  if(el && !el.dataset.orig) el.dataset.antes = el.textContent.trim();
+}, true);
+async function temaMudar(chave, valor){
+  const tema = { ...temaAtual, [chave]: valor };
+  aplicarTema(tema);
+  await salvarControle({ tema });
+}
+async function temaZerar(){ await salvarControle({ tema: {} }); aplicarControleVisual({ textos: textosAtuais, tema: {} }); modoEdicao(true); }
+async function textosZerar(){ await salvarControle({ textos: {} }); aplicarControleVisual({ textos: {}, tema: temaAtual }); }
+
 /* ==================================================================== hud */
 /**
  * Opções do jogo numa tela simples: cada controle grava na hora, no client
@@ -1985,9 +2139,9 @@ async function salvarControle(parcial){
   const r = await fetch('/api/admin/controle', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(parcial) }).then(x => x.json());
   if(r.erro){ $('#admAviso').innerHTML = `<div class="aviso amAviso">${esc(r.erro)}</div>`; return; }
   $('#admAviso').innerHTML = '';
-  admDados.controle = r;
+  if(admDados) admDados.controle = r;
   const el = $('#admSalvo'); el.textContent = 'salvo'; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1700);
-  desenharAdmin();
+  if(admDados) desenharAdmin();
 }
 
 const chaveAdm = (x) => String(x ?? '').trim().toLowerCase();
@@ -2253,6 +2407,7 @@ async function tick(){
     $('#estAviso').hidden = !av; $('#estAviso').textContent = av;
     $('#navAdmin').hidden = e.config?.admin !== true;
     $('#navHud').hidden = e.config?.admin !== true;
+    aplicarControleVisual(ctl);
     // Primeira vez que o client responde: as telas passam a seguir essa conta.
     if (e.conta && !contaEscolhidaPeloUsuario && contaAtual !== String(e.conta).split('#')[0] && contasConhecidas.some(c => c.nome === String(e.conta).split('#')[0])) {
       contaAtual = String(e.conta).split('#')[0]; desenharContaSel();
