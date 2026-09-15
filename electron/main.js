@@ -127,6 +127,7 @@ function criarJanela({ esconder = false } = {}) {
     width: 1180, height: 800, minWidth: 900, minHeight: 600,
     backgroundColor: '#0a0e14',
     title: 'LolCoach',
+    icon: join(AQUI, 'icone.png'),
     autoHideMenuBar: true,
     show: !esconder,
     webPreferences: { nodeIntegration: false, contextIsolation: true },
@@ -171,7 +172,7 @@ function abrirVivo({ focar = true } = {}) {
     return;
   }
   janelaVivo = new BrowserWindow({
-    width: 520, height: 780, minWidth: 380, minHeight: 420,
+    width: 520, height: 780, minWidth: 380, minHeight: 420, icon: join(AQUI, 'icone.png'),
     backgroundColor: '#080b11',
     title: 'LolCoach — ao vivo',
     autoHideMenuBar: true,
@@ -187,7 +188,7 @@ function abrirVivo({ focar = true } = {}) {
 }
 
 function criarBandeja() {
-  const icone = nativeImage.createFromPath(join(AQUI, 'icone.png'));
+  const icone = nativeImage.createFromPath(join(AQUI, 'icone-bandeja.png'));
   bandeja = new Tray(icone.isEmpty() ? nativeImage.createEmpty() : icone);
   bandeja.setToolTip('LolCoach');
   bandeja.setContextMenu(Menu.buildFromTemplate([

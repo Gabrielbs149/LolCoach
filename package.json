@@ -47,7 +47,8 @@
             "x64"
           ]
         }
-      ]
+      ],
+      "icon": "electron/icone.png"
     },
     "directories": {
       "output": "build"
