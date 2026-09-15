@@ -119,7 +119,7 @@ async function resumoRecente(riot, puuid, { quantas = QUANTAS, aoProgresso } = {
       .map((c) => ({ ...c, taxa: c.vitorias / c.jogos, kda: c.d ? (c.k + c.a) / c.d : c.k + c.a })),
     roles: [...porRole.entries()].sort((x, y) => y[1] - x[1]).map(([role, jogos]) => ({ role, jogos, fatia: jogos / n })),
     ultimas: linhas.slice(0, 10).map((l) => ({
-      campeao: l.campeao, championId: l.championId, role: l.role, venci: l.venci,
+      gameId: l.gameId, campeao: l.campeao, championId: l.championId, role: l.role, venci: l.venci,
       kda: `${l.kills}/${l.deaths}/${l.assists}`, quando: l.quando, duracaoS: l.duracaoS,
     })),
   };

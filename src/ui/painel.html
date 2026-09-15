@@ -819,6 +819,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div class="l" id="estFase"></div>
     <div class="l atualiza" id="estAtualiza" hidden></div>
     <div class="l avisoAdm" id="estAviso" hidden></div>
+    <div class="l atualiza" id="estPatch" hidden style="cursor:pointer" onclick="abrirAba('patch')"></div>
   </div>
 </aside>
 
@@ -903,6 +904,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <div id="amAviso"></div>
     <div class="amGrade" id="amGrade"></div>
     <div id="amDetalhe"></div>
+    <div id="amSemana"></div>
     <h2>Comparativo — últimas 20 solo de cada um</h2>
     <div class="amRolagem" id="amCompara"></div>
   </section>
@@ -1694,6 +1696,7 @@ function carregarBuilds(){
 let notas = [], notaAberta = null;
 
 async function carregarPatch(){
+  try { const pn = (await pegar('/api/estado')).patchNovo; if (pn?.slug) { localStorage.setItem('patchVisto', pn.slug); $('#estPatch').hidden = true; } } catch {}
   $('#patchLista').innerHTML = carregando();
   try { notas = await pegar('/api/patch'); }
   catch { $('#patchLista').innerHTML = '<div class="vazio">sem internet pra buscar as notas</div>'; return; }
@@ -1927,6 +1930,7 @@ function cartaoDeAmigo(p, { eu = false } = {}){
       <div><b>${r.kda.toFixed(2)}</b><span>AMA</span></div>
       <div><b>${r.csm.toFixed(1)}</b><span>cs/min</span></div>
     </div>` : ''}
+    ${p.emComum?.length ? `<div class="estadoA">${p.emComum.length} jogo${p.emComum.length>1?'s':''} com você · ${p.emComum.filter(j => j.venci).length}V ${p.emComum.filter(j => !j.venci).length}D</div>` : ''}
     ${p.carregando ? '<div class="estadoA carregando">atualizando na Riot…</div>'
       : perfil ? `<div class="estadoA">atualizado ${haQuanto(new Date(perfil.em).toISOString())}${perfil.desatualizado ? ' · a Riot não respondeu agora' : ''}</div>` : ''}
     <div class="acoesA">
@@ -1952,6 +1956,14 @@ function desenharAmigos(){
   /* ---- detalhe de quem está aberto ---- */
   const aberto = todos.find(p => p.tag && chaveAm(p) === amAberto && p.perfil);
   $('#amDetalhe').innerHTML = aberto ? detalheDeAmigo(aberto) : '';
+
+  /* ---- ranking da semana ---- */
+  const comSemana = todos.filter(p => p.semana != null).sort((a, b) => b.semana - a.semana);
+  $('#amSemana').innerHTML = comSemana.length ? `<h2>Ranking da semana</h2><div class="mini">${comSemana.map((p, i) => `
+    <div class="miniLinha"><b style="text-align:center;color:var(--apagado)">${i+1}º</b>
+      <span class="n">${esc(p.perfil?.conta?.nome ?? p.nome)}${p === eu ? ' (você)' : ''}</span>
+      <span class="wr ${p.semana>0?'v':p.semana<0?'d':''}">${p.semana>0?'+':''}${p.semana} PDL</span>
+      <span class="kda">${esc(eloSolo(p.perfil)?.nome ?? 'sem elo')}</span></div>`).join('')}</div>` : '';
 
   /* ---- comparativo ---- */
   const cols = todos.filter(p => p.perfil);
@@ -2290,6 +2302,7 @@ async function esquecerUsuario(id){
   if(r.erro){ $('#admAviso').innerHTML = `<div class="aviso amAviso">${esc(r.erro)}</div>`; return; }
   admDados.usuarios = admDados.usuarios.filter(u => u.id !== id); desenharAdmin();
 }
+function verRegistro(id){ const tr = document.getElementById('reg-' + id); if(tr) tr.hidden = !tr.hidden; }
 function alternarFuncao(f){
   const d = new Set(admDados.controle.desligadas ?? []);
   d.has(f) ? d.delete(f) : d.add(f);
@@ -2314,7 +2327,7 @@ function desenharAdmin(){
   if(!usuarios.length){ $('#admUsuarios').innerHTML = '<div class="vazio">ninguém se apresentou ainda</div>'; return; }
   const ESTADO = { liberado: ['ok','liberado'], bloqueado: ['nao','bloqueado'], esperando: ['esperando','esperando'] };
   $('#admUsuarios').innerHTML = `<table class="admTabela">
-    <thead><tr><th>Conta</th><th>Outras contas</th><th>Versão</th><th>Visto</th><th>Partidas</th><th>Sistema</th><th>Estado</th><th></th></tr></thead>
+    <thead><tr><th>Conta</th><th>Outras contas</th><th>Versão</th><th>Visto</th><th>Partidas</th><th>Aceitas · travadas · banidas</th><th>Sistema</th><th>Estado</th><th></th></tr></thead>
     <tbody>${usuarios.map(u => {
       const st = estadoDoUsuario(u), [cls, rot] = ESTADO[st];
       const souEu = u.id === eu.id;
@@ -2325,6 +2338,7 @@ function desenharAdmin(){
         <td>${esc(u.versao ?? '?')}</td>
         <td class="sub" title="${esc(u.vistoEm ?? '')}">${u.vistoEm ? haQuanto(u.vistoEm) : '—'}</td>
         <td>${num(u.partidas ?? 0)}</td>
+        <td class="sub">${u.uso ? `${u.uso.aceitas ?? 0} · ${u.uso.travadas ?? 0} · ${u.uso.banidas ?? 0}` : '—'}</td>
         <td class="sub">${esc(u.so ?? '—')}</td>
         <td><span class="estadoU ${cls}">${rot}</span></td>
         <td><div class="acoesU">
@@ -2332,8 +2346,10 @@ function desenharAdmin(){
             : `${st === 'esperando' ? `<button onclick="liberar('${esc(u.id)}')">Liberar</button>` : ''}<button class="perigo" onclick="bloquear('${esc(u.id)}')" ${souEu?'disabled title="não dá pra se bloquear"':''}>Bloquear</button>`}
           <input placeholder="aviso só pra essa pessoa" value="${esc(controle.avisos?.[u.id] ?? '')}" onchange="avisoPessoal('${esc(u.id)}', this.value)">
           ${souEu ? '' : `<button class="perigo" onclick="esquecerUsuario('${esc(u.id)}')" title="tira da lista; volta se o app dele se apresentar de novo">Esquecer</button>`}
+          ${u.registro?.length ? `<button onclick="verRegistro('${esc(u.id)}')">Registro</button>` : ''}
         </div></td>
-      </tr>`; }).join('')}</tbody></table>`;
+      </tr>
+      <tr id="reg-${esc(u.id)}" hidden><td colspan="9"><pre class="log" style="max-height:260px">${esc((u.registro ?? []).join('\n'))}</pre></td></tr>`; }).join('')}</tbody></table>`;
 }
 
 /* ============================================================ configuração */
@@ -2552,6 +2568,12 @@ async function tick(){
     if (ctl.bloqueado && ctl.aviso) $('#bloqueioTexto').textContent = ctl.aviso;
     const av = [ctl.aviso, ctl.desatualizado ? `atualize pra v${ctl.versaoMinima}` : ''].filter(Boolean).join(' · ');
     $('#estAviso').hidden = !av; $('#estAviso').textContent = av;
+    // Patch novo com campeão seu: linha na barra até você abrir a aba Patch.
+    const pn = e.patchNovo;
+    let vistoPatch = null; try { vistoPatch = localStorage.getItem('patchVisto'); } catch {}
+    const mostrarPatch = pn && (pn.meus || pn.contra) && vistoPatch !== pn.slug;
+    $('#estPatch').hidden = !mostrarPatch;
+    if (mostrarPatch) $('#estPatch').textContent = `patch novo: ${pn.meus} seu${pn.meus===1?'':'s'}, ${pn.contra} contra`;
     $('#navAdmin').hidden = e.config?.admin !== true;
     aplicarControleVisual(ctl);
     // Primeira vez que o client responde: as telas passam a seguir essa conta.

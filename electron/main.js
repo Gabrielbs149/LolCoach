@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, shell, nativeImage } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import electronUpdater from 'electron-updater';
@@ -6,7 +6,14 @@ import { iniciarDaemon } from '../src/daemon.js';
 import { criarServidor, criarEstado } from '../src/ui/servidor.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
-const estado = criarEstado();
+// Notificação do Windows só fora de partida e de seleção — nada de roubar
+// foco com o jogo aberto. Silenciosa (sem som) e sem clique que traga janela.
+const estado = criarEstado({
+  aoAvisar(titulo, texto, fase) {
+    if (['InProgress', 'ChampSelect', 'GameStart'].includes(fase) || !Notification.isSupported()) return;
+    new Notification({ title: titulo, body: texto, silent: true, icon: join(AQUI, 'icone.png') }).show();
+  },
+});
 
 /**
  * Onde ficam config e banco. Instalado pelo Setup, cada pessoa tem os seus em

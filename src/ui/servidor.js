@@ -390,12 +390,14 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
 }
 
 /** Estado ao vivo do daemon, pra UI mostrar o que está acontecendo. */
-export function criarEstado() {
+export function criarEstado({ aoAvisar } = {}) {
   const linhas = [];
   const dados = { conectado: false, conta: null, fase: null, config: null };
 
   return {
     set(chave, valor) { dados[chave] = valor; },
+    // Notificação do Windows — quem decide se pode (fora de partida) é o main.
+    avisar(titulo, texto) { try { aoAvisar?.(titulo, texto, dados.fase); } catch { /* sem notificação */ } },
     log(texto) {
       linhas.unshift({ em: new Date().toISOString(), texto });
       if (linhas.length > 200) linhas.pop();

@@ -26,9 +26,18 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   const lcu = new LcuClient();
   const db = abrirBanco();
 
+  // Contadores de uso pro painel admin: quantas vezes o app agiu por você.
+  const arquivoUso = () => resolve(pastaBase(), 'dados', 'uso.json');
+  let uso = { aceitas: 0, travadas: 0, banidas: 0 };
+  readFile(arquivoUso(), 'utf8').then((t) => { uso = { ...uso, ...JSON.parse(t) }; }).catch(() => {});
+  const contar = (chave) => { uso[chave] = (uso[chave] ?? 0) + 1; writeFile(arquivoUso(), JSON.stringify(uso), 'utf8').catch(() => {}); };
+
   const log = (texto) => {
     estado?.log(texto);
     console.log(`[${new Date().toLocaleTimeString('pt-BR')}]`, texto);
+    if (texto === 'partida aceita') { contar('aceitas'); estado?.avisar?.('Partida aceita', 'a fila achou partida — volta pro League'); }
+    else if (texto.startsWith('travou ')) contar('travadas');
+    else if (texto.startsWith('baniu ')) contar('banidas');
   };
 
   estado?.set('config', config);
@@ -121,6 +130,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         conta: eu.conta, versao, vistoEm: new Date().toISOString(),
         contas: [...new Set([eu.conta, ...Object.entries(tags).map(([n, tg]) => `${n}#${tg}`)].filter(Boolean))],
         so: Number(versaoDoWindows().split('.')[2]) >= 22000 ? 'Windows 11' : 'Windows 10', partidas,
+        uso, registro: (estado?.instantaneo?.().log ?? []).slice(0, 40).map((l) => `${String(l.em).slice(11, 19)} ${l.texto}`),
       });
     } catch (erro) {
       log(`controle: não consegui me apresentar (${erro.message})`);
@@ -659,6 +669,23 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     return listarAtualizacoes({ limite: 12 });
   }
 
+  /**
+   * Saiu patch novo que mexe em campeão seu? Confere ao abrir e a cada 6h e
+   * avisa na barra (o painel esconde quando você abre a aba Patch).
+   */
+  async function vigiarPatch() {
+    try {
+      const lista = await patchLista();
+      const ultimo = lista?.[0]; if (!ultimo?.slug) return;
+      const nota = await patchNota(ultimo.slug);
+      const meus = nota?.meus?.length ?? 0, contra = nota?.contra?.length ?? 0;
+      estado?.set('patchNovo', { slug: ultimo.slug, titulo: ultimo.titulo, meus, contra });
+      if (meus || contra) estado?.avisar?.('Patch novo', `${ultimo.titulo}: ${meus} campeão(ões) seu(s), ${contra} que te ganham`);
+    } catch { /* sem internet: fica pra próxima */ }
+  }
+  setTimeout(vigiarPatch, 20_000);
+  setInterval(vigiarPatch, 6 * 60 * 60 * 1000);
+
   async function patchNota(slug) {
     const { lerAtualizacao, mudancasDele } = await import('./dados/patchnotes.js');
     const { elencoCompleto } = await import('./dados/ddragon.js');
@@ -808,6 +835,23 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       ? { nome: meuNome, tag: minhaTag, perfil: await perfilDeAmigo(soDisco, { nome: meuNome, tag: minhaTag }, {}).catch(() => null) }
       : { nome: meuNome, tag: null, perfil: null };
 
+    // Jogos em comum: as últimas dele que também estão no meu banco.
+    const meusIds = new Set(db.prepare('SELECT gameId FROM partidas').all().map((r) => r.gameId));
+    for (const a of lista) {
+      a.emComum = (a.perfil?.recente?.ultimas ?? []).filter((u) => u.gameId && meusIds.has(u.gameId))
+        .map((u) => ({ gameId: u.gameId, venci: u.venci, campeao: u.campeao }));
+    }
+    // Ranking da semana: quanto cada um andou de PDL na solo nos últimos 7 dias.
+    const semana = new Date(Date.now() - 7 * 86400_000).toISOString();
+    const pontos = (h) => (['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'].indexOf(h.tier)) * 400 + ({ IV: 0, III: 1, II: 2, I: 3 }[h.rank] ?? 0) * 100 + (h.pdl ?? 0);
+    const deltaSemana = (nome) => {
+      if (!nome) return null;
+      const hist = db.prepare('SELECT tier, rank, pdl, em FROM elo_hist WHERE conta = ? AND fila = ? ORDER BY em ASC').all(nome, 'RANKED_SOLO_5x5');
+      if (hist.length < 2) return null;
+      const antes = [...hist].reverse().find((h) => h.em <= semana) ?? hist[0];
+      return pontos(hist.at(-1)) - pontos(antes);
+    };
+    for (const a of [...lista, eu]) if (a) a.semana = deltaSemana(a.perfil?.conta?.nome ?? a.nome);
     return { amigos: lista, eu, semChave: !config.riot?.apiKey };
   }
 
@@ -818,7 +862,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { perfilDeAmigo } = await import('./dados/amigos.js');
     log(`buscando perfil de ${nome}#${tag} na Riot…`);
     const p = await perfilDeAmigo(config.riot, { nome, tag }, { forcar });
-    if (!p.doCache) log(`perfil de ${nome}#${tag} atualizado (${p.recente?.jogos ?? 0} partidas recentes)`);
+    if (!p.doCache) { log(`perfil de ${nome}#${tag} atualizado (${p.recente?.jogos ?? 0} partidas recentes)`); anotarElo(p); }
     return p;
   }
 
