@@ -181,7 +181,20 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     log,
   });
 
-  autoChampSelect(lcu, config, { log, permite });
+  // Últimas runas aplicadas na seleção — a voz anuncia (pedra angular e árvores).
+  let ultimasRunas = null;
+  autoChampSelect(lcu, config, {
+    log, permite,
+    aoRunas: async ({ campeao, build }) => {
+      try {
+        const [{ tabelaDeRunas }, { ESTILO }] = await Promise.all([import('./dados/ddragon.js'), import('./vivo/falas.js')]);
+        const t = await tabelaDeRunas();
+        ultimasRunas = { campeao, chave: t.get(build.runas.selectedPerkIds?.[0])?.nome ?? null,
+          primaria: ESTILO[build.runas.primaryStyleId] ?? null, secundaria: ESTILO[build.runas.subStyleId] ?? null };
+      } catch { ultimasRunas = { campeao }; }
+    },
+  });
+  let seqFalas = 0;
 
   /* ------------------------------------------------------------- coleta */
   let coletando = false;
@@ -414,7 +427,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { falasNovas } = await import('./vivo/falas.js');
     partidaVivo.ultimoEstado = estado;
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
-      partidaVivo.falas.push({ ...f, seq: ++partidaVivo.seq, t: estado.tempo });
+      partidaVivo.falas.push({ ...f, seq: ++seqFalas, t: estado.tempo });
     }
 
     return {
@@ -449,7 +462,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const temIonia = (alvo.itens ?? []).some((i) => i.id === IONIA);
     const volta = e.tempo + (temIonia ? 268 : 300);
     partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
-    partidaVivo.falas.push({ seq: ++partidaVivo.seq, t: e.tempo, modulo: 'flash', prioridade: 2,
+    partidaVivo.falas.push({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
       serio: `Flash do ${alvo.campeao} marcado. Volta em ${temIonia ? 'quatro e meio' : 'cinco'} minutos.`,
       divertido: `${alvo.campeao} sem flash. Cinco minutos de temporada de caça.` });
     log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')}`);
@@ -470,6 +483,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * confrontos do op.gg, qual dos seus picks da rota ganha mais deles.
    */
   let selecaoCache = { chave: null, sugestao: null };
+  let selecaoMem = { gameId: null, ditas: new Set(), falas: [] };
   async function selecaoAtual() {
     if (!lcu.conectado) return null;
     const s = await lcu.get('/lol-champ-select/v1/session').catch(() => null);
@@ -488,10 +502,27 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const [{ confrontoContra }, { sugerirPick }] = await Promise.all([import('./dados/confrontos.js'), import('./vivo/falas.js')]);
       selecaoCache.sugestao = await sugerirPick({ candidatos, rota, inimigosIds: inimigos, confrontoContra, tabela, opcoes: { regiao: config.runas?.regiao ?? 'br' } }).catch(() => null);
     }
+    const meuCampeao = nomeDe(meu?.championId || meu?.championPickIntent) ?? null;
+    // Seleção nova: zera o que já foi dito.
+    if (selecaoMem.gameId !== (s.gameId ?? null)) selecaoMem = { gameId: s.gameId ?? null, ditas: new Set(), falas: [] };
+    // Sugestão de ban pela SUA história: quem mais te ganha nesta rota.
+    let sugestaoBan = [];
+    try {
+      const E = await import('./analise/estatisticas.js');
+      const chaveDb = { top: 'TOP', jungle: 'JUNGLE', middle: 'MID', bottom: 'ADC', utility: 'SUPORTE' }[rota];
+      const logada = estado?.instantaneo?.().conta ?? null;
+      sugestaoBan = (E.piores(db, { minimo: 5, conta: logada ? logada.split('#')[0] : null })[chaveDb] ?? []).filter((x) => x.custo > 0.5).slice(0, 2);
+    } catch { /* sem histórico */ }
+    const { falasDaSelecao } = await import('./vivo/falas.js');
+    const runas = ultimasRunas && meuCampeao && ultimasRunas.campeao === meuCampeao ? ultimasRunas : null;
+    for (const f of falasDaSelecao({ rota, inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados, meuCampeao, sugestaoBan, runas }, selecaoMem)) {
+      selecaoMem.falas.push({ ...f, seq: ++seqFalas });
+    }
     return {
-      fase: s.timer?.phase ?? '', rota, meuCampeao: nomeDe(meu?.championId || meu?.championPickIntent) ?? null,
+      fase: s.timer?.phase ?? '', rota, meuCampeao,
       inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados: aliados.map((id) => ({ id, nome: nomeDe(id) })),
       sugestao: selecaoCache.chave === chave ? selecaoCache.sugestao : null,
+      sugestaoBan, falas: selecaoMem.falas.slice(-8),
     };
   }
 

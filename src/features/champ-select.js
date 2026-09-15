@@ -68,7 +68,7 @@ function primeiroLivre(nomes, tabela, fora, permitidos) {
  *    também é consultada de segundo em segundo. Se um evento do client se
  *    perder, a janela de ~30s do ban continua sendo pega.
  */
-export function autoChampSelect(lcu, config, { log = () => {}, permite = () => true } = {}) {
+export function autoChampSelect(lcu, config, { log = () => {}, permite = () => true, aoRunas = () => {} } = {}) {
   let tabela = null;
   let carregandoTabela = null;
   let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false, feiticosFeitos: false };
@@ -256,6 +256,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
           paginaAlvo: config.runas?.paginaAlvo ?? null,
         });
         log(`runas de ${nome} ${build.role} aplicadas (${build.runas.estatistica}, ${build.fonte})`);
+        aoRunas({ campeao: nome, build });
         // O conjunto de itens da loja pra este campeão nesta role — usa o mesmo
         // cache do op.gg, então quase sempre é instantâneo.
         if (permite('builds')) aplicarConjunto(lcu, nome, meuCampeaoId, role, { regiao: config.runas?.regiao ?? 'br' })
