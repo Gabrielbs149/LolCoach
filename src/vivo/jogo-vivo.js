@@ -76,7 +76,7 @@ export async function lerEstado() {
     id: e.EventID,
     tipo: e.EventName,
     t: e.EventTime ?? 0,
-    autor: e.KillerName ?? null,
+    autor: e.KillerName ?? e.Recipient ?? e.Acer ?? null,
     vitima: e.VictimName ?? null,
     // Quem ajudou na kill também estava lá — é o que permite dizer onde o
     // jungler inimigo apareceu por último sem ler posição de ninguém.

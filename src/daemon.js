@@ -382,7 +382,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     ]);
 
     const estado = await lerEstado();
-    if (!estado?.eu) { partidaVivo = null; return { emJogo: false }; }
+    if (!estado?.eu) { partidaVivo = null; return { emJogo: false, selecao: await selecaoAtual() }; }
 
     const role = estado.eu.role || 'geral';
     if (!perfis.has(role)) {
@@ -392,7 +392,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const perfil = perfis.get(role);
 
     if (!partidaVivo || estado.tempo < partidaVivo.memoria.ultimoTempo - 5) {
-      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null };
+      const { novaMemoriaFalas } = await import('./vivo/falas.js');
+      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0 };
     }
 
     // As fichas dependem de rede (op.gg, Data Dragon) e do banco: montam uma
@@ -407,12 +408,50 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const rastreio = R.rastrear(estado, partidaVivo.memoria);
     const conselhos = [...rastreio.avisos, ...montarConselhos(estado, perfil)]
       .sort((a, b) => b.urgencia - a.urgencia);
+    const objs = objetivos(estado);
+    // A voz: só o que é novo desde a última leitura, numerado pra tela
+    // falar uma vez só.
+    const { falasNovas } = await import('./vivo/falas.js');
+    for (const f of falasNovas({ estado, rastreio, objetivos: objs, conselhos }, partidaVivo.memFalas)) {
+      partidaVivo.falas.push({ ...f, seq: ++partidaVivo.seq, t: estado.tempo });
+    }
 
     return {
       emJogo: true, estado, perfil, conselhos,
       contra: partidaVivo.fichas ?? [],
       vistos: rastreio.vistos,
-      objetivos: objetivos(estado),
+      objetivos: objs,
+      falas: partidaVivo.falas.slice(-12),
+    };
+  }
+
+  /**
+   * Seleção de campeão pra tela ao vivo: quem eles já travaram e, pelos
+   * confrontos do op.gg, qual dos seus picks da rota ganha mais deles.
+   */
+  let selecaoCache = { chave: null, sugestao: null };
+  async function selecaoAtual() {
+    if (!lcu.conectado) return null;
+    const s = await lcu.get('/lol-champ-select/v1/session').catch(() => null);
+    if (!s?.myTeam || (s.localPlayerCellId ?? -1) < 0) return null;
+    const meu = s.myTeam.find((c) => c.cellId === s.localPlayerCellId);
+    const rota = meu?.assignedPosition || config.champSelect?.rolePadrao || 'jungle';
+    const { tabelaDeCampeoes } = await import('./features/champ-select.js');
+    const tabela = await tabelaDeCampeoes(lcu).catch(() => null);
+    const nomeDe = (id) => tabela?.porId.get(id) ?? null;
+    const inimigos = (s.theirTeam ?? []).map((c) => c.championId).filter((id) => id > 0);
+    const aliados = (s.myTeam ?? []).map((c) => c.championId || c.championPickIntent).filter((id) => id > 0);
+    const candidatos = (config.champSelect?.picks?.[rota] ?? []).filter(Boolean);
+    const chave = `${rota}|${inimigos.join(',')}|${candidatos.join(',')}`;
+    if (inimigos.length && candidatos.length && tabela && selecaoCache.chave !== chave) {
+      selecaoCache = { chave, sugestao: null };
+      const [{ confrontoContra }, { sugerirPick }] = await Promise.all([import('./dados/confrontos.js'), import('./vivo/falas.js')]);
+      selecaoCache.sugestao = await sugerirPick({ candidatos, rota, inimigosIds: inimigos, confrontoContra, tabela, opcoes: { regiao: config.runas?.regiao ?? 'br' } }).catch(() => null);
+    }
+    return {
+      fase: s.timer?.phase ?? '', rota, meuCampeao: nomeDe(meu?.championId || meu?.championPickIntent) ?? null,
+      inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados: aliados.map((id) => ({ id, nome: nomeDe(id) })),
+      sugestao: selecaoCache.chave === chave ? selecaoCache.sugestao : null,
     };
   }
 
