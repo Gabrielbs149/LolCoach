@@ -2695,9 +2695,9 @@ async function tick(){
     $('#estClient').textContent = e.conectado ? 'client conectado' : 'client desconectado';
     $('#conta').textContent = e.conta ?? '—';
     if (e.versao) { $('#versao').textContent = 'v' + e.versao; $('#cfgVersao').textContent = 'v' + e.versao; }
-    // Tecla que não registrou fica vermelha na Configuração.
-    const reg = e.atalhos ?? {};
-    document.querySelectorAll('.tecla').forEach((b) => { const acel = b.dataset.acel; if (acel && acel in reg) b.classList.toggle('falhou', !reg[acel]); });
+    // Vigia de teclas parado: todas ficam vermelhas.
+    const vig = e.atalhos?.vigia;
+    document.querySelectorAll('.tecla').forEach((b) => b.classList.toggle('falhou', vig === false));
     // Painel de controle: bloqueio cobre tudo; aviso e "atualize" vão na barra.
     const ctl = e.controle ?? {};
     $('#bloqueio').hidden = !ctl.bloqueado;

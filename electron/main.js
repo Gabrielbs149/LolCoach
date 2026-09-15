@@ -1,5 +1,6 @@
 import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut, screen } from 'electron';
 import { cp, mkdir, readdir } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import electronUpdater from 'electron-updater';
@@ -299,34 +300,54 @@ function variantesDoFlash(acelerador) {
   if (f) return [0, 1, 2, 3, 4].map((i) => `${prefixo}F${Math.min(24, Number(f[1]) + i)}`);
   return [`${prefixo}${ultima}`];   // uma tecla só: marca a posição 1
 }
-function registrarAtalhos(cfg) {
-  globalShortcut.unregisterAll();
-  const at = { overlay: 'Control+Shift+O', painel: 'Control+Shift+L', ...(cfg?.atalhos ?? {}) };
-  const resultado = {};
-  const tenta = (acel, fn) => {
-    if (!acel) return;
-    let ok = false;
-    try { ok = globalShortcut.register(acel, fn); } catch { ok = false; }
-    resultado[acel] = ok;
-    if (!ok) estado.log(`não consegui registrar a tecla ${acel} (outro programa usa? NumLock desligado?)`);
+/**
+ * As teclas. O atalho global do Electron (RegisterHotKey) NÃO dispara com o
+ * jogo em foco — foi o que ele viu: só funcionava clicando na outra tela.
+ * Então um vigia em PowerShell (electron/teclas.ps1) pergunta ao Windows 40x
+ * por segundo se a tecla está apertada (GetAsyncKeyState, o mesmo que o
+ * push-to-talk do Discord) e avisa pela porta local. Um processo só, vive
+ * enquanto o app vive; reinicia só quando a configuração de teclas muda.
+ */
+let vigia = null;
+function acoesDasTeclas() {
+  return {
+    flash: (n) => { if (endereco) fetch(`${endereco}/api/flash?posicao=${n}`, { method: 'POST' }).catch(() => {}); },
+    overlay: () => {
+      overlayLigado = !overlayLigado;
+      if (overlayLigado && (faseAtual === 'InProgress' || faseAtual === 'GameStart')) abrirOverlay(); else fecharOverlay();
+      estado.log(`overlay ${overlayLigado ? 'ligado' : 'desligado'}`);
+    },
+    painel: () => {
+      if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
+      if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
+    },
   };
-  // Uma tecla por inimigo (1º ao 5º). Config antigo com `flash` único: deriva.
+}
+/** Chamado pelo servidor local quando o vigia vê uma tecla: "flash3", "overlay", "painel". */
+function teclaApertada(acao) {
+  const f = acoesDasTeclas();
+  const flash = String(acao).match(/^flash(\d)$/);
+  if (flash) return f.flash(Number(flash[1]));
+  if (f[acao]) return f[acao]();
+}
+function registrarAtalhos(cfg) {
+  const at = { overlay: 'Control+Shift+O', painel: 'Control+Shift+L', ...(cfg?.atalhos ?? {}) };
   const flashes = Array.isArray(at.flashes) && at.flashes.length ? at.flashes : variantesDoFlash(at.flash);
-  flashes.slice(0, 5).forEach((acel, i) => tenta(acel, () => {
-    if (!endereco) return;
-    fetch(`${endereco}/api/flash?posicao=${i + 1}`, { method: 'POST' }).catch(() => {});
-  }));
-  tenta(at.overlay, () => {
-    overlayLigado = !overlayLigado;
-    if (overlayLigado && (faseAtual === 'InProgress' || faseAtual === 'GameStart')) abrirOverlay(); else fecharOverlay();
-    estado.log(`overlay ${overlayLigado ? 'ligado' : 'desligado'}`);
-  });
-  tenta(at.painel, () => {
-    if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
-    if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
-  });
-  estado.set('atalhos', resultado);
-  estado.log(`teclas: ${Object.entries(resultado).map(([k, v]) => `${k} ${v ? 'ok' : 'FALHOU'}`).join(', ')}`);
+  const pares = [...flashes.slice(0, 5).map((acel, i) => `flash${i + 1}=${acel}`), `overlay=${at.overlay}`, `painel=${at.painel}`]
+    .filter((p) => !p.endsWith('=') && !p.endsWith('=null') && !p.endsWith('=undefined'));
+  if (vigia) { try { vigia.kill(); } catch { /* já morreu */ } vigia = null; }
+  const script = app.isPackaged ? join(process.resourcesPath, 'teclas.ps1') : join(AQUI, 'teclas.ps1');
+  try {
+    vigia = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', script, '-Porta', '8770', '-Teclas', pares.join(';')],
+      { windowsHide: true, stdio: 'ignore' });
+    const este = vigia;
+    este.on('exit', (codigo) => { if (vigia === este) { vigia = null; estado.set('atalhos', { vigia: false }); estado.log(`vigia de teclas parou (${codigo})`); } });
+    estado.set('atalhos', { vigia: true, teclas: pares });
+    estado.log(`teclas: ${pares.join(', ')}`);
+  } catch (erro) {
+    estado.set('atalhos', { vigia: false });
+    estado.log(`não consegui iniciar o vigia de teclas: ${erro.message}`);
+  }
 }
 
 function criarBandeja() {
@@ -377,7 +398,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar },
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.
@@ -402,7 +423,7 @@ app.whenReady().then(async () => {
   }, 4000);
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+app.on('will-quit', () => { globalShortcut.unregisterAll(); if (vigia) { try { vigia.kill(); } catch { /* já morreu */ } } });
 app.on('window-all-closed', (e) => e.preventDefault());  // vive na bandeja
 app.on('before-quit', () => {
   app.saindo = true;

@@ -135,6 +135,12 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      // O vigia de teclas viu uma tecla configurada.
+      if (req.method === 'POST' && url.pathname === '/api/tecla' && acoes.tecla) {
+        try { acoes.tecla(url.searchParams.get('acao')); } catch { /* ação sem efeito agora */ }
+        return enviar(200, 'application/json', '{"ok":true}');
+      }
+
       // Marcar flash de um inimigo (posição 1..5 ou nome).
       if (req.method === 'POST' && url.pathname === '/api/flash' && acoes.marcarFlash) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.marcarFlash({ posicao: url.searchParams.get('posicao'), nome: url.searchParams.get('nome') }))); }

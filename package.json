@@ -61,6 +61,10 @@
       {
         "from": "chave-embutida.json",
         "to": "chave.json"
+      },
+      {
+        "from": "electron/teclas.ps1",
+        "to": "teclas.ps1"
       }
     ],
     "nsis": {
