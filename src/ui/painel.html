@@ -901,7 +901,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="estat">
     <div class="titulo">Estatísticas</div>
     <div class="cartoes" id="eGeral"></div>
-    <h2>Meta</h2><div id="eMeta"></div>
     <h2>Últimas 20 contra o resto</h2><div id="eForma"></div>
     <div class="colunas2">
       <div><h2>Onde você joga</h2><div id="eRoles"></div>
@@ -1578,7 +1577,6 @@ async function carregarEstat(){
       `${Math.round(g.campeoes/173*100)}% do elenco`),
   ].join('');
 
-  desenharMeta(g);
   const f = e.forma;
   $('#eForma').innerHTML = f?.recente && f?.resto ? `<div class="compara">
     ${comparar('Taxa de vitória', Math.round(f.recente.taxa*100), Math.round(f.resto.taxa*100), {sufixo:'%'})}
@@ -1610,24 +1608,6 @@ async function carregarEstat(){
       <span class="wr ${t>=53?'v':t<=47?'d':''}">${t}%</span>
       <span class="kda">${c.kda.toFixed(2)}:1 · ${c.jogos}j · ${c.csm.toFixed(1)} cs/min</span></div>`;
   }).join('')}</div>`;
-}
-
-/* ---- meta de elo: onde quer chegar e quantas partidas faltam no ritmo atual ---- */
-const TIERS_META = [['IRON','Ferro'],['BRONZE','Bronze'],['SILVER','Prata'],['GOLD','Ouro'],['PLATINUM','Platina'],['EMERALD','Esmeralda'],['DIAMOND','Diamante'],['MASTER','Mestre']];
-async function desenharMeta(g){
-  let meta = null; try { meta = localStorage.getItem('metaElo'); } catch {}
-  let s; try { s = await pegar(comConta('/api/sessao')); } catch { s = null; }
-  const atual = s?.curva?.at(-1) ?? null;
-  const ptsDe = (tier, rank = 'IV', pdl = 0) => TIERS_META.findIndex(([t]) => t === tier) * 400 + ({IV:0,III:1,II:2,I:3}[rank] ?? 0) * 100 + pdl;
-  const sel = `<select class="contaSel" style="margin:0;width:180px" onchange="localStorage.setItem('metaElo', this.value); carregarEstat()">
-    <option value="">escolher meta…</option>${TIERS_META.map(([t, n]) => `<option value="${t}" ${meta===t?'selected':''}>${n}</option>`).join('')}</select>`;
-  if(!meta || !atual){ $('#eMeta').innerHTML = `<div class="forma">${sel}<span class="resumo">${atual ? 'escolhe onde quer chegar' : 'joga uma solo pra eu saber seu elo'}</span></div>`; return; }
-  const falta = ptsDe(meta) - atual.pontos;
-  const taxa = g?.taxa ?? 0.5;
-  const porJogo = (2 * taxa - 1) * 20;   // ~20 PDL por partida, líquido pela taxa de vitória
-  const texto = falta <= 0 ? 'meta batida — sobe a meta' : porJogo <= 0.5 ? `faltam ${falta} PDL, mas com ${Math.round(taxa*100)}% de vitória você não chega — precisa passar de 50%`
-    : `faltam ${falta} PDL ≈ ${Math.ceil(falta / porJogo)} partidas no ritmo atual (${Math.round(taxa*100)}% de vitória)`;
-  $('#eMeta').innerHTML = `<div class="forma">${sel}<span class="resumo" style="margin-left:12px">${texto}</span></div>`;
 }
 
 /* ================================================================ builds */
