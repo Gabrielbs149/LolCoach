@@ -50,8 +50,9 @@ function ligarAtualizacao() {
   });
   autoUpdater.on('error', (e) => estado.log(`atualização: ${e?.message ?? e}`));
   autoUpdater.checkForUpdates().catch(() => {});
-  // E de novo a cada 6h, pra quem deixa o app aberto o dia inteiro.
-  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+  // E de novo a cada 30 min, pra quem deixa o app aberto o dia inteiro — e
+  // sempre que uma partida termina, que é a hora natural de instalar.
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 30 * 60 * 1000);
 }
 let janela = null;
 let bandeja = null;
@@ -187,9 +188,12 @@ app.whenReady().then(async () => {
       estado,
       aoSelecionar: () => abrirVivo({ focar: false }),
       aoFase: (fase) => {
+        const antes = faseAtual;
         faseAtual = fase;
         // Saiu da partida: se o painel estava esperando pra aparecer, agora pode.
         if (fase !== 'InProgress') mostrarPainelSeSeguro();
+        // Acabou uma partida: boa hora pra procurar (e instalar) atualização.
+        if (antes === 'InProgress' && fase !== 'InProgress' && app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
       },
     });
     ({ url: endereco } = await criarServidor({
