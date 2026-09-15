@@ -100,7 +100,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
     if (!meuCell) {
       if (!fase.anunciou) {
         fase.anunciou = true;
-        log(`seleção aberta, mas não me achei no time (célula ${sessao.localPlayerCellId}) — não vou agir`);
+        log('seleção aberta, mas não me achei no time — não vou agir');
       }
       return;
     }
@@ -112,7 +112,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
       fase.anunciou = true;
       const picks = cfg.picks?.[role] ?? [];
       const bans = cfg.bans?.[role] ?? [];
-      log(`seleção aberta como ${role} (célula ${meuCell.cellId}, fase ${sessao.timer?.phase ?? '?'}) — banir: ${bans.join(', ') || '(lista vazia)'} | pegar: ${picks.join(', ') || '(lista vazia)'}`);
+      log(`seleção: ${role} — ban ${bans.join(', ') || 'nenhum'} · pick ${picks.join(', ') || 'nenhum'}`);
       if (cfg.ativo === false) log('agir na seleção está DESLIGADO na configuração');
     }
 
@@ -168,7 +168,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
           fase.acaoFeita = minha.id;
           const travar = minha.type === 'ban' ? cfg.travarBan !== false : cfg.travarPick === true;
           const espera = minha.type === 'ban' ? (cfg.atrasoBanMs ?? 2000) : (cfg.atrasoPickMs ?? 2500);
-          log(`minha vez de ${minha.type === 'ban' ? 'banir' : 'escolher'} — ${escolha.nome} em ${espera}ms`);
+          log(`minha vez de ${minha.type === 'ban' ? 'banir' : 'escolher'}: ${escolha.nome}`);
 
           setTimeout(async () => {
             const verbo = minha.type === 'ban' ? 'banir' : 'escolher';
@@ -188,7 +188,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
               if (travar) await lcu.post(`${caminho}/complete`);
               await esperar(700);
               let v = await conferir();
-              log(`${verbo} ${escolha.nome}: client respondeu ok — ação ${minha.id} agora: campeão ${v?.championId ?? '?'}, fechada ${v?.completed ?? '?'}`);
+              if (travar && v && !v.completed) log(`${verbo} ${escolha.nome}: o client aceitou mas não fechou (campeão ${v.championId}) — tentando de outro jeito`);
 
               // Não fechou? Jeito 2: PATCH com completed:true (versões antigas do client).
               if (travar && v && !v.completed) {
