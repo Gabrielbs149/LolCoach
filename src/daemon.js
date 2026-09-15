@@ -172,6 +172,21 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
   autoChampSelect(lcu, config, { log, permite });
 
+  /* ---------------------------------------------------------------- hud */
+  // Opções do jogo (HUD, câmera, som) numa tela simples. Só pro admin.
+  async function hudLer() {
+    if (config.admin !== true) throw new Error('só o admin');
+    const { lerOpcoes } = await import('./features/hud.js');
+    return lerOpcoes(lcu);
+  }
+  async function hudGravar({ mudancas } = {}) {
+    if (config.admin !== true) throw new Error('só o admin');
+    const { gravarOpcoes } = await import('./features/hud.js');
+    const onde = await gravarOpcoes(lcu, Array.isArray(mudancas) ? mudancas : [], { fase: estado?.instantaneo?.().fase });
+    log(`opções do jogo gravadas (${onde === 'client' ? 'pelo client' : 'no PersistedSettings.json'})`);
+    return { ok: true, onde };
+  }
+
   /* ------------------------------------------------------------- coleta */
   let coletando = false;
 
@@ -794,7 +809,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo,
-    adminUsuarios, adminGravarControle, adminEsquecer,
+    adminUsuarios, adminGravarControle, adminEsquecer, hudLer, hudGravar,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -841,5 +856,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'hudLer', 'hudGravar',
 ];
