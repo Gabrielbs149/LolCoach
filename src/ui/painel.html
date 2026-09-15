@@ -805,7 +805,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 <!-- Modo edição (admin): clica em qualquer texto e muda; tema ao lado. -->
 <div class="edicao" id="edicao" hidden>
   <b>Modo edição</b>
-  <span>clique em qualquer texto pra mudar · Enter salva · Esc cancela</span>
+  <span>clique no texto pra mudar · Enter salva · Esc cancela · na barra lateral é duplo clique · Ctrl+clique usa o botão</span>
   <label>Destaque <input type="color" id="edCor" onchange="temaMudar('ouro', this.value)"></label>
   <label>Fonte <input type="range" min="11" max="16" step="0.5" id="edFonte" onchange="temaMudar('fonte', Number(this.value))"></label>
   <label>Cantos <input type="range" min="0" max="14" step="1" id="edRaio" onchange="temaMudar('raio', Number(this.value))"></label>
@@ -2097,9 +2097,14 @@ function selecionar(span){
   $('#edElCor').value = e.cor ?? '#e9f0f8';
   $('#edElTam').value = e.tamanho ?? Math.round(parseFloat(getComputedStyle(elSelecionado).fontSize));
 }
-document.addEventListener('click', (ev) => {
+// Na barra lateral o clique navega (as abas precisam abrir pra editar o que
+// tem dentro); pra editar um texto da barra é duplo clique. No conteúdo o
+// clique edita; Ctrl+clique deixa o botão fazer o que faz normalmente.
+function cliqueDeEdicao(ev){
   if(!document.body.classList.contains('editando')) return;
   if(ev.target.closest('.edicao')) return;
+  const naBarra = !!ev.target.closest('aside');
+  if(ev.type === 'click' && (naBarra || ev.ctrlKey)) return;   // deixa passar
   const span = ev.target.closest('span.edT');
   ev.preventDefault(); ev.stopPropagation();
   if(editandoEl && span !== editandoEl) confirmarEdicao();
@@ -2109,7 +2114,9 @@ document.addEventListener('click', (ev) => {
   editandoEl = span; span.dataset.antes = span.textContent.trim();
   span.contentEditable = 'true'; span.focus();
   document.getSelection()?.selectAllChildren(span);
-}, true);
+}
+document.addEventListener('click', cliqueDeEdicao, true);
+document.addEventListener('dblclick', cliqueDeEdicao, true);
 document.addEventListener('keydown', (ev) => {
   if(!editandoEl) return;
   if(ev.key === 'Enter'){ ev.preventDefault(); confirmarEdicao(); }
