@@ -122,9 +122,6 @@ body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:
 .bloqueio{position:fixed;inset:0;z-index:50;background:rgba(7,10,15,.96);display:flex;align-items:center;justify-content:center;text-align:center;padding:24px}
 .bloqueio h1{font-size:22px;margin:0 0 10px;color:var(--der)}
 .bloqueio p{color:var(--fraco);font-size:14px;max-width:420px;margin:0 auto}
-.faixa{display:flex;align-items:center;gap:10px;width:300px}
-.faixa input[type=range]{flex:1;accent-color:var(--ouro);cursor:pointer}
-.faixa b{width:44px;text-align:right;font-variant-numeric:tabular-nums;font-size:12.5px}
 .campoAdm{width:360px;max-width:50%;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);padding:6px 10px;border-radius:var(--r-s);font:inherit;font-size:12.5px}
 .campoAdm.curto{width:120px}
 .campoAdm:focus{outline:none;border-color:var(--ouro)}
@@ -788,8 +785,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
     <button data-aba="patch" title="Patch">
       <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
     <div class="grupo">App</div>
-    <button data-aba="hud" title="HUD" id="navHud" hidden>
-      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 15h5v3H3zM16 15h5v3h-5zM8 8h8"/></svg><span class="nome">HUD</span></button>
     <button data-aba="admin" title="Admin" id="navAdmin" hidden>
       <svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="nome">Admin</span></button>
     <button data-aba="config" title="Configuração">
@@ -912,12 +907,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   <section id="vivo">
     <div class="titulo">Partida ao vivo</div>
     <iframe id="quadroVivo" data-src="/vivo" title="Partida ao vivo"></iframe>
-  </section>
-
-  <section id="hud">
-    <div class="titulo">HUD <span id="hudSalvo" class="salvo"></span></div>
-    <div id="hudAviso"></div>
-    <div id="hudCorpo"></div>
   </section>
 
   <section id="admin">
@@ -2077,48 +2066,6 @@ async function temaMudar(chave, valor){
 async function temaZerar(){ await salvarControle({ tema: {} }); aplicarControleVisual({ textos: textosAtuais, tema: {} }); modoEdicao(true); }
 async function textosZerar(){ await salvarControle({ textos: {} }); aplicarControleVisual({ textos: {}, tema: temaAtual }); }
 
-/* ==================================================================== hud */
-/**
- * Opções do jogo numa tela simples: cada controle grava na hora, no client
- * (se aberto) ou no PersistedSettings.json. Só admin.
- */
-let hudDados = null;
-async function carregarHud(){
-  $('#hudCorpo').innerHTML = carregando();
-  const r = await pegar('/api/hud');
-  if(r.erro){ $('#hudCorpo').innerHTML = `<div class="vazio">${esc(r.erro)}</div>`; return; }
-  hudDados = r; desenharHud();
-}
-const hudMostra = (op, v) => op.tipo === 'faixa' ? (op.max <= 1 ? Math.round(v*100) + '%' : (op.passo < 1 ? v.toFixed(2) : String(Math.round(v)))) : v;
-function desenharHud(){
-  $('#hudAviso').innerHTML = hudDados.origem === 'arquivo'
-    ? '<p class="dica" style="margin:0 0 var(--e2)">League fechado: gravando direto no arquivo — vale na próxima partida.</p>' : '';
-  const grupos = [...new Set(hudDados.opcoes.map(o => o.grupo))];
-  $('#hudCorpo').innerHTML = grupos.map(g => `<h2>${esc(g)}</h2><div class="painelCfg">${hudDados.opcoes.filter(o => o.grupo === g).map((op) => {
-    const k = op.secao + '.' + op.chave, v = op.valor;
-    let ctl;
-    if(op.tipo === 'liga') ctl = `<label class="chave"><input type="checkbox" ${v?'checked':''} onchange="hudMudar('${k}', this.checked)"><span class="pino"></span></label>`;
-    else if(op.tipo === 'opcao') ctl = `<div class="filtros" style="margin:0">${op.opcoes.map(([val, rot]) => `<button class="${Number(v)===val?'on':''}" onclick="hudMudar('${k}', ${val})">${esc(rot)}</button>`).join('')}</div>`;
-    else ctl = `<div class="faixa"><input type="range" min="${op.min}" max="${op.max}" step="${op.passo}" value="${v ?? op.min}"
-        oninput="this.nextElementSibling.textContent = hudMostra(hudDados.opcoes.find(o => o.secao+'.'+o.chave==='${k}'), Number(this.value))"
-        onchange="hudMudar('${k}', Number(this.value))"><b>${v == null ? '—' : hudMostra(op, v)}</b></div>`;
-    return `<div class="linhaCfg"><div class="txt"><b>${esc(op.rotulo)}</b></div>${ctl}</div>`;
-  }).join('')}</div>`).join('');
-}
-let hudFila = null;
-async function hudMudar(k, valor){
-  const [secao, chave] = k.split('.');
-  const op = hudDados.opcoes.find(o => o.secao === secao && o.chave === chave);
-  if(op) op.valor = valor;
-  clearTimeout(hudFila);
-  hudFila = setTimeout(async () => {
-    const r = await fetch('/api/hud', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ mudancas: [{ secao, chave, valor }] }) }).then(x => x.json());
-    if(r.erro){ $('#hudAviso').innerHTML = `<div class="aviso amAviso">${esc(r.erro)}</div>`; return; }
-    const el = $('#hudSalvo'); el.textContent = r.onde === 'client' ? 'salvo no client' : 'salvo no arquivo'; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 1700);
-    if(op?.tipo === 'opcao') desenharHud();
-  }, 250);
-}
-
 /* ================================================================== admin */
 /**
  * O painel do Gabriel: quem usa (check-ins no repositório privado) e o que
@@ -2406,7 +2353,6 @@ async function tick(){
     const av = [ctl.aviso, ctl.desatualizado ? `atualize pra v${ctl.versaoMinima}` : ''].filter(Boolean).join(' · ');
     $('#estAviso').hidden = !av; $('#estAviso').textContent = av;
     $('#navAdmin').hidden = e.config?.admin !== true;
-    $('#navHud').hidden = e.config?.admin !== true;
     aplicarControleVisual(ctl);
     // Primeira vez que o client responde: as telas passam a seguir essa conta.
     if (e.conta && !contaEscolhidaPeloUsuario && contaAtual !== String(e.conta).split('#')[0] && contasConhecidas.some(c => c.nome === String(e.conta).split('#')[0])) {
@@ -2439,7 +2385,7 @@ async function tick(){
  * abertura do app atrasaria a única tela que a maioria quer ver.
  */
 const CARREGADORES = {
-  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, hud: carregarHud,
+  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin,
   // O iframe do ao vivo só nasce quando a aba é aberta: antes ele ficava
   // consultando a API do jogo a cada 2s mesmo com o painel escondido.
   vivo: () => { const q = document.getElementById('quadroVivo'); if (!q.src) q.src = q.dataset.src; },

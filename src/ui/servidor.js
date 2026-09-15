@@ -135,22 +135,6 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
-      // Opções do jogo (HUD): ler e gravar. Só admin (o daemon confere).
-      if (url.pathname === '/api/hud' && req.method !== 'POST' && acoes.hudLer) {
-        try { return enviar(200, 'application/json', JSON.stringify(await acoes.hudLer())); }
-        catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
-      }
-      if (req.method === 'POST' && url.pathname === '/api/hud' && acoes.hudGravar) {
-        const pedacos = [];
-        for await (const p of req) pedacos.push(p);
-        try {
-          const corpo = JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}');
-          return enviar(200, 'application/json', JSON.stringify(await acoes.hudGravar(corpo)));
-        } catch (erro) {
-          return enviar(403, 'application/json', JSON.stringify({ erro: erro.message }));
-        }
-      }
-
       // Painel admin: quem usa e o controle. Só responde pra quem é admin
       // (o daemon confere) — pra todo o resto é 403.
       if (url.pathname === '/api/admin/usuarios' && acoes.adminUsuarios) {
