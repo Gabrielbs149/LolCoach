@@ -2553,7 +2553,9 @@ function desenharCaixa(tipo, rota, i){
   const img = $('#img-' + caixaId(tipo, rota, i));
   const input = $('#add-' + caixaId(tipo, rota, i));
   if (!img || !input) return;
-  img.src = c ? '/icone/' + c.id : '';
+  // Sem campeão, sem <img>: src vazio desenha o ícone de imagem quebrada.
+  img.hidden = !c;
+  if (c) img.src = '/icone/' + c.id; else img.removeAttribute('src');
   if (document.activeElement !== input) input.value = nome ?? '';
 }
 
