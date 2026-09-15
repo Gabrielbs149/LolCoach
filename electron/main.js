@@ -285,6 +285,39 @@ function fecharOverlay() {
   janelaOverlay = null;
 }
 
+/**
+ * Atalhos globais, configuráveis na aba Configuração (config.atalhos). O do
+ * flash vale pra posição 1; as outras seguem: se termina em dígito, 1..5;
+ * se termina em F-tecla, F(n)..F(n+4). Só escuta a tecla — nada entra no jogo.
+ */
+function variantesDoFlash(acelerador) {
+  const partes = String(acelerador || 'Control+Alt+1').split('+');
+  const ultima = partes.pop();
+  const prefixo = partes.length ? partes.join('+') + '+' : '';
+  if (/^\d$/.test(ultima)) return [1, 2, 3, 4, 5].map((n) => `${prefixo}${n}`);
+  const f = ultima.match(/^F(\d{1,2})$/i);
+  if (f) return [0, 1, 2, 3, 4].map((i) => `${prefixo}F${Math.min(24, Number(f[1]) + i)}`);
+  return [`${prefixo}${ultima}`];   // uma tecla só: marca a posição 1
+}
+function registrarAtalhos(cfg) {
+  globalShortcut.unregisterAll();
+  const at = { flash: 'Control+Alt+1', overlay: 'Control+Shift+O', painel: 'Control+Shift+L', ...(cfg?.atalhos ?? {}) };
+  const tenta = (acel, fn) => { try { if (acel) globalShortcut.register(acel, fn); } catch { estado.log(`atalho inválido: ${acel}`); } };
+  variantesDoFlash(at.flash).forEach((acel, i) => tenta(acel, () => {
+    if (!endereco) return;
+    fetch(`${endereco}/api/flash?posicao=${i + 1}`, { method: 'POST' }).catch(() => {});
+  }));
+  tenta(at.overlay, () => {
+    overlayLigado = !overlayLigado;
+    if (overlayLigado && (faseAtual === 'InProgress' || faseAtual === 'GameStart')) abrirOverlay(); else fecharOverlay();
+    estado.log(`overlay ${overlayLigado ? 'ligado' : 'desligado'}`);
+  });
+  tenta(at.painel, () => {
+    if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
+    if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
+  });
+}
+
 function criarBandeja() {
   const icone = nativeImage.createFromPath(join(AQUI, 'icone-bandeja.png'));
   bandeja = new Tray(icone.isEmpty() ? nativeImage.createEmpty() : icone);
@@ -318,6 +351,7 @@ app.whenReady().then(async () => {
     daemon = await iniciarDaemon({
       estado,
       aoSelecionar: () => abrirVivo({ focar: false }),
+      aoConfig: (cfg) => registrarAtalhos(cfg),
       aoFase: (fase) => {
         const antes = faseAtual;
         faseAtual = fase;
@@ -345,26 +379,8 @@ app.whenReady().then(async () => {
   criarJanela({ esconder: true });
   criarBandeja();
   ligarAtualizacao();
-  // Ctrl+Shift+L abre/fecha o painel — fora de partida (mostrar janela com o
-  // jogo rodando minimiza o LoL).
-  // Ctrl+Alt+1..5 marca o flash do inimigo na posição N (ordem da tela ao
-  // vivo). Só escuta a tecla, como o push-to-talk do Discord — nada entra no jogo.
-  for (let n = 1; n <= 5; n++) {
-    globalShortcut.register(`Control+Alt+${n}`, () => {
-      if (!endereco) return;
-      fetch(`${endereco}/api/flash?posicao=${n}`, { method: 'POST' }).catch(() => {});
-    });
-  }
-  // Ctrl+Shift+O liga/desliga o overlay (sem tirar o foco do jogo).
-  globalShortcut.register('Control+Shift+O', () => {
-    overlayLigado = !overlayLigado;
-    if (overlayLigado && (faseAtual === 'InProgress' || faseAtual === 'GameStart')) abrirOverlay(); else fecharOverlay();
-    estado.log(`overlay ${overlayLigado ? 'ligado' : 'desligado'}`);
-  });
-  globalShortcut.register('Control+Shift+L', () => {
-    if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
-    if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
-  });
+  registrarAtalhos(daemon.config);
+
   setTimeout(() => {
     if (!painelPendente) return;
     if (faseAtual === 'InProgress') {

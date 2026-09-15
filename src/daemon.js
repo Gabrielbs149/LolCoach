@@ -21,7 +21,7 @@ async function versaoDoApp() {
   try { return JSON.parse(await readFile(resolve(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version; } catch { return '?'; }
 }
 
-export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, aoFase } = {}) {
+export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, aoFase, aoConfig } = {}) {
   const config = configDada ?? await carregarConfig();
   const lcu = new LcuClient();
   const db = abrirBanco();
@@ -554,6 +554,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
     log('configuração salva');
     estado?.set('config', config);
+    aoConfig?.(config);
     return config;
   }
 
