@@ -411,6 +411,22 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   });
   let seqFalas = 0;
   let ultimoResumo = null;   // da última partida, pra janela ao vivo mostrar enquanto espera a próxima
+  /**
+   * Fim da partida (pela fase do client OU pela API do jogo sumindo — o que
+   * vier primeiro): resumo no registro, confere as previsões, monta o cartão.
+   * Idempotente: roda uma vez por partida.
+   */
+  function encerrarPartidaVivo() {
+    const pv = partidaVivo;
+    if (!pv?.contSitu || pv.encerrada) return;
+    pv.encerrada = true;
+    const c = pv.contSitu;
+    const top = [...c.porTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
+    log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
+    if (!pv.pastaSitu) return;
+    const base = pv.pastaSitu;
+    conferirPrevisoes(base).catch((erro) => { log(`previsões: ${erro.message}`); return null; }).then(() => montarResumoDe(base)).then((r) => { ultimoResumo = r; }).catch(() => {});
+  }
   async function montarResumoDe(base) {
     const partida = (await lerJsonl(resolve(base, 'partida.json')))[0];
     const [sits, fls, avs, acs] = await Promise.all([lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl')), lerJsonl(resolve(base, 'acertos.jsonl'))]);
@@ -496,16 +512,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     aoFase?.(fase);
     if (faseAnterior === 'EndOfGame' || (faseAnterior === 'InProgress' && fase === 'None')) coletar();
     // Acabou: resumo do que o olho viu e falou, pra conferir no registro.
-    if (faseAnterior === 'InProgress' && fase !== 'InProgress' && partidaVivo?.contSitu) {
-      const c = partidaVivo.contSitu;
-      const top = [...c.porTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
-      log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
-      if (partidaVivo.pastaSitu) {
-        // Resumo da partida pra janela ao vivo: mortes × avisos × previsões
-        const base = partidaVivo.pastaSitu;
-        conferirPrevisoes(base).catch((erro) => { log(`previsões: ${erro.message}`); return null; }).then(() => montarResumoDe(base)).then((r) => { ultimoResumo = r; }).catch(() => {});
-      }
-    }
+    if (faseAnterior === 'InProgress' && fase !== 'InProgress') encerrarPartidaVivo();
     if (fase !== 'InProgress' && fase !== 'GameStart') sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };
     faseAnterior = fase;
   });
@@ -702,7 +709,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     ]);
 
     const estado = await lerEstado();
-    if (!estado?.eu) { partidaVivo = null; return { emJogo: false, selecao: await selecaoAtual(), ultimaPartida: ultimoResumo && Date.now() - ultimoResumo.em < 4 * 3600_000 ? ultimoResumo : null }; }
+    // A API do jogo pode falhar uma leitura (timeout) sem a partida ter acabado: só encerra
+    // depois de 5 s seguidos sem resposta; enquanto isso devolve o último estado montado.
+    if (!estado?.eu && partidaVivo?.ultimoVivo) {
+      partidaVivo.semEstadoDesde ??= Date.now();
+      if (Date.now() - partidaVivo.semEstadoDesde < 5000) return partidaVivo.ultimoVivo;
+    }
+    if (estado?.eu && partidaVivo) partidaVivo.semEstadoDesde = null;
+    if (!estado?.eu) { if (partidaVivo) encerrarPartidaVivo(); partidaVivo = null; return { emJogo: false, selecao: await selecaoAtual(), ultimaPartida: ultimoResumo && Date.now() - ultimoResumo.em < 4 * 3600_000 ? ultimoResumo : null }; }
 
     const role = estado.eu.role || 'geral';
     if (!perfis.has(role)) {
@@ -777,7 +791,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: estado.tempo }));
     }
 
-    return {
+    return (partidaVivo.ultimoVivo = {
       emJogo: true, estado, perfil, conselhos,
       contra: partidaVivo.fichas ?? [],
       vistos: rastreio.vistos,
@@ -795,7 +809,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
           tecla: config.atalhos?.flashes?.[['top', 'jungle', 'mid', 'adc', 'sup'].indexOf(j.role) >= 0 ? ['top', 'jungle', 'mid', 'adc', 'sup'].indexOf(j.role) : i] ?? null, flashEm: f ? Math.max(0, Math.round(f.volta - estado.tempo)) : null, flashMarcado: !!f,
           visto: r?.vistoEm ? { texto: r.texto, lane: r.lane, lado: r.lado, ha: Math.round((Date.now() - r.vistoEm) / 1000), x: r.x, y: r.y } : null };
       }),
-    };
+    });
   }
 
   /**
