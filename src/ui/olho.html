@@ -556,7 +556,16 @@ async function desenharFalsa(t) {
     const t0 = Date.now();
     setInterval(async () => { const r = await desenharFalsa(Date.now() - t0); window.esperado = r; }, INTERVALO);
   } else if (!FINGIR) { await lerPartida(); setInterval(lerPartida, 2000); }
-  setInterval(quadro, INTERVALO);
+  // Ritmo adaptável: quadro pesado (muitos ícones) → espera mais, pra não roubar CPU do jogo.
+  let intervalo = INTERVALO;
+  const laco = async () => {
+    const t0 = performance.now();
+    await quadro();
+    const gasto = performance.now() - t0;
+    intervalo = gasto > 80 ? Math.min(250, intervalo + 20) : gasto < 35 ? Math.max(INTERVALO, intervalo - 10) : intervalo;
+    setTimeout(laco, Math.max(20, intervalo - gasto));
+  };
+  laco();
 })().catch((erro) => { log('falhou: ' + erro.message); if (!TESTE) fetch('/api/olho', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ erro: erro.message, t: Date.now() }) }).catch(() => {}); });
 </script>
 </body>
