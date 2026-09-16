@@ -752,7 +752,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         }
       } catch { /* sem banco, sem contexto */ }
     }
-    const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null, waves: dados.waves ?? null, mortesZona: partidaVivo.mortesZona }, e, objs);
+    const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null, waves: dados.waves ?? null, wards: dados.wards ?? null, mortesZona: partidaVivo.mortesZona }, e, objs);
     const gravar = (arquivo, obj) => appendFile(resolve(partidaVivo.pastaSitu, arquivo), JSON.stringify(obj) + '\n').catch(() => {});
     const Cb = await import('./vivo/cerebro.js');
     partidaVivo.memCerebro ??= Cb.novaMemoriaCerebro();

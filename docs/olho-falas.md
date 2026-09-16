@@ -75,7 +75,7 @@ histórico/inferência) · 🔴 difícil (reconhecer ícone novo, OCR, muita heu
 
 ## 6. Visão e wards
 
-- 🔴 Wards nossas (olho verde no minimapa) → "sem ward no rio do bot" antes do objetivo; "ward do rio expirou".
+- 🟢 Wards nossas (quadradinho verde; control ward rosa) → "Dragão em um minuto e sem ward no pit"; ward deles ainda 🔴 (sem amostra confirmada). Antes: 🔴 Wards nossas (olho verde no minimapa) → "sem ward no rio do bot" antes do objetivo; "ward do rio expirou".
 - 🔴 Wards deles reveladas (olho vermelho) → "ward deles no tri-bush, limpa".
 - 🔴 Cobertura de visão antes de dragão/barão: sem ward nossa a 60 s do objetivo → aviso.
 

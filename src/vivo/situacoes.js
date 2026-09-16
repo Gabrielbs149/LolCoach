@@ -280,6 +280,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         if (pertoPit) partes.push(`${pertoPit} deles perto do pit`);
         if (meuJg && visivel(meuJg, t)) partes.push(`seu jungler a ${seg(dist(meuJg.ultimo, pit))} segundos`);
         if (partes.length) situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome}: ${partes.join(', ')}.`, cooldown: 100 });
+        if (mundo.wards && leitura.wards && !mundo.wards.nossas.some((w) => dist(w, pit) < 0.14)) situ(`sem-ward-${o.nome}`, { tipo: 'visao', prioridade: minhaLane === 'jungle' || eu.role === 'sup' ? 2 : 1, modulo: 'timers', serio: F`${o.nome} em um minuto e sem ward no pit.`, cooldown: 100, dados: { objetivo: o.nome } });
       }
       const deles = vis.filter((f) => dist(f.ultimo, pit) < 0.12), nossos = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.12);
       if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 60 });
@@ -319,6 +320,20 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (t > 900 && recuando.length >= 4) situ('reset-deles', { tipo: 'oportunidade', prioridade: 2, modulo: 'timers', serio: F`${recuando.length} deles na base. Objetivo de graça.`, cooldown: 90 });
   }
 
+  /* ============================================ 3a. wards */
+  if (leitura.wards) {
+    mundo.wards ??= { nossas: [], deles: [] };
+    for (const lado of ['nossas', 'deles']) {
+      const lista = mundo.wards[lado];
+      for (const w of leitura.wards[lado] ?? []) {
+        const j = lista.find((q) => dist(q, w) < 0.02);
+        if (j) { j.t = t; j.tipo = w.tipo; } else lista.push({ x: w.x, y: w.y, tipo: w.tipo, t, desde: t });
+      }
+      mundo.wards[lado] = lista.filter((q) => t - q.t < 90);
+    }
+    // ward deles revelada: registro (e pro jungler/sup, que limpam)
+    for (const w of mundo.wards.deles) if (w.desde === t) { const l = lugar(w.x, w.y, meuTime); situ(`ward-deles-${l.chave}`, { tipo: 'visao', prioridade: ['jungle', 'bot'].includes(minhaLane) && l.lado === 'nosso' ? 1 : 0, modulo: 'mapa', serio: F`Ward deles ${l.texto}.`, cooldown: 120, dados: { x: w.x, y: w.y } }); }
+  }
   /* ============================================ 3b. waves (minions) */
   if (leitura.waves) {
     mundo.wavesBruto = leitura.waves;
@@ -418,6 +433,7 @@ export function instantaneo(mundo, estado) {
   return {
     t,
     waves: mundo.wavesBruto ?? null,
+    wards: mundo.wards ? { nossas: mundo.wards.nossas.map((w) => [w.x, w.y, w.tipo]), deles: mundo.wards.deles.map((w) => [w.x, w.y]) } : null,
     campeoes: [...mundo.campeoes.values()].map((f) => ({ c: f.campeao, time: f.time, role: f.role, morto: !!f.morto, x: f.ultimo?.x ?? null, y: f.ultimo?.y ?? null, ha: f.ultimo ? Math.round((t - f.ultimo.t) * 10) / 10 : null, regiao: f.regiao?.chave ?? null })),
   };
 }

@@ -183,6 +183,43 @@ const LANES_TRILHA = {
   mid: [[0.16, 0.84], [0.84, 0.16]],
   bot: [[0.15, 0.90], [0.88, 0.90], [0.90, 0.20]],
 };
+/**
+ * Wards no minimapa (medido nas amostras reais): ward nossa = quadradinho
+ * verde ~(75,150,72) com 8–12 px; control ward = rosa ~(153,94,140) com ~17 px;
+ * Ward deles revelada seria um quadradinho vermelho, mas vermelho pequeno no
+ * minimapa é minion, torre, ping… — sem amostra confirmada, fica de fora.
+ * Plantas são amarelas: fora. Devolve posições normalizadas (0..1).
+ */
+function wards(rgba, s, icones) {
+  const cel = 4, nc = Math.ceil(s / cel);
+  const verde = new Uint16Array(nc * nc), rosa = new Uint16Array(nc * nc);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2], i = ((y / cel) | 0) * nc + ((x / cel) | 0);
+    if (g > 130 && r < 115 && b < 115 && g > r * 1.5 && g > b * 1.5) verde[i]++;
+    else if (r > 135 && b > 110 && g < 120 && r > g * 1.3 && b > g * 1.15) rosa[i]++;
+  }
+  const k = (s / 321) ** 2;   // tamanhos medidos a 321 px
+  const juntar = (cont, min, max) => {
+    const pontos = [];
+    for (let j = 0; j + 1 < nc; j++) for (let i = 0; i + 1 < nc; i++) {
+      const n = cont[j * nc + i] + cont[j * nc + i + 1] + cont[(j + 1) * nc + i] + cont[(j + 1) * nc + i + 1];
+      if (n < min * k || n > max * k) continue;
+      // isolado: um ícone de campeão tem a cor espalhada em volta; a ward não
+      let volta = 0; for (let jj = j - 2; jj <= j + 3; jj++) for (let ii = i - 2; ii <= i + 3; ii++) if (jj >= 0 && ii >= 0 && jj < nc && ii < nc) volta += cont[jj * nc + ii];
+      if (volta > n * 1.6) continue;
+      pontos.push({ x: (i + 1) * cel, y: (j + 1) * cel, n });
+    }
+    const out = [];
+    for (const p of pontos.sort((a, b) => b.n - a.n)) if (!out.some((q) => Math.abs(q.x - p.x) < 12 && Math.abs(q.y - p.y) < 12)) out.push(p);
+    return out;
+  };
+  const longeDeIcone = (p) => !icones.some((c) => Math.hypot(c.x * s - p.x, c.y * s - p.y) < c.d * 0.8);
+  const norm = (p, tipo) => ({ x: Math.round(p.x / s * 1000) / 1000, y: Math.round(p.y / s * 1000) / 1000, tipo });
+  return {
+    nossas: [...juntar(verde, 5, 24).map((p) => norm(p, 'ward')), ...juntar(rosa, 12, 40).filter(longeDeIcone).map((p) => norm(p, 'control'))],
+    deles: [],
+  };
+}
 function wavesPorLane(rgba, s, d) {
   const ehRed = (r, g, b) => r > 120 && r > g * 1.7 && r > b * 1.5, ehAzul = (r, g, b) => b > 140 && b > r * 1.8 && b > g * 1.25 && g < 170;
   const raio = Math.max(3, Math.round(d * 0.25));
@@ -351,6 +388,7 @@ async function quadro() {
     const vermelhos = manchasVermelhas(rgba, s, d0());
     const azuis = manchasVermelhas(rgba, s, d0(), 'azul');
     const waves = rodada % 10 === 0 ? wavesPorLane(rgba, s, d0()) : null;
+    let wardsVistas = null;
 
     // escala dos ícones pelo MEU ícone
     // Escala pelos ícones que estão SEMPRE no minimapa: eu + aliados. Pra cada
@@ -442,7 +480,8 @@ async function quadro() {
     if (aliados.length >= 3 && vistosAli.length < 2) fracoDesde ||= agora; else fracoDesde = 0;
     if (!eu && !vistosAli.length && !limpos.length) { cegoDesde ||= agora; if (agora - cegoDesde > 15000 && agora - cegoAvisado > 60000) { cegoAvisado = agora; log('cego há 15 s: nada reconhecido no minimapa (outra janela na frente do jogo?)'); } }
     else cegoDesde = 0;
-    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
+    if (rodada % 10 === 5) wardsVistas = wards(rgba, s, [...limpos, ...vistosAli, ...(eu ? [eu] : [])].map((v) => ({ x: v.x, y: v.y, d })));
+    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, wards: wardsVistas, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
       log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
@@ -517,7 +556,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
 }
 function enviar(dados) {
   const agora = Date.now();
-  const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.waves && Object.values(dados.waves).map((w) => Math.round((w.frente ?? -1) * 20)), dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
+  const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.wards && [dados.wards.nossas.length, dados.wards.deles.length, dados.wards.nossas.map((w) => Math.round(w.x * 50 + w.y * 5000))], dados.waves && Object.values(dados.waves).map((w) => Math.round((w.frente ?? -1) * 20)), dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
   if (chave === ultimoEnvio && agora - ultimoEnvioEm < 1000) return;
   ultimoEnvio = chave; ultimoEnvioEm = agora;
   if (TESTE || FINGIR) { log(`${dados.vistos.map((v) => `${v.campeao} ${v.x.toFixed(2)},${v.y.toFixed(2)} (${v.score})`).join(' · ') || 'ninguém'}${dados.eu ? ` | eu ${dados.eu.x.toFixed(2)},${dados.eu.y.toFixed(2)}` : ''}`); return; }
