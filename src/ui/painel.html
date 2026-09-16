@@ -1690,6 +1690,21 @@ async function abrirPartida(gameId){
     if(!s?.situacoes?.length) return;
     const mm = (t) => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
     const faladas = s.situacoes.filter(x => x.falada);
+    // Suas mortes cruzadas com o que o olho via: jungler sumido? avançado? em menor número?
+    const M = s.mortes;
+    if (M?.total) {
+      const REG = { 'base-nosso': 'na nossa base', 'base-deles': 'na base deles', barao: 'no barão', dragao: 'no dragão' };
+      const regiao = (r) => r ? (REG[r] ?? r.replace(/^jg-cima-/, 'na jungle de cima, lado ').replace(/^jg-baixo-/, 'na jungle de baixo, lado ').replace(/^rio-barao$/, 'no rio do barão').replace(/^rio-dragao$/, 'no rio do dragão').replace(/^(top|mid|bot)-/, 'no $1, lado ')) : '?';
+      const linha = (m) => {
+        const partes = [];
+        if (m.onde) partes.push(m.onde + (m.avancado ? ' (avançado)' : ''));
+        if (m.jg) partes.push(m.jg.morto ? 'jungler deles morto' : m.jg.ha == null ? 'jungler deles nunca visto' : m.jg.ha >= 30 ? `jungler deles sumido há ${Math.round(m.jg.ha)} s (última vez ${regiao(m.jg.regiao)})` : `jungler deles visto há ${Math.round(m.jg.ha)} s ${regiao(m.jg.regiao)}`);
+        if (m.perto?.length) partes.push(`${m.perto.length} deles perto: ${m.perto.join(', ')}`);
+        return `<div class="situ"><span class="t">${mm(m.t)}</span><span class="txt">Morte ${m.n}: ${esc(partes.join(' · ') || 'sem leitura do olho')}</span><span></span><span></span></div>`;
+      };
+      const resumo = [M.semJg ? `${M.semJg} de ${M.total} com o jungler deles sumido há 30 s+` : '', M.avancado ? `${M.avancado} avançado no lado deles` : '', M.emNumero ? `${M.emNumero} com 2+ deles perto` : ''].filter(Boolean).join(' · ');
+      $('#det').insertAdjacentHTML('beforeend', `<h2>Suas mortes <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${esc(resumo)}</small></h2><div class="cartao" style="padding:6px 0">${M.lista.map(linha).join('')}</div>`);
+    }
     $('#det').insertAdjacentHTML('beforeend', `<h2>Minimapa <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${faladas.length} faladas de ${s.situacoes.length}</small></h2><div class="cartao" style="padding:6px 0">${faladas.slice(0, 60).map(x => `<div class="situ falada"><span class="t">${mm(x.t)}</span><span class="txt">${esc(x.texto)}</span><span class="p p${x.prioridade}">p${x.prioridade}</span><span></span></div>`).join('')}</div>`);
   }).catch(() => {});
 }

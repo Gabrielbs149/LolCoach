@@ -173,7 +173,46 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const base = resolve(pastaSituacoes(), pasta);
     const [partida, situacoes, falas, avaliacoes] = await Promise.all([lerJsonl(resolve(base, 'partida.json')), lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl'))]);
     const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
-    return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null })), falas };
+    const mortes = await mortesCruzadas(base, partida[0]).catch(() => null);
+    return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null })), falas, mortes };
+  }
+  /**
+   * Pós-jogo que ensina: cada morte sua cruzada com o que o olho via na hora —
+   * jungler deles sumido há quanto tempo (e onde foi visto), quantos deles
+   * estavam perto, se você estava avançado (lado deles). Só dado gravado.
+   */
+  async function mortesCruzadas(base, partida) {
+    if (!partida?.eu) return null;
+    const [estados, leituras] = await Promise.all([lerJsonl(resolve(base, 'estado.jsonl')), lerJsonl(resolve(base, 'leituras.jsonl'))]);
+    if (!estados.length || !leituras.length) return null;
+    const { lugar } = await import('./vivo/olho.js');
+    const meuTime = partida.eu.time, meuC = partida.eu.campeao;
+    const jgDeles = partida.jogadores.find((j) => j.time !== meuTime && j.role === 'jungle')?.campeao ?? null;
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const mortes = [];
+    let antes = 0;
+    for (const e of estados) {
+      const eu = e.jogadores?.find((j) => j.c === meuC && j.time === meuTime); if (!eu) continue;
+      if (eu.m > antes) {
+        antes = eu.m;
+        // a leitura de uns 3 s antes da morte (a morte em si já tira você do mapa)
+        const l = leituras.filter((x) => x.t <= e.t - 2).at(-1) ?? leituras.find((x) => x.t >= e.t - 8);
+        if (!l) { mortes.push({ n: eu.m, t: e.t }); continue; }
+        const me = l.campeoes.find((c) => c.c === meuC && c.time === meuTime);
+        const minhaPos = me?.x != null && me.ha != null && me.ha <= 6 ? { x: me.x, y: me.y } : null;
+        const jg = jgDeles ? l.campeoes.find((c) => c.c === jgDeles) : null;
+        const perto = minhaPos ? l.campeoes.filter((c) => c.time !== meuTime && c.x != null && c.ha != null && c.ha <= 5 && dist(c, minhaPos) < 0.16).map((c) => c.c) : [];
+        const onde = minhaPos ? lugar(minhaPos.x, minhaPos.y, meuTime) : null;
+        mortes.push({ n: eu.m, t: e.t,
+          onde: onde?.texto ?? null, avancado: onde?.lado === 'deles' && onde.lane !== 'base',
+          jg: jg ? { campeao: jg.c, morto: jg.morto, ha: jg.ha, regiao: jg.regiao } : null,
+          perto });
+      }
+    }
+    const semJg = mortes.filter((m) => m.jg && !m.jg.morto && (m.jg.ha == null || m.jg.ha >= 30)).length;
+    const avancado = mortes.filter((m) => m.avancado).length;
+    const emNumero = mortes.filter((m) => m.perto.length >= 2).length;
+    return { lista: mortes, total: mortes.length, semJg, avancado, emNumero };
   }
   /** Resumo por tipo de situação em todas as partidas gravadas: quantas, quantas faladas, 👍/👎. */
   const { baseChave } = await import('./vivo/cerebro.js');
