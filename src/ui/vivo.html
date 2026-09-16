@@ -137,7 +137,7 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 .situ{display:flex;gap:8px;font-size:12px;color:var(--texto);padding:4px 8px;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-s)}
 .situ span{color:var(--apagado);font-variant-numeric:tabular-nums}
 .situ.quieta{color:var(--apagado)} .situ.p3{border-color:#5c2226}
-.resumoFim{margin-top:18px;text-align:left;font-size:12px;color:var(--texto);background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-s);padding:8px 12px;line-height:1.7} .resumoFim b{display:block;margin-bottom:2px} .resumoFim .dica{color:var(--apagado);font-size:11px}
+.resumoFim{margin-top:18px;text-align:left;font-size:12px;color:var(--texto);background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-s);padding:8px 12px;line-height:1.7} .resumoFim b{display:block;margin-bottom:2px} .resumoFim .dica{color:var(--apagado);font-size:11px} .resumoFim details{margin-top:6px} .resumoFim summary{cursor:pointer;color:var(--apagado);font-size:11px} .resumoFim .situs{display:flex;flex-direction:column;gap:3px;margin-top:6px;max-height:260px;overflow:auto}
 .situ .aval{margin-left:auto;display:flex;gap:6px;font-weight:normal} .situ .aval i{cursor:pointer;font-style:normal;opacity:.45;filter:grayscale(1)} .situ .aval i:hover{opacity:1;filter:none} .situ .aval.bom i[data-n="1"],.situ .aval.ruim i[data-n="-1"]{opacity:1;filter:none}
 .linha .visto.agora{color:var(--ouro-claro)}
 .time h3 small{font-weight:400;color:var(--apagado);font-size:9.5px;text-transform:none;letter-spacing:0;margin-left:6px}
@@ -286,7 +286,7 @@ document.addEventListener('click', async (ev) => {
   const i = ev.target.closest('.aval i'); if (!i) return;
   const b = i.parentElement, k = b.dataset.k, nota = Number(i.dataset.n);
   const [t, ...resto] = k.split('|'); const chave = resto.join('|');
-  const s = (ultimoDado?.situacoes ?? []).find((x) => `${x.t}|${x.chave}` === k);
+  const s = [...(ultimoDado?.situacoes ?? []), ...(ultimoDado?.ultimaPartida?.ditas ?? [])].find((x) => `${x.t}|${x.chave}` === k);
   avaliadas.set(k, nota); b.classList.toggle('bom', nota === 1); b.classList.toggle('ruim', nota === -1);
   try { await fetch('/api/situacoes/avaliar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pasta: pastaSituAtual, chave, t: Number(t), nota, texto: s?.texto, tipo: s?.tipo }) }); } catch {}
 });
@@ -404,7 +404,9 @@ function desenhar(d){
         ${u.previsoes ? `<div>previsões certas: ${u.previsoes.certas}/${u.previsoes.total}</div>` : ''}
         ${u.mortes ? `<div>mortes: ${u.mortes.total} · com aviso antes: ${u.mortes.avisadas} · jungler sumido: ${u.mortes.semJg} · avançado: ${u.mortes.avancado}</div>` : ''}
         <div class="dica">detalhe em Partidas → a partida → Suas mortes</div>
+        ${u.ditas?.length ? `<details><summary>Avaliar o que a voz falou (${u.ditas.length})</summary><div class="situs">${u.ditas.map(s => `<div class="situ"><span>${mmss(s.t)}</span>${esc(s.texto)}<b class="aval ${(avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === 1 ? 'bom' : (avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === -1 ? 'ruim' : ''}" data-k="${esc(`${s.t}|${s.chave}`)}"><i data-n="1" title="boa">👍</i><i data-n="-1" title="lixo">👎</i></b></div>`).join('')}</div></details>` : ''}
       </div>` : '';
+    if (u?.pasta) pastaSituAtual = u.pasta;
     $('#tudo').innerHTML = `<div class="vazio"><div class="anel"></div><b>Esperando a partida</b>
       <p>acende sozinha quando o jogo carregar</p>${resumo}</div>`;
     return;

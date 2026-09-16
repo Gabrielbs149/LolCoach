@@ -344,7 +344,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
   async function avaliarSituacao({ pasta, chave, t, nota, texto, tipo } = {}) {
     const atual = partidaVivo?.pastaSitu ? basename(partidaVivo.pastaSitu) : null;
-    if (config.admin !== true && pasta !== atual) throw new Error('só a partida atual');
+    if (config.admin !== true && pasta !== atual && pasta !== ultimoResumo?.pasta) throw new Error('só a partida atual');
     if (!pasta || /[\\/]/.test(pasta)) throw new Error('pasta inválida');
     await appendFile(resolve(pastaSituacoes(), pasta, 'avaliacoes.jsonl'), JSON.stringify({ t, chave, nota, em: new Date().toISOString() }) + '\n');
     subirAvaliacoes(pasta, { t, chave, nota, texto, tipo }).catch((erro) => log(`avaliação não subiu: ${erro.message}`));
@@ -509,7 +509,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         conferirPrevisoes(base).catch((erro) => { log(`previsões: ${erro.message}`); return null; }).then(async (prev) => {
           const partida = (await lerJsonl(resolve(base, 'partida.json')))[0];
           const mortes = await mortesCruzadas(base, partida).catch(() => null);
-          ultimoResumo = { em: Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
+          const [sits, fls, avs] = await Promise.all([lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl'))]);
+          const notas = new Map(avs.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+          const ditas = [...sits.filter((s) => s.falada).map((s) => ({ t: s.t, chave: s.chave, texto: s.texto, tipo: s.tipo })), ...fls.filter((f) => f.id).map((f) => ({ t: f.t, chave: f.id, texto: f.serio, tipo: 'fala:' + f.modulo }))]
+            .sort((a, b) => a.t - b.t).map((d) => ({ ...d, aval: notas.get(`${d.t}|${d.chave}`) ?? null }));
+          ultimoResumo = { ditas, em: Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
             situacoes: c2.total, faladas: c2.faladas, previsoes: prev, mortes: mortes ? { total: mortes.total, avisadas: mortes.avisadas, semJg: mortes.semJg, avancado: mortes.avancado } : null };
         });
       }
