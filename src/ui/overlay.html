@@ -27,6 +27,10 @@ body{font:12.5px/1.3 "Segoe UI",system-ui,sans-serif;color:var(--texto);-webkit-
 .obj b{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.7px;color:var(--apagado);font-weight:700}
 .obj span{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
 .obj.vivo span{color:var(--ouro-claro)} .obj.perto span{color:var(--g2)}
+.jg{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.08);font-size:12px}
+.jg img{width:20px;height:20px;border-radius:50%;border:1px solid var(--der)}
+.jg b{color:var(--ouro-claro)} .jg .ha{margin-left:auto;color:var(--fraco);font-variant-numeric:tabular-nums}
+.jg.sumido{background:rgba(224,160,63,.10)} .jg.sumido .ha{color:var(--g2)} .jg.perigo{background:rgba(240,122,122,.14)}
 .cab{display:flex;align-items:center;justify-content:space-between;padding:5px 10px 2px;font-size:9.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700}
 .ini{display:grid;grid-template-columns:22px 1fr auto 70px;align-items:center;gap:7px;padding:3px 10px}
 .ini img{width:22px;height:22px;border-radius:4px;background:#1a2230}
@@ -58,6 +62,18 @@ const CLS = { 'Dragão': 'dragao', 'Arauto': 'arauto', 'Barão': 'barao' };
 const LUGAR = { top: 'top', mid: 'mid', bot: 'bot', jungle: 'jg', rio: 'rio', barao: 'barão', dragao: 'dragão', base: 'base' };
 const visto = (v) => !v || v.ha >= 90 ? '' : v.ha <= 3 ? `<em class="v agora">${LUGAR[v.lane] ?? v.lane}${v.lado === 'deles' ? ' deles' : ''}</em>` : `<em class="v">${LUGAR[v.lane] ?? v.lane} ${v.ha}s</em>`;
 
+/* Linha do jungler deles: onde foi visto e há quanto tempo — o que mais importa no minimapa. */
+function jgLinha(d){
+  const jg = (d.inimigos ?? []).find(j => j.role === 'jungle');
+  if (!jg) return '';
+  const v = jg.visto;
+  const LUG = { top: 'top', mid: 'mid', bot: 'bot', jungle: 'jungle', rio: 'rio', barao: 'barão', dragao: 'dragão', base: 'base' };
+  if (jg.morto) return `<div class="jg">${icone(jg.campeao)}<span>Jungler <b>morto</b></span></div>`;
+  if (!v) return `<div class="jg">${icone(jg.campeao)}<span>Jungler <b>não visto</b></span></div>`;
+  const onde = `${LUG[v.lane] ?? v.lane}${v.lado === 'deles' ? ' deles' : v.lado === 'nosso' ? ' nosso' : ''}`;
+  const cls = v.ha <= 3 ? (v.lado === 'nosso' ? 'perigo' : '') : v.ha >= 20 ? 'sumido' : '';
+  return `<div class="jg ${cls}">${icone(jg.campeao)}<span>Jungler <b>${esc(onde)}</b></span><span class="ha">${v.ha <= 3 ? 'agora' : `há ${v.ha}s`}</span></div>`;
+}
 function desenhar(d){
   const hud = document.getElementById('hud');
   if(!d.emJogo){ hud.classList.add('oculto'); return; }
@@ -79,6 +95,7 @@ function desenhar(d){
   hud.innerHTML = `<div class="topo">${icone(eu.campeao)}<span class="t">${mmss(e.tempo)}</span>
       <span class="kda">${eu.kills}/${eu.mortes}/${eu.assists}<span>${eu.cs ?? 0} cs</span></span></div>
     <div class="objs">${objs}</div>
+    ${jgLinha(d)}
     <div class="cab"><span>Inimigos</span><span>flash</span></div>
     ${inis}
     ${mostraFala ? `<div class="fala u${ultimaFala.prioridade ?? 1}">${esc(ultimaFala.serio)}</div>` : (urgente ? `<div class="fala u3">${esc(urgente.titulo)}</div>` : '')}`;
