@@ -31,6 +31,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       ...cfg,
       riot: { ...(cfg.riot ?? {}), apiKey: '', temChave: !!cfg.riot?.apiKey },
       controle: { ...(cfg.controle ?? {}), githubToken: '', temToken: !!cfg.controle?.githubToken },
+      voz: { ...(cfg.voz ?? {}), chave: '', temChave: !!cfg.voz?.chave },
     };
   };
 
@@ -284,6 +285,19 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         } catch (erro) {
           return enviar(503, 'application/json', JSON.stringify({ erro: erro.message }));
         }
+      }
+
+      // Voz do coach (ElevenLabs): lista de vozes e o mp3 de uma frase.
+      if (url.pathname === '/api/voz/vozes' && acoes.vozVozes) {
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.vozVozes())); }
+        catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
+      if (url.pathname === '/api/voz/falar' && acoes.vozFalar) {
+        try {
+          const { corpo, tipo } = await acoes.vozFalar({ texto: url.searchParams.get('texto') ?? '' });
+          res.writeHead(200, { 'Content-Type': tipo, 'Cache-Control': 'no-store' });
+          return res.end(corpo);
+        } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
 
       // Retrato do perfil (ícone de invocador).

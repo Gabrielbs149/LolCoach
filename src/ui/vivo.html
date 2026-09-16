@@ -216,8 +216,32 @@ function acharVoz(){
 }
 if ('speechSynthesis' in window) { acharVoz(); speechSynthesis.onvoiceschanged = acharVoz; }
 const filaFalas = [];
+// Motor de voz vem da Configuração: 'elevenlabs' toca mp3 do daemon; qualquer outro, voz do Windows.
+let motorVoz = 'windows';
+const lerMotor = () => fetch('/api/config').then(r => r.json()).then(c => { motorVoz = c?.voz?.motor === 'elevenlabs' && c?.voz?.temChave && c?.voz?.vozId ? 'elevenlabs' : 'windows'; }).catch(() => {});
+lerMotor(); setInterval(lerMotor, 60000);
+const filaMp3 = []; let tocando = null;
+function tocarProxima(){
+  if (tocando || !filaMp3.length) return;
+  const { texto } = filaMp3.shift();
+  const a = new Audio('/api/voz/falar?texto=' + encodeURIComponent(texto));
+  a.volume = voz.volume; tocando = a;
+  const fim = () => { tocando = null; tocarProxima(); };
+  a.onended = fim;
+  a.onerror = () => { fim(); falarWindows(texto); };
+  a.play().catch(() => { fim(); falarWindows(texto); });
+}
 function falar(texto, forcar = false){
-  if (!('speechSynthesis' in window) || (!voz.ligada && !forcar) || !texto) return;
+  if ((!voz.ligada && !forcar) || !texto) return;
+  if (motorVoz === 'elevenlabs') {
+    if (filaMp3.length >= 3) filaMp3.shift();
+    filaMp3.push({ texto }); tocarProxima();
+    return;
+  }
+  falarWindows(texto);
+}
+function falarWindows(texto){
+  if (!('speechSynthesis' in window) || !texto) return;
   const u = new SpeechSynthesisUtterance(texto);
   if (vozPt) u.voice = vozPt;
   u.lang = 'pt-BR'; u.rate = 1.05; u.volume = voz.volume;
@@ -226,7 +250,7 @@ function falar(texto, forcar = false){
   filaFalas.push(u); u.onend = () => { const i = filaFalas.indexOf(u); if (i >= 0) filaFalas.splice(i, 1); };
   speechSynthesis.speak(u);
 }
-function vozAlternar(){ voz.ligada = !voz.ligada; if(!voz.ligada) speechSynthesis.cancel(); vozSalvar(); desenharVoz(); }
+function vozAlternar(){ voz.ligada = !voz.ligada; if(!voz.ligada){ speechSynthesis.cancel(); filaMp3.length = 0; tocando?.pause(); tocando = null; } vozSalvar(); desenharVoz(); }
 function vozModo(m){ voz.modo = m; vozSalvar(); desenharVoz(); falar(m === 'serio' ? 'Modo sério.' : 'Modo divertido ligado. Bora zoar.', true); }
 function vozVolumeMudar(v){ voz.volume = Number(v); vozSalvar(); }
 function vozModulo(k){ voz.modulos[k] = !voz.modulos[k]; vozSalvar(); desenharVoz(); }

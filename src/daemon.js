@@ -978,6 +978,28 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
   const listaDeAmigos = () => (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
 
+  /* ------------------------------------------------------------- voz */
+  // ElevenLabs: a voz dele (clonada lá no site). Texto entra, mp3 sai; cache em dados/voz.
+  const vozCfg = () => ({ motor: config.voz?.motor ?? 'windows', chave: config.voz?.chave ?? '', vozId: config.voz?.vozId ?? '', modelo: config.voz?.modelo || 'eleven_flash_v2_5' });
+  async function vozVozes() {
+    const { vozesEleven, cotaEleven } = await import('./vivo/voz.js');
+    const v = vozCfg();
+    if (!v.chave) throw new Error('cole a chave do ElevenLabs primeiro');
+    const [vozes, cota] = await Promise.all([vozesEleven(v.chave), cotaEleven(v.chave).catch(() => null)]);
+    return { vozes, cota, vozId: v.vozId };
+  }
+  const vozEmAndamento = new Map();
+  async function vozFalar({ texto } = {}) {
+    const { falarEleven } = await import('./vivo/voz.js');
+    const v = vozCfg();
+    if (v.motor !== 'elevenlabs') throw new Error('motor de voz não é o ElevenLabs');
+    const chave = `${v.vozId}|${texto}`;
+    if (!vozEmAndamento.has(chave)) {
+      vozEmAndamento.set(chave, falarEleven({ ...v, texto, pasta: resolve(pastaBase(), 'dados') }).finally(() => vozEmAndamento.delete(chave)));
+    }
+    return { corpo: await vozEmAndamento.get(chave), tipo: 'audio/mpeg' };
+  }
+
   /**
    * Sugestões de nick enquanto ele digita (como o op.gg, só que com o que a
    * gente tem): amigos do client, amigos já adicionados e todo mundo que já
@@ -1136,7 +1158,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     campeoes, lerConfig, salvarConfig, vivo,
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
-    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks,
+    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar,
     adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
@@ -1183,6 +1205,6 @@ const ACOES_DO_PAINEL = [
   'vivo', 'arte', 'campeoes', 'lerConfig', 'salvarConfig',
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
-  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks',
+  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash',
 ];

@@ -643,6 +643,8 @@ h2:first-child{margin-top:0}
 .linhaCfg{display:flex;align-items:center;gap:14px;padding:9px 14px;border-bottom:1px solid var(--borda);min-height:52px}
 .linhaCfg:last-child{border-bottom:0}
 .linhaCfg .txt{flex:1;min-width:0}
+.linhaCfg .cfgSel{margin:0;width:240px}
+#vAviso .aviso{margin:8px 14px}
 .linhaCfg b{display:block;font-weight:650;font-size:13px}
 .linhaCfg i{display:block;font-style:normal;color:var(--apagado);font-size:11.5px;margin-top:2px}
 .chave{display:inline-flex;cursor:pointer;flex:0 0 auto}
@@ -1081,6 +1083,28 @@ h2{letter-spacing:1px}
         <div class="txt"><b>Olho no minimapa</b></div>
         <label class="chave"><input type="checkbox" id="cOlho"><span class="pino"></span></label>
       </div>
+    </div>
+
+    <h2>Voz</h2>
+    <div class="painelCfg">
+      <div class="linhaCfg">
+        <div class="txt"><b>Motor</b></div>
+        <select class="contaSel cfgSel" id="vMotor" onchange="vozMotor(this.value)">
+          <option value="windows">Windows</option>
+          <option value="elevenlabs">ElevenLabs (sua voz)</option>
+        </select>
+      </div>
+      <div class="linhaCfg vozEleven" hidden>
+        <div class="txt"><b>Chave do ElevenLabs</b><i id="vChaveEstado"></i></div>
+        <input class="busca" id="vChave" type="password" placeholder="sk_…" autocomplete="off" style="max-width:260px;margin:0">
+        <button class="acao" onclick="vozSalvarChave()">Salvar</button>
+      </div>
+      <div class="linhaCfg vozEleven" hidden>
+        <div class="txt"><b>Voz</b><i id="vCota"></i></div>
+        <select class="contaSel cfgSel" id="vVoz" onchange="vozEscolher(this.value)"><option value="">carregando…</option></select>
+        <button class="acao" onclick="vozTestar(this)">Testar</button>
+      </div>
+      <div id="vAviso"></div>
     </div>
 
     <h2>Teclas</h2>
@@ -2791,9 +2815,68 @@ async function carregarConfig(){
   $('#cChamp').onchange = e => { cfg.champSelect.escolher = e.target.checked; gravar(); };
   $('#cBanir').onchange = e => { cfg.champSelect.banir = e.target.checked; gravar(); };
   $('#cOlho').checked = cfg.olho?.ligado !== false;
+  desenharVozCfg();
   $('#cOlho').onchange = e => { cfg.olho = { ...(cfg.olho ?? {}), ligado: e.target.checked }; gravar(); };
   desenharRotas(); desenharTeclas();
   if(!listaCampeoes.length) document.querySelectorAll('.rotas input').forEach(i => i.placeholder = 'abra o League uma vez');
+}
+
+/* ------------------------------------------------------------- voz */
+function desenharVozCfg(){
+  const v = cfg.voz ?? {};
+  $('#vMotor').value = v.motor === 'elevenlabs' ? 'elevenlabs' : 'windows';
+  const eleven = $('#vMotor').value === 'elevenlabs';
+  document.querySelectorAll('.vozEleven').forEach(el => { el.hidden = !eleven; });
+  $('#vChaveEstado').textContent = v.temChave ? 'salva' : '';
+  $('#vChave').placeholder = v.temChave ? '••••••••••••' : 'sk_…';
+  if(eleven && v.temChave) carregarVozes(); else $('#vVoz').innerHTML = '<option value="">—</option>';
+}
+async function postConfig(corpo){
+  const r = await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo) }).then(x => x.json());
+  if(r.erro) throw new Error(r.erro);
+  cfg = r; marcarSalvo();
+  return r;
+}
+async function vozMotor(m){
+  await postConfig({ voz: { motor: m } }).catch(e => { $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; });
+  desenharVozCfg();
+}
+async function vozSalvarChave(){
+  const chave = $('#vChave').value.trim();
+  if(!chave) return;
+  $('#vAviso').innerHTML = '';
+  try { await postConfig({ voz: { chave } }); $('#vChave').value = ''; desenharVozCfg(); }
+  catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
+}
+async function carregarVozes(){
+  const sel = $('#vVoz');
+  try {
+    const r = await pegar('/api/voz/vozes');
+    if(r.erro) throw new Error(r.erro);
+    sel.innerHTML = '<option value="">escolha…</option>' + r.vozes.map(v => `<option value="${esc(v.id)}" ${v.id === r.vozId ? 'selected' : ''}>${esc(v.nome)}${v.minha ? ' · sua' : ''}</option>`).join('');
+    $('#vCota').textContent = r.cota ? `${num(r.cota.usado)} / ${num(r.cota.limite)} caracteres no mês` : '';
+    $('#vAviso').innerHTML = '';
+  } catch(e){
+    sel.innerHTML = '<option value="">—</option>';
+    $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`;
+  }
+}
+async function vozEscolher(id){
+  if(!id) return;
+  await postConfig({ voz: { vozId: id } }).catch(e => { $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; });
+}
+let vozTesteAudio = null;
+async function vozTestar(b){
+  b.disabled = true; const antes = b.textContent; b.textContent = 'gerando…';
+  $('#vAviso').innerHTML = '';
+  try {
+    const frases = ['Jungler deles no rio do dragão. Olho nele.', 'Flash do Ezreal marcado. Volta em cinco minutos.', 'Tem gold pro Gume do Infinito. Empurra a wave e volta.'];
+    const r = await fetch('/api/voz/falar?texto=' + encodeURIComponent(frases[Math.floor(Math.random() * frases.length)]));
+    if(!r.ok){ const e = await r.json().catch(() => ({})); throw new Error(e.erro ?? 'não deu'); }
+    const url = URL.createObjectURL(await r.blob());
+    vozTesteAudio?.pause(); vozTesteAudio = new Audio(url); await vozTesteAudio.play();
+  } catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
+  b.disabled = false; b.textContent = antes;
 }
 
 /* =============================================================== atividade */
