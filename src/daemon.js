@@ -432,6 +432,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   });
   let seqFalas = 0;
   let ultimoResumo = null;   // da última partida, pra janela ao vivo mostrar enquanto espera a próxima
+  async function montarResumoDe(base) {
+    const partida = (await lerJsonl(resolve(base, 'partida.json')))[0];
+    const [sits, fls, avs, acs] = await Promise.all([lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl')), lerJsonl(resolve(base, 'acertos.jsonl'))]);
+    const mortes = await mortesCruzadas(base, partida).catch(() => null);
+    const notas = new Map(avs.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+    const ditas = [...sits.filter((s) => s.falada).map((s) => ({ t: s.t, chave: s.chave, texto: s.texto, tipo: s.tipo })), ...fls.filter((f) => f.id).map((f) => ({ t: f.t, chave: f.id, texto: f.serio, tipo: 'fala:' + f.modulo }))]
+      .sort((a, b) => a.t - b.t).map((d) => ({ ...d, aval: notas.get(`${d.t}|${d.chave}`) ?? null }));
+    return { ditas, em: Date.parse(partida?.inicio ?? '') || Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
+      situacoes: sits.length, faladas: sits.filter((s) => s.falada).length, previsoes: acs.length ? { total: acs.length, certas: acs.filter((a) => a.acertou).length } : null,
+      mortes: mortes ? { total: mortes.total, avisadas: mortes.avisadas, semJg: mortes.semJg, avancado: mortes.avancado } : null };
+  }
+  // ao abrir: se a última partida gravada é de menos de 3 h, o cartão volta
+  setTimeout(async () => {
+    const pastas = (await readdir(pastaSituacoes()).catch(() => [])).sort();
+    const ult = pastas.at(-1); if (!ult) return;
+    const r = await montarResumoDe(resolve(pastaSituacoes(), ult)).catch(() => null);
+    if (r && Date.now() - r.em < 4 * 3600_000 && !ultimoResumo) ultimoResumo = r;
+  }, 8000).unref?.();
 
   /* ------------------------------------------------------------- coleta */
   let coletando = false;
@@ -505,17 +523,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
       if (partidaVivo.pastaSitu) {
         // Resumo da partida pra janela ao vivo: mortes × avisos × previsões
-        const base = partidaVivo.pastaSitu, c2 = c;
-        conferirPrevisoes(base).catch((erro) => { log(`previsões: ${erro.message}`); return null; }).then(async (prev) => {
-          const partida = (await lerJsonl(resolve(base, 'partida.json')))[0];
-          const mortes = await mortesCruzadas(base, partida).catch(() => null);
-          const [sits, fls, avs] = await Promise.all([lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl'))]);
-          const notas = new Map(avs.map((a) => [`${a.t}|${a.chave}`, a.nota]));
-          const ditas = [...sits.filter((s) => s.falada).map((s) => ({ t: s.t, chave: s.chave, texto: s.texto, tipo: s.tipo })), ...fls.filter((f) => f.id).map((f) => ({ t: f.t, chave: f.id, texto: f.serio, tipo: 'fala:' + f.modulo }))]
-            .sort((a, b) => a.t - b.t).map((d) => ({ ...d, aval: notas.get(`${d.t}|${d.chave}`) ?? null }));
-          ultimoResumo = { ditas, em: Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
-            situacoes: c2.total, faladas: c2.faladas, previsoes: prev, mortes: mortes ? { total: mortes.total, avisadas: mortes.avisadas, semJg: mortes.semJg, avancado: mortes.avancado } : null };
-        });
+        const base = partidaVivo.pastaSitu;
+        conferirPrevisoes(base).catch((erro) => { log(`previsões: ${erro.message}`); return null; }).then(() => montarResumoDe(base)).then((r) => { ultimoResumo = r; }).catch(() => {});
       }
     }
     if (fase !== 'InProgress' && fase !== 'GameStart') sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };
@@ -714,7 +723,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     ]);
 
     const estado = await lerEstado();
-    if (!estado?.eu) { partidaVivo = null; return { emJogo: false, selecao: await selecaoAtual(), ultimaPartida: ultimoResumo && Date.now() - ultimoResumo.em < 3 * 3600_000 ? ultimoResumo : null }; }
+    if (!estado?.eu) { partidaVivo = null; return { emJogo: false, selecao: await selecaoAtual(), ultimaPartida: ultimoResumo && Date.now() - ultimoResumo.em < 4 * 3600_000 ? ultimoResumo : null }; }
 
     const role = estado.eu.role || 'geral';
     if (!perfis.has(role)) {
