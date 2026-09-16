@@ -36,7 +36,7 @@ const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
 const N = 48;                          // grade da calibração do minimapa
 const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.72, LIMIAR_SEGUIDO = 0.62, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.55, MARGEM = 0.04;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
-let cegoDesde = 0, cegoAvisado = 0;
+let cegoDesde = 0, cegoAvisado = 0, fracoDesde = 0;
 
 const $log = document.getElementById('log');
 const log = (...a) => { const t = a.join(' '); $log.textContent = (t + '\n' + $log.textContent).slice(0, 3000); console.log('[olho]', t); };
@@ -352,16 +352,20 @@ async function quadro() {
     const waves = rodada % 10 === 0 ? wavesPorLane(rgba, s, d0()) : null;
 
     // escala dos ícones pelo MEU ícone
-    if ((!escala || (!escala.confiavel && agora - escala.em > 5000)) && meuCampeao) {
+    // Escala pelos ícones que estão SEMPRE no minimapa: eu + aliados. Pra cada
+    // tamanho, soma o melhor score de cada um; o tamanho que mais casa vence.
+    // Re-mede a cada 60 s enquanto o reconhecimento estiver fraco.
+    const nomesEscala = [meuCampeao, ...aliados.filter((j) => !j.morto).map((j) => j.campeao)].filter(Boolean);
+    if (nomesEscala.length && (!escala || (!escala.confiavel && agora - escala.em > 5000) || (escala.confiavel && agora - escala.em > 60000 && fracoDesde && agora - fracoDesde > 30000))) {
       escala = { ...(escala ?? {}), em: agora };
-      let melhor = { score: -1 };
-      for (let d = Math.round(s * 0.06); d <= Math.round(s * 0.12); d += 1) {
-        const t = await template(meuCampeao, d); if (!t) break;
-        const [p] = buscar(m, t, null, 1);
-        if (p && p.score > melhor.score) melhor = { ...p, d };
+      let melhor = { media: -1, d: 0 };
+      for (let d = Math.round(s * 0.05); d <= Math.round(s * 0.11); d += 1) {
+        let soma = 0, n = 0;
+        for (const nome of nomesEscala) { const t = await template(nome, d); if (!t) continue; const [p] = buscar(m, t, null, 1); if (p) { soma += p.score; n++; } }
+        if (n && soma / n > melhor.media) melhor = { media: soma / n, d };
       }
-      if (melhor.score >= LIMIAR_EU) { escala = { d: melhor.d, score: Math.round(melhor.score * 100) / 100, confiavel: true, em: agora }; log(`ícone: ${melhor.d}px (score ${escala.score})`); }
-      else if (!escala.d) { escala = { d: Math.round(s * 0.081), score: 0, confiavel: false, em: agora }; log(`meu ícone ainda não achado (melhor ${Math.round(melhor.score * 100) / 100} com ${melhor.d ?? '?'}px); usando ${escala.d}px por enquanto`); }
+      if (melhor.media >= 0.7 || (melhor.media >= 0.6 && nomesEscala.length >= 3)) { const antes = escala.d; escala = { d: melhor.d, score: Math.round(melhor.media * 100) / 100, confiavel: true, em: agora }; if (antes !== melhor.d) log(`ícone: ${melhor.d}px (média ${escala.score} em ${nomesEscala.length} ícones)`); fracoDesde = 0; }
+      else if (!escala.d) { escala = { d: Math.round(s * 0.081), score: 0, confiavel: false, em: agora }; log(`tamanho do ícone incerto (melhor média ${Math.round(melhor.media * 100) / 100} com ${melhor.d}px); usando ${escala.d}px por enquanto`); }
     }
     if (!escala?.d) return;
     const d = escala.d;
@@ -425,6 +429,7 @@ async function quadro() {
     rodada++;
     enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves });
     // Cego: minimapa calibrado mas nada reconhecido (nem eu, nem aliados) por 15 s → outra janela na frente do jogo?
+    if (aliados.length >= 3 && vistosAli.length < 2) fracoDesde ||= agora; else fracoDesde = 0;
     if (!eu && !vistosAli.length && !limpos.length) { cegoDesde ||= agora; if (agora - cegoDesde > 15000 && agora - cegoAvisado > 60000) { cegoAvisado = agora; log('cego há 15 s: nada reconhecido no minimapa (outra janela na frente do jogo?)'); } }
     else cegoDesde = 0;
     if (agora - ultimoDiag > 20000) {

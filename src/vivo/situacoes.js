@@ -48,7 +48,12 @@ function ficha(mundo, j) {
 function verVisto(f, v, t) {
   const p = { t, x: v.x, y: v.y };
   const antes = f.ultimo;
-  if (antes && t - antes.t < 6 && dist(antes, p) > 0.35) f.tp = t;      // pulo grande em pouco tempo = TP
+  // Pulo grande em pouco tempo: pode ser TP ou um ícone parecido no lugar errado.
+  // Só aceita se a leitura seguinte confirmar o novo lugar.
+  if (antes && t - antes.t < 6 && dist(antes, p) > 0.25) {
+    if (f.pendente && t - f.pendente.t < 2.5 && dist(f.pendente, p) < 0.08) { f.tp = t; f.pendente = null; }
+    else { f.pendente = p; return; }
+  } else f.pendente = null;
   f.hist.push(p); if (f.hist.length > 400) f.hist.splice(0, 100);
   f.ultimo = p; if (!f.primeiro) f.primeiro = p;
 }
@@ -266,7 +271,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         const pertoPit = vis.filter((f) => dist(f.ultimo, pit) < 0.2).length;
         if (pertoPit) partes.push(`${pertoPit} deles perto do pit`);
         if (meuJg && visivel(meuJg, t)) partes.push(`seu jungler a ${seg(dist(meuJg.ultimo, pit))} segundos`);
-        if (partes.length) situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} em um minuto: ${partes.join(', ')}.`, cooldown: 100 });
+        if (partes.length) situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome}: ${partes.join(', ')}.`, cooldown: 100 });
       }
       const deles = vis.filter((f) => dist(f.ultimo, pit) < 0.12), nossos = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.12);
       if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 60 });

@@ -12,6 +12,7 @@ import { F } from './texto.js';
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const ROLE_FALA = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'ADC', sup: 'suporte' };
+const LANE_DE_ROLE = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'bot', sup: 'bot' };
 
 const DRAGAO = {
   Fire: ['Dragão Infernal', 'Mais dano de ataque e habilidade pra gente.'],
@@ -85,9 +86,9 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
         const k = mem.meusKills;
         if (k >= 5 && k % 5 === 0) dizer(`kill-${e.id}`, 'kills', F`${k} kills. Não morre de graça.`, F`${k} kills. Segura o ego.`, 1);
       } else if (autorJ && autorJ.time !== eu.time && autorJ.role === 'jungle' && vitimaJ?.role) {
-        dizer(`jg-${e.id}`, 'jungler', F`${autorJ.campeao} matou no ${vitimaJ.role}. Lado oposto livre.`, F`${autorJ.campeao} no ${vitimaJ.role}. Outro lado livre.`, 2);
+        dizer(`jg-${e.id}`, 'jungler', F`${autorJ.campeao} matou no ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}. Lado oposto livre.`, F`${autorJ.campeao} no ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}. Outro lado livre.`, 2);
       } else if (jgDeles && e.assistentes?.includes(jgDeles.nome) && vitimaJ && vitimaJ.time === eu.time) {
-        dizer(`jg-${e.id}`, 'jungler', F`${jgDeles.campeao} gankou o ${vitimaJ.role}.`, F`${jgDeles.campeao} gankou o ${vitimaJ.role}.`, 1);
+        dizer(`jg-${e.id}`, 'jungler', F`${jgDeles.campeao} gankou o ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}.`, F`${jgDeles.campeao} gankou o ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}.`, 1);
       } else if (vitimaJ && vitimaJ.time !== eu.time && vitimaJ.role === 'jungle') {
         dizer(`jgmorreu-${e.id}`, 'jungler', F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, 2);
       }
@@ -210,12 +211,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
   if (mortosDeles >= 3) dizer(`3mortos-${Math.floor(tempo / 30)}`, 'timers', F`${mortosDeles} deles mortos. Torre ou objetivo agora.`, F`${mortosDeles} deles mortos. Pega alguma coisa.`, 3);
   if (tempo >= 1800 && tempo < 1808 && nossosKills > delesKills + 5) dizer('fecha', 'lane', F`Trinta minutos, ${nossosKills - delesKills} kills na frente. Fecha o jogo.`, F`Trinta minutos, ${nossosKills - delesKills} kills na frente. Fecha.`, 2);
 
-  /* ---- conselhos urgentes que ainda não foram ditos ---- */
-  for (const c of conselhos ?? []) {
-    if (c.urgencia < 3) continue;
-    const modulo = /gold/i.test(c.titulo) ? 'economia' : /vida/i.test(c.titulo) ? 'kills' : /dragão|barão|dragões/i.test(c.titulo) ? 'timers' : 'lane';
-    dizer(`c-${c.chave ?? c.titulo}`, modulo, `${c.titulo}. ${c.acao}`, `${c.titulo}. ${c.acao}`, c.urgencia);
-  }
+  void conselhos;   // os conselhos ficam na tela; a voz só fala fato.
 
   mem.ultimoTempo = tempo;
   return novas.sort((a, b) => b.prioridade - a.prioridade);
