@@ -49,3 +49,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.50 — Pronúncia dos apelidos de item (BORK = bórk, GA = gê á, QSS, LDR, Zhonya = zônia, Liandry, Cleaver, Youmuu, Heartsteel, Guinsoo, Shurelya…).
 - v2.28.51/52 — Faxina: leituras.jsonl/estado.jsonl (3–4 MB por partida) ficam só das últimas 30 partidas (10 min depois de abrir, após conferir as previsões); situações/falas/avaliações/acertos ficam pra sempre. Cérebro: "é a minha lane" também vale pra roam (para), início (laneGank) e sumido (rumo).
 - v2.28.53 — Num 6/Num 9 (e o resumo do Admin) valem pra QUALQUER fala, não só as do minimapa: timers, kills, gold, itens… (falas.jsonl agora guarda o id da fala; tipo aparece como "fala:timers"). Fala com 3 👎 e nenhum 👍 para de sair, igual às situações.
+- v2.28.54 — Teto geral: 7 falas por minuto somando olho + módulos (timers, kills, gold, itens); prioridade 3 sempre passa. Antes cada lado tinha o seu limite e a soma passava de 10/min.

@@ -617,6 +617,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   let partidaVivo = null;
   // Toda fala passa por aqui antes de ir pra tela: aplica o texto que o admin
   // personalizou (config.voz.falas) e preenche os {n}.
+  // Teto geral de falas: 7 por minuto somando olho + módulos (timers, kills…); prioridade 3 sempre passa.
+  const cabeFala = (prioridade, tempo) => {
+    if (prioridade >= 3) return true;
+    const ultimas = partidaVivo.falas.filter((f) => f.seq && tempo - (f.t ?? 0) < 60);
+    return ultimas.length < 7;
+  };
   const prontaFala = (f) => {
     personalizarFalas(config.voz?.falas ?? {});
     const pronta = { ...f, serio: renderFala(f.serio), divertido: renderFala(f.divertido ?? f.serio) };
@@ -711,6 +717,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras, olho: !!partidaVivo.olho?.calib && Date.now() - partidaVivo.olho.recebidoEm < 5000 }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       if (f.id && partidaVivo.silenciadas?.has(baseChave(f.id))) continue;
+      if (!cabeFala(f.prioridade, estado.tempo)) continue;
       partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: estado.tempo }));
     }
 
@@ -836,6 +843,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const LANE_DE = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'bot', sup: 'bot' };
     Cb.decidir(situacoes, { t: e.tempo, minhaLane: LANE_DE[e.eu.role] ?? null, minhaRole: e.eu.role, notas: partidaVivo.notas, silenciadas: partidaVivo.silenciadas }, partidaVivo.memCerebro);
     for (const sit of situacoes) {
+      if (sit.falar && !cabeFala(sit.prioridade, e.tempo)) sit.falar = false;   // teto geral de falas/min
       const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });
       gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, nota: sit.nota, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
         contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
