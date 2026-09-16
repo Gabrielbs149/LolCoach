@@ -220,6 +220,38 @@ function wards(rgba, s, icones) {
     deles: [],
   };
 }
+/**
+ * Retângulo branco da câmera no minimapa (medido: 90×50 px a 321, linha de 2 px).
+ * Com a câmera travada ele fica centrado em você — serve de posição sua quando
+ * o seu ícone não é reconhecido. Devolve o centro normalizado ou null.
+ */
+function retanguloCamera(rgba, s) {
+  const branco = (x, y) => { const q = (y * s + x) * 4; return rgba[q] > 185 && rgba[q + 1] > 185 && rgba[q + 2] > 185 && Math.abs(rgba[q] - rgba[q + 2]) < 35; };
+  // linhas horizontais com uma sequência branca longa (≥ 0,2·s)
+  const runs = [];
+  for (let y = 0; y < s; y++) {
+    let melhor = null, ini = -1;
+    for (let x = 0; x <= s; x++) {
+      const b = x < s && branco(x, y);
+      if (b && ini < 0) ini = x;
+      if (!b && ini >= 0) { if (x - ini >= s * 0.2 && (!melhor || x - ini > melhor.n)) melhor = { x1: ini, x2: x - 1, n: x - ini }; ini = -1; }
+    }
+    if (melhor) runs.push({ y, ...melhor });
+  }
+  if (runs.length < 2) return null;
+  // par topo/base com distância parecida com a altura do retângulo (0,12–0,2·s) e mesma faixa em x
+  for (let i = 0; i < runs.length; i++) for (let j = runs.length - 1; j > i; j--) {
+    const a = runs[i], b = runs[j], h = b.y - a.y;
+    if (h < s * 0.12 || h > s * 0.2) continue;
+    if (Math.abs(a.x1 - b.x1) > 6 || Math.abs(a.x2 - b.x2) > 6) continue;
+    return { x: (a.x1 + a.x2) / 2 / s, y: (a.y + b.y) / 2 / s, w: a.n / s, h: h / s };
+  }
+  // só uma borda horizontal visível (retângulo cortado pela beira do mapa): usa a largura e chuta a altura
+  const a = runs[0];
+  if (a.n >= s * 0.24) return { x: (a.x1 + a.x2) / 2 / s, y: Math.min(1, Math.max(0, (a.y + (a.y < s / 2 ? s * 0.078 : -s * 0.078)) / s)), w: a.n / s, h: 0.156, cortado: true };
+  return null;
+}
+let camTravada = { ok: 0, n: 0 }, ultimaCam = null;
 function wavesPorLane(rgba, s, d) {
   const ehRed = (r, g, b) => r > 120 && r > g * 1.7 && r > b * 1.5, ehAzul = (r, g, b) => b > 140 && b > r * 1.8 && b > g * 1.25 && g < 170;
   const raio = Math.max(3, Math.round(d * 0.25));
@@ -415,6 +447,14 @@ async function quadro() {
       const t = await template(meuCampeao, d);
       if (t) { const p = procurar(m, rgba, s, t, 'eu', agora, rodada % 4 === 0); if (p) eu = p; }
     }
+    // Câmera travada? Enquanto o ícone aparece, mede se o retângulo fica em cima dele.
+    // Se sim (≥ 70% das vezes), o retângulo vira a sua posição quando o ícone some.
+    if (rodada % 3 === 0) {
+      const cam = retanguloCamera(rgba, s);
+      if (cam && eu) { camTravada.n++; if (Math.hypot(cam.x - eu.x, cam.y - eu.y) < 0.05) camTravada.ok++; if (camTravada.n > 60) { camTravada.n = 40; camTravada.ok = Math.round(camTravada.ok * 40 / 61); } }
+      if (cam && !eu && camTravada.n >= 10 && camTravada.ok / camTravada.n >= 0.7) eu = { x: cam.x, y: cam.y, score: 0, fonte: 'camera' };
+      ultimaCam = cam;
+    } else if (!eu && ultimaCam && camTravada.n >= 10 && camTravada.ok / camTravada.n >= 0.7) eu = { x: ultimaCam.x, y: ultimaCam.y, score: 0, fonte: 'camera' };
     // inimigos vivos: quem está sendo seguido é procurado em volta de onde
     // estava; quem não, nas manchas vermelhas e — um por quadro, em rodízio —
     // no minimapa inteiro (garantia pra quem joga sem anel vermelho).
@@ -484,7 +524,7 @@ async function quadro() {
     enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, wards: wardsVistas, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
-      log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
+      log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · eu ${eu ? (eu.fonte === 'camera' ? 'câmera' : 'ícone') : 'não'} (câmera travada ${camTravada.n ? Math.round(100 * camTravada.ok / camTravada.n) + '%' : '?'}) · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
       melhoresDoQuadro.clear();
     }
     if (!TESTE && agora - ultimaFoto > 30000 && fotos < 40) {
