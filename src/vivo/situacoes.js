@@ -164,7 +164,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       for (const o of objetivos) if ((o.vivo || o.em <= 45) && dist(jg.ultimo, pitDe(o.nome)) < 0.09) situ(`jg-obj-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`Jungler deles no ${o.nome}.`, cooldown: 40 });
       if (l.lane === 'jungle' && l.lado === 'nosso') situ('jg-nossa-jungle', { tipo: 'jungler', prioridade: 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}. Camps em risco.`, cooldown: 45 });
       else if (l.lane === 'base') situ('jg-base', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F('Jungler deles na base. Uns 40 segundos livres.'), cooldown: 60 });
-      else if (mudou && !alvo && !primeira && t - (mundo.ditas.get('jg-em') ?? -99) >= 12 && mundo.ditas.set('jg-em', t)) situ(`jg-em-${l.chave}`, { tipo: 'jungler', prioridade: 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}.`, cooldown: 20 });
+      else if (mudou && !alvo && !primeira && t - (mundo.ditas.get('jg-em') ?? -99) >= 12 && mundo.ditas.set('jg-em', t)) situ(`jg-em-${l.chave}`, { tipo: 'jungler', prioridade: l.lane === 'jungle' && l.lado === 'deles' ? 0 : 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}.`, cooldown: 20 });
       if (t > 180 && minhaPos && seg(dist(jg.ultimo, minhaPos)) >= 25 && minhaLane && minhaLane !== 'jungle') situ('jg-lado-livre', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles ${l.texto}, longe. Seu lado livre por uns ${seg(dist(jg.ultimo, minhaPos))} segundos.`, cooldown: 75 });
       // pra quem é jungle: o lado da jungle dele que está livre pra invadir
       if (minhaLane === 'jungle' && t > 150) {
@@ -243,7 +243,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       // avançado demais no nosso lado
       if (l.lado === 'nosso' && ['top', 'mid', 'bot'].includes(l.lane) && dist(f.ultimo, minhaBase) < 0.42 && (!jg || !visivel(jg, t) || dist(jg.ultimo, f.ultimo) > 0.25)) situ(`avancado-${f.nome}`, { tipo: 'oportunidade', prioridade: 0, modulo: 'mapa', serio: F`${f.campeao} avançado demais no ${l.lane}. Chama o jungler.`, cooldown: 60 });
       // lane swap (duo deles no top, ou top deles no bot) nos primeiros 8 min
-      if (t < 480 && ((f.role === 'adc' && l.lane === 'top') || (f.role === 'top' && l.lane === 'bot'))) situ('lane-swap', { tipo: 'lane', prioridade: 2, modulo: 'lane', serio: F`Lane swap: ${f.campeao} no ${l.lane}.`, cooldown: 300 });
+      const trocado = (role, lane) => fIni.some((g) => g.role === role && visivel(g, t) && g.regiao?.lane === lane);
+      if (t >= 90 && t < 480 && ((f.role === 'adc' && l.lane === 'top' && trocado('top', 'bot')) || (f.role === 'top' && l.lane === 'bot' && trocado('adc', 'top')))) situ('lane-swap', { tipo: 'lane', prioridade: 2, modulo: 'lane', serio: F`Lane swap: ${f.campeao} no ${l.lane}.`, cooldown: 300 });
     } else if (!f.morto) {
       const ha = vistoHa(f, t);
       if (ha >= 30 && ha < 32 && laneDele && laneDele !== 'jungle' && f.regiao?.lane === laneDele && laneDele !== minhaLane) situ(`sumiu-${f.nome}`, { tipo: 'roam', prioridade: laneDele === 'mid' || f.role === 'sup' ? 2 : 1, modulo: 'mapa', serio: F`${f.campeao} sumiu do ${laneDele}. Cuidado com roam.`, cooldown: 90 });
@@ -358,8 +359,11 @@ export function processar(mundo, leitura, estado, objetivos = []) {
 
   /* ============================================ 4. você */
   if (minhaPos) {
-    const perto = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 8);
-    if (perto.length >= 2) situ('perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`${perto.length} deles a menos de 8 segundos de você.`, divertido: F`${perto.length} deles vindo te buscar. Sai.`, cooldown: 20, dados: { quem: perto.map((f) => f.campeao) } });
+    const pertoTodos = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 8);
+    const minhaRegiao = lugar(minhaPos.x, minhaPos.y, meuTime);
+    const esperado = (f) => minhaLane && minhaLane !== 'jungle' && LANE_DE[f.role] === minhaLane && minhaRegiao.lane === minhaLane;   // oponente de lane, na lane
+    const perto = pertoTodos.length >= 3 ? pertoTodos : pertoTodos.filter((f) => !esperado(f));
+    if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) situ('perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: perto.length >= 2 ? F`${perto.length} deles a menos de 8 segundos de você.` : F`${perto[0].campeao} a menos de 8 segundos de você, com o ${pertoTodos.find((f) => f !== perto[0]).campeao}.`, divertido: F`${pertoTodos.length} deles vindo te buscar. Sai.`, cooldown: 30, dados: { quem: pertoTodos.map((f) => f.campeao) } });
     const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
     if (vidaPct < 0.35 && perto.length) situ('vida-baixa-vindo', { tipo: 'perigo', prioridade: 3, modulo: 'kills', serio: F`Vida baixa e ${perto[0].campeao} vindo. Sai.`, cooldown: 20 });
     if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 120) situ('na-frente-sem-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 60 });
@@ -415,7 +419,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     const naNossa = fIni.filter((f) => visivel(f, t) && f.regiao?.lado === 'nosso' && f.regiao.lane === 'jungle');
     if (naNossa.length >= 2) { mundo.invadeDito = true; situ('invade', { tipo: 'perigo', prioridade: 3, modulo: 'jungler', serio: F`Invade! ${naNossa.length} deles na nossa jungle.`, divertido: F`INVADE! ${naNossa.length} deles na nossa jungle, acorda!`, cooldown: 1 }); }
     const cheese = fIni.filter((f) => visivel(f, t) && f.regiao?.lado === 'nosso' && ['top', 'mid', 'bot'].includes(f.regiao.lane));
-    if (cheese.length && t < 80) situ('cheese', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${cheese[0].campeao} já no nosso ${cheese[0].regiao.lane} aos ${mmss(t)}.`, cooldown: 120 });
+    if (cheese.length && t >= 40 && t < 80) situ('cheese', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${cheese[0].campeao} já no nosso ${cheese[0].regiao.lane} aos ${mmss(t)}.`, cooldown: 120 });
   }
 
   /* ============================================ 8. fechar */
