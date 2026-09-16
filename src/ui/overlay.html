@@ -78,6 +78,8 @@ function jgLinha(d){
   const prev = pg ? `<div class="jg" style="font-size:11px;color:var(--fraco)"><span></span><span>gank previsto: <b>${esc(pg.lane)}</b> ${mmss(pg.de)}–${mmss(pg.ate)}</span></div>` : '';
   return `<div class="jg ${cls}">${icone(jg.campeao)}<span>Jungler <b>${esc(onde)}</b></span><span class="ha">${v.ha <= 3 ? 'agora' : `há ${v.ha}s`}</span></div>${prev}${timersLinha}`;
 }
+// Olho cego: outra janela na frente do jogo (o olho lê a tela, não o jogo)
+function linhaCego(d){ return d.olho?.cego ? `<div class="jg perigo"><span></span><span>Olho cego: <b>janela na frente do jogo</b></span></div>` : ''; }
 function desenhar(d){
   const hud = document.getElementById('hud');
   if(!d.emJogo){ hud.classList.add('oculto'); return; }
@@ -99,7 +101,7 @@ function desenhar(d){
   hud.innerHTML = `<div class="topo">${icone(eu.campeao)}<span class="t">${mmss(e.tempo)}</span>
       <span class="kda">${eu.kills}/${eu.mortes}/${eu.assists}<span>${eu.cs ?? 0} cs</span></span></div>
     <div class="objs">${objs}</div>
-    ${jgLinha(d)}
+    ${linhaCego(d)}${jgLinha(d)}
     <div class="cab"><span>Inimigos${(() => { const n = (d.inimigos ?? []).filter(j => !j.morto && (!j.visto || j.visto.ha > 15)).length; return n >= 2 ? ` · <em style="font-style:normal;color:var(--g2)">${n} sumidos</em>` : ''; })()}</span><span>flash</span></div>
     ${inis}
     ${mostraFala ? `<div class="fala u${ultimaFala.prioridade ?? 1}">${esc(ultimaFala.serio)}</div>` : (urgente ? `<div class="fala u3">${esc(urgente.titulo)}</div>` : '')}`;

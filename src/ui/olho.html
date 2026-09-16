@@ -438,11 +438,11 @@ async function quadro() {
     // dois ícones no mesmo lugar: fica o de maior score
     const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));
     rodada++;
-    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves });
     // Cego: minimapa calibrado mas nada reconhecido (nem eu, nem aliados) por 15 s → outra janela na frente do jogo?
     if (aliados.length >= 3 && vistosAli.length < 2) fracoDesde ||= agora; else fracoDesde = 0;
     if (!eu && !vistosAli.length && !limpos.length) { cegoDesde ||= agora; if (agora - cegoDesde > 15000 && agora - cegoAvisado > 60000) { cegoAvisado = agora; log('cego há 15 s: nada reconhecido no minimapa (outra janela na frente do jogo?)'); } }
     else cegoDesde = 0;
+    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
       log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);

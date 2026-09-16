@@ -663,6 +663,17 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     partidaVivo.olho = { ...dados, recebidoEm: Date.now() };
     if (dados.calib && (!antes?.calib || antes.calib.s !== dados.calib.s)) log(`olho: minimapa ${dados.calib.s}px (score ${dados.calib.score})${dados.escala ? `, ícone ${dados.escala.d}px` : ''}`);
     if (!dados.calib && antes?.calib !== null && Date.now() - partidaVivo.olhoLog > 30000) { partidaVivo.olhoLog = Date.now(); log('olho: não achei o minimapa (jogo em tela cheia exclusiva? overlay por cima?)'); }
+    // Cego (nada reconhecido há 15 s+ com o minimapa achado, depois de 1:00 de jogo): avisa uma vez por episódio
+    const eAgora = partidaVivo.ultimoEstado;
+    const cegoAgora = !!dados.calib && (dados.cego ?? 0) >= 15 && (eAgora?.tempo ?? 0) > 60;
+    if (cegoAgora && !partidaVivo.cegoAvisado) {
+      partidaVivo.cegoAvisado = true;
+      partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: eAgora.tempo, modulo: 'mapa', prioridade: 2, serio: F`Olho cego: tem janela na frente do jogo.`, divertido: F`Olho cego: tira a janela da frente do jogo.` }));
+      log('olho: cego — avisei');
+    } else if (!cegoAgora && partidaVivo.cegoAvisado && (dados.vistos?.length || dados.aliados?.length || dados.eu)) {
+      partidaVivo.cegoAvisado = false;
+      log('olho: voltou a enxergar');
+    }
     // O mundo: posições, direções, quem sumiu → situações (todas gravadas,
     // parte falada). É a matéria-prima pra depois aprender o que vale falar.
     const S = await import('./vivo/situacoes.js');
@@ -716,7 +727,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       gankPrevisto: pg && !pg.dito && (estado?.tempo ?? 0) < pg.ate + 30 ? { lane: pg.lane, de: pg.de, ate: pg.ate } : null,
       // buffs e camps deles vistos com o jungler: quando renascem
       timers: [...(partidaVivo.mundo?.buffs ?? []).map((b) => ({ nome: b.nome === 'red' ? 'Red deles' : 'Azul deles', em: b.em + 300 })), ...(partidaVivo.mundo?.camps ?? []).map((c) => ({ nome: `${c.nome} deles`, em: c.em + 135 }))].filter((x) => x.em - (estado?.tempo ?? 0) > -20 && x.em - (estado?.tempo ?? 0) < 300).map((x) => ({ nome: x.nome, em: Math.round(x.em - (estado?.tempo ?? 0)) })),
-      eu: o.eu ?? null,
+      eu: o.eu ?? null, cego: !!o.calib && (o.cego ?? 0) >= 15,
       vistos: (o.vistos ?? []).map((v) => ({ campeao: v.campeao, x: v.x, y: v.y })),
       ha: Math.round((Date.now() - o.recebidoEm) / 1000) };
   }
