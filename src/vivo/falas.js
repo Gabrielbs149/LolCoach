@@ -92,7 +92,11 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
         dizer(`jgmorreu-${e.id}`, 'jungler', F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, 2);
       }
     }
-    if (e.tipo === 'Ace') dizer(`ace-${e.id}`, 'kills', ehAliado(e.autor) ? F('Ace. Barão ou torre agora.') : F('Levamos ace. Defende a base.'), ehAliado(e.autor) ? F('Ace. Vai pro Barão.') : F('Levamos ace. Segura a base.'), 3);
+    if (e.tipo === 'Ace') {
+      // No Ace a API manda o TIME (ORDER/CHAOS), não um jogador.
+      const aceNosso = e.autor === 'ORDER' ? eu.time === 100 : e.autor === 'CHAOS' ? eu.time === 200 : ehAliado(e.autor);
+      dizer(`ace-${e.id}`, 'kills', aceNosso ? F('Ace. Barão ou torre agora.') : F('Levamos ace. Defende a base.'), aceNosso ? F('Ace. Vai pro Barão.') : F('Levamos ace. Segura a base.'), 3);
+    }
 
     if (e.tipo === 'DragonKill') {
       const nosso = ehAliado(e.autor);
@@ -111,8 +115,11 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
     if (e.tipo === 'TurretKilled' && e.torre) {
       const m = String(e.torre).match(/Turret_T(\d)_([LRC])_(\d\d)/);
       const nossa = m && Number(m[1]) === (eu.time === 100 ? 1 : 2);
-      const lane = m ? ({ L: 'top', C: 'mid', R: 'bot' })[m[2]] : '';
-      const inib = m && m[3] === '01';
+      // Letras são do ponto de vista de cada base: pro time vermelho (T2) L é o bot e R é o top.
+      const lane = m ? (m[1] === '2' ? { L: 'bot', C: 'mid', R: 'top' } : { L: 'top', C: 'mid', R: 'bot' })[m[2]] : '';
+      const inib = m && ((m[2] === 'C' && m[3] === '03') || (m[2] !== 'C' && m[3] === '01'));
+      const nexus = m && m[2] === 'C' && (m[3] === '01' || m[3] === '02');
+      if (nexus) continue;
       if (nossa) dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? 3 : 1);
       else dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, 2);
     }

@@ -72,15 +72,26 @@ export async function lerEstado() {
   }));
 
   const eu = jogadores.find((j) => j.souEu) ?? null;
+  // Nos eventos a Riot escreve o nome de um jeito (só o gameName, ou o
+  // summonerName antigo) e em allPlayers de outro (riotId "nome#tag"). Sem
+  // igualar os dois, "quem pegou o dragão" nunca bate com ninguém do time.
+  const apelidos = new Map();
+  for (const p of bruto.allPlayers) {
+    const canon = p.riotId ?? p.summonerName;
+    for (const a of [p.riotId, p.summonerName, p.riotIdGameName, String(p.riotId ?? '').split('#')[0], String(p.summonerName ?? '').split('#')[0]]) {
+      if (a) apelidos.set(String(a).trim().toLowerCase(), canon);
+    }
+  }
+  const canonico = (n) => (n == null ? null : (apelidos.get(String(n).trim().toLowerCase()) ?? n));
   const eventos = (bruto.events?.Events ?? []).map((e) => ({
     id: e.EventID,
     tipo: e.EventName,
     t: e.EventTime ?? 0,
-    autor: e.KillerName ?? e.Recipient ?? e.Acer ?? null,
-    vitima: e.VictimName ?? null,
+    autor: canonico(e.KillerName ?? e.Recipient ?? e.Acer ?? null),
+    vitima: canonico(e.VictimName ?? null),
     // Quem ajudou na kill também estava lá — é o que permite dizer onde o
     // jungler inimigo apareceu por último sem ler posição de ninguém.
-    assistentes: Array.isArray(e.Assisters) ? e.Assisters : [],
+    assistentes: Array.isArray(e.Assisters) ? e.Assisters.map(canonico) : [],
     dragao: e.DragonType ?? null,
     torre: e.TurretKilled ?? null,
     roubado: e.Stolen === 'True',
