@@ -269,6 +269,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const pastas = (await readdir(pastaSituacoes()).catch(() => [])).sort();
     for (const p of pastas.slice(0, Math.max(0, pastas.length - 30))) for (const arq of ['leituras.jsonl', 'estado.jsonl']) await rm(resolve(pastaSituacoes(), p, arq), { force: true }).catch(() => {});
   }, 10 * 60_000).unref?.();
+  // Admin: faxina no repositório de controle (partidas/ do flash compartilhado) uma vez por dia
+  if (config.admin === true) setTimeout(async () => {
+    if (!tokenControle()) return;
+    const n = await Controle.faxinaPartidas(tokenControle(), 2).catch(() => 0);
+    if (n) log(`controle: ${n} partida(s) velha(s) apagada(s)`);
+  }, 15 * 60_000).unref?.();
   // Partidas gravadas antes disso existir: confere uma vez, aos poucos, depois de abrir
   setTimeout(async () => {
     for (const p of (await readdir(pastaSituacoes()).catch(() => []))) {

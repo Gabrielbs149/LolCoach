@@ -106,6 +106,22 @@ export async function listarAvaliacoes(token) {
   return todas.filter(Array.isArray).flat();
 }
 
+/** Apaga partidas/<gameId>.json (flash compartilhado) com mais de `dias` dias — só o admin roda. */
+export async function faxinaPartidas(token, dias = 2) {
+  const lista = await pedir(token, 'GET', 'partidas');
+  if (!Array.isArray(lista)) return 0;
+  let n = 0;
+  for (const f of lista.filter((x) => x.name.endsWith('.json'))) {
+    const a = await lerArquivo(token, `partidas/${f.name}`).catch(() => null);
+    const em = Object.values(a?.dados?.flashes ?? {}).map((x) => Date.parse(x.em)).filter(Boolean);
+    const ultimo = em.length ? Math.max(...em) : 0;
+    if (Date.now() - ultimo < dias * 86_400_000) continue;
+    await pedir(token, 'DELETE', `partidas/${f.name}`, { message: 'faxina', sha: a?.sha ?? f.sha }).catch(() => {});
+    n++;
+  }
+  return n;
+}
+
 /** Todos os check-ins, um por instalação. */
 export async function listarUsuarios(token) {
   const lista = await pedir(token, 'GET', 'usuarios');

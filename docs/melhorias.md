@@ -64,3 +64,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.65 — "Suas mortes" mostra o que a voz avisou nos 25 s antes de cada morte (só prioridade 2+ de jungler/mapa) e o resumo "N de M com aviso da voz antes" — pra ver se o app está avisando a tempo ou ficando mudo.
 - v2.28.66 — Janela ao vivo, depois da partida: cartão "Última partida de X" com falas/situações, previsões certas, mortes (com aviso antes, jungler sumido, avançado) — por 3 h, até a próxima.
 - v2.28.67 — Overlay: 2 min antes do dragão/barão (e enquanto ele está no mapa) mostra "Dragão em 1:30: ward no pit" ou, em vermelho, "sem ward no pit" (lido do minimapa).
+- v2.28.68 — Faxina no repositório de controle: o admin apaga partidas/<gameId>.json (flash compartilhado) com mais de 2 dias, 15 min depois de abrir. Testado agora contra o repo.
