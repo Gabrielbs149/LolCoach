@@ -848,7 +848,13 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const pastas = (await readdir(resolve(pastaBase(), 'dados', 'olho')).catch(() => [])).sort();
     for (const velha of pastas.slice(0, -6)) await rm(resolve(pastaBase(), 'dados', 'olho', velha), { recursive: true, force: true }).catch(() => {});
   }
+  // Erro dentro do olho (bug em situações/cérebro) não pode sumir em silêncio: vai pro registro, 1x por 30 s
+  let erroOlhoEm = 0;
   async function receberOlho(dados) {
+    try { await receberOlhoInterno(dados); }
+    catch (erro) { if (Date.now() - erroOlhoEm > 30_000) { erroOlhoEm = Date.now(); log(`olho: erro ao processar: ${erro.stack?.split('\n').slice(0, 2).join(' ← ') ?? erro.message}`); } }
+  }
+  async function receberOlhoInterno(dados) {
     if (dados?.erro) { log(`olho: ${dados.erro}`); return; }
     if (!partidaVivo?.ultimoEstado) return;
     if (!partidaVivo.memOlho) {

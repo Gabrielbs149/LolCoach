@@ -74,3 +74,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.75 — Admin → Situações: tabela com todas as partidas gravadas (falas/min, faladas/situações, previsões certas %, 👍/👎); clicar abre a partida. Janela de conferência das previsões: 40 s pro jungler, 45 s pra roam.
 - v2.28.76 — Eventos da partida (kills, torres, dragões, barão…) gravados inteiros em eventos.jsonl; o replay usa pros timers de objetivo (antes ficava no padrão).
 - v2.28.77 — "Suas mortes" com eventos.jsonl: hora exata da morte e quem matou ("Morte 3: por Xin Zhao · no bot…"); sem eventos (partidas antigas) continua pelo placar de 5 em 5 s.
+- v2.28.78 — Erro dentro do processamento do olho (situações/cérebro) ia pro nada (promessa sem catch); agora vai pro registro, 1× por 30 s, com a linha do erro.

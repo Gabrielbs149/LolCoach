@@ -152,7 +152,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       if (req.method === 'POST' && url.pathname === '/api/olho' && acoes.olho) {
         const pedacos = [];
         for await (const p of req) pedacos.push(p);
-        try { acoes.olho(JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}')); } catch { /* leitura torta */ }
+        try { Promise.resolve(acoes.olho(JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}'))).catch(() => {}); } catch { /* leitura torta */ }
         return enviar(200, 'application/json', '{"ok":true}');
       }
 
