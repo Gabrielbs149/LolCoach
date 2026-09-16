@@ -490,13 +490,20 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const rota = ROTA_DA_TECLA[Number(posicao) - 1];
     const alvo = nome ? inimigos.find((j) => j.nome === nome || j.campeao === nome) : (inimigos.find((j) => j.role === rota) ?? inimigos[Number(posicao) - 1]);
     if (!alvo) throw new Error('inimigo não achado');
+    // Aceleração de feitiço: bota da Ionia (+12) e Percepção Cósmica (+18, se
+    // ele tem a árvore Inspiração — a API só mostra a árvore, não a runa; assume
+    // que tem, porque errar pra menos é pior: o flash volta ANTES do avisado).
     const temIonia = (alvo.itens ?? []).some((i) => i.id === IONIA);
-    const volta = e.tempo + (temIonia ? 268 : 300);
-    partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
+    const temInspiracao = [alvo.runas?.primaria, alvo.runas?.secundaria].some((a) => /inspira/i.test(a ?? ''));
+    const haste = (temIonia ? 12 : 0) + (temInspiracao ? 18 : 0);
+    const cd = Math.round(300 / (1 + haste / 100));
+    const volta = e.tempo + cd;
+    const cdTxt = `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}`;
+    partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
     partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
-      serio: F`Flash do ${alvo.campeao} marcado. Volta em ${temIonia ? 'quatro e meio' : 'cinco'} minutos.`,
-      divertido: F`${alvo.campeao} sem flash. Cinco minutos de temporada de caça.` }));
-    log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')}`);
+      serio: F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
+      divertido: F`${alvo.campeao} sem flash por ${cdTxt}.` }));
+    log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')} (volta em ${cdTxt}: ionia ${temIonia ? 'sim' : 'não'}, inspiração ${temInspiracao ? 'sim' : 'não'})`);
     return { ok: true, campeao: alvo.campeao, volta };
   }
   /**
@@ -565,8 +572,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       vistos: (o.vistos ?? []).map((v) => ({ campeao: v.campeao, x: v.x, y: v.y })),
       ha: Math.round((Date.now() - o.recebidoEm) / 1000) };
   }
+  /** Aceleração de feitiço de um jogador agora (bota da Ionia + árvore Inspiração). */
+  const hasteDe = (j) => ((j.itens ?? []).some((i) => i.id === IONIA) ? 12 : 0) + ([j.runas?.primaria, j.runas?.secundaria].some((x) => /inspira/i.test(x ?? '')) ? 18 : 0);
   function falasDeFlash(tempo) {
     const novas = [];
+    // Comprou a bota depois de marcar? O tempo de volta acompanha.
+    for (const f of partidaVivo.flashes.values()) {
+      const j = partidaVivo.ultimoEstado?.jogadores.find((x) => x.nome === f.nomeJogador);
+      if (j) f.volta = f.usadoEm + Math.round(300 / (1 + hasteDe(j) / 100));
+    }
     for (const f of partidaVivo.flashes.values()) {
       const em = f.volta - tempo;
       if (!f.avisado60 && em <= 60 && em > 0) { f.avisado60 = true; novas.push({ modulo: 'flash', prioridade: 1, serio: F`Flash do ${f.campeao} volta em um minuto.`, divertido: F`Um minuto e o ${f.campeao} tem flash de novo. Aproveita agora.` }); }

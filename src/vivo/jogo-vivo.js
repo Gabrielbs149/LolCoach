@@ -68,6 +68,7 @@ export async function lerEstado() {
     itens: (p.items ?? []).map((i) => ({ id: i.itemID, nome: i.displayName, preco: i.price })),
     spells: [p.summonerSpells?.summonerSpellOne?.displayName, p.summonerSpells?.summonerSpellTwo?.displayName]
       .filter(Boolean),
+    runas: { pedra: p.runes?.keystone?.displayName ?? null, primaria: p.runes?.primaryRuneTree?.displayName ?? null, secundaria: p.runes?.secondaryRuneTree?.displayName ?? null },
     souEu: achaEu(p),
   }));
 
