@@ -9,6 +9,7 @@
  */
 
 import { F } from './texto.js';
+import { nomeItem } from './itens-nomes.js';
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const ROLE_FALA = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'ADC', sup: 'suporte' };
@@ -152,7 +153,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
           mem.meusItens.add(it.id);
           const prox = b.ordem.find((x) => !tenho.has(x.id));
           const cedo = tempo < 8 * 60 && b.principais?.[0]?.id === it.id;
-          dizer(`item-${it.id}`, 'economia', F`${it.nome} fechado.${prox ? ` Próximo: ${prox.nome}.` : ''}`, F`${it.nome} fechado.${prox ? ` Próximo: ${prox.nome}.` : ''}`, 1);
+          dizer(`item-${it.id}`, 'economia', F`${nomeItem(it.id, it.nome)} fechado.${prox ? ` Próximo: ${nomeItem(prox.id, prox.nome)}.` : ''}`, F`${nomeItem(it.id, it.nome)} fechado.${prox ? ` Próximo: ${nomeItem(prox.id, prox.nome)}.` : ''}`, 1);
         }
       }
       const prox = b.ordem.find((x) => !tenho.has(x.id));
@@ -165,8 +166,12 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   if (rival && tempo >= 360 && tempo % 180 < 8) {
     const k = Math.floor(tempo / 180);
     const vant = (eu.nivel - rival.nivel) + (eu.cs - rival.cs) / 25 + (eu.kills - rival.kills) * 0.7 - (eu.mortes - rival.mortes) * 0.5;
-    if (vant >= 2) dizer(`rival-${k}`, 'lane', F`Você está na frente do ${rival.campeao}.`, F`Você está na frente do ${rival.campeao}.`, 1);
-    else if (vant <= -2) dizer(`rival-${k}`, 'lane', F`${rival.campeao} está na frente. Não força trade.`, F`${rival.campeao} está na frente. Não força trade.`, 1);
+    const patamar = vant >= 4 ? 2 : vant >= 2 ? 1 : vant <= -4 ? -2 : vant <= -2 ? -1 : 0;
+    if (patamar !== (mem.rivalPatamar ?? 0)) {
+      mem.rivalPatamar = patamar;
+      if (patamar > 0) dizer(`rival-${k}`, 'lane', F`Você está na frente do ${rival.campeao}.`, F`Você está na frente do ${rival.campeao}.`, 1);
+      else if (patamar < 0) dizer(`rival-${k}`, 'lane', F`${rival.campeao} está na frente. Não força trade.`, F`${rival.campeao} está na frente. Não força trade.`, 1);
+    }
   }
   const itensRival = rival ? (rival.itens ?? []).filter((i) => i.preco >= 2000).length : 0;
   if (rival && itensRival >= 2) dizer(`rival-itens-${itensRival}`, 'spikes', F`${rival.campeao} fechou o ${itensRival}º item.`, F`${rival.campeao} fechou o ${itensRival}º item.`, 2);
@@ -200,13 +205,15 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   }
 
   /* ---- inimigo fedado ---- */
-  const forte = inimigos.find((j) => j.kills >= 5 && j.kills >= j.mortes * 2);
+  const forte = inimigos.find((j) => j.kills >= 5 && j.kills >= j.mortes * 2 && (j.kills - 5) % 3 === 0);
   if (forte) dizer(`forte-${forte.nome}-${forte.kills}`, 'kills', F`${forte.campeao} está ${forte.kills} a ${forte.mortes}. Não vai sozinho nele.`, F`${forte.campeao} fedado: ${forte.kills} a ${forte.mortes}. Não vai sozinho.`, 2);
 
   /* ---- economia ---- */
   const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
-  if (!eu.morto && eu.ouro >= 1000 && vidaPct < 0.4) dizer(`base-${Math.floor(tempo / 45)}`, 'economia', F('Vida baixa e gold sobrando. Base.'), F('Vida baixa e gold sobrando. Base.'), 2);
-  else if (!eu.morto && eu.ouro >= 2000 && !jaFalouDoGold) dizer(`gold-${Math.floor(tempo / 240)}`, 'economia', F`${eu.ouro} de gold parado.`, F`${eu.ouro} de gold parado.`, 1);
+  if (!eu.morto && eu.ouro >= 1000 && vidaPct < 0.4 && !(mem.vidaBaixaAntes) && tempo - (mem.baseDito ?? -999) > 120) { mem.baseDito = tempo; dizer(`base-${Math.floor(tempo)}`, 'economia', F('Vida baixa e gold sobrando. Base.'), F('Vida baixa e gold sobrando. Base.'), 2); }
+  const vidaBaixaAgora = !eu.morto && vidaPct < 0.4;
+  if (!vidaBaixaAgora && !eu.morto && eu.ouro >= 2000 && !jaFalouDoGold) dizer(`gold-${Math.floor(tempo / 240)}`, 'economia', F`${eu.ouro} de gold parado.`, F`${eu.ouro} de gold parado.`, 1);
+  mem.vidaBaixaAntes = vidaBaixaAgora;
 
   /* ---- estado do jogo ---- */
   const nossosKills = aliados.reduce((s, j) => s + j.kills, 0), delesKills = inimigos.reduce((s, j) => s + j.kills, 0);

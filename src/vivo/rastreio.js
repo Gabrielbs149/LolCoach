@@ -1,3 +1,4 @@
+import { nomeItem as apelido } from './itens-nomes.js';
 /**
  * Onde cada inimigo foi visto por último — só pelo que é público.
  *
@@ -106,7 +107,7 @@ export function rastrear(estado, mem) {
     if (antes) {
       for (const id of agora) {
         if (antes.has(id) || !ITENS_QUE_MUDAM.has(id)) continue;
-        const nomeItem = j.itens.find((i) => i.id === id)?.nome ?? ITENS_QUE_MUDAM.get(id);
+        const nomeItem = apelido(id, j.itens.find((i) => i.id === id)?.nome ?? ITENS_QUE_MUDAM.get(id));
         novos.push({
           t: tempo, chave: `item-${j.nome}-${id}`, urgencia: j.role === eu.role || j.role === 'jungle' ? 2 : 1,
           titulo: `${j.campeao} fechou ${nomeItem}`,
