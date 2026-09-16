@@ -17,3 +17,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.16 — Situação "zona onde você morre muito": pega do banco (últimas 60 partidas na sua rota) quantas mortes por jogo em cada zona; se você entra numa zona com 0,5+ mortes/jogo, fora da sua lane e com o jungler deles sumido, avisa (uma vez a cada 4 min). Testado: npm test.
 - v2.28.17 — Aprendizado v0: tipo de situação com 3+ 👎 e nenhum 👍 nas suas avaliações deixa de ser falado (continua gravado); aparece como "silenciada" no Resumo por tipo. Testado: npm test.
 - v2.28.18 — Voz: fala urgente (prioridade 3 — "Recua!", "Dive vindo", "Eles no Barão") fura a fila e corta o que está tocando. Testado: sintaxe.
+- v2.28.19 — "Jungler deles nasce em N segundos" (respawn pela API) — janela pra sair da jungle dele/terminar o objetivo. Testado: npm test.

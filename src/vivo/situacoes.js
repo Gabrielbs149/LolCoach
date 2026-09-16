@@ -171,6 +171,11 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     // buffs deles renascendo
     for (const b of mundo.buffs) if (!b.avisado && t >= b.em + 270) { b.avisado = true; situ(`buff-nasce-${b.nome}-${b.em}`, { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`${b.nome === 'red' ? 'Red' : 'Azul'} deles nasce em 30 segundos.`, cooldown: 1 }); }
   }
+  // jungler deles prestes a nascer (a API dá o tempo de respawn)
+  if (jg) {
+    const jj = estado.jogadores.find((x) => x.nome === jg.nome);
+    if (jj?.morto && jj.renasceEm > 0 && jj.renasceEm <= 10) situ(`jg-nasce-${Math.floor(t / 30)}`, { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles nasce em ${Math.round(jj.renasceEm)} segundos.`, cooldown: 25 });
+  }
   // lado do jungler pela chegada do duo deles (leash)
   if (!mundo.duo.dito && t >= 95 && t < 200) {
     const duo = fIni.filter((f) => f.role === 'adc' || f.role === 'sup');
