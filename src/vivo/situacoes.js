@@ -376,6 +376,15 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     const alVis = fAli.filter((f) => visivel(f, t));
     const grupo = alVis.filter((f) => alVis.filter((g) => dist(f.ultimo, g.ultimo) < 0.14).length >= 3);
     if (grupo.length >= 3 && minhaPos && grupo.every((f) => dist(f.ultimo, minhaPos) > 0.3) && t > 900) situ('time-agrupou', { tipo: 'aliado', prioridade: 1, modulo: 'mapa', serio: F`Time agrupou ${lugarTxt(grupo[0].ultimo)} e você longe.`, cooldown: 90 });
+    // aliado avançado no lado deles com o jungler deles perto dele (ou sumido) — vale pra quem faz call / pro jungler
+    for (const f of alVis) {
+      if (f.nome === eu.nome || !LANE_DE[f.role] || LANE_DE[f.role] === 'jungle') continue;
+      const l = lugar(f.ultimo.x, f.ultimo.y, meuTime);
+      if (l.lado !== 'deles' || !['top', 'mid', 'bot'].includes(l.lane) || dist(f.ultimo, baseDeles) > 0.42) continue;
+      const jgPerto = !!(jg && visivel(jg, t) && seg(dist(jg.ultimo, f.ultimo)) <= 12);
+      const jgSumido = !!(jg && vistoHa(jg, t) > 25);
+      if (jgPerto || jgSumido) situ(`aliado-avancado-${f.nome}`, { tipo: 'aliado', prioridade: minhaLane === 'jungle' && jgPerto ? 2 : 0, modulo: 'mapa', serio: jgPerto ? F`${f.campeao} avançado no ${l.lane} com o jungler deles perto.` : F`${f.campeao} avançado no ${l.lane} e o jungler deles sumido.`, cooldown: 60, dados: { lane: l.lane, jgPerto } });
+    }
     for (const f of alVis) {
       const outros = alVis.filter((g) => g !== f);
       if (t > 900 && outros.length >= 3 && outros.every((g) => dist(g.ultimo, f.ultimo) > 0.35) && fIni.filter((g) => visivel(g, t) && dist(g.ultimo, f.ultimo) < 0.15).length >= 2) situ(`aliado-sozinho-${f.nome}`, { tipo: 'aliado', prioridade: 1, modulo: 'mapa', serio: F`${f.campeao} sozinho com ${fIni.filter((g) => visivel(g, t) && dist(g.ultimo, f.ultimo) < 0.15).length} deles em cima.`, cooldown: 60 });
