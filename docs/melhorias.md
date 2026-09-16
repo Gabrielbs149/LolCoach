@@ -23,3 +23,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.22 — Overlay: "gank previsto: bot 3:10–3:40" embaixo da linha do jungler, até ele aparecer. Testado: sintaxe + npm test.
 - v2.28.23 — "Jinx e Nami sumiu da lane e o jungler deles também. Recua." quando seus oponentes somem da lane (12–60 s) com o jungler sumido e você avançado. Testado: npm test.
 - v2.28.24 — Partida gravada ganha o gameId (da sessão do client); a tela de detalhe da partida mostra a seção "Minimapa" com o que a voz falou naquela partida (tempo, texto, prioridade). Testado: sintaxe + npm test.
+- v2.28.25 — Anti-spam do minimapa: além de 1 fala a cada 4 s, no máximo 8 por minuto (urgentes sempre passam); o resto fica só gravado. Testado: npm test.

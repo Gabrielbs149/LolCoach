@@ -34,7 +34,7 @@ const pitDe = (nome) => (nome === 'Dragão' || nome === 'Ancião' ? PONTOS.draga
 export function novoMundo() {
   return {
     inicio: Date.now(), campeoes: new Map(), leituras: 0, ultimaLeituraT: 0,
-    ditas: new Map(), ultimaFalaEm: 0, buffs: [], ganksPorLane: new Map(), invadeDito: false,
+    ditas: new Map(), ultimaFalaEm: 0, faladasEm: [], buffs: [], ganksPorLane: new Map(), invadeDito: false,
     duo: { primeiraVezNaLane: null, dito: false }, lanesLivres: new Map(), snapshotEm: 0, waves: {}, camps: [],
   };
 }
@@ -382,11 +382,13 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   }
 
   // Controle de spam: no máximo uma fala a cada 4 s, a não ser prioridade 3.
+  // Controle de spam: no máximo uma fala a cada 4 s e 8 por minuto (prioridade 3 sempre passa).
   const saida = [];
+  mundo.faladasEm = mundo.faladasEm.filter((x) => t - x < 60);
   for (const s of novas.sort((a, b) => b.prioridade - a.prioridade)) {
-    if (s.prioridade < 3 && t - mundo.ultimaFalaEm < 4) { s.falar = false; saida.push(s); continue; }
     if (s.prioridade === 0) s.falar = false;   // só registro
-    if (s.falar) mundo.ultimaFalaEm = t;
+    else if (s.prioridade < 3 && (t - mundo.ultimaFalaEm < 4 || mundo.faladasEm.length >= 8)) s.falar = false;
+    if (s.falar) { mundo.ultimaFalaEm = t; mundo.faladasEm.push(t); }
     saida.push(s);
   }
   return saida;
