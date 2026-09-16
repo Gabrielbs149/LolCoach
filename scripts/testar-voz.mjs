@@ -10,6 +10,7 @@ import { lugar } from '../src/vivo/olho.js';
 import { novoMundo, processar } from '../src/vivo/situacoes.js';
 import { render, catalogo } from '../src/vivo/texto.js';
 import { pronunciar } from '../src/vivo/pronuncia.js';
+import { decidir, novaMemoriaCerebro } from '../src/vivo/cerebro.js';
 
 let falhas = 0;
 const ok = (cond, msg) => { if (!cond) { falhas++; console.log('  ✗', msg); } else console.log('  ✓', msg); };
@@ -63,6 +64,20 @@ console.log('situações do olho');
   ok(textos.some((t) => /Deve aparecer no bot/.test(t)), 'previsão do primeiro gank');
   ok(textos.some((t) => /a \d+ segundos de você/.test(t)), 'distância em segundos');
   ok(textos.some((t) => /Dragão em 60 segundos|no Dragão, que nasce/.test(t)) || true, 'armando objetivo (opcional)');
+}
+
+console.log('cérebro');
+{
+  const mem = novaMemoriaCerebro();
+  const lote = (t) => Array.from({ length: 8 }, (_, i) => ({ chave: `jg-em-x${i}`, tipo: 'jungler', prioridade: 2, dados: {}, falar: true }));
+  const r1 = decidir(lote(100), { t: 100, minhaLane: 'mid', notas: new Map(), silenciadas: new Set() }, mem);
+  ok(r1.filter((x) => x.falar).length <= 1, 'mesmo instante: no máximo uma fala (gap de 6 s)');
+  let total = 0; for (let t = 110; t < 170; t += 6) total += decidir([{ chave: 'roam-a-top', tipo: 'roam', prioridade: 2, dados: { lane: 'top' }, falar: true }], { t, minhaLane: 'mid', notas: new Map(), silenciadas: new Set() }, mem).filter((x) => x.falar).length;
+  ok(total <= 5, `orçamento por minuto respeitado (${total} faladas)`);
+  const r3 = decidir([{ chave: 'jg-vindo', tipo: 'jungler', prioridade: 3, dados: {}, falar: true }], { t: 171, minhaLane: 'mid', notas: new Map(), silenciadas: new Set() }, novaMemoriaCerebro());
+  ok(r3[0].falar && r3[0].nota >= 3, 'urgente passa');
+  const r4 = decidir([{ chave: 'roam-b-mid', tipo: 'roam', prioridade: 1, dados: { lane: 'mid' }, falar: true }], { t: 200, minhaLane: 'mid', notas: new Map(), silenciadas: new Set() }, novaMemoriaCerebro());
+  ok(r4[0].falar, 'minha lane ganha ponto e passa da régua');
 }
 
 console.log('pronúncia');

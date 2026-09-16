@@ -465,7 +465,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /** Pasta da partida em dados/situacoes: criada na primeira leitura, com o elenco. */
   async function garantirPastaSitu(e) {
     if (!partidaVivo || partidaVivo.pastaSitu) return;
-    resumoInterno().then((r) => { partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
+    resumoInterno().then((r) => { partidaVivo.notas = new Map(r.tipos.map((t) => [t.chave, { bom: t.bom, ruim: t.ruim }])); partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
     partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
     await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
     const gameId = await lcu.get('/lol-gameflow/v1/session').then((s) => s?.gameData?.gameId ?? null).catch(() => null);
@@ -493,7 +493,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
     if (!partidaVivo || estado.tempo < partidaVivo.memoria.ultimoTempo - 5) {
       const { novaMemoriaFalas } = await import('./vivo/falas.js');
-      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null, extras: null, montandoExtras: null, olho: null, memOlho: null, olhoLog: 0, mundo: null, pastaSitu: null, ultimoInstantaneo: 0 };
+      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null, extras: null, montandoExtras: null, olho: null, memOlho: null, olhoLog: 0, mundo: null, pastaSitu: null, ultimoInstantaneo: 0, memCerebro: null, notas: null };
     }
 
     // Extras da voz (build, tipo de dano deles, quem está de main): uma vez
@@ -651,11 +651,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null, waves: dados.waves ?? null, mortesZona: partidaVivo.mortesZona }, e, objs);
     const gravar = (arquivo, obj) => appendFile(resolve(partidaVivo.pastaSitu, arquivo), JSON.stringify(obj) + '\n').catch(() => {});
+    const Cb = await import('./vivo/cerebro.js');
+    partidaVivo.memCerebro ??= Cb.novaMemoriaCerebro();
+    const LANE_DE = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'bot', sup: 'bot' };
+    Cb.decidir(situacoes, { t: e.tempo, minhaLane: LANE_DE[e.eu.role] ?? null, minhaRole: e.eu.role, notas: partidaVivo.notas, silenciadas: partidaVivo.silenciadas }, partidaVivo.memCerebro);
     for (const sit of situacoes) {
       const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });
-      gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
+      gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, nota: sit.nota, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
         contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
-      if (sit.falar && partidaVivo.silenciadas?.has(baseChave(sit.chave))) sit.falar = false;
       if (sit.falar) partidaVivo.falas.push(pronta);
       const cs = (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() });
       cs.total++; if (sit.falar) cs.faladas++; cs.porTipo.set(sit.tipo, (cs.porTipo.get(sit.tipo) ?? 0) + 1);

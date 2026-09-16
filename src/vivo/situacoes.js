@@ -398,16 +398,9 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   }
 
   // Controle de spam: no máximo uma fala a cada 4 s, a não ser prioridade 3.
-  // Controle de spam: no máximo uma fala a cada 6 s e 5 por minuto (prioridade 3 sempre passa).
-  const saida = [];
-  mundo.faladasEm = mundo.faladasEm.filter((x) => t - x < 60);
-  for (const s of novas.sort((a, b) => b.prioridade - a.prioridade)) {
-    if (s.prioridade === 0) s.falar = false;   // só registro
-    else if (s.prioridade < 3 && (t - mundo.ultimaFalaEm < 6 || mundo.faladasEm.length >= 5)) s.falar = false;
-    if (s.falar) { mundo.ultimaFalaEm = t; mundo.faladasEm.push(t); }
-    saida.push(s);
-  }
-  return saida;
+  // Quem decide o que é falado é o cérebro (cerebro.js); aqui só marca o que é registro puro.
+  for (const s of novas) if (s.prioridade === 0) s.falar = false;
+  return novas;
 }
 
 /** Foto do mundo pra gravar (1x por segundo): posições e idades. */
