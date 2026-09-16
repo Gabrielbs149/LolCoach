@@ -425,6 +425,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     },
   });
   let seqFalas = 0;
+  let ultimoResumo = null;   // da última partida, pra janela ao vivo mostrar enquanto espera a próxima
 
   /* ------------------------------------------------------------- coleta */
   let coletando = false;
@@ -471,7 +472,16 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const c = partidaVivo.contSitu;
       const top = [...c.porTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
       log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
-      if (partidaVivo.pastaSitu) conferirPrevisoes(partidaVivo.pastaSitu).catch((erro) => log(`previsões: ${erro.message}`));
+      if (partidaVivo.pastaSitu) {
+        // Resumo da partida pra janela ao vivo: mortes × avisos × previsões
+        const base = partidaVivo.pastaSitu, c2 = c;
+        conferirPrevisoes(base).catch((erro) => { log(`previsões: ${erro.message}`); return null; }).then(async (prev) => {
+          const partida = (await lerJsonl(resolve(base, 'partida.json')))[0];
+          const mortes = await mortesCruzadas(base, partida).catch(() => null);
+          ultimoResumo = { em: Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
+            situacoes: c2.total, faladas: c2.faladas, previsoes: prev, mortes: mortes ? { total: mortes.total, avisadas: mortes.avisadas, semJg: mortes.semJg, avancado: mortes.avancado } : null };
+        });
+      }
     }
     if (fase !== 'InProgress' && fase !== 'GameStart') sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };
     faseAnterior = fase;
@@ -662,7 +672,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     ]);
 
     const estado = await lerEstado();
-    if (!estado?.eu) { partidaVivo = null; return { emJogo: false, selecao: await selecaoAtual() }; }
+    if (!estado?.eu) { partidaVivo = null; return { emJogo: false, selecao: await selecaoAtual(), ultimaPartida: ultimoResumo && Date.now() - ultimoResumo.em < 3 * 3600_000 ? ultimoResumo : null }; }
 
     const role = estado.eu.role || 'geral';
     if (!perfis.has(role)) {
