@@ -73,6 +73,7 @@ function projecao(f, t, s) {
   const p = f.ultimo;
   return { x: Math.min(1, Math.max(0, p.x + v.vx * s)), y: Math.min(1, Math.max(0, p.y + v.vy * s)) };
 }
+const LUGAR_NOME = { top: 'top', mid: 'mid', bot: 'bot', barao: 'barão', dragao: 'dragão' };
 const vivo = (f) => f.ultimo && !f.morto;
 const vistoHa = (f, t) => (f.ultimo ? t - f.ultimo.t : Infinity);
 const visivel = (f, t) => vistoHa(f, t) <= 1.5;
@@ -143,6 +144,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         mundo.previsaoGank = { lane: laneGank, de: 190, ate: 220, dito: false };
       }
       else if (primeira && t < 270 && ['jungle', 'top', 'bot', 'rio'].includes(l.lane)) situ('jg-inicio', { tipo: 'jungler', prioridade: 3, modulo: 'jungler', serio: F`Jungler deles ${l.texto} aos ${mmss(t)}. Começou ${jg.ultimo.x + jg.ultimo.y < 1 ? 'embaixo' : 'em cima'}.`, dados: { x: jg.ultimo.x, y: jg.ultimo.y } });
+      // pra onde ele ia (usado no "sumido": "última vez no rio, indo pro top")
+      { const pr = projecao(jg, t, 12); const lr = pr ? lugar(pr.x, pr.y, meuTime) : null; jg.rumo = lr && lr.lane !== jg.regiao?.lane && ['top', 'mid', 'bot', 'barao', 'dragao'].includes(lr.lane) ? lr.lane : (jg.rumo && t - jg.ultimo.t < 1 ? jg.rumo : null); if (lr && lr.lane === jg.regiao?.lane) jg.rumo = null; }
       // buff deles: viu no buff → renasce 5 min depois
       for (const [nome, p] of Object.entries(buffsDeles)) if (dist(jg.ultimo, p) < 0.05 && !mundo.buffs.some((b) => b.nome === nome && t - b.em < 240)) { mundo.buffs.push({ nome, em: t, avisado: false }); situ(`jg-buff-${nome}-${Math.floor(t / 240)}`, { tipo: 'jungler', prioridade: 0, modulo: 'jungler', serio: F`Jungler deles no ${nome} deles. Renasce às ${mmss(t + 300)}.`, cooldown: 200 }); }
       // camps deles: viu o jungler num camp → renasce 2:15 depois (só registro; fala se você é jungle)
@@ -182,7 +185,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       const ha = Math.round(vistoHa(jg, t));
       const pg = mundo.previsaoGank;
       if (pg && !pg.dito && t >= pg.de && t <= pg.ate + 30) { pg.dito = true; situ('jg-gank-previsto', { tipo: 'jungler', prioridade: pg.lane === minhaLane ? 3 : 1, modulo: 'jungler', serio: F`Hora do primeiro gank: jungler deles deve estar chegando no ${pg.lane}.`, cooldown: 1 }); }
-      if (ha >= 20 && ha <= 180 && ha - jg.sumidoDito >= 30) { jg.sumidoDito = ha; situ('jg-sumido', { tipo: 'jungler', prioridade: ha < 40 ? 1 : 2, modulo: 'jungler', serio: F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}.`, divertido: F`Cadê o jungler? ${ha} segundos sumido, última vez ${lugarTxt(jg.ultimo)}.`, cooldown: 25, dados: { ha } }); }
+      if (ha >= 20 && ha <= 180 && ha - jg.sumidoDito >= 30) { jg.sumidoDito = ha; situ('jg-sumido', { tipo: 'jungler', prioridade: ha < 40 ? 1 : 2, modulo: 'jungler', serio: jg.rumo && ha <= 60 ? F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}, indo pro ${LUGAR_NOME[jg.rumo] ?? jg.rumo}.` : F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}.`, divertido: F`Cadê o jungler? ${ha} segundos sumido, última vez ${lugarTxt(jg.ultimo)}.`, cooldown: 25, dados: { ha, rumo: jg.rumo ?? null } }); }
     }
     for (const c of mundo.camps) if (!c.avisado && t >= c.em + 115) { c.avisado = true; if (minhaLane === 'jungle') situ(`camp-nasce-${c.nome}-${c.em}`, { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`${c.nome} deles nascem em 20 segundos.`, cooldown: 1 }); }
     // buffs deles renascendo

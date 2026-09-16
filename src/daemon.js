@@ -247,6 +247,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       else if ((m = s.chave.match(/^perto-(.+)$/))) { const c = campeaoDe.get(m[1]); if (c) acertou = aproximou(c, s.t, s.t + 10); }
       else if (s.chave === 'jg-vindo' && jgDeles) acertou = aproximou(jgDeles, s.t, s.t + 12);
       else if (s.chave === 'jg-inicio' && jgDeles && s.dados?.laneGank) acertou = chegouNaLane(jgDeles, s.dados.laneGank, 170, 250);
+      else if (s.chave === 'jg-sumido' && jgDeles && ['top', 'mid', 'bot'].includes(s.dados?.rumo)) acertou = chegouNaLane(jgDeles, s.dados.rumo, s.t, s.t + 45);
       else if (s.chave === 'jg-gank-previsto' && jgDeles && s.dados?.lane) acertou = chegouNaLane(jgDeles, s.dados.lane, s.t - 10, s.t + 40);
       if (acertou == null) continue;
       saida.push({ t: s.t, chave: s.chave, falada: !!s.falada, acertou });
