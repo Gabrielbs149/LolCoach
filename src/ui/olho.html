@@ -171,6 +171,56 @@ function manchasVermelhas(rgba, s, d, cor = 'vermelho') {
 }
 const d0 = () => escala?.d ?? 24;
 
+/**
+ * Onde está a wave de cada lane: minions são pontinhos vermelhos/azuis ao
+ * longo da lane. Mede, em cada lane, a posição média dos pontos de cada cor
+ * (0 = ponta da base azul, 1 = ponta da base vermelha) e devolve a frente
+ * (média das duas). Ignora ícones grandes (campeões, torres) pelo tamanho.
+ */
+const LANES_TRILHA = {
+  top: [[0.10, 0.80], [0.10, 0.12], [0.85, 0.10]],
+  mid: [[0.16, 0.84], [0.84, 0.16]],
+  bot: [[0.15, 0.90], [0.88, 0.90], [0.90, 0.20]],
+};
+function wavesPorLane(rgba, s, d) {
+  const ehRed = (r, g, b) => r > 120 && r > g * 1.7 && r > b * 1.5, ehAzul = (r, g, b) => b > 140 && b > r * 1.8 && b > g * 1.25 && g < 170;
+  const raio = Math.max(3, Math.round(d * 0.25));
+  // Máscara de ícones: célula de 6 px com muitos pixels coloridos é campeão/torre/ping, não minion.
+  const cel = 6, nc = Math.ceil(s / cel), contR = new Uint16Array(nc * nc), contA = new Uint16Array(nc * nc);
+  for (let y = 0; y < s; y++) for (let x = 0; x < s; x++) {
+    const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
+    if (ehRed(r, g, b)) contR[((y / cel) | 0) * nc + ((x / cel) | 0)]++; else if (ehAzul(r, g, b)) contA[((y / cel) | 0) * nc + ((x / cel) | 0)]++;
+  }
+  const icone = (x, y) => { const i = ((y / cel) | 0) * nc + ((x / cel) | 0); return contR[i] + contA[i] >= 12; };
+  const saida = {};
+  for (const [lane, trilha] of Object.entries(LANES_TRILHA)) {
+    // comprimento total pra parametrizar
+    const segs = []; let total = 0;
+    for (let i = 1; i < trilha.length; i++) { const L = Math.hypot(trilha[i][0] - trilha[i - 1][0], trilha[i][1] - trilha[i - 1][1]); segs.push(L); total += L; }
+    let somaR = 0, nR = 0, somaA = 0, nA = 0, acum = 0;
+    for (let i = 1; i < trilha.length; i++) {
+      const [ax, ay] = trilha[i - 1], [bx, by] = trilha[i];
+      const passos = Math.max(2, Math.round(segs[i - 1] * s / 2));
+      for (let k = 0; k <= passos; k++) {
+        const f = k / passos, u = (acum + f * segs[i - 1]) / total;
+        const cx = Math.round((ax + (bx - ax) * f) * s), cy = Math.round((ay + (by - ay) * f) * s);
+        for (let dy = -raio; dy <= raio; dy += 2) for (let dx = -raio; dx <= raio; dx += 2) {
+          const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= s || y >= s) continue;
+          const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
+          if (icone(x, y)) continue;
+          if (ehRed(r, g, b)) { somaR += u; nR++; } else if (ehAzul(r, g, b)) { somaA += u; nA++; }
+        }
+      }
+      acum += segs[i - 1];
+    }
+    // ícones grandes (campeão/torre) somam dezenas de pixels de uma vez: só conta se parecer minion (poucos pixels)
+    const frenteR = nR ? somaR / nR : null, frenteA = nA ? somaA / nA : null;
+    // frente só com as duas cores presentes (uma cor só costuma ser borda de ícone, não wave)
+    saida[lane] = { red: nR, azul: nA, frente: nR >= 6 && nA >= 6 ? (frenteR + frenteA) / 2 : null, frenteRed: frenteR, frenteAzul: frenteA };
+  }
+  return saida;
+}
+
 /* ------------------------------------------------- 2. ícones e escala */
 let porNome = new Map();                 // nome normalizado -> id
 const icones = new Map();                // id -> Image
@@ -299,6 +349,7 @@ async function quadro() {
     const m = meia(g, s, s);
     const vermelhos = manchasVermelhas(rgba, s, d0());
     const azuis = manchasVermelhas(rgba, s, d0(), 'azul');
+    const waves = rodada % 10 === 0 ? wavesPorLane(rgba, s, d0()) : null;
 
     // escala dos ícones pelo MEU ícone
     if ((!escala || (!escala.confiavel && agora - escala.em > 5000)) && meuCampeao) {
@@ -372,7 +423,7 @@ async function quadro() {
     // dois ícones no mesmo lugar: fica o de maior score
     const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));
     rodada++;
-    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu });
+    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves });
     // Cego: minimapa calibrado mas nada reconhecido (nem eu, nem aliados) por 15 s → outra janela na frente do jogo?
     if (!eu && !vistosAli.length && !limpos.length) { cegoDesde ||= agora; if (agora - cegoDesde > 15000 && agora - cegoAvisado > 60000) { cegoAvisado = agora; log('cego há 15 s: nada reconhecido no minimapa (outra janela na frente do jogo?)'); } }
     else cegoDesde = 0;
@@ -450,7 +501,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
 }
 function enviar(dados) {
   const agora = Date.now();
-  const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
+  const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.waves && Object.values(dados.waves).map((w) => Math.round((w.frente ?? -1) * 20)), dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
   if (chave === ultimoEnvio && agora - ultimoEnvioEm < 1000) return;
   ultimoEnvio = chave; ultimoEnvioEm = agora;
   if (TESTE || FINGIR) { log(`${dados.vistos.map((v) => `${v.campeao} ${v.x.toFixed(2)},${v.y.toFixed(2)} (${v.score})`).join(' · ') || 'ninguém'}${dados.eu ? ` | eu ${dados.eu.x.toFixed(2)},${dados.eu.y.toFixed(2)}` : ''}`); return; }

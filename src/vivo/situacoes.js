@@ -32,7 +32,7 @@ export function novoMundo() {
   return {
     inicio: Date.now(), campeoes: new Map(), leituras: 0, ultimaLeituraT: 0,
     ditas: new Map(), ultimaFalaEm: 0, buffs: [], ganksPorLane: new Map(), invadeDito: false,
-    duo: { primeiraVezNaLane: null, dito: false }, lanesLivres: new Map(), snapshotEm: 0,
+    duo: { primeiraVezNaLane: null, dito: false }, lanesLivres: new Map(), snapshotEm: 0, waves: {},
   };
 }
 
@@ -258,6 +258,24 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (t > 900 && recuando.length >= 4) situ('reset-deles', { tipo: 'oportunidade', prioridade: 2, modulo: 'timers', serio: F`${recuando.length} deles na base. Objetivo de graça.`, cooldown: 90 });
   }
 
+  /* ============================================ 3b. waves (minions) */
+  if (leitura.waves) {
+    mundo.wavesBruto = leitura.waves;
+    for (const [lane, w] of Object.entries(leitura.waves)) {
+      if (w.frente == null || w.red + w.azul < 6) continue;
+      // frente: 0 = base azul, 1 = base vermelha → lado de quem está
+      const noNossoLado = meuTime === 100 ? w.frente < 0.45 : w.frente > 0.55;
+      const noLadoDeles = meuTime === 100 ? w.frente > 0.55 : w.frente < 0.45;
+      const estadoWave = noNossoLado ? 'nosso' : noLadoDeles ? 'deles' : 'meio';
+      const antes = mundo.waves[lane];
+      mundo.waves[lane] = { estado: estadoWave, frente: w.frente, t };
+      if (antes?.estado === estadoWave) continue;
+      const minha = lane === minhaLane;
+      if (estadoWave === 'nosso') situ(`wave-${lane}-nosso`, { tipo: 'wave', prioridade: 0, modulo: 'lane', serio: F`Wave do ${lane} empurrada pro nosso lado.`, cooldown: 90, dados: { lane, frente: w.frente } });
+      else if (estadoWave === 'deles') situ(`wave-${lane}-deles`, { tipo: 'wave', prioridade: 0, modulo: 'lane', serio: minha ? F`Sua wave está na torre deles${jg && vistoHa(jg, t) > 15 ? ' e o jungler sumido' : ''}.` : F`Wave do ${lane} na torre deles.`, cooldown: 90, dados: { lane, frente: w.frente } });
+    }
+  }
+
   /* ============================================ 4. você */
   if (minhaPos) {
     const perto = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 8);
@@ -323,6 +341,7 @@ export function instantaneo(mundo, estado) {
   const t = estado.tempo ?? 0;
   return {
     t,
+    waves: mundo.wavesBruto ?? null,
     campeoes: [...mundo.campeoes.values()].map((f) => ({ c: f.campeao, time: f.time, role: f.role, morto: !!f.morto, x: f.ultimo?.x ?? null, y: f.ultimo?.y ?? null, ha: f.ultimo ? Math.round((t - f.ultimo.t) * 10) / 10 : null, regiao: f.regiao?.chave ?? null })),
   };
 }

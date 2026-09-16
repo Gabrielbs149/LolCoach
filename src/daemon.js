@@ -567,7 +567,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (!partidaVivo.mundo) partidaVivo.mundo = S.novoMundo();
     await garantirPastaSitu(e);
     const objs = objetivos(e);
-    const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null }, e, objs);
+    const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null, waves: dados.waves ?? null }, e, objs);
     const gravar = (arquivo, obj) => appendFile(resolve(partidaVivo.pastaSitu, arquivo), JSON.stringify(obj) + '\n').catch(() => {});
     for (const sit of situacoes) {
       const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });
