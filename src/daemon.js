@@ -258,6 +258,16 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     log(`previsões: ${certas}/${saida.length} certas (${[...porTipo].map(([k, r]) => `${k} ${r.ok}/${r.n}`).join(', ')})`);
     return { total: saida.length, certas };
   }
+  // Partidas gravadas antes disso existir: confere uma vez, aos poucos, depois de abrir
+  setTimeout(async () => {
+    for (const p of (await readdir(pastaSituacoes()).catch(() => []))) {
+      const base = resolve(pastaSituacoes(), p);
+      if ((await lerJsonl(resolve(base, 'acertos.jsonl'))).length) continue;
+      if (!(await lerJsonl(resolve(base, 'leituras.jsonl'))).length) continue;
+      await conferirPrevisoes(base).catch(() => {});
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }, 90_000).unref?.();
   /** Resumo por tipo de situação em todas as partidas gravadas: quantas, quantas faladas, 👍/👎. */
   const { baseChave } = await import('./vivo/cerebro.js');
   async function situacoesResumo() {
