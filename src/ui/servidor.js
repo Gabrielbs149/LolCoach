@@ -180,7 +180,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
       if (url.pathname === '/api/situacoes' && acoes.situacoesPartidas) {
-        try { const pasta = url.searchParams.get('pasta'); return enviar(200, 'application/json', JSON.stringify(pasta ? await acoes.situacoesDe({ pasta }) : await acoes.situacoesPartidas())); }
+        try { const pasta = url.searchParams.get('pasta'), gameId = url.searchParams.get('gameId'); return enviar(200, 'application/json', JSON.stringify(pasta || gameId ? await acoes.situacoesDe({ pasta, gameId }) : await acoes.situacoesPartidas())); }
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
       if (req.method === 'POST' && url.pathname === '/api/situacoes/avaliar' && acoes.avaliarSituacao) {

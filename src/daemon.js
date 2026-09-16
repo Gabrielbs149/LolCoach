@@ -164,8 +164,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     return saida;
   }
-  async function situacoesDe({ pasta } = {}) {
-    if (config.admin !== true) throw new Error('só pra admin');
+  async function situacoesDe({ pasta, gameId } = {}) {
+    if (gameId && !pasta) {
+      for (const p of (await readdir(pastaSituacoes()).catch(() => []))) { const info = (await lerJsonl(resolve(pastaSituacoes(), p, 'partida.json')))[0]; if (info?.gameId === Number(gameId)) { pasta = p; break; } }
+      if (!pasta) return { partida: null, situacoes: [], falas: [] };
+    } else if (config.admin !== true) throw new Error('só pra admin');
     if (!pasta || /[\\/]/.test(pasta)) throw new Error('pasta inválida');
     const base = resolve(pastaSituacoes(), pasta);
     const [partida, situacoes, falas, avaliacoes] = await Promise.all([lerJsonl(resolve(base, 'partida.json')), lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl'))]);
@@ -463,7 +466,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     resumoInterno().then((r) => { partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
     partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
     await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
-    await appendFile(resolve(partidaVivo.pastaSitu, 'partida.json'), JSON.stringify({ inicio: new Date().toISOString(), eu: e.eu, jogadores: e.jogadores.map((j) => ({ nome: j.nome, campeao: j.campeao, time: j.time, role: j.role })), modo: e.modo }) + '\n').catch(() => {});
+    const gameId = await lcu.get('/lol-gameflow/v1/session').then((s) => s?.gameData?.gameId ?? null).catch(() => null);
+    await appendFile(resolve(partidaVivo.pastaSitu, 'partida.json'), JSON.stringify({ inicio: new Date().toISOString(), gameId, eu: e.eu, jogadores: e.jogadores.map((j) => ({ nome: j.nome, campeao: j.campeao, time: j.time, role: j.role })), modo: e.modo }) + '\n').catch(() => {});
     // limpa partidas velhas (fica com 30)
     const pastas = (await readdir(resolve(pastaBase(), 'dados', 'situacoes')).catch(() => [])).sort();
     for (const velha of pastas.slice(0, -30)) await rm(resolve(pastaBase(), 'dados', 'situacoes', velha), { recursive: true, force: true }).catch(() => {});

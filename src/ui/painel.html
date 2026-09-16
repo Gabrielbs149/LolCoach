@@ -1685,6 +1685,13 @@ async function abrirPartida(gameId){
   h.push('</div>');
 
   $('#det').innerHTML = h.join('');
+  // O que o olho viu nessa partida (se foi gravada).
+  pegar('/api/situacoes?gameId=' + gameId).then((s) => {
+    if(!s?.situacoes?.length) return;
+    const mm = (t) => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+    const faladas = s.situacoes.filter(x => x.falada);
+    $('#det').insertAdjacentHTML('beforeend', `<h2>Minimapa <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${faladas.length} faladas de ${s.situacoes.length}</small></h2><div class="cartao" style="padding:6px 0">${faladas.slice(0, 60).map(x => `<div class="situ falada"><span class="t">${mm(x.t)}</span><span class="txt">${esc(x.texto)}</span><span class="p p${x.prioridade}">p${x.prioridade}</span><span></span></div>`).join('')}</div>`);
+  }).catch(() => {});
 }
 
 /* ============================================================ estatísticas */
