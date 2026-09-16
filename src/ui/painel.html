@@ -1085,24 +1085,29 @@ h2{letter-spacing:1px}
       </div>
     </div>
 
-    <h2 class="soAdmin" hidden>Voz</h2>
-    <div class="painelCfg soAdmin" hidden>
+    <h2>Voz</h2>
+    <div class="painelCfg">
       <div class="linhaCfg">
         <div class="txt"><b>Motor</b></div>
-        <select class="contaSel cfgSel" id="vMotor" onchange="vozMotor(this.value)">
+        <select class="contaSel cfgSel" id="vMotor" onchange="vozMudar()">
+          <option value="edge">Neural (internet)</option>
           <option value="windows">Windows</option>
-          <option value="elevenlabs">ElevenLabs (sua voz)</option>
         </select>
       </div>
-      <div class="linhaCfg vozEleven" hidden>
-        <div class="txt"><b>Chave do ElevenLabs</b><i id="vChaveEstado"></i></div>
-        <input class="busca" id="vChave" type="password" placeholder="sk_…" autocomplete="off" style="max-width:260px;margin:0">
-        <button class="acao" onclick="vozSalvarChave()">Salvar</button>
+      <div class="linhaCfg vozEdge">
+        <div class="txt"><b>Voz</b></div>
+        <select class="contaSel cfgSel" id="vVoz" onchange="vozMudar()"></select>
       </div>
-      <div class="linhaCfg vozEleven" hidden>
-        <div class="txt"><b>Voz</b><i id="vCota"></i></div>
-        <select class="contaSel cfgSel" id="vVoz" onchange="vozEscolher(this.value)"><option value="">carregando…</option></select>
-        <button class="acao" onclick="vozTestar(this)">Testar</button>
+      <div class="linhaCfg vozEdge">
+        <div class="txt"><b>Velocidade</b></div>
+        <select class="contaSel cfgSel" id="vRitmo" onchange="vozMudar()">
+          <option value="-10%">devagar</option>
+          <option value="0%">normal</option>
+          <option value="+5%">um pouco rápida</option>
+          <option value="+10%">rápida</option>
+          <option value="+20%">muito rápida</option>
+        </select>
+        <button class="acao" onclick="vozTestar(this)">Ouvir</button>
       </div>
       <div id="vAviso"></div>
     </div>
@@ -2822,14 +2827,16 @@ async function carregarConfig(){
 }
 
 /* ------------------------------------------------------------- voz */
-function desenharVozCfg(){
+let vozesEdge = [];
+async function desenharVozCfg(){
   const v = cfg.voz ?? {};
-  $('#vMotor').value = v.motor === 'elevenlabs' ? 'elevenlabs' : 'windows';
-  const eleven = $('#vMotor').value === 'elevenlabs';
-  document.querySelectorAll('.vozEleven').forEach(el => { el.hidden = !eleven; });
-  $('#vChaveEstado').textContent = v.temChave ? 'salva' : '';
-  $('#vChave').placeholder = v.temChave ? '••••••••••••' : 'sk_…';
-  if(eleven && v.temChave) carregarVozes(); else $('#vVoz').innerHTML = '<option value="">—</option>';
+  $('#vMotor').value = v.motor === 'windows' ? 'windows' : 'edge';
+  $('#vRitmo').value = v.ritmo || '+5%';
+  if(!vozesEdge.length){ try { vozesEdge = (await pegar('/api/voz/vozes')).vozes ?? []; } catch { vozesEdge = []; } }
+  const sel = $('#vVoz');
+  sel.innerHTML = vozesEdge.map(x => `<option value="${esc(x.id)}">${esc(x.nome)} · ${x.genero}${x.sotaque ? ` · sotaque ${x.sotaque}` : ''}</option>`).join('');
+  sel.value = vozesEdge.some(x => x.id === v.vozId) ? v.vozId : 'pt-BR-AntonioNeural';
+  document.querySelectorAll('.vozEdge').forEach(el => { el.hidden = $('#vMotor').value !== 'edge'; });
 }
 async function postConfig(corpo){
   const r = await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo) }).then(x => x.json());
@@ -2837,42 +2844,21 @@ async function postConfig(corpo){
   cfg = r; marcarSalvo();
   return r;
 }
-async function vozMotor(m){
-  await postConfig({ voz: { motor: m } }).catch(e => { $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; });
-  desenharVozCfg();
-}
-async function vozSalvarChave(){
-  const chave = $('#vChave').value.trim();
-  if(!chave) return;
+async function vozMudar(){
+  const voz = { motor: $('#vMotor').value, vozId: $('#vVoz').value, ritmo: $('#vRitmo').value };
   $('#vAviso').innerHTML = '';
-  try { await postConfig({ voz: { chave } }); $('#vChave').value = ''; desenharVozCfg(); }
-  catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
-}
-async function carregarVozes(){
-  const sel = $('#vVoz');
-  try {
-    const r = await pegar('/api/voz/vozes');
-    if(r.erro) throw new Error(r.erro);
-    sel.innerHTML = '<option value="">escolha…</option>' + r.vozes.map(v => `<option value="${esc(v.id)}" ${v.id === r.vozId ? 'selected' : ''}>${esc(v.nome)}${v.minha ? ' · sua' : ''}</option>`).join('');
-    $('#vCota').textContent = r.cota ? `${num(r.cota.usado)} / ${num(r.cota.limite)} caracteres no mês` : '';
-    $('#vAviso').innerHTML = '';
-  } catch(e){
-    sel.innerHTML = '<option value="">—</option>';
-    $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`;
-  }
-}
-async function vozEscolher(id){
-  if(!id) return;
-  await postConfig({ voz: { vozId: id } }).catch(e => { $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; });
+  try { await postConfig({ voz }); } catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
+  document.querySelectorAll('.vozEdge').forEach(el => { el.hidden = voz.motor !== 'edge'; });
 }
 let vozTesteAudio = null;
 async function vozTestar(b){
-  b.disabled = true; const antes = b.textContent; b.textContent = 'gerando…';
+  b.disabled = true; const antes = b.textContent; b.textContent = '…';
   $('#vAviso').innerHTML = '';
   try {
-    const frases = ['Jungler deles no rio do dragão. Olho nele.', 'Flash do Ezreal marcado. Volta em cinco minutos.', 'Tem gold pro Gume do Infinito. Empurra a wave e volta.'];
-    const r = await fetch('/api/voz/falar?texto=' + encodeURIComponent(frases[Math.floor(Math.random() * frases.length)]));
-    if(!r.ok){ const e = await r.json().catch(() => ({})); throw new Error(e.erro ?? 'não deu'); }
+    const frases = ['Jungler deles no rio do dragão. Olho nele.', 'Flash do Ezreal marcado. Volta em cinco minutos.', 'Tem gold pro Gume do Infinito. Empurra a wave e volta.', 'Dragão em um minuto. Ward no rio e vai junto.'];
+    const q = new URLSearchParams({ texto: frases[Math.floor(Math.random() * frases.length)], voz: $('#vVoz').value, ritmo: $('#vRitmo').value });
+    const r = await fetch('/api/voz/falar?' + q);
+    if(!r.ok){ const e = await r.json().catch(() => ({})); throw new Error(e.erro ?? 'sem internet?'); }
     const url = URL.createObjectURL(await r.blob());
     vozTesteAudio?.pause(); vozTesteAudio = new Audio(url); await vozTesteAudio.play();
   } catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
@@ -2919,7 +2905,6 @@ async function tick(){
     $('#estPatch').hidden = !mostrarPatch;
     if (mostrarPatch) $('#estPatch').textContent = `patch novo: ${pn.meus} seu${pn.meus===1?'':'s'}, ${pn.contra} contra`;
     $('#navAdmin').hidden = e.config?.admin !== true;
-    document.querySelectorAll('.soAdmin').forEach(el => { el.hidden = e.config?.admin !== true; });
     aplicarControleVisual(ctl);
     // Recado do admin: uma vez por id.
     const pp = ctl.popup;

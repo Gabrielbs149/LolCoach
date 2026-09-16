@@ -979,25 +979,20 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   const listaDeAmigos = () => (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
 
   /* ------------------------------------------------------------- voz */
-  // ElevenLabs: a voz dele (clonada lá no site). Texto entra, mp3 sai; cache em dados/voz.
-  const vozCfg = () => ({ motor: config.voz?.motor ?? 'windows', chave: config.voz?.chave ?? '', vozId: config.voz?.vozId ?? '', modelo: config.voz?.modelo || 'eleven_flash_v2_5' });
+  // Vozes neurais do Edge (grátis). Texto entra, mp3 sai; cache em dados/voz.
+  const vozCfg = () => ({ motor: config.voz?.motor ?? 'edge', vozId: config.voz?.vozId || 'pt-BR-AntonioNeural', ritmo: config.voz?.ritmo || '+5%' });
   async function vozVozes() {
-    if (config.admin !== true) throw new Error('só pra admin');
-    const { vozesEleven, cotaEleven } = await import('./vivo/voz.js');
-    const v = vozCfg();
-    if (!v.chave) throw new Error('cole a chave do ElevenLabs primeiro');
-    const [vozes, cota] = await Promise.all([vozesEleven(v.chave), cotaEleven(v.chave).catch(() => null)]);
-    return { vozes, cota, vozId: v.vozId };
+    const { VOZES } = await import('./vivo/voz.js');
+    return { vozes: VOZES, ...vozCfg() };
   }
   const vozEmAndamento = new Map();
-  async function vozFalar({ texto } = {}) {
-    const { falarEleven } = await import('./vivo/voz.js');
-    const v = vozCfg();
-    if (config.admin !== true) throw new Error('só pra admin');
-    if (v.motor !== 'elevenlabs') throw new Error('motor de voz não é o ElevenLabs');
-    const chave = `${v.vozId}|${texto}`;
+  /** `voz`/`ritmo` opcionais servem pra ouvir uma voz antes de escolher. */
+  async function vozFalar({ texto, voz, ritmo } = {}) {
+    const { falarEdge } = await import('./vivo/voz.js');
+    const v = { ...vozCfg(), ...(voz ? { vozId: voz } : {}), ...(ritmo ? { ritmo } : {}) };
+    const chave = `${v.vozId}|${v.ritmo}|${texto}`;
     if (!vozEmAndamento.has(chave)) {
-      vozEmAndamento.set(chave, falarEleven({ ...v, texto, pasta: resolve(pastaBase(), 'dados') }).finally(() => vozEmAndamento.delete(chave)));
+      vozEmAndamento.set(chave, falarEdge({ ...v, texto, pasta: resolve(pastaBase(), 'dados') }).finally(() => vozEmAndamento.delete(chave)));
     }
     return { corpo: await vozEmAndamento.get(chave), tipo: 'audio/mpeg' };
   }

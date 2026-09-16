@@ -216,9 +216,9 @@ function acharVoz(){
 }
 if ('speechSynthesis' in window) { acharVoz(); speechSynthesis.onvoiceschanged = acharVoz; }
 const filaFalas = [];
-// Motor de voz vem da Configuração: 'elevenlabs' toca mp3 do daemon; qualquer outro, voz do Windows.
-let motorVoz = 'windows';
-const lerMotor = () => fetch('/api/config').then(r => r.json()).then(c => { motorVoz = c?.admin === true && c?.voz?.motor === 'elevenlabs' && c?.voz?.temChave && c?.voz?.vozId ? 'elevenlabs' : 'windows'; }).catch(() => {});
+// Motor de voz vem da Configuração: 'edge' toca o mp3 neural do daemon; 'windows' usa a voz do sistema.
+let motorVoz = 'edge';
+const lerMotor = () => fetch('/api/config').then(r => r.json()).then(c => { motorVoz = c?.voz?.motor === 'windows' ? 'windows' : 'edge'; }).catch(() => {});
 lerMotor(); setInterval(lerMotor, 60000);
 const filaMp3 = []; let tocando = null;
 function tocarProxima(){
@@ -233,7 +233,7 @@ function tocarProxima(){
 }
 function falar(texto, forcar = false){
   if ((!voz.ligada && !forcar) || !texto) return;
-  if (motorVoz === 'elevenlabs') {
+  if (motorVoz === 'edge') {
     if (filaMp3.length >= 3) filaMp3.shift();
     filaMp3.push({ texto }); tocarProxima();
     return;
