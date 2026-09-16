@@ -233,6 +233,12 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       if (ha >= 30 && ha < 32 && laneDele && laneDele !== 'jungle' && f.regiao?.lane === laneDele && laneDele !== minhaLane) situ(`sumiu-${f.nome}`, { tipo: 'roam', prioridade: laneDele === 'mid' || f.role === 'sup' ? 2 : 1, modulo: 'mapa', serio: F`${f.campeao} sumiu do ${laneDele}. Cuidado com roam.`, cooldown: 90 });
     }
   }
+  // seus oponentes de lane sumiram (estavam na lane, some há 12 s+) e o jungler deles também: armadilha
+  if (minhaLane && minhaLane !== 'jungle' && minhaPos && t > 180) {
+    const oponentes = fIni.filter((f) => LANE_DE[f.role] === minhaLane && !f.morto && f.ultimo && f.regiao?.lane === minhaLane);
+    const somidos = oponentes.filter((f) => vistoHa(f, t) >= 12 && vistoHa(f, t) < 60);
+    if (oponentes.length && somidos.length === oponentes.length && jg && vistoHa(jg, t) > 15 && !ladoNosso(minhaPos)) situ('lane-sumiu-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${somidos.map((f) => f.campeao).join(' e ')} sumiu da lane e o jungler deles também. Recua.`, cooldown: 60 });
+  }
   // contagem de sumidos, quando você está avançado
   const sumidos = fIni.filter((f) => !f.morto && vistoHa(f, t) > 15);
   if (sumidos.length >= 3 && minhaPos && !ladoNosso(minhaPos)) situ('sumidos', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${sumidos.length} deles sumidos e você no lado deles.`, cooldown: 45, dados: { sumidos: sumidos.map((f) => f.campeao) } });

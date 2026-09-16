@@ -21,3 +21,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.20 — Quadro do objetivo um minuto antes, numa frase: "Dragão em um minuto: jungler deles no rio do dragão, 2 deles perto do pit, seu jungler a 17 segundos." Testado: simulação + npm test.
 - v2.28.21 — Pra jungle: "Jungle de baixo dele livre: ele está a 30 segundos de lá" quando o jungler deles é visto do outro lado e você chega antes. Testado: npm test.
 - v2.28.22 — Overlay: "gank previsto: bot 3:10–3:40" embaixo da linha do jungler, até ele aparecer. Testado: sintaxe + npm test.
+- v2.28.23 — "Jinx e Nami sumiu da lane e o jungler deles também. Recua." quando seus oponentes somem da lane (12–60 s) com o jungler sumido e você avançado. Testado: npm test.
