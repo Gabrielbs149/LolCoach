@@ -85,9 +85,11 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
         mem.meusKills++;
         const k = mem.meusKills;
         if (k >= 5 && k % 5 === 0) dizer(`kill-${e.id}`, 'kills', F`${k} kills. Não morre de graça.`, F`${k} kills. Segura o ego.`, 1);
+      } else if (autorJ && autorJ.time !== eu.time && autorJ.role === 'jungle' && vitimaJ?.role === 'jungle') {
+        dizer(`jg-${e.id}`, 'jungler', F`${autorJ.campeao} matou nosso jungler.`, F`${autorJ.campeao} matou nosso jungler.`, 2);
       } else if (autorJ && autorJ.time !== eu.time && autorJ.role === 'jungle' && vitimaJ?.role) {
         dizer(`jg-${e.id}`, 'jungler', F`${autorJ.campeao} matou no ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}. Lado oposto livre.`, F`${autorJ.campeao} no ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}. Outro lado livre.`, 2);
-      } else if (jgDeles && e.assistentes?.includes(jgDeles.nome) && vitimaJ && vitimaJ.time === eu.time) {
+      } else if (jgDeles && e.assistentes?.includes(jgDeles.nome) && vitimaJ && vitimaJ.time === eu.time && vitimaJ.role !== 'jungle') {
         dizer(`jg-${e.id}`, 'jungler', F`${jgDeles.campeao} gankou o ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}.`, F`${jgDeles.campeao} gankou o ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}.`, 1);
       } else if (vitimaJ && vitimaJ.time !== eu.time && vitimaJ.role === 'jungle') {
         dizer(`jgmorreu-${e.id}`, 'jungler', F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, 2);
@@ -115,13 +117,14 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
     }
     if (e.tipo === 'TurretKilled' && e.torre) {
       const m = String(e.torre).match(/Turret_T(\d)_([LRC])_(\d\d)/);
-      const nossa = m && Number(m[1]) === (eu.time === 100 ? 1 : 2);
+      const nossa = m ? Number(m[1]) === (eu.time === 100 ? 1 : 2) : !ehAliado(e.autor);
       // Letras são do ponto de vista de cada base: pro time vermelho (T2) L é o bot e R é o top.
       const lane = m ? (m[1] === '2' ? { L: 'bot', C: 'mid', R: 'top' } : { L: 'top', C: 'mid', R: 'bot' })[m[2]] : '';
       const inib = m && ((m[2] === 'C' && m[3] === '03') || (m[2] !== 'C' && m[3] === '01'));
       const nexus = m && m[2] === 'C' && (m[3] === '01' || m[3] === '02');
       if (nexus) continue;
-      if (nossa) dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? 3 : 1);
+      if (!lane) dizer(`tk-${e.id}`, 'timers', nossa ? F('Torre nossa caiu.') : F('Torre deles caiu.'), nossa ? F('Torre nossa caiu.') : F('Torre deles caiu.'), nossa ? 1 : 2);
+      else if (nossa) dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? 3 : 1);
       else dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, 2);
     }
     if (e.tipo === 'InhibKilled') dizer(`ik-${e.id}`, 'timers', ehAliado(e.autor) ? F('Inibidor deles caiu.') : F('Inibidor nosso caiu.'), ehAliado(e.autor) ? F('Inibidor deles caiu.') : F('Inibidor nosso caiu.'), 2);
@@ -178,10 +181,10 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
 
   /* ---- torres: vantagem ---- */
   const torres = eventos.filter((e) => e.tipo === 'TurretKilled' && e.torre);
-  const minhasT = torres.filter((e) => Number(String(e.torre).match(/Turret_T(\d)/)?.[1]) !== (eu.time === 100 ? 1 : 2)).length;
+  const minhasT = torres.filter((e) => { const t = String(e.torre).match(/Turret_T(\d)/)?.[1]; return t ? Number(t) !== (eu.time === 100 ? 1 : 2) : ehAliado(e.autor); }).length;
   const delasT = torres.length - minhasT;
-  if (minhasT - delasT >= 3) dizer(`torres-${minhasT - delasT}`, 'timers', F`${minhasT - delasT} torres na frente.`, F`${minhasT - delasT} torres na frente.`, 1);
-  else if (delasT - minhasT >= 3) dizer(`torres--${delasT - minhasT}`, 'timers', F`${delasT - minhasT} torres atrás.`, F`${delasT - minhasT} torres atrás.`, 1);
+  if (minhasT - delasT >= 3 && (minhasT - delasT) % 2 === 1) dizer(`torres-${minhasT - delasT}`, 'timers', F`${minhasT - delasT} torres na frente.`, F`${minhasT - delasT} torres na frente.`, 1);
+  else if (delasT - minhasT >= 3 && (delasT - minhasT) % 2 === 1) dizer(`torres--${delasT - minhasT}`, 'timers', F`${delasT - minhasT} torres atrás.`, F`${delasT - minhasT} torres atrás.`, 1);
 
   /* ---- jungler deles morto: janela ---- */
   if (jgDeles?.morto && jgDeles.renasceEm > 20) dizer(`jgbase-${Math.floor(tempo / 60)}`, 'jungler', F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, 1);
@@ -208,7 +211,8 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
   const nossosKills = aliados.reduce((s, j) => s + j.kills, 0), delesKills = inimigos.reduce((s, j) => s + j.kills, 0);
   if (tempo >= 900 && tempo < 908 && nossosKills !== delesKills) dizer('jogo-15', 'lane', F`Quinze minutos: ${nossosKills} a ${delesKills} em kills.`, F`Quinze minutos: ${nossosKills} a ${delesKills}.`, 1);
   const mortosDeles = inimigos.filter((j) => j.morto).length;
-  if (mortosDeles >= 3) dizer(`3mortos-${Math.floor(tempo / 30)}`, 'timers', F`${mortosDeles} deles mortos. Torre ou objetivo agora.`, F`${mortosDeles} deles mortos. Pega alguma coisa.`, 3);
+  if (mortosDeles >= 3 && !(mem.nMortosAntes >= 3)) dizer(`3mortos-${Math.floor(tempo)}`, 'timers', F`${mortosDeles} deles mortos. Torre ou objetivo agora.`, F`${mortosDeles} deles mortos. Pega alguma coisa.`, 3);
+  mem.nMortosAntes = mortosDeles;
   if (tempo >= 1800 && tempo < 1808 && nossosKills > delesKills + 5) dizer('fecha', 'lane', F`Trinta minutos, ${nossosKills - delesKills} kills na frente. Fecha o jogo.`, F`Trinta minutos, ${nossosKills - delesKills} kills na frente. Fecha.`, 2);
 
   void conselhos;   // os conselhos ficam na tela; a voz só fala fato.

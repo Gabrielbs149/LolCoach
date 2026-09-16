@@ -570,6 +570,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { falasNovas } = await import('./vivo/falas.js');
     partidaVivo.ultimoEstado = estado;
     await garantirPastaSitu(estado);
+    for (const ev of estado.eventos ?? []) {
+      if (ev.tipo !== 'TurretKilled' || !ev.torre || /Turret_T\d_[LRC]_\d\d/.test(ev.torre)) continue;
+      (partidaVivo.torresEstranhas ??= new Set());
+      if (!partidaVivo.torresEstranhas.has(ev.torre)) { partidaVivo.torresEstranhas.add(ev.torre); log(`torre com nome desconhecido: ${ev.torre} (por ${ev.autor})`); }
+    }
     // Retrato da API do jogo a cada 5 s (placar, itens, níveis, gold): contexto pras situações.
     if (partidaVivo.pastaSitu && Date.now() - ultimoRetrato >= 5000) {
       ultimoRetrato = Date.now();
