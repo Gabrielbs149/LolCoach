@@ -296,7 +296,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     for (const p of pastas) {
       const [situacoes, avaliacoes, acertos] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'acertos.jsonl'))]);
       const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
-      for (const a of acertos) { const k = base(a.chave); const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: '?', n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: '' }).get(k); r.previstas = (r.previstas ?? 0) + 1; if (a.acertou) r.certas = (r.certas ?? 0) + 1; }
+      // precisão só das últimas 8 partidas: as regras mudam e o passado velho não pode puxar pra baixo
+      const recente = pastas.slice().sort().slice(-8).includes(p);
+      for (const a of recente ? acertos : []) { const k = base(a.chave); const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: '?', n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: '' }).get(k); r.previstas = (r.previstas ?? 0) + 1; if (a.acertou) r.certas = (r.certas ?? 0) + 1; }
       for (const s of situacoes) {
         const k = base(s.chave);
         const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: s.tipo, n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: s.texto }).get(k);
