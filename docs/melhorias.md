@@ -26,3 +26,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.25 — Anti-spam do minimapa: além de 1 fala a cada 4 s, no máximo 8 por minuto (urgentes sempre passam); o resto fica só gravado. Testado: npm test.
 - v2.28.26 — Overlay: timers dos buffs e camps deles (vistos com o jungler) — "Red deles 2:10", "raptors deles nasceu". Testado: sintaxe + npm test.
 - v2.28.27 — Seleção de campeão útil (pedido dele: "só falava os campeões que pegaram"): tirou "Inimigo pegou X"; agora fala o jungler deles com a dica ("Lee Sin, gank forte nível 3, ward aos 2:45" — tabela de 60 junglers), o confronto do SEU campeão com cada um deles pelo op.gg ("Zed: você ganha só 44% com Ahri"), o tipo de dano do time deles com 4+ travados, e continua com ban sugerido, CC → Purificar e runas. Testado: simulação + npm test.
+- v2.28.28 — "Jungler deles a N segundos do Dragão. Cuidado com o roubo." quando o time está no objetivo e o jungler deles se aproxima (urgente). Testado: npm test.
