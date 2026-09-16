@@ -621,7 +621,20 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     await garantirPastaSitu(e);
     const objs = objetivos(e);
     (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() }).leituras++;
-    const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null, waves: dados.waves ?? null }, e, objs);
+    // Onde você mais morre nessa rota (banco, últimas 60 partidas): entra como contexto das situações.
+    if (partidaVivo.mortesZona === undefined) {
+      partidaVivo.mortesZona = null;
+      try {
+        const role = { top: 'TOP', jungle: 'JUNGLE', mid: 'MID', adc: 'ADC', sup: 'SUPORTE' }[e.eu.role] ?? null;
+        const jogos = db.prepare(`SELECT gameId FROM partidas WHERE duracaoS >= 300${role ? ' AND minhaRole = ?' : ''} ORDER BY quando DESC LIMIT 60`).all(...(role ? [role] : []));
+        if (jogos.length >= 10) {
+          const ids = jogos.map((r) => r.gameId);
+          const linhas = db.prepare(`SELECT zona, COUNT(*) n FROM achados WHERE tipo = 'morte' AND gameId IN (${ids.map(() => '?').join(',')}) GROUP BY zona`).all(...ids);
+          partidaVivo.mortesZona = { jogos: jogos.length, porZona: Object.fromEntries(linhas.map((l) => [l.zona, l.n])) };
+        }
+      } catch { /* sem banco, sem contexto */ }
+    }
+    const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null, waves: dados.waves ?? null, mortesZona: partidaVivo.mortesZona }, e, objs);
     const gravar = (arquivo, obj) => appendFile(resolve(partidaVivo.pastaSitu, arquivo), JSON.stringify(obj) + '\n').catch(() => {});
     for (const sit of situacoes) {
       const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });

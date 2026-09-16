@@ -311,6 +311,17 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (t > 1200 && aliadoMaisPerto != null && aliadoMaisPerto > 0.3 && sumidos.length >= 2) situ('isolado', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`Você isolado: aliado mais perto a ${seg(aliadoMaisPerto)} segundos, ${sumidos.length} deles sumidos.`, cooldown: 60 });
   }
 
+  /* ============================================ 4b. zona onde você morre muito (banco) */
+  if (minhaPos && leitura.mortesZona && t > 120) {
+    const ZONA_DE = { 'rio-barao': 'river de cima', 'rio-dragao': 'river de baixo', barao: 'pit do barão', dragao: 'pit do dragão', 'jg-cima-nosso': 'sua jungle de cima', 'jg-baixo-nosso': 'sua jungle de baixo', 'jg-cima-deles': 'jungle deles de cima', 'jg-baixo-deles': 'jungle deles de baixo' };
+    const l = lugar(minhaPos.x, minhaPos.y, meuTime);
+    const zona = ZONA_DE[l.chave] ?? (['top', 'mid', 'bot'].includes(l.lane) ? l.lane : null);
+    const n = zona ? leitura.mortesZona.porZona[zona] ?? 0 : 0;
+    const porJogo = n / leitura.mortesZona.jogos;
+    // só zonas fora da sua lane, com histórico ruim, e com o jungler deles sumido
+    if (zona && zona !== minhaLane && porJogo >= 0.5 && jg && vistoHa(jg, t) > 15) situ(`zona-ruim-${zona}`, { tipo: 'perigo', prioridade: 1, modulo: 'mapa', serio: F`Você morre ${porJogo.toFixed(1)} vezes por jogo aqui (${zona}) e o jungler deles está sumido.`, cooldown: 240, dados: { zona, porJogo } });
+  }
+
   /* ============================================ 5. aliados */
   if (meuJg && minhaPos && visivel(meuJg, t)) {
     const s = seg(dist(meuJg.ultimo, minhaPos));
