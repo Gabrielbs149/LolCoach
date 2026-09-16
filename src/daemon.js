@@ -672,6 +672,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const pg = partidaVivo.mundo?.previsaoGank;
     return { ligado: !velho, minimapa: !!o.calib, icone: o.escala?.d ?? null, confiavel: !!o.escala?.confiavel,
       gankPrevisto: pg && !pg.dito && (estado?.tempo ?? 0) < pg.ate + 30 ? { lane: pg.lane, de: pg.de, ate: pg.ate } : null,
+      // buffs e camps deles vistos com o jungler: quando renascem
+      timers: [...(partidaVivo.mundo?.buffs ?? []).map((b) => ({ nome: b.nome === 'red' ? 'Red deles' : 'Azul deles', em: b.em + 300 })), ...(partidaVivo.mundo?.camps ?? []).map((c) => ({ nome: `${c.nome} deles`, em: c.em + 135 }))].filter((x) => x.em - (estado?.tempo ?? 0) > -20 && x.em - (estado?.tempo ?? 0) < 300).map((x) => ({ nome: x.nome, em: Math.round(x.em - (estado?.tempo ?? 0)) })),
       eu: o.eu ?? null,
       vistos: (o.vistos ?? []).map((v) => ({ campeao: v.campeao, x: v.x, y: v.y })),
       ha: Math.round((Date.now() - o.recebidoEm) / 1000) };
