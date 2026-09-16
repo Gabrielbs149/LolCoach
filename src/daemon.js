@@ -184,8 +184,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    */
   async function mortesCruzadas(base, partida) {
     if (!partida?.eu) return null;
-    const [estados, leituras] = await Promise.all([lerJsonl(resolve(base, 'estado.jsonl')), lerJsonl(resolve(base, 'leituras.jsonl'))]);
+    const [estados, leituras, falasP] = await Promise.all([lerJsonl(resolve(base, 'estado.jsonl')), lerJsonl(resolve(base, 'leituras.jsonl')), lerJsonl(resolve(base, 'falas.jsonl'))]);
     if (!estados.length || !leituras.length) return null;
+    // o que a voz avisou nos 25 s antes de cada morte (jungler, mapa, perigo) — a voz ajudou ou ficou muda?
+    const avisosAntes = (t) => falasP.filter((f) => f.t >= t - 25 && f.t <= t - 1 && (f.prioridade ?? 1) >= 2 && ['jungler', 'mapa'].includes(f.modulo)).map((f) => ({ t: f.t, texto: f.serio }));
     const { lugar } = await import('./vivo/olho.js');
     const meuTime = partida.eu.time, meuC = partida.eu.campeao;
     const jgDeles = partida.jogadores.find((j) => j.time !== meuTime && j.role === 'jungle')?.campeao ?? null;
@@ -198,13 +200,13 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         antes = eu.m;
         // a leitura de uns 3 s antes da morte (a morte em si já tira você do mapa)
         const l = leituras.filter((x) => x.t <= e.t - 2).at(-1) ?? leituras.find((x) => x.t >= e.t - 8);
-        if (!l) { mortes.push({ n: eu.m, t: e.t }); continue; }
+        if (!l) { mortes.push({ n: eu.m, t: e.t, avisos: avisosAntes(e.t) }); continue; }
         const me = l.campeoes.find((c) => c.c === meuC && c.time === meuTime);
         const minhaPos = me?.x != null && me.ha != null && me.ha <= 6 ? { x: me.x, y: me.y } : null;
         const jg = jgDeles ? l.campeoes.find((c) => c.c === jgDeles) : null;
         const perto = minhaPos ? l.campeoes.filter((c) => c.time !== meuTime && c.x != null && c.ha != null && c.ha <= 5 && dist(c, minhaPos) < 0.16).map((c) => c.c) : [];
         const onde = minhaPos ? lugar(minhaPos.x, minhaPos.y, meuTime) : null;
-        mortes.push({ n: eu.m, t: e.t,
+        mortes.push({ n: eu.m, t: e.t, avisos: avisosAntes(e.t),
           onde: onde?.texto ?? null, avancado: onde?.lado === 'deles' && onde.lane !== 'base',
           jg: jg ? { campeao: jg.c, morto: jg.morto, ha: jg.ha, regiao: jg.regiao } : null,
           perto });
@@ -213,7 +215,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const semJg = mortes.filter((m) => m.jg && !m.jg.morto && (m.jg.ha == null || m.jg.ha >= 30)).length;
     const avancado = mortes.filter((m) => m.avancado).length;
     const emNumero = mortes.filter((m) => m.perto.length >= 2).length;
-    return { lista: mortes, total: mortes.length, semJg, avancado, emNumero };
+    const avisadas = mortes.filter((m) => m.avisos?.length).length;
+    return { lista: mortes, total: mortes.length, semJg, avancado, emNumero, avisadas };
   }
 /**
    * Auto-avaliação: situação que PREVÊ algo ("jungler indo pro bot", "Ahri
