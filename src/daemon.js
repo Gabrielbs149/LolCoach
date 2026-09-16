@@ -301,8 +301,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (a.nota === 1) r.bom++; else if (a.nota === -1) r.ruim++;
     }
     for (const p of pastas) {
-      const [situacoes, avaliacoes, acertos] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'acertos.jsonl'))]);
+      const [situacoes, avaliacoes, acertos, falasP] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'acertos.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'falas.jsonl'))]);
       const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+      for (const f of falasP) {
+        if (!f.id) continue;   // situações do olho não têm id (já contadas acima)
+        const k = base(f.id);
+        const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: 'fala:' + f.modulo, n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: f.serio }).get(k);
+        r.n++; r.faladas++;
+        const nota = notas.get(`${f.t}|${f.id}`); if (nota === 1) r.bom++; else if (nota === -1) r.ruim++;
+      }
       // precisão só das últimas 8 partidas: as regras mudam e o passado velho não pode puxar pra baixo
       const recente = pastas.slice().sort().slice(-8).includes(p);
       for (const a of recente ? acertos : []) { const k = base(a.chave); const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: '?', n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: '' }).get(k); r.previstas = (r.previstas ?? 0) + 1; if (a.acertou) r.certas = (r.certas ?? 0) + 1; }
@@ -329,7 +336,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /** Tecla no jogo: 👍/👎 na última fala do minimapa (a que acabou de sair). */
   async function avaliarUltima(nota) {
     if (![1, -1].includes(nota) || !partidaVivo?.pastaSitu) return { ok: false };
-    const ult = (partidaVivo.situacoesRecentes ?? []).filter((s) => s.falada).at(-1);
+    const ultSitu = (partidaVivo.situacoesRecentes ?? []).filter((s) => s.falada).at(-1);
+    const ultFala = partidaVivo.falas.filter((f) => f.id).at(-1);
+    let ult = ultSitu;
+    if (ultFala && (!ultSitu || ultFala.t > ultSitu.t)) ult = { t: Math.round(ultFala.t * 10) / 10, chave: ultFala.id, texto: ultFala.serio, tipo: 'fala:' + ultFala.modulo };
     if (!ult || (partidaVivo.ultimoEstado?.tempo ?? 0) - ult.t > 45) return { ok: false };   // só vale nos 45 s seguintes
     const pasta = basename(partidaVivo.pastaSitu);
     await avaliarSituacao({ pasta, chave: ult.chave, t: ult.t, nota, texto: ult.texto, tipo: ult.tipo });
@@ -611,7 +621,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     personalizarFalas(config.voz?.falas ?? {});
     const pronta = { ...f, serio: renderFala(f.serio), divertido: renderFala(f.divertido ?? f.serio) };
     // Tudo que a voz diz fica gravado junto com as situações: material pra aprender o que vale falar.
-    if (partidaVivo?.pastaSitu && pronta.seq) appendFile(resolve(partidaVivo.pastaSitu, 'falas.jsonl'), JSON.stringify({ t: Math.round((pronta.t ?? 0) * 10) / 10, modulo: pronta.modulo, prioridade: pronta.prioridade, serio: pronta.serio, divertido: pronta.divertido }) + '\n').catch(() => {});
+    if (partidaVivo?.pastaSitu && pronta.seq) appendFile(resolve(partidaVivo.pastaSitu, 'falas.jsonl'), JSON.stringify({ t: Math.round((pronta.t ?? 0) * 10) / 10, id: pronta.id ?? null, modulo: pronta.modulo, prioridade: pronta.prioridade, serio: pronta.serio, divertido: pronta.divertido }) + '\n').catch(() => {});
     return pronta;
   };
   let ultimoRetrato = 0;
@@ -700,6 +710,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         eventos: (estado.eventos ?? []).length }) + '\n').catch(() => {});
     }
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras, olho: !!partidaVivo.olho?.calib && Date.now() - partidaVivo.olho.recebidoEm < 5000 }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
+      if (f.id && partidaVivo.silenciadas?.has(baseChave(f.id))) continue;
       partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: estado.tempo }));
     }
 
