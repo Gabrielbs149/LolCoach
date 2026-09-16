@@ -502,6 +502,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * leitura da janela ao vivo.
    */
   async function receberOlho(dados) {
+    if (dados?.erro) { log(`olho: ${dados.erro}`); return; }
     if (!partidaVivo?.ultimoEstado) return;
     if (!partidaVivo.memOlho) {
       const { novaMemoriaOlho } = await import('./vivo/olho.js');

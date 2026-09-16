@@ -85,6 +85,7 @@ async function abrirCaptura() {
   await new Promise((ok) => { video.onloadedmetadata = ok; });
   await video.play().catch(() => {});
   W = video.videoWidth; H = video.videoHeight; fonte = video;
+  if (!W || !H) throw new Error('captura sem tamanho (tela cheia exclusiva?)');
   stream.getVideoTracks()[0].onended = () => { log('captura encerrada'); fonte = null; };
 }
 const ctxDe = (c) => c.getContext('2d', { willReadFrequently: true });
@@ -424,7 +425,7 @@ async function desenharFalsa(t) {
     setInterval(async () => { const r = await desenharFalsa(Date.now() - t0); window.esperado = r; }, INTERVALO);
   } else if (!FINGIR) { await lerPartida(); setInterval(lerPartida, 2000); }
   setInterval(quadro, INTERVALO);
-})().catch((erro) => log('falhou: ' + erro.message));
+})().catch((erro) => { log('falhou: ' + erro.message); if (!TESTE) fetch('/api/olho', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ erro: erro.message, t: Date.now() }) }).catch(() => {}); });
 </script>
 </body>
 </html>

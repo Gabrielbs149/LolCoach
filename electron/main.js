@@ -301,6 +301,10 @@ function abrirOlho() {
     webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
   });
   janelaOlho.loadURL(`${endereco}/olho`);
+  // O que a janela escondida diz vai pro registro do app: é a única forma de ver por que não achou o minimapa.
+  janelaOlho.webContents.on('console-message', (ev) => { const msg = String(ev?.message ?? ''); if (msg.includes('[olho]')) estado.log(msg.replace('[olho] ', 'olho: ')); });
+  janelaOlho.webContents.on('did-fail-load', (_e, code, desc) => estado.log(`olho: não carregou (${code} ${desc})`));
+  estado.log('olho: janela aberta');
   janelaOlho.on('closed', () => { janelaOlho = null; });
 }
 function fecharOlho() {
