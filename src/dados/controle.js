@@ -59,6 +59,16 @@ async function pedir(token, metodo, caminho, corpo) {
 const decodificar = (arquivo) => JSON.parse(Buffer.from(arquivo.content, 'base64').toString('utf8'));
 const codificar = (obj) => Buffer.from(JSON.stringify(obj, null, 2) + '\n', 'utf8').toString('base64');
 
+/** Lê um JSON só se mudou desde o `etag` (304 não gasta cota). Devolve { dados, sha, etag } ou { igual: true }. */
+export async function lerArquivoSeMudou(token, caminho, etag = null) {
+  const r = await fetch(`${API}/${caminho}`, { headers: { ...cabecalhos(token), ...(etag ? { 'If-None-Match': etag } : {}) }, signal: AbortSignal.timeout(15_000) });
+  if (r.status === 304) return { igual: true, etag };
+  if (r.status === 404) return null;
+  const a = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(`GitHub GET ${caminho} → HTTP ${r.status}: ${a.message ?? ''}`);
+  return { dados: decodificar(a), sha: a.sha, etag: r.headers.get('etag') };
+}
+
 /** Lê um JSON do repositório; null se não existir. */
 export async function lerArquivo(token, caminho) {
   const a = await pedir(token, 'GET', caminho);

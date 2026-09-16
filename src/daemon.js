@@ -283,6 +283,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
 
   let faseAnterior = null;
+  let sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };   // flash compartilhado (partidas/<gameId>.json)
   lcu.observar('/lol-gameflow/v1/gameflow-phase', (fase) => {
     if (fase === faseAnterior) return;
     estado?.set('fase', fase);
@@ -298,6 +299,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const top = [...c.porTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
       log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
     }
+    if (fase !== 'InProgress' && fase !== 'GameStart') sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };
     faseAnterior = fase;
   });
 
@@ -590,6 +592,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const volta = e.tempo + cd;
     const cdTxt = `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}`;
     partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
+    compartilharFlash(alvo, e).catch((erro) => log(`flash compartilhado falhou: ${erro.message}`));
     partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
       serio: F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
       divertido: F`${alvo.campeao} sem flash por ${cdTxt}.` }));
@@ -680,7 +683,54 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
   /** Aceleração de feitiço de um jogador agora (bota da Ionia + árvore Inspiração). */
   const hasteDe = (j) => ((j.itens ?? []).some((i) => i.id === IONIA) ? 12 : 0) + ([j.runas?.primaria, j.runas?.secundaria].some((x) => /inspira/i.test(x ?? '')) ? 18 : 0);
+  /**
+   * Flash compartilhado: quem marca avisa os amigos que estão na MESMA
+   * partida e no MESMO time com o app. Passa pelo repositório de controle
+   * (arquivo partidas/<gameId>.json), lido a cada 8 s com ETag — barato e
+   * sem servidor. Atraso de uns 10 s no pior caso.
+   */
+
+  async function salaDaPartida() {
+    if (!tokenControle() || !lcu.conectado) return null;
+    if (!sala.gameId) sala.gameId = await lcu.get('/lol-gameflow/v1/session').then((s) => s?.gameData?.gameId ?? null).catch(() => null);
+    return sala.gameId ? `partidas/${sala.gameId}.json` : null;
+  }
+  async function compartilharFlash(alvo, e) {
+    const caminho = await salaDaPartida(); if (!caminho) return;
+    const C = await import('./dados/controle.js');
+    const eu = estado?.instantaneo?.().conta ?? config.riot?.gameName ?? 'alguém';
+    for (let tentativa = 0; tentativa < 2; tentativa++) {
+      const atual = await C.lerArquivo(tokenControle(), caminho).catch(() => null);
+      const dados = atual?.dados ?? { flashes: {} };
+      dados.flashes[alvo.nome] = { campeao: alvo.campeao, usadoEm: Math.round(e.tempo), time: e.eu.time, por: String(eu).split('#')[0], em: new Date().toISOString() };
+      try { await C.gravarArquivo(tokenControle(), caminho, dados, `flash ${alvo.campeao}`); sala.vistos.add(`${alvo.nome}|${Math.round(e.tempo)}`); return; }
+      catch (erro) { if (tentativa) throw erro; }   // sha velho: lê de novo e tenta uma vez
+    }
+  }
+  async function receberFlashes() {
+    if (!partidaVivo?.ultimoEstado || Date.now() - sala.ultimaLeitura < 8000) return;
+    sala.ultimaLeitura = Date.now();
+    const caminho = await salaDaPartida(); if (!caminho) return;
+    const C = await import('./dados/controle.js');
+    const r = await C.lerArquivoSeMudou(tokenControle(), caminho, sala.etag).catch(() => null);
+    if (!r || r.igual) return;
+    sala.etag = r.etag;
+    const e = partidaVivo.ultimoEstado;
+    for (const [nome, f] of Object.entries(r.dados?.flashes ?? {})) {
+      const chave = `${nome}|${f.usadoEm}`;
+      if (sala.vistos.has(chave) || f.time !== e.eu.time) continue;
+      sala.vistos.add(chave);
+      const alvo = e.jogadores.find((j) => j.nome === nome); if (!alvo) continue;
+      const local = partidaVivo.flashes.get(nome);
+      if (local && Math.abs(local.usadoEm - f.usadoEm) < 20) continue;   // eu já tinha marcado
+      const cd = Math.round(300 / (1 + hasteDe(alvo) / 100));
+      partidaVivo.flashes.set(nome, { campeao: alvo.campeao, nomeJogador: nome, usadoEm: f.usadoEm, volta: f.usadoEm + cd, avisado60: false, avisadoVolta: false });
+      partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 1, serio: F`Flash do ${alvo.campeao} marcado pelo ${f.por}.`, divertido: F`${f.por} marcou o flash do ${alvo.campeao}.` }));
+      log(`flash do ${alvo.campeao} veio do ${f.por}`);
+    }
+  }
   function falasDeFlash(tempo) {
+    receberFlashes().catch(() => {});
     const novas = [];
     // Comprou a bota depois de marcar? O tempo de volta acompanha.
     for (const f of partidaVivo.flashes.values()) {
