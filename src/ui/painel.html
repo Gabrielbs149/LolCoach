@@ -1092,8 +1092,8 @@ h2{letter-spacing:1px}
       </div>
     </div>
 
-    <h2>Voz</h2>
-    <div class="painelCfg">
+    <h2 class="soAdmin" hidden>Voz</h2>
+    <div class="painelCfg soAdmin" hidden>
       <div class="linhaCfg">
         <div class="txt"><b>Motor</b></div>
         <select class="contaSel cfgSel" id="vMotor" onchange="vozMudar()">
@@ -2846,6 +2846,7 @@ async function desenharVozCfg(){
   const v = cfg.voz ?? {};
   $('#vMotor').value = v.motor === 'windows' ? 'windows' : 'edge';
   $('#vRitmo').value = v.ritmo || '+5%';
+  if(cfg.admin !== true) return;
   if(!vozesEdge.length){ try { vozesEdge = (await pegar('/api/voz/vozes')).vozes ?? []; } catch { vozesEdge = []; } }
   const sel = $('#vVoz');
   sel.innerHTML = vozesEdge.map(x => `<option value="${esc(x.id)}">${esc(x.nome)} · ${x.genero}${x.sotaque ? ` · sotaque ${x.sotaque}` : ''}</option>`).join('');
@@ -2937,6 +2938,7 @@ async function tick(){
     $('#estPatch').hidden = !mostrarPatch;
     if (mostrarPatch) $('#estPatch').textContent = `patch novo: ${pn.meus} seu${pn.meus===1?'':'s'}, ${pn.contra} contra`;
     $('#navAdmin').hidden = e.config?.admin !== true;
+    document.querySelectorAll('.soAdmin').forEach(el => { el.hidden = e.config?.admin !== true; });
     aplicarControleVisual(ctl);
     // Recado do admin: uma vez por id.
     const pp = ctl.popup;

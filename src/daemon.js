@@ -982,6 +982,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   // Vozes neurais do Edge (grátis). Texto entra, mp3 sai; cache em dados/voz.
   const vozCfg = () => ({ motor: config.voz?.motor ?? 'edge', vozId: config.voz?.vozId || 'pt-BR-AntonioNeural', ritmo: config.voz?.ritmo || '+5%' });
   async function vozVozes() {
+    if (config.admin !== true) throw new Error('só pra admin');
     const { VOZES } = await import('./vivo/voz.js');
     return { vozes: VOZES, ...vozCfg() };
   }
