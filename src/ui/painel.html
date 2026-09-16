@@ -1709,7 +1709,9 @@ async function abrirPartida(gameId){
       const resumo = [M.semJg ? `${M.semJg} de ${M.total} com o jungler deles sumido há 30 s+` : '', M.avancado ? `${M.avancado} avançado no lado deles` : '', M.emNumero ? `${M.emNumero} com 2+ deles perto` : ''].filter(Boolean).join(' · ');
       $('#det').insertAdjacentHTML('beforeend', `<h2>Suas mortes <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${esc(resumo)}</small></h2><div class="cartao" style="padding:6px 0">${M.lista.map(linha).join('')}</div>`);
     }
-    $('#det').insertAdjacentHTML('beforeend', `<h2>Minimapa <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${faladas.length} faladas de ${s.situacoes.length}</small></h2><div class="cartao" style="padding:6px 0">${faladas.slice(0, 60).map(x => `<div class="situ falada"><span class="t">${mm(x.t)}</span><span class="txt">${esc(x.texto)}</span><span class="p p${x.prioridade}">p${x.prioridade}</span><span></span></div>`).join('')}</div>`);
+    const conf = s.situacoes.filter(x => x.acertou != null), certas = conf.filter(x => x.acertou).length;
+    const marca = (x) => x.acertou == null ? '' : x.acertou ? '<span style="color:var(--vit)" title="aconteceu">✓</span>' : '<span style="color:var(--der)" title="não aconteceu">✗</span>';
+    $('#det').insertAdjacentHTML('beforeend', `<h2>Minimapa <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${faladas.length} faladas de ${s.situacoes.length}${conf.length ? ` · previsões certas ${certas}/${conf.length}` : ''}</small></h2><div class="cartao" style="padding:6px 0">${faladas.slice(0, 60).map(x => `<div class="situ falada"><span class="t">${mm(x.t)}</span><span class="txt">${esc(x.texto)}</span><span class="p p${x.prioridade}">p${x.prioridade}</span><span>${marca(x)}</span></div>`).join('')}</div>`);
   }).catch(() => {});
 }
 

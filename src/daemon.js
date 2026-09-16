@@ -171,10 +171,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     } else if (config.admin !== true) throw new Error('só pra admin');
     if (!pasta || /[\\/]/.test(pasta)) throw new Error('pasta inválida');
     const base = resolve(pastaSituacoes(), pasta);
-    const [partida, situacoes, falas, avaliacoes] = await Promise.all([lerJsonl(resolve(base, 'partida.json')), lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl'))]);
+    const [partida, situacoes, falas, avaliacoes, acertos] = await Promise.all([lerJsonl(resolve(base, 'partida.json')), lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl')), lerJsonl(resolve(base, 'acertos.jsonl'))]);
     const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+    const conferidas = new Map(acertos.map((a) => [`${a.t}|${a.chave}`, a.acertou]));
     const mortes = await mortesCruzadas(base, partida[0]).catch(() => null);
-    return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null })), falas, mortes };
+    return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null, acertou: conferidas.get(`${s.t}|${s.chave}`) ?? null })), falas, mortes };
   }
   /**
    * Pós-jogo que ensina: cada morte sua cruzada com o que o olho via na hora —
