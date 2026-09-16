@@ -16,7 +16,8 @@
     "historico": "node scripts/historico.js",
     "reprocessar": "node scripts/reprocessar.js",
     "portatil": "electron-builder --win portable",
-    "publicar": "node scripts/publicar.js"
+    "publicar": "node scripts/publicar.js",
+    "test": "node scripts/testar-voz.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",
