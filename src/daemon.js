@@ -666,12 +666,19 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
     const gameId = await lcu.get('/lol-gameflow/v1/session').then((s) => s?.gameData?.gameId ?? null).catch(() => null);
     await appendFile(resolve(partidaVivo.pastaSitu, 'partida.json'), JSON.stringify({ inicio: new Date().toISOString(), gameId, eu: e.eu, jogadores: e.jogadores.map((j) => ({ nome: j.nome, campeao: j.campeao, time: j.time, role: j.role })), modo: e.modo }) + '\n').catch(() => {});
-    // limpa partidas velhas (fica com 30)
+    // limpa: o pesado (leituras/estado) além de 30 partidas; a pasta inteira só além de 200 (situações/avaliações/acertos ensinam o cérebro)
     const pastas = (await readdir(resolve(pastaBase(), 'dados', 'situacoes')).catch(() => [])).sort();
-    for (const velha of pastas.slice(0, -30)) await rm(resolve(pastaBase(), 'dados', 'situacoes', velha), { recursive: true, force: true }).catch(() => {});
+    for (const velha of pastas.slice(0, -30)) for (const arq of ['leituras.jsonl', 'estado.jsonl']) await rm(resolve(pastaBase(), 'dados', 'situacoes', velha, arq), { force: true }).catch(() => {});
+    for (const velha of pastas.slice(0, -200)) await rm(resolve(pastaBase(), 'dados', 'situacoes', velha), { recursive: true, force: true }).catch(() => {});
   }
 
-  async function vivo() {
+  let vivoCache = { em: 0, promessa: null };
+  function vivo() {
+    if (vivoCache.promessa && Date.now() - vivoCache.em < 400) return vivoCache.promessa;
+    vivoCache = { em: Date.now(), promessa: montarVivo().catch((erro) => { vivoCache.em = 0; throw erro; }) };
+    return vivoCache.promessa;
+  }
+  async function montarVivo() {
     const [{ lerEstado }, { montarPerfil }, { montarConselhos }, { fichasDaPartida }, R] = await Promise.all([
       import('./vivo/jogo-vivo.js'), import('./vivo/perfil.js'), import('./vivo/conselhos.js'),
       import('./vivo/confronto-vivo.js'), import('./vivo/rastreio.js'),

@@ -66,3 +66,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.67 — Overlay: 2 min antes do dragão/barão (e enquanto ele está no mapa) mostra "Dragão em 1:30: ward no pit" ou, em vermelho, "sem ward no pit" (lido do minimapa).
 - v2.28.68 — Faxina no repositório de controle: o admin apaga partidas/<gameId>.json (flash compartilhado) com mais de 2 dias, 15 min depois de abrir. Testado agora contra o repo.
 - v2.28.69 — Seleção: dica de jungler pra Rumble, Twitch, Sett, Darius, Aatrox; corrigida entrada duplicada "Lillia " (com espaço) que nunca casava.
+- v2.28.70 — Fala urgente sai mais rápido: a janela ao vivo consulta a cada 700 ms em jogo (era 2 s) e o estado ao vivo é montado no máximo a cada 400 ms, compartilhado entre janela e overlay (antes cada uma montava o seu, lendo a API do jogo duas vezes). Faxina corrigida: não apaga mais a pasta inteira além de 30 partidas (só leituras/estado); situações/avaliações/acertos ficam até 200 partidas.
