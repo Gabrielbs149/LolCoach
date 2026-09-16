@@ -841,7 +841,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const Cb = await import('./vivo/cerebro.js');
     partidaVivo.memCerebro ??= Cb.novaMemoriaCerebro();
     const LANE_DE = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'bot', sup: 'bot' };
-    Cb.decidir(situacoes, { t: e.tempo, minhaLane: LANE_DE[e.eu.role] ?? null, minhaRole: e.eu.role, notas: partidaVivo.notas, silenciadas: partidaVivo.silenciadas }, partidaVivo.memCerebro);
+    Cb.decidir(situacoes, { t: e.tempo, minhaLane: LANE_DE[e.eu.role] ?? null, minhaRole: e.eu.role, morto: !!e.eu.morto, notas: partidaVivo.notas, silenciadas: partidaVivo.silenciadas }, partidaVivo.memCerebro);
     for (const sit of situacoes) {
       if (sit.falar && !cabeFala(sit.prioridade, e.tempo)) sit.falar = false;   // teto geral de falas/min
       const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });

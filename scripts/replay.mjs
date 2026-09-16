@@ -45,7 +45,7 @@ async function replay(pasta) {
       waves: l.waves ?? null, wards: l.wards ? { nossas: l.wards.nossas.map(([x, y, tipo]) => ({ x, y, tipo })), deles: [] } : null,
     };
     const situacoes = S.processar(mundo, leitura, estado, objetivos(estado));
-    Cb.decidir(situacoes, { t: l.t, minhaLane: LANE_DE[eu.role] ?? null, minhaRole: eu.role, notas: null, silenciadas: null }, mem);
+    Cb.decidir(situacoes, { t: l.t, minhaLane: LANE_DE[eu.role] ?? null, minhaRole: eu.role, morto: !!eu.morto, notas: null, silenciadas: null }, mem);
     for (const s of situacoes) {
       total++;
       const k = Cb.baseChave(s.chave);

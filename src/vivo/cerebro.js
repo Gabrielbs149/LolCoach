@@ -11,7 +11,7 @@ export function novaMemoriaCerebro() { return { faladasEm: [], ultimaFalaEm: -In
 
 /**
  * `situacoes`: as novas deste instante (com prioridade 0..3).
- * `ctx`: { t, minhaLane, minhaRole, notas: Map(baseChave → {bom, ruim}), silenciadas: Set }
+ * `ctx`: { t, minhaLane, minhaRole, morto, notas: Map(baseChave → {bom, ruim, precisao}), silenciadas: Set }
  * Marca `falar` e `nota` em cada uma e devolve a lista.
  */
 export function decidir(situacoes, ctx, mem) {
@@ -27,6 +27,8 @@ export function decidir(situacoes, ctx, mem) {
     const lane = s.dados?.lane ?? s.dados?.para ?? s.dados?.laneGank ?? s.dados?.rumo ?? null;
     if (lane && lane === minhaLane) nota += 1;
     if (['perigo'].includes(s.tipo)) nota += 0.5;
+    // morto: só objetivo/grupo interessa; o resto espera você nascer
+    if (ctx.morto && !['objetivo', 'grupo', 'aliado'].includes(s.tipo)) nota -= 1.5;
     // cedo: jungler e início valem mais; tarde: grupo e objetivo valem mais
     if (t < 600 && ['jungler'].includes(s.tipo)) nota += 0.5;
     if (t >= 900 && ['objetivo', 'grupo'].includes(s.tipo)) nota += 0.5;
