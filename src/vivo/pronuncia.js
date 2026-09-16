@@ -56,11 +56,28 @@ const GIRIAS = {
   'drake': 'drêik', 'baron': 'bâron', 'nash': 'néxi', 'proc': 'próc', 'stack': 'stéc', 'stacks': 'stécs', 'clear': 'clír', 'cs': 'cê ésse',
 };
 
+// Itens pelo apelido (itens-nomes.js) — como soam na call
+const ITENS = {
+  'BORK': 'bórk', 'GA': 'gê á', 'QSS': 'quê ésse ésse', 'LDR': 'éle dê érre', 'Kraken': 'cráken', 'Zhonya': 'zônia',
+  'Liandry': 'liândri', 'Cleaver': 'clíver', 'Shurelya': 'xurélia', 'Locket': 'lóquet', 'Youmuu': 'iumú', 'Frozen': 'frôzen',
+  'Thornmail': 'tórnmeil', 'Dead Man': 'déd mén', 'Sunfire': 'sânfáier', 'Heartsteel': 'rárt stíl', 'Guinsoo': 'guinsú',
+  'Void Staff': 'vóid stéf', 'Statikk': 'státik', 'Edge of Night': 'édje óv náit', 'Lich Bane': 'lítch bêin', 'Nashor': 'néxor',
+  'Shadowflame': 'chédou flêim', 'Riftmaker': 'rift mêiker', 'Rylai': 'rilái', 'Stormsurge': 'stórm sârdj', 'Luden': 'lúden',
+  'Sterak': 'stérak', 'Hullbreaker': 'rôl brêiker', 'Death Dance': 'déf dâns', 'Titanic': 'titânic', 'Wit': 'uít',
+  'Jak Sho': 'jék xou', 'Ardent': 'árdent', 'Zeke': 'zík', 'Knight Vow': 'náit vau', 'Moonstone': 'múnstoun', 'Warmog': 'uórmog',
+  'Hextech': 'réxtec', 'Spear of Shojin': 'spír óv xôjin', 'Sundered Sky': 'sânderd skái', 'Putrifier': 'piútrifáier',
+  'Banshee': 'bânxi', 'Randuin': 'rânduin', 'Rapid Fire': 'rápid fáier', 'Profane': 'profêin', 'Voltaic': 'voltáic',
+  'Horizon': 'roráizon', 'Malignance': 'malignâns', 'Cryptbloom': 'críptblum', 'Chempunk': 'quémpânk', 'Zephyr': 'zéfir',
+  'Hollow Radiance': 'rólou rêidians', 'Radiant Virtue': 'rêidiant vêrtchu', 'Staff of Flowing': 'stéf óv flôuin',
+  'Kaenic': 'kêinic', 'Unending Despair': 'anêndin dispér', 'Blackfire': 'blécfáier', 'Serylda': 'serílda', 'Navori': 'navóri',
+  'Mikael': 'micaél', 'Terminus': 'términus', 'Muramana': 'muramâna', 'Rabadon': 'rábadon', 'Morello': 'morélo', 'Gume': 'gúme',
+};
+
 const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 let compilado = null, compiladoDe = '';
 
 function compilar(extra) {
-  const todos = { ...CAMPEOES, ...GIRIAS, ...(extra ?? {}) };
+  const todos = { ...CAMPEOES, ...GIRIAS, ...ITENS, ...(extra ?? {}) };
   // Os mais longos primeiro: "Twisted Fate" antes de "Fate", "Lee Sin" antes de "Sin".
   const chaves = Object.keys(todos).filter((k) => k.trim() && todos[k]).sort((a, b) => b.length - a.length);
   const re = new RegExp(`(?<![\\p{L}\\p{N}])(${chaves.map(escapar).join('|')})(?![\\p{L}\\p{N}])`, 'giu');
