@@ -982,6 +982,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   // ElevenLabs: a voz dele (clonada lá no site). Texto entra, mp3 sai; cache em dados/voz.
   const vozCfg = () => ({ motor: config.voz?.motor ?? 'windows', chave: config.voz?.chave ?? '', vozId: config.voz?.vozId ?? '', modelo: config.voz?.modelo || 'eleven_flash_v2_5' });
   async function vozVozes() {
+    if (config.admin !== true) throw new Error('só pra admin');
     const { vozesEleven, cotaEleven } = await import('./vivo/voz.js');
     const v = vozCfg();
     if (!v.chave) throw new Error('cole a chave do ElevenLabs primeiro');
@@ -992,6 +993,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   async function vozFalar({ texto } = {}) {
     const { falarEleven } = await import('./vivo/voz.js');
     const v = vozCfg();
+    if (config.admin !== true) throw new Error('só pra admin');
     if (v.motor !== 'elevenlabs') throw new Error('motor de voz não é o ElevenLabs');
     const chave = `${v.vozId}|${texto}`;
     if (!vozEmAndamento.has(chave)) {

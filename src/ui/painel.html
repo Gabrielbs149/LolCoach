@@ -1085,8 +1085,8 @@ h2{letter-spacing:1px}
       </div>
     </div>
 
-    <h2>Voz</h2>
-    <div class="painelCfg">
+    <h2 class="soAdmin" hidden>Voz</h2>
+    <div class="painelCfg soAdmin" hidden>
       <div class="linhaCfg">
         <div class="txt"><b>Motor</b></div>
         <select class="contaSel cfgSel" id="vMotor" onchange="vozMotor(this.value)">
@@ -2919,6 +2919,7 @@ async function tick(){
     $('#estPatch').hidden = !mostrarPatch;
     if (mostrarPatch) $('#estPatch').textContent = `patch novo: ${pn.meus} seu${pn.meus===1?'':'s'}, ${pn.contra} contra`;
     $('#navAdmin').hidden = e.config?.admin !== true;
+    document.querySelectorAll('.soAdmin').forEach(el => { el.hidden = e.config?.admin !== true; });
     aplicarControleVisual(ctl);
     // Recado do admin: uma vez por id.
     const pp = ctl.popup;

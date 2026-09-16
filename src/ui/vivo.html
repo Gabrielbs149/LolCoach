@@ -218,7 +218,7 @@ if ('speechSynthesis' in window) { acharVoz(); speechSynthesis.onvoiceschanged =
 const filaFalas = [];
 // Motor de voz vem da Configuração: 'elevenlabs' toca mp3 do daemon; qualquer outro, voz do Windows.
 let motorVoz = 'windows';
-const lerMotor = () => fetch('/api/config').then(r => r.json()).then(c => { motorVoz = c?.voz?.motor === 'elevenlabs' && c?.voz?.temChave && c?.voz?.vozId ? 'elevenlabs' : 'windows'; }).catch(() => {});
+const lerMotor = () => fetch('/api/config').then(r => r.json()).then(c => { motorVoz = c?.admin === true && c?.voz?.motor === 'elevenlabs' && c?.voz?.temChave && c?.voz?.vozId ? 'elevenlabs' : 'windows'; }).catch(() => {});
 lerMotor(); setInterval(lerMotor, 60000);
 const filaMp3 = []; let tocando = null;
 function tocarProxima(){
