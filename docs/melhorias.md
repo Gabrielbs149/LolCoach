@@ -9,3 +9,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.8 — Situações novas: "Dragão/Barão livre: jungler deles morto por N s / a N s do pit"; timers dos camps deles (viu o jungler no camp → "raptors deles nascem em 20 s", falado só pra quem é jungle; posições dos camps aproximadas). Testado: simulação.
 - v2.28.9 — Janela ao vivo: seção "Minimapa" com as últimas 10 situações (as não faladas em cinza). Overlay: "N sumidos" ao lado de Inimigos quando 2+ estão sem ser vistos há 15 s. Testado: sintaxe.
 - v2.28.10 — Admin → Situações → "Resumo por tipo": tabela com quantas vezes cada situação aconteceu em todas as partidas gravadas, quantas foram faladas e os 👍/👎 — a primeira visão pra decidir o que falar. Testado: sintaxe.
+- v2.28.11 — Modo divertido: variantes pras 12 situações principais do minimapa (jungler começou/vindo/em cima/indo/sumido, dive, roam, furtivo, invade, perigo perto, flanco, seu jungler). Testado: sintaxe.
