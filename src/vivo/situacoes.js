@@ -59,10 +59,12 @@ function verVisto(f, v, t) {
 }
 /** Velocidade (mapa/s) pelas leituras dos últimos 3 s. */
 function velocidade(f, t) {
-  const h = f.hist.filter((p) => t - p.t <= 3.5);
-  if (h.length < 2) return null;
+  const h = f.hist.filter((p) => t - p.t <= 4);
+  if (h.length < 4) return null;
   const a = h[0], b = h[h.length - 1], dt = b.t - a.t;
-  if (dt < 0.8) return null;
+  if (dt < 2.5) return null;
+  // trajetória tem que ser coerente: os pontos do meio perto da reta a→b
+  for (const q of h) { const u = ((q.x - a.x) * (b.x - a.x) + (q.y - a.y) * (b.y - a.y)) / (dist(a, b) ** 2 || 1); const px = a.x + (b.x - a.x) * u, py = a.y + (b.y - a.y) * u; if (dist(q, { x: px, y: py }) > 0.05) return null; }
   return { vx: (b.x - a.x) / dt, vy: (b.y - a.y) / dt, mod: dist(a, b) / dt };
 }
 /** Onde estará daqui a `s` segundos, se continuar. */
@@ -117,10 +119,13 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     return s;
   };
   const lugarTxt = (p) => lugar(p.x, p.y, meuTime).texto;
-  const laneAlvo = (f) => {                         // pra onde ele vai, se for pra uma lane
-    const p = projecao(f, t, 12); if (!p) return null;
-    const l = lugar(p.x, p.y, meuTime);
-    return ['top', 'mid', 'bot'].includes(l.lane) && l.lane !== f.regiao?.lane ? l : null;
+  const laneAlvo = (f) => {                         // pra onde ele vai, se for pra uma lane (duas leituras seguidas concordando)
+    const p = projecao(f, t, 12);
+    const l = p ? lugar(p.x, p.y, meuTime) : null;
+    const lane = l && ['top', 'mid', 'bot'].includes(l.lane) && l.lane !== f.regiao?.lane ? l.lane : null;
+    const ok = lane && f.alvoAntes === lane;
+    f.alvoAntes = lane;
+    return ok ? l : null;
   };
 
   /* ================================================== 1. jungler deles */
@@ -151,7 +156,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       }
       // indo pra uma lane
       const alvo = laneAlvo(jg);
-      if (alvo && !(minhaPos && seg(dist(jg.ultimo, minhaPos)) <= 12)) situ(`jg-indo-${alvo.lane}`, { tipo: 'jungler', prioridade: alvo.lane === minhaLane ? 3 : 2, modulo: 'jungler', serio: F`Jungler deles indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Recua' : ''}.`, divertido: F`Jungler deles rumo ao ${alvo.lane}${alvo.lane === minhaLane ? '. É com você, sai' : ''}.`, cooldown: 25, dados: { lane: alvo.lane } });
+      if (alvo && !(minhaPos && seg(dist(jg.ultimo, minhaPos)) <= 12)) situ(`jg-indo-${alvo.lane}`, { tipo: 'jungler', prioridade: alvo.lane === minhaLane ? 3 : 2, modulo: 'jungler', serio: F`Jungler deles indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Recua' : ''}.`, divertido: F`Jungler deles rumo ao ${alvo.lane}${alvo.lane === minhaLane ? '. É com você, sai' : ''}.`, cooldown: 40, dados: { lane: alvo.lane } });
       // objetivo / nossa jungle / base / lado livre
       for (const o of objetivos) if ((o.vivo || o.em <= 45) && dist(jg.ultimo, pitDe(o.nome)) < 0.09) situ(`jg-obj-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`Jungler deles no ${o.nome}.`, cooldown: 40 });
       if (l.lane === 'jungle' && l.lado === 'nosso') situ('jg-nossa-jungle', { tipo: 'jungler', prioridade: 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}. Camps em risco.`, cooldown: 45 });
@@ -218,19 +223,22 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (visivel(f, t)) {
       const l = f.regiao;
       // TP
-      if (f.tp === t) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: 2, modulo: 'mapa', serio: F`${f.campeao} deu TP pro ${l.lane === 'jungle' ? 'mapa' : l.lane}.`, cooldown: 60 });
+      const temTp = (estado.jogadores.find((x) => x.nome === f.nome)?.spells ?? []).some((sp) => /teleport/i.test(sp));
+      if (f.tp === t) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: temTp ? 2 : 0, modulo: 'mapa', serio: F`${f.campeao} deu TP pro ${l.lane === 'jungle' ? 'mapa' : l.lane}.`, cooldown: 60 });
       // roam em andamento: laner fora da lane dele indo pra outra
       const alvo = laneAlvo(f);
-      if (laneDele && laneDele !== 'jungle' && alvo && alvo.lane !== laneDele) situ(`roam-${f.nome}-${alvo.lane}`, { tipo: 'roam', prioridade: alvo.lane === minhaLane ? 3 : 2, modulo: 'mapa', serio: F`${f.campeao} (${laneDele}) indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Cuidado' : ''}.`, divertido: F`${f.campeao} largou o ${laneDele} e vai pro ${alvo.lane}${alvo.lane === minhaLane ? '. Presente pra você' : ''}.`, cooldown: 30, dados: { de: laneDele, para: alvo.lane } });
+      const foraDaLane = f.hist.filter((q) => t - q.t <= 3).every((q) => lugar(q.x, q.y, meuTime).lane !== laneDele);
+      if (laneDele && laneDele !== 'jungle' && alvo && alvo.lane !== laneDele && foraDaLane) situ(`roam-${f.nome}-${alvo.lane}`, { tipo: 'roam', prioridade: alvo.lane === minhaLane ? 3 : 0, modulo: 'mapa', serio: F`${f.campeao} (${laneDele}) indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Cuidado' : ''}.`, divertido: F`${f.campeao} largou o ${laneDele} e vai pro ${alvo.lane}${alvo.lane === minhaLane ? '. Presente pra você' : ''}.`, cooldown: 30, dados: { de: laneDele, para: alvo.lane } });
       // chegou no seu lado / perto de você
       if (minhaPos && laneDele !== minhaLane) {
         const s = seg(dist(f.ultimo, minhaPos));
-        if (s <= 8) situ(`perto-${f.nome}`, { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`${f.campeao} a ${s} segundos de você, ${l.texto}.`, cooldown: 20, dados: { s } });
+        const vf = velocidade(f, t), chegando = vf ? dist({ x: f.ultimo.x + vf.vx * 3, y: f.ultimo.y + vf.vy * 3 }, minhaPos) < dist(f.ultimo, minhaPos) - 0.01 : false;
+        if (s <= 8 && chegando) situ(`perto-${f.nome}`, { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`${f.campeao} a ${s} segundos de você, ${l.texto}.`, cooldown: 30, dados: { s } });
       }
       // na base → lane dele livre
       if (l.lane === 'base' && l.lado === 'deles' && laneDele && laneDele !== 'jungle') situ(`base-${f.nome}`, { tipo: 'lane', prioridade: laneDele === minhaLane ? 2 : 0, modulo: 'lane', serio: F`${f.campeao} na base. ${laneDele === minhaLane ? 'Sua lane livre por uns 30 segundos.' : `${laneDele} deles vazio.`}`, cooldown: 60 });
       // avançado demais no nosso lado
-      if (l.lado === 'nosso' && ['top', 'mid', 'bot'].includes(l.lane) && dist(f.ultimo, minhaBase) < 0.42 && (!jg || !visivel(jg, t) || dist(jg.ultimo, f.ultimo) > 0.25)) situ(`avancado-${f.nome}`, { tipo: 'oportunidade', prioridade: 1, modulo: 'mapa', serio: F`${f.campeao} avançado demais no ${l.lane}. Chama o jungler.`, cooldown: 60 });
+      if (l.lado === 'nosso' && ['top', 'mid', 'bot'].includes(l.lane) && dist(f.ultimo, minhaBase) < 0.42 && (!jg || !visivel(jg, t) || dist(jg.ultimo, f.ultimo) > 0.25)) situ(`avancado-${f.nome}`, { tipo: 'oportunidade', prioridade: 0, modulo: 'mapa', serio: F`${f.campeao} avançado demais no ${l.lane}. Chama o jungler.`, cooldown: 60 });
       // lane swap (duo deles no top, ou top deles no bot) nos primeiros 8 min
       if (t < 480 && ((f.role === 'adc' && l.lane === 'top') || (f.role === 'top' && l.lane === 'bot'))) situ('lane-swap', { tipo: 'lane', prioridade: 2, modulo: 'lane', serio: F`Lane swap: ${f.campeao} no ${l.lane}.`, cooldown: 300 });
     } else if (!f.morto) {
@@ -254,7 +262,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       if (!['top', 'bot'].includes(f.regiao?.lane)) continue;
       const outros = vis.filter((g) => g !== f);
       const longe = outros.filter((g) => dist(g.ultimo, f.ultimo) > 0.35);
-      if (outros.length >= 3 && longe.length === outros.length) situ(`split-${f.nome}`, { tipo: 'grupo', prioridade: 1, modulo: 'mapa', serio: F`${f.campeao} sozinho no ${f.regiao.lane}. Os outros ${outros.length} ${lugarTxt(outros[0].ultimo)}.`, cooldown: 60 });
+      if (outros.length >= 3 && longe.length === outros.length) situ(`split-${f.nome}`, { tipo: 'grupo', prioridade: 0, modulo: 'mapa', serio: F`${f.campeao} sozinho no ${f.regiao.lane}. Os outros ${outros.length} ${lugarTxt(outros[0].ultimo)}.`, cooldown: 60 });
     }
   }
 
@@ -292,13 +300,14 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (alVis.length >= 3) {
       const cx = alVis.reduce((s, f) => s + f.ultimo.x, 0) / alVis.length, cy = alVis.reduce((s, f) => s + f.ultimo.y, 0) / alVis.length;
       const centro = { x: cx, y: cy };
-      const pertoNosso = vis.filter((f) => dist(f.ultimo, centro) < 0.2);
+      const grupoApertado = alVis.every((f) => dist(f.ultimo, centro) < 0.14);
+      const pertoNosso = grupoApertado ? vis.filter((f) => dist(f.ultimo, centro) < 0.18) : [];
       const restoDeles = vis.filter((f) => !pertoNosso.includes(f));
       for (const f of pertoNosso) {
         if (restoDeles.length < 2) continue;
         const rc = { x: restoDeles.reduce((s, g) => s + g.ultimo.x, 0) / restoDeles.length, y: restoDeles.reduce((s, g) => s + g.ultimo.y, 0) / restoDeles.length };
         const lado = (f.ultimo.x - centro.x) * (rc.x - centro.x) + (f.ultimo.y - centro.y) * (rc.y - centro.y);
-        if (lado < 0) situ(`flanco-${f.nome}`, { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`Flanco: ${f.campeao} atrás do time.`, divertido: F`${f.campeao} por trás! Flanco.`, cooldown: 40 });
+        if (lado < 0 && pertoNosso.length >= 2) situ(`flanco-${f.nome}`, { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`Flanco: ${f.campeao} atrás do time.`, divertido: F`${f.campeao} por trás! Flanco.`, cooldown: 40 });
       }
     }
     // base sendo empurrada
@@ -389,12 +398,12 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   }
 
   // Controle de spam: no máximo uma fala a cada 4 s, a não ser prioridade 3.
-  // Controle de spam: no máximo uma fala a cada 4 s e 8 por minuto (prioridade 3 sempre passa).
+  // Controle de spam: no máximo uma fala a cada 6 s e 5 por minuto (prioridade 3 sempre passa).
   const saida = [];
   mundo.faladasEm = mundo.faladasEm.filter((x) => t - x < 60);
   for (const s of novas.sort((a, b) => b.prioridade - a.prioridade)) {
     if (s.prioridade === 0) s.falar = false;   // só registro
-    else if (s.prioridade < 3 && (t - mundo.ultimaFalaEm < 4 || mundo.faladasEm.length >= 8)) s.falar = false;
+    else if (s.prioridade < 3 && (t - mundo.ultimaFalaEm < 6 || mundo.faladasEm.length >= 5)) s.falar = false;
     if (s.falar) { mundo.ultimaFalaEm = t; mundo.faladasEm.push(t); }
     saida.push(s);
   }
