@@ -715,7 +715,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const candidatos = (config.champSelect?.picks?.[rota] ?? []).filter(Boolean);
     const chave = `${rota}|${inimigos.join(',')}|${candidatos.join(',')}`;
     if (inimigos.length && candidatos.length && tabela && selecaoCache.chave !== chave) {
-      selecaoCache = { chave, sugestao: null };
+      selecaoCache = { ...selecaoCache, chave, sugestao: null };
       const [{ confrontoContra }, { sugerirPick }] = await Promise.all([import('./dados/confrontos.js'), import('./vivo/falas.js')]);
       selecaoCache.sugestao = await sugerirPick({ candidatos, rota, inimigosIds: inimigos, confrontoContra, tabela, opcoes: { regiao: config.runas?.regiao ?? 'br' } }).catch(() => null);
     }
@@ -732,7 +732,26 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     } catch { /* sem histórico */ }
     const { falasDaSelecao } = await import('./vivo/falas.js');
     const runas = ultimasRunas && meuCampeao && ultimasRunas.campeao === meuCampeao ? ultimasRunas : null;
-    for (const f of falasDaSelecao({ rota, inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados, meuCampeao, sugestaoBan, runas }, selecaoMem)) {
+    // Contexto útil: confronto do seu campeão com cada um deles, jungler deles, tipo de dano.
+    let confrontos = [], junglerDeles = null, dano = null;
+    try {
+      const nomesIni = inimigos.map((id) => nomeDe(id)).filter(Boolean);
+      const { JUNGLERS } = await import('./vivo/junglers.js');
+      const jgNome = nomesIni.find((n) => JUNGLERS[n]);
+      if (jgNome) junglerDeles = { nome: jgNome, dica: JUNGLERS[jgNome] };
+      if (meuCampeao && inimigos.length) {
+        const chaveC = `${meuCampeao}|${rota}|${inimigos.join(',')}`;
+        if (selecaoCache.chaveConfrontos !== chaveC) {
+          const { confrontoContra } = await import('./dados/confrontos.js');
+          const lista = [];
+          for (const id of inimigos) { const c = await confrontoContra(meuCampeao, rota, id, { regiao: config.runas?.regiao ?? 'br' }).catch(() => null); if (c) lista.push({ id, campeao: nomeDe(id), taxa: c.taxa, jogos: c.jogos }); }
+          selecaoCache.chaveConfrontos = chaveC; selecaoCache.confrontos = lista;
+        }
+        confrontos = selecaoCache.confrontos ?? [];
+      }
+      if (nomesIni.length >= 4) { const X = await import('./vivo/extras.js'); dano = await X.perfilDeDano(nomesIni.map((n) => ({ campeao: n }))); }
+    } catch { /* sem contexto, segue com o básico */ }
+    for (const f of falasDaSelecao({ rota, inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados, meuCampeao, sugestaoBan, runas, confrontos, junglerDeles, dano }, selecaoMem)) {
       selecaoMem.falas.push(prontaFala({ ...f, seq: ++seqFalas }));
     }
     return {

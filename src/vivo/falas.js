@@ -256,7 +256,7 @@ const ESTILO = { 8000: 'Precisão', 8100: 'Dominação', 8200: 'Feitiçaria', 83
  * sugerido, muito CC no time deles, runas aplicadas). `mem.ditas` zera a
  * cada seleção nova.
  */
-export function falasDaSelecao({ rota, inimigos, aliados, meuCampeao, sugestaoBan, runas }, mem) {
+export function falasDaSelecao({ rota, inimigos, aliados, meuCampeao, sugestaoBan, runas, confrontos = [], junglerDeles = null, dano = null }, mem) {
   const novas = [];
   const dizer = (id, serio, divertido, prioridade = 1) => {
     if (mem.ditas.has(id)) return;
@@ -268,7 +268,20 @@ export function falasDaSelecao({ rota, inimigos, aliados, meuCampeao, sugestaoBa
     const [a, b] = sugestaoBan;
     dizer('ban', F`Ban sugerido: ${a.campeao}.${b ? ` Ou ${b.campeao}.` : ''}`, F`Ban sugerido: ${a.campeao}.${b ? ` Ou ${b.campeao}.` : ''}`, 2);
   }
-  for (const i of inimigos) if (i.nome) dizer(`ini-${i.id}`, F`Inimigo pegou ${i.nome}${i.rota ? ' ' + i.rota : ''}.`, F`Eles pegaram ${i.nome}. Anota.`, 1);
+  // Jungler deles: quem é e o que fazer contra (só se for campeão de jungle).
+  if (junglerDeles) dizer(`jg-${junglerDeles.nome}`, F`Jungler deles: ${junglerDeles.nome}, ${junglerDeles.dica}.`, F`Jungler deles é ${junglerDeles.nome}: ${junglerDeles.dica}.`, 2);
+  // Confronto do SEU campeão com cada um deles (op.gg): só o que sai do 50/50.
+  for (const c of confrontos) {
+    if (c.jogos < 30) continue;
+    const pct = Math.round(c.taxa * 100);
+    if (pct <= 46) dizer(`vs-${meuCampeao}-${c.id}`, F`${c.campeao}: você ganha só ${pct}% com ${meuCampeao}.`, F`${c.campeao} te come: ${pct}% de ${meuCampeao}.`, 2);
+    else if (pct >= 54) dizer(`vs-${meuCampeao}-${c.id}`, F`${c.campeao}: ${pct}% pra você com ${meuCampeao}.`, F`${c.campeao} é comida: ${pct}% pra você.`, 1);
+  }
+  // Time deles: AD ou AP (com 4+ travados).
+  if (dano && dano.ad + dano.ap >= 4) {
+    if (dano.ad >= 4) dizer('dano', F`Time deles: ${dano.ad} AD. Armadura.`, F`Time deles: ${dano.ad} AD. Armadura.`, 1);
+    else if (dano.ap >= 3) dizer('dano', F`Time deles: ${dano.ap} AP. Resistência mágica.`, F`Time deles: ${dano.ap} AP. Resistência mágica.`, 1);
+  }
   const cc = inimigos.filter((i) => MUITO_CC.has(i.nome)).length;
   if (cc >= 3 && ['bottom', 'middle'].includes(rota)) dizer('cc', F`${cc} campeões de CC no time deles. Purificar ou Mercúrio.`, F`${cc} de CC no time deles. Purificar ou Mercúrio.`, 2);
   if (meuCampeao && runas) dizer(`runas-${meuCampeao}`, F`Runas: ${runas.chave ?? ''}${runas.primaria ? ', ' + runas.primaria : ''}${runas.secundaria ? ' com ' + runas.secundaria : ''}.`, F`Runas: ${runas.chave ?? ''}.`, 1);
