@@ -23,8 +23,8 @@ export function conferir(situacoes, leituras, p) {
   for (const s of situacoes) {
     let acertou = null;
     let m;
-    if ((m = s.chave.match(/^jg-indo-(top|mid|bot)$/)) && jgDeles) acertou = chegouNaLane(jgDeles, m[1], s.t, s.t + 30);
-    else if ((m = s.chave.match(/^roam-(.+)-(top|mid|bot)$/))) { const c = campeaoDe.get(m[1]); if (c) acertou = chegouNaLane(c, m[2], s.t, s.t + 35); }
+    if ((m = s.chave.match(/^jg-indo-(top|mid|bot)$/)) && jgDeles) acertou = chegouNaLane(jgDeles, m[1], s.t, s.t + 40);
+    else if ((m = s.chave.match(/^roam-(.+)-(top|mid|bot)$/))) { const c = campeaoDe.get(m[1]); if (c) acertou = chegouNaLane(c, m[2], s.t, s.t + 45); }
     else if ((m = s.chave.match(/^perto-(.+)$/))) { const c = campeaoDe.get(m[1]); if (c) acertou = aproximou(c, s.t, s.t + 10); }
     else if (s.chave === 'jg-vindo' && jgDeles) acertou = aproximou(jgDeles, s.t, s.t + 12);
     else if (s.chave === 'jg-inicio' && jgDeles && s.dados?.laneGank) acertou = chegouNaLane(jgDeles, s.dados.laneGank, 170, 250);

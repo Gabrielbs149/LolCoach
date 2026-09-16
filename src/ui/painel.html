@@ -1067,6 +1067,7 @@ h2{letter-spacing:1px}
 
     <details class="falasCaixa" id="situCaixa" ontoggle="if(this.open) carregarSituacoes()">
       <summary><span>Situações da partida</span><small id="situResumo"></small></summary>
+      <div id="situTabela"></div>
       <div class="falasTopo">
         <select class="contaSel cfgSel" id="situPartida" onchange="abrirSituacoes(this.value)"></select>
         <label class="falasSo"><input type="checkbox" id="situSoFaladas" onchange="desenharSituacoes()"> só as faladas</label>
@@ -3031,6 +3032,8 @@ async function carregarSituacoes(){
   const sel = $('#situPartida');
   sel.innerHTML = situPartidas.length ? situPartidas.map(p => `<option value="${esc(p.pasta)}">${esc((p.inicio ?? p.pasta).slice(0, 16).replace('T', ' '))} · ${esc(p.campeao ?? '?')} ${esc(role(p.role ?? ''))} · ${p.situacoes}</option>`).join('') : '<option value="">nenhuma partida gravada</option>';
   $('#situResumo').textContent = situPartidas.length ? `${situPartidas.length} partida${situPartidas.length > 1 ? 's' : ''}` : '';
+  // visão geral: falas/min, previsões certas e avaliações por partida
+  const tab = $('#situTabela'); if (tab) tab.innerHTML = situPartidas.length ? `<table class="amTabela" style="margin:6px 14px 10px;width:auto"><tr><th>Partida</th><th>Falas/min</th><th>Faladas</th><th>Previsões certas</th><th>👍</th><th>👎</th></tr>${situPartidas.map(p => `<tr style="cursor:pointer" onclick="$('#situPartida').value='${esc(p.pasta)}';abrirSituacoes('${esc(p.pasta)}')"><td>${esc((p.inicio ?? p.pasta).slice(5, 16).replace('T', ' '))} · ${esc(p.campeao ?? '?')}</td><td>${p.porMin ?? ''}</td><td>${p.faladas}/${p.situacoes}</td><td>${p.previstas ? `${p.certas}/${p.previstas} (${Math.round(100 * p.certas / p.previstas)}%)` : ''}</td><td>${p.bom || ''}</td><td>${p.ruim || ''}</td></tr>`).join('')}</table>` : '';
   if(situPartidas.length) abrirSituacoes(situPartidas[0].pasta);
 }
 async function abrirSituacoes(pasta){

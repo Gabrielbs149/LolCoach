@@ -159,8 +159,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const saida = [];
     for (const p of pastas.slice(0, 30)) {
       const info = (await lerJsonl(resolve(pastaSituacoes(), p, 'partida.json')))[0] ?? {};
-      const n = (await lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl'))).length;
-      saida.push({ pasta: p, inicio: info.inicio ?? null, campeao: info.eu?.campeao ?? null, role: info.eu?.role ?? null, situacoes: n });
+      const [sits, acs, avs] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'acertos.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl'))]);
+      const min = sits.length ? Math.max(1, sits.at(-1).t / 60) : 0;
+      saida.push({ pasta: p, inicio: info.inicio ?? null, campeao: info.eu?.campeao ?? null, role: info.eu?.role ?? null, situacoes: sits.length, faladas: sits.filter((s) => s.falada).length, porMin: min ? Math.round(10 * sits.filter((s) => s.falada).length / min) / 10 : null, previstas: acs.length, certas: acs.filter((a) => a.acertou).length, bom: avs.filter((a) => a.nota === 1).length, ruim: avs.filter((a) => a.nota === -1).length });
     }
     return saida;
   }

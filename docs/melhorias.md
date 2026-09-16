@@ -71,3 +71,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.72 — Revisão depois do jogo na janela ao vivo: o cartão da última partida abre a lista de tudo que a voz falou, com 👍/👎 em cada uma (vale por 3 h) — avaliar com calma depois é mais fácil do que no meio da partida.
 - v2.28.73 — O cartão da última partida (com a revisão 👍/👎) volta ao abrir o app, se a partida foi há menos de 4 h.
 - v2.28.74 — `src/vivo/conferir.js`: a conferência das previsões virou módulo (daemon e replay usam o mesmo); o replay agora mostra precisão com as regras atuais ("das faladas 5/12"). Hoje, nas 5 partidas: 12–26 previsões por partida (eram 120–190) e 45–65% das faladas confirmadas.
+- v2.28.75 — Admin → Situações: tabela com todas as partidas gravadas (falas/min, faladas/situações, previsões certas %, 👍/👎); clicar abre a partida. Janela de conferência das previsões: 40 s pro jungler, 45 s pra roam.
