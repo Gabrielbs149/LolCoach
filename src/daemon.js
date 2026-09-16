@@ -4,7 +4,7 @@ import { autoAceitar } from './features/auto-aceitar.js';
 import { autoChampSelect } from './features/champ-select.js';
 import { abrirBanco } from './dados/banco.js';
 import { coletarPendentes } from './dados/coletor.js';
-import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, rm, appendFile } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
 import { resolve } from 'node:path';
 import { F, render as renderFala, personalizar as personalizarFalas } from './vivo/texto.js';
@@ -410,7 +410,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
     if (!partidaVivo || estado.tempo < partidaVivo.memoria.ultimoTempo - 5) {
       const { novaMemoriaFalas } = await import('./vivo/falas.js');
-      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null, extras: null, montandoExtras: null, olho: null, memOlho: null, olhoLog: 0 };
+      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null, extras: null, montandoExtras: null, olho: null, memOlho: null, olhoLog: 0, mundo: null, pastaSitu: null, ultimoInstantaneo: 0 };
     }
 
     // Extras da voz (build, tipo de dano deles, quem está de main): uma vez
@@ -524,10 +524,33 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     partidaVivo.olho = { ...dados, recebidoEm: Date.now() };
     if (dados.calib && (!antes?.calib || antes.calib.s !== dados.calib.s)) log(`olho: minimapa ${dados.calib.s}px (score ${dados.calib.score})${dados.escala ? `, ícone ${dados.escala.d}px` : ''}`);
     if (!dados.calib && antes?.calib !== null && Date.now() - partidaVivo.olhoLog > 30000) { partidaVivo.olhoLog = Date.now(); log('olho: não achei o minimapa (jogo em tela cheia exclusiva? overlay por cima?)'); }
-    const { falasDoOlho } = await import('./vivo/olho.js');
+    // O mundo: posições, direções, quem sumiu → situações (todas gravadas,
+    // parte falada). É a matéria-prima pra depois aprender o que vale falar.
+    const S = await import('./vivo/situacoes.js');
+    const { objetivos } = await import('./vivo/objetivos.js');
     const e = partidaVivo.ultimoEstado;
-    for (const f of falasDoOlho({ vistos: dados.vistos ?? [], eu: dados.eu ?? null, estado: e }, partidaVivo.memOlho)) {
-      partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: e.tempo }));
+    if (!partidaVivo.mundo) {
+      partidaVivo.mundo = S.novoMundo();
+      partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
+      await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
+      await appendFile(resolve(partidaVivo.pastaSitu, 'partida.json'), JSON.stringify({ inicio: new Date().toISOString(), eu: e.eu, jogadores: e.jogadores.map((j) => ({ nome: j.nome, campeao: j.campeao, time: j.time, role: j.role })), modo: e.modo }) + '\n').catch(() => {});
+      // limpa partidas velhas (fica com 30)
+      const pastas = (await readdir(resolve(pastaBase(), 'dados', 'situacoes')).catch(() => [])).sort();
+      for (const velha of pastas.slice(0, -30)) await rm(resolve(pastaBase(), 'dados', 'situacoes', velha), { recursive: true, force: true }).catch(() => {});
+    }
+    const objs = objetivos(e);
+    const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null }, e, objs);
+    const gravar = (arquivo, obj) => appendFile(resolve(partidaVivo.pastaSitu, arquivo), JSON.stringify(obj) + '\n').catch(() => {});
+    for (const sit of situacoes) {
+      const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });
+      gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
+        contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
+      if (sit.falar) partidaVivo.falas.push(pronta);
+    }
+    // foto do mundo 1x por segundo
+    if (Date.now() - partidaVivo.ultimoInstantaneo >= 1000) {
+      partidaVivo.ultimoInstantaneo = Date.now();
+      gravar('leituras.jsonl', S.instantaneo(partidaVivo.mundo, e));
     }
   }
   function resumoDoOlho(estado) {
@@ -1008,7 +1031,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (config.admin !== true) throw new Error('só pra admin');
     const { catalogo } = await import('./vivo/texto.js');
     const fontes = [];
-    for (const [arquivo, opcoes] of [['./vivo/falas.js', {}], ['./vivo/olho.js', { secaoFixa: 'olho no minimapa' }], ['./daemon.js', { moduloFixo: 'flash', secaoFixa: 'flash' }]]) {
+    for (const [arquivo, opcoes] of [['./vivo/falas.js', {}], ['./vivo/olho.js', { secaoFixa: 'olho no minimapa' }], ['./vivo/situacoes.js', { secaoFixa: 'olho no minimapa' }], ['./daemon.js', { moduloFixo: 'flash', secaoFixa: 'flash' }]]) {
       fontes.push({ src: await readFile(new URL(arquivo, import.meta.url), 'utf8'), arquivo, ...opcoes });
     }
     return { catalogo: catalogo(fontes), personalizadas: config.voz?.falas ?? {} };

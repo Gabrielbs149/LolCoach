@@ -150,17 +150,18 @@ function calibrar() {
  * poucos lugares onde vale procurar quem não está sendo seguido. Ward e
  * ping também são vermelhos — a correlação depois separa.
  */
-function manchasVermelhas(rgba, s, d) {
+function manchasVermelhas(rgba, s, d, cor = 'vermelho') {
   const cel = Math.max(4, Math.round(d / 2)), nc = Math.ceil(s / cel), cont = new Uint16Array(nc * nc);
+  const bate = cor === 'azul' ? (r, g, b) => b > 130 && b > r * 1.8 && b > g * 1.25 && g < 170 : (r, g, b) => r > 110 && r > g * 1.7 && r > b * 1.5;
   for (let y = 0; y < s; y += 2) for (let x = 0; x < s; x += 2) {
     const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
-    if (r > 110 && r > g * 1.7 && r > b * 1.5) cont[((y / cel) | 0) * nc + ((x / cel) | 0)]++;
+    if (bate(r, g, b)) cont[((y / cel) | 0) * nc + ((x / cel) | 0)]++;
   }
   const pontos = [];
   for (let j = 0; j < nc; j++) for (let i = 0; i < nc; i++) {
     // soma 2x2 de células (o anel cruza várias)
     const n = cont[j * nc + i] + (i + 1 < nc ? cont[j * nc + i + 1] : 0) + (j + 1 < nc ? cont[(j + 1) * nc + i] : 0) + (i + 1 < nc && j + 1 < nc ? cont[(j + 1) * nc + i + 1] : 0);
-    if (n >= 8) pontos.push({ x: (i + 1) * cel, y: (j + 1) * cel, n });   // centro do bloco 2x2
+    if (n >= 8 && n <= 70) pontos.push({ x: (i + 1) * cel, y: (j + 1) * cel, n });   // centro do bloco 2x2 (cheio demais = rio, não anel)
   }
   // junta vizinhos
   const juntos = [];
@@ -260,7 +261,7 @@ function confirmar(rgba, s, tpl, x, y) {
 }
 
 /* ------------------------------------------------------------- estado */
-let inimigos = [], meuCampeao = null, meuTime = 100;
+let inimigos = [], aliados = [], meuCampeao = null, meuTime = 100;
 let escala = null;                       // {d, score, confiavel}
 let ultimoEnvio = '', ultimoEnvioEm = 0, ultimaCalibEm = 0;
 const rastros = new Map();               // nome -> {x, y, em} (cheia, dentro do recorte)
@@ -271,6 +272,7 @@ async function lerPartida() {
     if (!d.emJogo) { inimigos = []; meuCampeao = null; return; }
     inimigos = (d.inimigos ?? []).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     meuCampeao = d.estado?.eu?.campeao ?? null; meuTime = d.estado?.eu?.time ?? 100;
+    aliados = (d.estado?.jogadores ?? []).filter((j) => j.time === meuTime && j.campeao !== meuCampeao).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
   } catch { /* daemon ocupado */ }
 }
 
@@ -295,6 +297,7 @@ async function quadro() {
     const g = cinzaDe(rgba, s, s);
     const m = meia(g, s, s);
     const vermelhos = manchasVermelhas(rgba, s, d0());
+    const azuis = manchasVermelhas(rgba, s, d0(), 'azul');
 
     // escala dos ícones pelo MEU ícone
     if ((!escala || (!escala.confiavel && agora - escala.em > 5000)) && meuCampeao) {
@@ -325,6 +328,10 @@ async function quadro() {
     for (const j of inimigos) if (j.morto) rastros.delete(j.campeao);
     const tpls = new Map();
     for (const j of vivos) { const t = await template(j.campeao, d); if (t) tpls.set(j.campeao, t); }
+    // aliados (anel azul): mesmo reconhecimento, sem rastro
+    const tplsAli = new Map();
+    for (const j of aliados.filter((j) => !j.morto)) { const t = await template(j.campeao, d); if (t) tplsAli.set(j.campeao, t); }
+    const vistosAli = reconhecerEmManchas(azuis, tplsAli, m, rgba, s, null);
     // (a) cada mancha vermelha: pontua os 5 e fica com o mais parecido, se ganhar com margem
     const tomados = new Set();
     const manchasAvaliadas = [];
@@ -364,10 +371,10 @@ async function quadro() {
     // dois ícones no mesmo lugar: fica o de maior score
     const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));
     rodada++;
-    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, eu });
+    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu });
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
-      log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · manchas ${vermelhos.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
+      log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
       melhoresDoQuadro.clear();
     }
     if (!TESTE && agora - ultimaFoto > 30000 && fotos < 40) {
@@ -379,6 +386,32 @@ async function quadro() {
   finally { ocupado = false; }
 }
 /** Procura um ícone: perto de onde estava, senão (se pode) no minimapa todo. Devolve posição 0..1. */
+/** Em cada mancha, o campeão mais parecido (entre os templates) leva, se ganhar com margem. */
+function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora) {
+  const saida = [], tomados = tomadosFora ?? new Set(), avaliadas = [];
+  for (const p of manchas) {
+    const notas = [];
+    for (const [nome, t] of tpls) {
+      const tw = t.meiaRes.w, cx = p.x / 2 - tw / 2, cy = p.y / 2 - tw / 2;
+      const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
+      if (!cand.length || cand[0].score < 0.3) continue;
+      const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
+      notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, d: t.d });
+    }
+    notas.sort((a, b) => b.score - a.score);
+    if (notas.length) avaliadas.push(notas);
+  }
+  avaliadas.sort((a, b) => b[0].score - a[0].score);
+  for (const notas of avaliadas) {
+    const livres = notas.filter((n) => !tomados.has(n.nome));
+    if (!livres.length) continue;
+    const [a, b] = livres;
+    if (a.score < LIMIAR_MANCHA || (b && b.score > a.score - MARGEM && a.score < 0.85)) continue;
+    tomados.add(a.nome);
+    saida.push({ campeao: a.nome, x: (a.x + a.d / 2) / s, y: (a.y + a.d / 2) / s, score: Math.round(a.score * 100) / 100 });
+  }
+  return saida;
+}
 function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   const rastro = rastros.get(chave);
   const seguindo = rastro && agora - rastro.em < 2000;
@@ -413,7 +446,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
 }
 function enviar(dados) {
   const agora = Date.now();
-  const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
+  const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
   if (chave === ultimoEnvio && agora - ultimoEnvioEm < 1000) return;
   ultimoEnvio = chave; ultimoEnvioEm = agora;
   if (TESTE || FINGIR) { log(`${dados.vistos.map((v) => `${v.campeao} ${v.x.toFixed(2)},${v.y.toFixed(2)} (${v.score})`).join(' · ') || 'ninguém'}${dados.eu ? ` | eu ${dados.eu.x.toFixed(2)},${dados.eu.y.toFixed(2)}` : ''}`); return; }
