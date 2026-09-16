@@ -1070,7 +1070,9 @@ h2{letter-spacing:1px}
       <div class="falasTopo">
         <select class="contaSel cfgSel" id="situPartida" onchange="abrirSituacoes(this.value)"></select>
         <label class="falasSo"><input type="checkbox" id="situSoFaladas" onchange="desenharSituacoes()"> só as faladas</label>
+        <button class="acao" onclick="situResumoAbrir()">Resumo por tipo</button>
       </div>
+      <div id="situResumoCaixa" hidden></div>
       <div id="situLista"></div>
     </details>
 
@@ -3012,6 +3014,15 @@ function desenharSituacoes(){
   const lista = situDados.situacoes.filter(s => !so || s.falada);
   const mm = (t) => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
   el.innerHTML = lista.length ? lista.map((s, i) => `<div class="situ ${s.falada ? 'falada' : ''}"><span class="t">${mm(s.t)}</span><span class="txt">${esc(s.texto)}<span class="chave">${esc(s.chave)}${s.falada ? '' : ' · não falada'}</span></span><span class="p p${s.prioridade}">p${s.prioridade}</span><span class="nota"><button class="${s.nota === 1 ? 'on' : ''}" onclick="avaliarSitu(${i}, 1)">👍</button> <button class="${s.nota === -1 ? 'on' : ''}" onclick="avaliarSitu(${i}, -1)">👎</button></span></div>`).join('') : '<div class="falasVazio">nada aqui</div>';
+}
+async function situResumoAbrir(){
+  const el = $('#situResumoCaixa');
+  if(!el.hidden){ el.hidden = true; return; }
+  try {
+    const r = await pegar('/api/situacoes/resumo');
+    el.innerHTML = `<table class="amTabela" style="margin:10px 14px;width:auto"><tr><th>Situação</th><th>Vezes</th><th>Faladas</th><th>👍</th><th>👎</th><th>Exemplo</th></tr>${r.tipos.map(t => `<tr><td>${esc(t.chave)}</td><td>${t.n}</td><td>${t.faladas}</td><td>${t.bom || ''}</td><td>${t.ruim || ''}</td><td style="color:var(--apagado);font-weight:400;white-space:normal">${esc(t.exemplo)}</td></tr>`).join('')}</table>`;
+    el.hidden = false;
+  } catch(e){ el.innerHTML = `<div class="falasVazio">${esc(e.message)}</div>`; el.hidden = false; }
 }
 async function avaliarSitu(i, nota){
   const so = $('#situSoFaladas').checked;

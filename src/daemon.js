@@ -172,6 +172,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
     return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null })), falas };
   }
+  /** Resumo por tipo de situação em todas as partidas gravadas: quantas, quantas faladas, 👍/👎. */
+  async function situacoesResumo() {
+    if (config.admin !== true) throw new Error('só pra admin');
+    const pastas = (await readdir(pastaSituacoes()).catch(() => []));
+    const porChave = new Map();
+    const base = (chave) => String(chave).replace(/-d+$/, '').replace(/-(id|[A-Za-z' ]+#[^-]+)$/, '');
+    for (const p of pastas) {
+      const [situacoes, avaliacoes] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl'))]);
+      const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+      for (const s of situacoes) {
+        const k = base(s.chave);
+        const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: s.tipo, n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: s.texto }).get(k);
+        r.n++; if (s.falada) r.faladas++;
+        const nota = notas.get(`${s.t}|${s.chave}`); if (nota === 1) r.bom++; else if (nota === -1) r.ruim++;
+      }
+    }
+    return { partidas: pastas.length, tipos: [...porChave.values()].sort((a, b) => b.n - a.n) };
+  }
   async function avaliarSituacao({ pasta, chave, t, nota } = {}) {
     if (config.admin !== true) throw new Error('só pra admin');
     if (!pasta || /[\\/]/.test(pasta)) throw new Error('pasta inválida');
@@ -1274,7 +1292,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
-    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, situacoesResumo,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -1321,5 +1339,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'situacoesResumo',
 ];
