@@ -28,7 +28,7 @@ export function decidir(situacoes, ctx, mem) {
     if (lane && lane === minhaLane) nota += 1;
     if (['perigo'].includes(s.tipo)) nota += 0.5;
     // morto: só objetivo/grupo interessa; o resto espera você nascer
-    if (ctx.morto && !['objetivo', 'grupo', 'aliado'].includes(s.tipo)) nota -= 1.5;
+    if (ctx.morto && !['objetivo', 'grupo', 'aliado'].includes(s.tipo)) nota -= 2.5;
     // cedo: jungler e início valem mais; tarde: grupo e objetivo valem mais
     if (t < 600 && ['jungler'].includes(s.tipo)) nota += 0.5;
     if (t >= 900 && ['objetivo', 'grupo'].includes(s.tipo)) nota += 0.5;
@@ -38,7 +38,7 @@ export function decidir(situacoes, ctx, mem) {
     // o que você avaliou
     const n = ctx.notas?.get(base);
     if (n) nota += Math.max(-1, Math.min(1, (n.bom - n.ruim) * 0.3));
-    if (n?.precisao != null) nota += (n.precisao - 0.5) * 2;
+    if (n?.precisao != null) nota += Math.max(-2, Math.min(1.5, (n.precisao - 0.5) * 4));   // 10% certo = −1,6; 80% = +1,2
     if (ctx.silenciadas?.has(base)) nota = -9;
     s.nota = Math.round(nota * 10) / 10;
   }

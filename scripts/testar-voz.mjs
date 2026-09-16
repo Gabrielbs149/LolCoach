@@ -78,6 +78,12 @@ console.log('cérebro');
   ok(r3[0].falar && r3[0].nota >= 3, 'urgente passa');
   const r4 = decidir([{ chave: 'roam-b-mid', tipo: 'roam', prioridade: 1, dados: { lane: 'mid' }, falar: true }], { t: 200, minhaLane: 'mid', notas: new Map(), silenciadas: new Set() }, novaMemoriaCerebro());
   ok(r4[0].falar, 'minha lane ganha ponto e passa da régua');
+  const r5 = decidir([{ chave: 'jg-indo-mid', tipo: 'jungler', prioridade: 2, dados: { lane: 'mid' }, falar: true }], { t: 300, minhaLane: 'mid', morto: true, notas: new Map(), silenciadas: new Set() }, novaMemoriaCerebro());
+  ok(!r5[0].falar, 'morto: jungler indo pra minha lane não fala');
+  const r6 = decidir([{ chave: 'perto-Zed#BR1', tipo: 'perigo', prioridade: 3, dados: {}, falar: true }], { t: 300, minhaLane: 'mid', notas: new Map([['perto', { bom: 0, ruim: 0, precisao: 0.1 }]]), silenciadas: new Set() }, novaMemoriaCerebro());
+  ok(!r6[0].falar && r6[0].nota < 3, 'precisão medida de 10% derruba a nota');
+  const r7 = decidir([{ chave: 'roam-c-top', tipo: 'roam', prioridade: 1, dados: { para: 'top' }, falar: true }], { t: 300, minhaLane: 'top', notas: new Map(), silenciadas: new Set() }, novaMemoriaCerebro());
+  ok(r7[0].falar, 'lane por dados.para conta como minha lane');
 }
 
 console.log('pronúncia');
