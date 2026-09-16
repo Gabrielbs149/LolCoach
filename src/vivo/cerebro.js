@@ -24,7 +24,8 @@ export function decidir(situacoes, ctx, mem) {
     const base = baseChave(s.chave);
     let nota = s.prioridade;
     // é sobre a minha lane / sobre mim
-    if (s.dados?.lane && s.dados.lane === minhaLane) nota += 1;
+    const lane = s.dados?.lane ?? s.dados?.para ?? s.dados?.laneGank ?? s.dados?.rumo ?? null;
+    if (lane && lane === minhaLane) nota += 1;
     if (['perigo'].includes(s.tipo)) nota += 0.5;
     // cedo: jungler e início valem mais; tarde: grupo e objetivo valem mais
     if (t < 600 && ['jungler'].includes(s.tipo)) nota += 0.5;
