@@ -188,7 +188,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       const ha = Math.round(vistoHa(jg, t));
       const pg = mundo.previsaoGank;
       if (pg && !pg.dito && t >= pg.de && t <= pg.ate + 30) { pg.dito = true; situ('jg-gank-previsto', { tipo: 'jungler', prioridade: pg.lane === minhaLane ? 3 : 1, modulo: 'jungler', serio: F`Hora do primeiro gank: jungler deles deve estar chegando no ${pg.lane}.`, cooldown: 1 }); }
-      if (ha >= 20 && ha <= 180 && ha - jg.sumidoDito >= 30) { jg.sumidoDito = ha; situ('jg-sumido', { tipo: 'jungler', prioridade: ha < 40 ? 1 : 2, modulo: 'jungler', serio: jg.rumo && ha <= 60 ? F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}, indo pro ${LUGAR_NOME[jg.rumo] ?? jg.rumo}.` : F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}.`, divertido: F`Cadê o jungler? ${ha} segundos sumido, última vez ${lugarTxt(jg.ultimo)}.`, cooldown: 25, dados: { ha, rumo: jg.rumo ?? null } }); }
+      if (ha >= 20 && ha <= 130 && ha - jg.sumidoDito >= (ha < 60 ? 30 : 60)) { jg.sumidoDito = ha; situ('jg-sumido', { tipo: 'jungler', prioridade: ha < 40 ? 1 : 2, modulo: 'jungler', serio: jg.rumo && ha <= 60 ? F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}, indo pro ${LUGAR_NOME[jg.rumo] ?? jg.rumo}.` : F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}.`, divertido: F`Cadê o jungler? ${ha} segundos sumido, última vez ${lugarTxt(jg.ultimo)}.`, cooldown: 25, dados: { ha, rumo: jg.rumo ?? null } }); }
     }
     for (const c of mundo.camps) if (!c.avisado && t >= c.em + 115) { c.avisado = true; if (minhaLane === 'jungle') situ(`camp-nasce-${c.nome}-${c.em}`, { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`${c.nome} deles nascem em 20 segundos.`, cooldown: 1 }); }
     // buffs deles renascendo
@@ -309,7 +309,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (alVis.length >= 3) {
       const cx = alVis.reduce((s, f) => s + f.ultimo.x, 0) / alVis.length, cy = alVis.reduce((s, f) => s + f.ultimo.y, 0) / alVis.length;
       const centro = { x: cx, y: cy };
-      const grupoApertado = alVis.every((f) => dist(f.ultimo, centro) < 0.14);
+      const grupoApertado = t > 600 && alVis.length >= 3 && alVis.every((f) => dist(f.ultimo, centro) < 0.14);
       const pertoNosso = grupoApertado ? vis.filter((f) => dist(f.ultimo, centro) < 0.18) : [];
       const restoDeles = vis.filter((f) => !pertoNosso.includes(f));
       const flanqueadores = [];
@@ -423,7 +423,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   if (t < 95 && !mundo.invadeDito) {
     const naNossa = fIni.filter((f) => visivel(f, t) && f.regiao?.lado === 'nosso' && f.regiao.lane === 'jungle');
     if (naNossa.length >= 2) { mundo.invadeDito = true; situ('invade', { tipo: 'perigo', prioridade: 3, modulo: 'jungler', serio: F`Invade! ${naNossa.length} deles na nossa jungle.`, divertido: F`INVADE! ${naNossa.length} deles na nossa jungle, acorda!`, cooldown: 1 }); }
-    const cheese = fIni.filter((f) => visivel(f, t) && f.regiao?.lado === 'nosso' && ['top', 'mid', 'bot'].includes(f.regiao.lane));
+    const naNossaLane = fIni.filter((f) => visivel(f, t) && f.regiao?.lado === 'nosso' && ['top', 'mid', 'bot'].includes(f.regiao.lane));
+    const cheese = naNossaLane.filter((f) => LANE_DE[f.role] !== f.regiao.lane || naNossaLane.filter((g) => g.regiao.lane === f.regiao.lane).length >= 2);
     if (cheese.length && t >= 40 && t < 80) situ('cheese', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${cheese[0].campeao} já no nosso ${cheese[0].regiao.lane} aos ${mmss(t)}.`, cooldown: 120 });
   }
 
