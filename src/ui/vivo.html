@@ -225,26 +225,30 @@ if ('speechSynthesis' in window) { acharVoz(); speechSynthesis.onvoiceschanged =
 const filaFalas = [];
 // Motor de voz vem da Configuração: 'edge' toca o mp3 neural do daemon; 'windows' usa a voz do sistema.
 let motorVoz = 'edge';
-const lerMotor = () => fetch('/api/config').then(r => r.json()).then(c => { motorVoz = c?.voz?.motor === 'windows' ? 'windows' : 'edge'; }).catch(() => {});
+const lerMotor = () => fetch('/api/config').then(r => r.json()).then(c => { const m = c?.voz?.motor === 'windows' ? 'windows' : 'edge'; if (m === 'edge' && errosSeguidos >= 4) return; motorVoz = m; }).catch(() => {});
 lerMotor(); setInterval(lerMotor, 60000);
 const filaMp3 = []; let tocando = null;
+let errosSeguidos = 0;
 function tocarProxima(){
   if (tocando || !filaMp3.length) return;
-  const { texto } = filaMp3.shift();
+  const { texto, em } = filaMp3.shift();
+  if (em && Date.now() - em > 8000) { tocarProxima(); return; }   // fala velha demais: não vale mais
   const a = new Audio('/api/voz/falar?texto=' + encodeURIComponent(texto));
   a.volume = voz.volume; tocando = a;
   const fim = () => { tocando = null; tocarProxima(); };
-  a.onended = fim;
-  a.onerror = () => { fim(); falarWindows(texto); };
-  a.play().catch(() => { fim(); falarWindows(texto); });
+  // Falhou a nuvem: pula a fala (não mistura voz do Windows no meio). Só depois de 4 falhas seguidas troca de vez pro Windows.
+  const falhou = () => { fim(); if (++errosSeguidos >= 4 && motorVoz === 'edge') { motorVoz = 'windows'; falarWindows(texto); } };
+  a.onended = () => { errosSeguidos = 0; fim(); };
+  a.onerror = falhou;
+  a.play().catch(falhou);
 }
 // Urgente (prioridade 3) fura a fila: vai pra frente e corta o que está tocando.
 function falar(texto, forcar = false, prioridade = 1){
   if ((!voz.ligada && !forcar) || !texto) return;
   if (motorVoz === 'edge') {
-    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto }); if (tocando) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
+    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto, em: Date.now() }); if (tocando) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
     if (filaMp3.length >= 3) filaMp3.shift();
-    filaMp3.push({ texto }); tocarProxima();
+    filaMp3.push({ texto, em: Date.now() }); tocarProxima();
     return;
   }
   if (prioridade >= 3 && 'speechSynthesis' in window) { speechSynthesis.cancel(); filaFalas.length = 0; }

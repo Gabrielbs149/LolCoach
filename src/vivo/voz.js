@@ -32,6 +32,10 @@ export const VOZ_PADRAO = 'pt-BR-AntonioNeural';
 const RITMOS = new Set(['-10%', '0%', '+5%', '+10%', '+15%', '+20%']);
 
 let cliente = null, clienteCfg = '';
+// Um pedido por vez: o websocket do Edge embaralha os pedaços de áudio de dois pedidos ao mesmo tempo.
+let fila = Promise.resolve();
+const umPorVez = (fn) => { const p = fila.then(fn, fn); fila = p.catch(() => {}); return p; };
+const comTempo = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error('a voz demorou demais')), ms))]);
 async function clienteParaVoz(vozId, ritmo) {
   const chave = `${vozId}|${ritmo}`;
   if (cliente && clienteCfg === chave) return cliente;
@@ -59,8 +63,10 @@ export async function falarEdge({ vozId = VOZ_PADRAO, ritmo = '+5%', texto, past
     return Buffer.concat(partes);
   };
   let mp3;
-  try { mp3 = await gerar(); }
-  catch { cliente = null; clienteCfg = ''; mp3 = await gerar(); }   // conexão caiu: reabre uma vez
+  await umPorVez(async () => {
+    try { mp3 = await comTempo(gerar(), 6000); }
+    catch { cliente = null; clienteCfg = ''; mp3 = await comTempo(gerar(), 6000); }   // conexão caiu: reabre uma vez
+  });
   if (!mp3.length) throw new Error('a Microsoft não devolveu áudio');
   await mkdir(dir, { recursive: true }).then(() => writeFile(caminho, mp3)).catch(() => {});
   return mp3;
