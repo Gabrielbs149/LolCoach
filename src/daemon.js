@@ -280,7 +280,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   const { baseChave } = await import('./vivo/cerebro.js');
   async function situacoesResumo() {
     if (config.admin !== true) throw new Error('só pra admin');
-    return resumoInterno();
+    const r = await resumoInterno();
+    return { partidas: r.partidas, tipos: r.tipos };
   }
   let cacheRemotas = { em: 0, lista: [] };
   async function avaliacoesRemotas() {
@@ -293,37 +294,44 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const pastas = (await readdir(pastaSituacoes()).catch(() => []));
     const porChave = new Map();
     const base = baseChave;
+    const P = await import('./vivo/pesos.js');
+    const evidencias = new Map();
     // o que os amigos avaliaram (só admin junta; pra eles conta só o próprio)
     if (config.admin === true) for (const a of await avaliacoesRemotas()) {
       if (a.de === config.instalacaoId) continue;   // as minhas já estão nas pastas
       const k = base(a.chave);
       const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: a.tipo ?? '?', n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: a.texto }).get(k);
       if (a.nota === 1) r.bom++; else if (a.nota === -1) r.ruim++;
+      if (a.nota === 1 || a.nota === -1) P.somar(evidencias, k, a.t ?? 0, '?', a.nota === 1 ? 'bom' : 'ruim');
     }
     for (const p of pastas) {
       const [situacoes, avaliacoes, acertos, falasP] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'acertos.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'falas.jsonl'))]);
       const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+      const funcao = (await lerJsonl(resolve(pastaSituacoes(), p, 'partida.json')))[0]?.eu?.role ?? '?';
       for (const f of falasP) {
         if (!f.id) continue;   // situações do olho não têm id (já contadas acima)
         const k = base(f.id);
         const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: 'fala:' + f.modulo, n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: f.serio }).get(k);
         r.n++; r.faladas++;
         const nota = notas.get(`${f.t}|${f.id}`); if (nota === 1) r.bom++; else if (nota === -1) r.ruim++;
+        if (nota === 1 || nota === -1) P.somar(evidencias, k, f.t, funcao, nota === 1 ? 'bom' : 'ruim');
       }
       // precisão só das últimas 8 partidas: as regras mudam e o passado velho não pode puxar pra baixo
       const recente = pastas.slice().sort().slice(-8).includes(p);
+      for (const a of recente ? acertos : []) P.somar(evidencias, base(a.chave), a.t, funcao, a.acertou ? 'certas' : 'erradas');
       for (const a of recente ? acertos : []) { const k = base(a.chave); const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: '?', n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: '' }).get(k); r.previstas = (r.previstas ?? 0) + 1; if (a.acertou) r.certas = (r.certas ?? 0) + 1; }
       for (const s of situacoes) {
         const k = base(s.chave);
         const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: s.tipo, n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: s.texto }).get(k);
         r.n++; if (s.falada) r.faladas++;
         const nota = notas.get(`${s.t}|${s.chave}`); if (nota === 1) r.bom++; else if (nota === -1) r.ruim++;
+        if (nota === 1 || nota === -1) P.somar(evidencias, k, s.t, funcao, nota === 1 ? 'bom' : 'ruim');
       }
     }
     const tipos = [...porChave.values()].sort((a, b) => b.n - a.n);
     // Aprendizado v0: tipo com 3+ 👎 e nenhum 👍 deixa de ser falado (continua gravado).
-    for (const t of tipos) { t.silenciada = t.ruim >= 3 && t.bom === 0; if (t.previstas >= 5) t.precisao = Math.round(100 * (t.certas ?? 0) / t.previstas) / 100; }
-    return { partidas: pastas.length, tipos };
+    for (const t of tipos) { t.silenciada = t.ruim >= 3 && t.bom === 0; if (t.previstas >= 5) t.precisao = Math.round(100 * (t.certas ?? 0) / t.previstas) / 100; t.ajuste = Math.round(P.ajuste(evidencias.get(t.chave)) * 100) / 100; }
+    return { partidas: pastas.length, tipos, evidencias };
   }
   async function avaliarSituacao({ pasta, chave, t, nota, texto, tipo } = {}) {
     const atual = partidaVivo?.pastaSitu ? basename(partidaVivo.pastaSitu) : null;
@@ -634,7 +642,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /** Pasta da partida em dados/situacoes: criada na primeira leitura, com o elenco. */
   async function garantirPastaSitu(e) {
     if (!partidaVivo || partidaVivo.pastaSitu) return;
-    resumoInterno().then((r) => { partidaVivo.notas = new Map(r.tipos.map((t) => [t.chave, { bom: t.bom, ruim: t.ruim, precisao: t.precisao ?? null }])); partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
+    resumoInterno().then((r) => { partidaVivo.evidencias = r.evidencias; partidaVivo.notas = new Map(r.tipos.map((t) => [t.chave, { bom: t.bom, ruim: t.ruim, precisao: t.precisao ?? null }])); partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
     partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
     await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
     const gameId = await lcu.get('/lol-gameflow/v1/session').then((s) => s?.gameData?.gameId ?? null).catch(() => null);
@@ -841,7 +849,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const Cb = await import('./vivo/cerebro.js');
     partidaVivo.memCerebro ??= Cb.novaMemoriaCerebro();
     const LANE_DE = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'bot', sup: 'bot' };
-    Cb.decidir(situacoes, { t: e.tempo, minhaLane: LANE_DE[e.eu.role] ?? null, minhaRole: e.eu.role, morto: !!e.eu.morto, notas: partidaVivo.notas, silenciadas: partidaVivo.silenciadas }, partidaVivo.memCerebro);
+    Cb.decidir(situacoes, { t: e.tempo, minhaLane: LANE_DE[e.eu.role] ?? null, minhaRole: e.eu.role, morto: !!e.eu.morto, notas: partidaVivo.notas, evidencias: partidaVivo.evidencias ?? null, silenciadas: partidaVivo.silenciadas }, partidaVivo.memCerebro);
     for (const sit of situacoes) {
       if (sit.falar && !cabeFala(sit.prioridade, e.tempo)) sit.falar = false;   // teto geral de falas/min
       const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });

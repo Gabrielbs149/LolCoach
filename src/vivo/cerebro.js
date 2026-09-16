@@ -5,6 +5,8 @@
  * por tipo). Só fala o que passa da régua, dentro do orçamento de falas por
  * minuto. Tudo fica gravado com a nota, pra treinar isso de verdade depois.
  */
+import { ajusteDe } from './pesos.js';
+
 export const baseChave = (chave) => String(chave).split('-').filter((p) => !/#|^\d+$/.test(p)).join('-');
 
 export function novaMemoriaCerebro() { return { faladasEm: [], ultimaFalaEm: -Infinity, ultimaPorTipo: new Map() }; }
@@ -36,9 +38,13 @@ export function decidir(situacoes, ctx, mem) {
     const antes = mem.ultimaPorTipo.get(base);
     if (antes != null && t - antes < 90) nota -= 1;
     // o que você avaliou
-    const n = ctx.notas?.get(base);
-    if (n) nota += Math.max(-1, Math.min(1, (n.bom - n.ruim) * 0.3));
-    if (n?.precisao != null) nota += Math.max(-2, Math.min(1.5, (n.precisao - 0.5) * 4));   // 10% certo = −1,6; 80% = +1,2
+    // v2: pesos aprendidos (👍/👎 + previsões conferidas, por fase e função); v1 como reserva
+    if (ctx.evidencias) nota += ajusteDe(ctx.evidencias, base, t, ctx.minhaRole ?? '?');
+    else {
+      const n = ctx.notas?.get(base);
+      if (n) nota += Math.max(-1, Math.min(1, (n.bom - n.ruim) * 0.3));
+      if (n?.precisao != null) nota += Math.max(-2, Math.min(1.5, (n.precisao - 0.5) * 4));   // 10% certo = −1,6; 80% = +1,2
+    }
     if (ctx.silenciadas?.has(base)) nota = -9;
     s.nota = Math.round(nota * 10) / 10;
   }

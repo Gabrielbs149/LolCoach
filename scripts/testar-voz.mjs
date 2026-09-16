@@ -86,6 +86,15 @@ console.log('cérebro');
   ok(r7[0].falar, 'lane por dados.para conta como minha lane');
 }
 
+console.log('pesos');
+{
+  const P = await import('../src/vivo/pesos.js');
+  ok(P.ajuste(null) === 0 && P.ajuste({ bom: 0, ruim: 0, certas: 0, erradas: 0 }) === 0, 'sem evidência = 0');
+  ok(P.ajuste({ bom: 0, ruim: 6, certas: 0, erradas: 0 }) <= -1.5, '6 👎 cala');
+  ok(P.ajuste({ bom: 5, ruim: 0, certas: 4, erradas: 1 }) > 0.8, 'bom + certo sobe');
+  const ev = new Map(); for (let i = 0; i < 6; i++) P.somar(ev, 'roam', 300, 'adc', 'ruim'); P.somar(ev, 'roam', 1500, 'adc', 'bom');
+  ok(P.ajusteDe(ev, 'roam', 300, 'adc') < -1 && P.ajusteDe(ev, 'roam', 1500, 'adc') < 0 && P.ajusteDe(ev, 'roam', 1500, 'top') < 0, 'chave fina com 5+; senão cai pro tipo');
+}
 console.log('pronúncia');
 {
   ok(pronunciar("Kha'Zix no top aos 0:45") === 'Cazícs no tóp aos 45 segundos', 'nome + tempo');
