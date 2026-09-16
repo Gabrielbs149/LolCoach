@@ -154,6 +154,8 @@ export async function carregarPartidaDaRiot(riot, matchId) {
     championId: p.championId,
     campeao: p.championName,
     nome: p.riotIdGameName || p.summonerName || '?',
+    tag: p.riotIdTagline ?? null,
+    puuid: p.puuid ?? null,
     spells: [p.summoner1Id, p.summoner2Id],
     role: null,
     stats: p, // a Riot já entrega tudo achatado no participante

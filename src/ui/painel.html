@@ -748,6 +748,20 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 /* ------------------------------------------------------------- amigos */
 .amForma{display:flex;gap:var(--e2);align-items:center;margin-bottom:var(--e3);flex-wrap:wrap}
 .amForma .busca{max-width:300px;margin:0}
+/* Sugestões de nick embaixo da busca (amigos do client, adicionados, quem já jogou com ele). */
+.sugCaixa{position:relative}
+.sugestoes{position:absolute;top:calc(100% + 4px);left:0;width:340px;max-width:90vw;z-index:30;background:var(--f1);border:1px solid var(--borda-forte);border-radius:var(--r-m);box-shadow:0 10px 30px rgba(0,0,0,.5);overflow:hidden}
+.sugestoes .sug{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--borda)}
+.sugestoes .sug:last-child{border-bottom:0}
+.sugestoes .sug:hover,.sugestoes .sug.on{background:var(--f2)}
+.sugestoes .sug img,.sugestoes .sug .semIcone{width:30px;height:30px;border-radius:50%;border:1px solid var(--borda);background:var(--f2);object-fit:cover}
+.sugestoes .sug .n{font-weight:700;color:var(--texto);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.sugestoes .sug .n b{color:var(--ouro-claro)}
+.sugestoes .sug .n small{color:var(--apagado);font-weight:500}
+.sugestoes .sug .d{display:block;font-size:11px;color:var(--apagado);font-weight:500;margin-top:1px}
+.sugestoes .sug .tipo{font-size:10px;text-transform:uppercase;letter-spacing:.6px;font-weight:700;color:var(--apagado);white-space:nowrap}
+.sugestoes .sug .tipo.online{color:var(--vit)}
+.sugestoes .sug .tipo.jogo{color:var(--g2)}
 .amAviso{margin-bottom:var(--e2)}
 .amGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(228px,1fr));gap:var(--e2)}
 .amCartao{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:12px 13px;
@@ -955,7 +969,10 @@ h2{letter-spacing:1px}
   <section id="amigos">
     <div class="titulo">Amigos</div>
     <div class="amForma">
-      <input class="busca" id="amNome" placeholder="nome#tag — ex.: roIindo#br1" autocomplete="off" onkeydown="if(event.key==='Enter')adicionarAmigo()">
+      <div class="sugCaixa">
+        <input class="busca" id="amNome" placeholder="nome#tag — ex.: roIindo#br1" autocomplete="off" oninput="sugerirNicks()" onkeydown="teclaSugestao(event)" onblur="setTimeout(fecharSugestoes, 150)" onfocus="sugerirNicks()">
+        <div class="sugestoes" id="amSug" hidden></div>
+      </div>
       <button class="acao" id="amAdicionar" onclick="adicionarAmigo()">Adicionar</button>
       <button class="acao" onclick="carregarAmigos(true)" title="pergunta de novo à Riot o elo e as partidas de todo mundo">Atualizar todos</button>
       <span class="salvo" id="amSalvo"></span>
@@ -1973,6 +1990,50 @@ async function atualizarAmigos(fila, forcar){
     p.carregando = false; desenharAmigos();
   }
   amFila = null;
+}
+
+/* ------------------------------------------------ sugestões de nick */
+let sugTimer = null, sugLista = [], sugIdx = -1, sugPedido = 0;
+function sugerirNicks(){
+  clearTimeout(sugTimer);
+  const q = $('#amNome').value.trim();
+  if(q.length < 2 || q.includes('#')){ fecharSugestoes(); return; }
+  sugTimer = setTimeout(async () => {
+    const meu = ++sugPedido;
+    let lista = [];
+    try { lista = await pegar('/api/nicks?q=' + encodeURIComponent(q)); } catch { lista = []; }
+    if(meu !== sugPedido) return;
+    sugLista = lista; sugIdx = -1;
+    desenharSugestoes(q);
+  }, 140);
+}
+function fecharSugestoes(){ const el = $('#amSug'); if(el){ el.hidden = true; el.innerHTML = ''; } sugLista = []; sugIdx = -1; }
+function desenharSugestoes(q){
+  const el = $('#amSug'); if(!el) return;
+  if(!sugLista.length){ fecharSugestoes(); return; }
+  const marca = (nome) => { const i = nome.toLowerCase().indexOf(q.toLowerCase()); return i < 0 ? esc(nome) : esc(nome.slice(0,i)) + '<b>' + esc(nome.slice(i, i+q.length)) + '</b>' + esc(nome.slice(i+q.length)); };
+  el.innerHTML = sugLista.map((x, i) => {
+    const icone = x.icone ? `<img src="/iconeperfil/${x.icone}" alt="">` : x.championId ? `<img src="/icone/${x.championId}" alt="">` : '<span class="semIcone"></span>';
+    const online = x.online && x.online !== 'offline' && x.online !== 'mobile';
+    const tipo = online ? '<span class="tipo online">online</span>' : x.online === 'dnd' || x.online === 'inGame' ? '<span class="tipo jogo">em jogo</span>' : x.origens.includes('client') ? '<span class="tipo">amigo</span>' : x.origens.includes('amigo') ? '<span class="tipo">na aba</span>' : '';
+    const det = x.jogos ? `${x.jogos} partida${x.jogos > 1 ? 's' : ''} com você${x.juntos ? ` · ${x.juntos} no seu time` : ''} · ${haQuanto(x.ultima)}` : x.origens.includes('client') ? 'amigo no client' : 'já na aba';
+    return `<div class="sug ${i===sugIdx?'on':''}" onmousedown="escolherSugestao(${i})">${icone}<span class="n">${marca(x.nome)}<small>#${esc(x.tag ?? '?')}</small><span class="d">${det}</span></span>${tipo}</div>`;
+  }).join('');
+  el.hidden = false;
+}
+function teclaSugestao(ev){
+  if(ev.key === 'Enter'){ if(sugIdx >= 0 && sugLista[sugIdx]){ ev.preventDefault(); escolherSugestao(sugIdx); } else adicionarAmigo(); return; }
+  if(ev.key === 'Escape'){ fecharSugestoes(); return; }
+  if(!sugLista.length) return;
+  if(ev.key === 'ArrowDown'){ ev.preventDefault(); sugIdx = (sugIdx + 1) % sugLista.length; desenharSugestoes($('#amNome').value.trim()); }
+  if(ev.key === 'ArrowUp'){ ev.preventDefault(); sugIdx = (sugIdx - 1 + sugLista.length) % sugLista.length; desenharSugestoes($('#amNome').value.trim()); }
+}
+function escolherSugestao(i){
+  const x = sugLista[i]; if(!x) return;
+  fecharSugestoes();
+  const inp = $('#amNome');
+  if(x.tag){ inp.value = `${x.nome}#${x.tag}`; adicionarAmigo(); }
+  else { inp.value = `${x.nome}#`; inp.focus(); $('#amAviso').innerHTML = '<div class="aviso amAviso">não sei a #tag desse nick — completa aí</div>'; }
 }
 
 async function adicionarAmigo(){

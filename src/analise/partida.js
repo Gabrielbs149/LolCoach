@@ -116,6 +116,8 @@ export async function carregarPartida(lcu, gameId) {
       championId: p.championId,
       campeao: campeoes.get(p.championId) ?? `#${p.championId}`,
       nome: ident?.player?.gameName ?? ident?.player?.summonerName ?? '?',
+      tag: ident?.player?.tagLine ?? null,
+      puuid: ident?.player?.puuid ?? null,
       spells: [p.spell1Id, p.spell2Id],
       role: null,
       stats: p.stats,

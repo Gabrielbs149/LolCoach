@@ -361,11 +361,12 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         ['/api/patch', 'patchLista'],
         ['/api/amigos', 'amigos'],
         ['/api/sessao', 'sessao'],
+        ['/api/nicks', 'nicks'],
         ['/api/marcadas', 'marcadas'],
       ]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         try {
-          const opcoes = { forcar: url.searchParams.get('forcar') === '1', conta: url.searchParams.get('conta') || null };
+          const opcoes = { forcar: url.searchParams.get('forcar') === '1', conta: url.searchParams.get('conta') || null, q: url.searchParams.get('q') || '' };
           return enviar(200, 'application/json', JSON.stringify(await acoes[nome](opcoes)));
         } catch (erro) {
           return enviar(503, 'application/json', JSON.stringify({ erro: erro.message }));

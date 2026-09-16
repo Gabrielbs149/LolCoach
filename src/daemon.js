@@ -979,6 +979,75 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   const listaDeAmigos = () => (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
 
   /**
+   * Sugestões de nick enquanto ele digita (como o op.gg, só que com o que a
+   * gente tem): amigos do client, amigos já adicionados e todo mundo que já
+   * jogou com ou contra ele. A Riot não tem busca por nome; o op.gg usa um
+   * índice próprio que não é público.
+   */
+  async function nicks({ q = '' } = {}) {
+    const termo = String(q).trim().toLowerCase();
+    if (termo.length < 2) return [];
+    const norm = (s) => String(s ?? '').toLowerCase();
+    const saida = new Map();
+    const chaveDe = (nome, tag) => `${norm(nome)}#${norm(tag) || '?'}`;
+    const poe = (x) => { const k = chaveDe(x.nome, x.tag); const antes = saida.get(k); saida.set(k, { ...(antes ?? {}), ...x, origens: [...new Set([...(antes?.origens ?? []), x.origem])] }); };
+
+    if (lcu.conectado) {
+      const amigosLol = await lcu.get('/lol-chat/v1/friends').catch(() => []);
+      for (const f of amigosLol ?? []) {
+        if (!norm(f.gameName).includes(termo)) continue;
+        poe({ nome: f.gameName, tag: f.gameTag, icone: f.icon ?? null, online: f.availability ?? null, origem: 'client' });
+      }
+    }
+    for (const a of listaDeAmigos()) if (norm(a.nome).includes(termo)) poe({ nome: a.nome, tag: a.tag, origem: 'amigo' });
+
+    // Do banco: jogos com ele, última vez, último campeão. Sem tag pra partidas
+    // antigas até o completarTags passar por elas.
+    const linhas = db.prepare(`
+      SELECT j.nome nome, MAX(j.tag) tag, COUNT(*) jogos, MAX(p.quando) ultima,
+             (SELECT j2.championId FROM jogadores j2 JOIN partidas p2 ON p2.gameId = j2.gameId
+              WHERE j2.nome = j.nome ORDER BY p2.quando DESC LIMIT 1) championId,
+             SUM(CASE WHEN j.time = (SELECT m.time FROM jogadores m WHERE m.gameId = p.gameId AND m.participantId = p.meuId) THEN 1 ELSE 0 END) juntos
+      FROM jogadores j JOIN partidas p ON p.gameId = j.gameId
+      WHERE j.participantId <> p.meuId AND LOWER(j.nome) LIKE ? ESCAPE '\\'
+      GROUP BY j.nome ORDER BY jogos DESC LIMIT 40`).all('%' + termo.replace(/[%_\\]/g, (c) => '\\' + c) + '%');
+    for (const l of linhas) poe({ nome: l.nome, tag: l.tag || null, jogos: l.jogos, juntos: l.juntos, ultima: l.ultima, championId: l.championId, origem: 'partidas' });
+
+    const peso = (x) => (norm(x.nome).startsWith(termo) ? 1000 : 0) + (x.origens.includes('client') ? 500 : 0) + (x.origens.includes('amigo') ? 300 : 0) + Math.min(200, (x.jogos ?? 0) * 5) + (x.tag ? 50 : 0);
+    return [...saida.values()].sort((a, b) => peso(b) - peso(a)).slice(0, 8);
+  }
+
+  /**
+   * Partidas antigas guardaram só o nome de cada jogador, sem a #tag. O
+   * histórico do client entrega a tag de graça (sem gastar a chave da Riot),
+   * então, com o client aberto e fora de partida, completa aos poucos.
+   */
+  let completandoTags = false;
+  async function completarTags() {
+    if (completandoTags || !lcu.conectado) return;
+    completandoTags = true;
+    try {
+      const pendentes = db.prepare(`SELECT DISTINCT gameId FROM jogadores WHERE tag IS NULL ORDER BY gameId DESC LIMIT 60`).all();
+      if (!pendentes.length) return;
+      const upd = db.prepare('UPDATE jogadores SET tag = ?, puuid = ? WHERE gameId = ? AND participantId = ?');
+      let feitas = 0;
+      for (const { gameId } of pendentes) {
+        if (!lcu.conectado || faseAnterior === 'InProgress' || faseAnterior === 'ChampSelect') break;
+        const jogo = await lcu.get(`/lol-match-history/v1/games/${gameId}`).catch(() => null);
+        if (!jogo?.participantIdentities) { db.prepare("UPDATE jogadores SET tag = '' WHERE gameId = ? AND tag IS NULL").run(gameId); continue; }
+        for (const pi of jogo.participantIdentities) upd.run(pi.player?.tagLine ?? '', pi.player?.puuid ?? null, gameId, pi.participantId);
+        feitas++;
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      if (feitas) log(`tags completadas em ${feitas} partidas`);
+      if (pendentes.length === 60) setTimeout(completarTags, 5_000);
+    } catch (erro) { log(`completar tags: ${erro.message}`); }
+    finally { completandoTags = false; }
+  }
+  lcu.on('conectado', () => setTimeout(completarTags, 45_000));
+  setInterval(completarTags, 30 * 60 * 1000);
+
+  /**
    * A lista com o que já está em disco de cada um — nunca bate na Riot aqui.
    * Quem atualiza é a tela, um amigo por vez (`amigoPerfil`), pra não estourar
    * o limite da chave. `conta` é a sua conta nas telas: vira o "você" da
@@ -1067,7 +1136,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     campeoes, lerConfig, salvarConfig, vivo,
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
-    amigos, amigoPerfil, adicionarAmigo, removerAmigo,
+    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks,
     adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
@@ -1114,6 +1183,6 @@ const ACOES_DO_PAINEL = [
   'vivo', 'arte', 'campeoes', 'lerConfig', 'salvarConfig',
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
-  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo',
+  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash',
 ];

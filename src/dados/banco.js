@@ -98,6 +98,7 @@ function migrar(db) {
   const novas = {
     eventos: { wardType: 'TEXT', itemId: 'INTEGER', skillSlot: 'INTEGER', danoRecebido: 'TEXT' },
     partidas: { matchId: 'TEXT', fonte: 'TEXT' },
+    jogadores: { tag: 'TEXT', puuid: 'TEXT' },
   };
   for (const [tabela, campos] of Object.entries(novas)) {
     const tem = colunas(tabela);
@@ -134,14 +135,14 @@ export function salvarPartida(db, { partida: p, eu, achados, quando, zonaDe }) {
       p.matchId ?? null, p.fonte ?? 'lcu');
 
     const insJog = db.prepare(`INSERT INTO jogadores
-      (gameId, participantId, time, championId, campeao, nome, role, kills, deaths, assists, cs, ouro, dano, visao, wards)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
+      (gameId, participantId, time, championId, campeao, nome, role, kills, deaths, assists, cs, ouro, dano, visao, wards, tag, puuid)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`);
     for (const j of p.jogadores) {
       const s = j.stats;
       insJog.run(p.gameId, j.id, j.time, j.championId, j.campeao, j.nome, j.role,
         s.kills, s.deaths, s.assists,
         s.totalMinionsKilled + s.neutralMinionsKilled, s.goldEarned,
-        s.totalDamageDealtToChampions, s.visionScore, s.wardsPlaced);
+        s.totalDamageDealtToChampions, s.visionScore, s.wardsPlaced, j.tag ?? null, j.puuid ?? null);
     }
 
     const insFrame = db.prepare(`INSERT INTO frames
