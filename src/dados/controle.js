@@ -92,6 +92,20 @@ export function gravarControle(token, controle) {
   return gravarArquivo(token, 'controle.json', { ...CONTROLE_PADRAO, ...controle }, 'painel: controle atualizado');
 }
 
+/**
+ * Avaliações das falas (👍/👎) de qualquer usuário: avaliacoes/<id>-<gameId>.json.
+ * Cada arquivo é a lista da partida; regravar substitui (a lista inteira vem do app).
+ */
+export function gravarAvaliacoes(token, id, gameId, lista) {
+  return gravarArquivo(token, `avaliacoes/${id}-${gameId}.json`, lista, `avaliações ${id} ${gameId}`);
+}
+export async function listarAvaliacoes(token) {
+  const lista = await pedir(token, 'GET', 'avaliacoes');
+  if (!Array.isArray(lista)) return [];
+  const todas = await Promise.all(lista.filter((f) => f.name.endsWith('.json')).map((f) => lerArquivo(token, `avaliacoes/${f.name}`).then((a) => a?.dados).catch(() => null)));
+  return todas.filter(Array.isArray).flat();
+}
+
 /** Todos os check-ins, um por instalação. */
 export async function listarUsuarios(token) {
   const lista = await pedir(token, 'GET', 'usuarios');

@@ -6,7 +6,7 @@ import { abrirBanco } from './dados/banco.js';
 import { coletarPendentes } from './dados/coletor.js';
 import { readFile, writeFile, mkdir, readdir, rm, appendFile } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
-import { resolve } from 'node:path';
+import { resolve, basename } from 'node:path';
 import { F, render as renderFala, personalizar as personalizarFalas } from './vivo/texto.js';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
@@ -176,15 +176,29 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null })), falas };
   }
   /** Resumo por tipo de situação em todas as partidas gravadas: quantas, quantas faladas, 👍/👎. */
-  const baseChave = (chave) => String(chave).split('-').filter((p) => !/#|^d+$/.test(p)).join('-');
+  const { baseChave } = await import('./vivo/cerebro.js');
   async function situacoesResumo() {
     if (config.admin !== true) throw new Error('só pra admin');
     return resumoInterno();
+  }
+  let cacheRemotas = { em: 0, lista: [] };
+  async function avaliacoesRemotas() {
+    if (!tokenControle()) return [];
+    if (Date.now() - cacheRemotas.em < 10 * 60_000) return cacheRemotas.lista;
+    cacheRemotas = { em: Date.now(), lista: await Controle.listarAvaliacoes(tokenControle()).catch(() => cacheRemotas.lista) };
+    return cacheRemotas.lista;
   }
   async function resumoInterno() {
     const pastas = (await readdir(pastaSituacoes()).catch(() => []));
     const porChave = new Map();
     const base = baseChave;
+    // o que os amigos avaliaram (só admin junta; pra eles conta só o próprio)
+    if (config.admin === true) for (const a of await avaliacoesRemotas()) {
+      if (a.de === config.instalacaoId) continue;   // as minhas já estão nas pastas
+      const k = base(a.chave);
+      const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: a.tipo ?? '?', n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: a.texto }).get(k);
+      if (a.nota === 1) r.bom++; else if (a.nota === -1) r.ruim++;
+    }
     for (const p of pastas) {
       const [situacoes, avaliacoes] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl'))]);
       const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
@@ -200,11 +214,33 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     for (const t of tipos) t.silenciada = t.ruim >= 3 && t.bom === 0;
     return { partidas: pastas.length, tipos };
   }
-  async function avaliarSituacao({ pasta, chave, t, nota } = {}) {
-    if (config.admin !== true) throw new Error('só pra admin');
+  async function avaliarSituacao({ pasta, chave, t, nota, texto, tipo } = {}) {
+    const atual = partidaVivo?.pastaSitu ? basename(partidaVivo.pastaSitu) : null;
+    if (config.admin !== true && pasta !== atual) throw new Error('só a partida atual');
     if (!pasta || /[\\/]/.test(pasta)) throw new Error('pasta inválida');
     await appendFile(resolve(pastaSituacoes(), pasta, 'avaliacoes.jsonl'), JSON.stringify({ t, chave, nota, em: new Date().toISOString() }) + '\n');
+    subirAvaliacoes(pasta, { t, chave, nota, texto, tipo }).catch((erro) => log(`avaliação não subiu: ${erro.message}`));
     return { ok: true };
+  }
+  // Avaliações vão pro repositório de controle (uma gravação por vez, juntando o que chegou no meio)
+  const filaAval = new Map();   // pasta → lista pendente
+  let subindoAval = null;
+  async function subirAvaliacoes(pasta, item) {
+    if (!tokenControle()) return;
+    (filaAval.get(pasta) ?? filaAval.set(pasta, []).get(pasta)).push(item);
+    if (subindoAval) return subindoAval;
+    subindoAval = (async () => {
+      await new Promise((r) => setTimeout(r, 3000));   // junta cliques seguidos
+      for (const [p, itens] of [...filaAval]) {
+        filaAval.delete(p);
+        const gameId = (await lerJsonl(resolve(pastaSituacoes(), p, 'partida.json')))[0]?.gameId ?? p;
+        const todas = (await lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl'))).map((a) => ({ ...a, de: config.instalacaoId, conta: quemSou().conta }));
+        const textos = new Map(itens.map((i) => [`${i.t}|${i.chave}`, i]));
+        for (const a of todas) { const i = textos.get(`${a.t}|${a.chave}`); if (i) { a.texto = i.texto; a.tipo = i.tipo; } }
+        await Controle.gravarAvaliacoes(tokenControle(), config.instalacaoId, gameId, todas);
+      }
+    })().finally(() => { subindoAval = null; });
+    return subindoAval;
   }
   async function adminUsuarios() {
     const token = exigirAdmin();
@@ -554,7 +590,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
       // O olho: minimapa achado? onde cada um foi visto pela última vez.
       olho: resumoDoOlho(estado),
-      situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10),
+      situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
         const f = partidaVivo.flashes.get(j.nome);
@@ -662,7 +698,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (sit.falar) partidaVivo.falas.push(pronta);
       const cs = (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() });
       cs.total++; if (sit.falar) cs.faladas++; cs.porTipo.set(sit.tipo, (cs.porTipo.get(sit.tipo) ?? 0) + 1);
-      (partidaVivo.situacoesRecentes ??= []).push({ t: Math.round(e.tempo), chave: sit.chave, prioridade: sit.prioridade, texto: pronta.serio, falada: sit.falar });
+      (partidaVivo.situacoesRecentes ??= []).push({ t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, texto: pronta.serio, falada: sit.falar });
       if (partidaVivo.situacoesRecentes.length > 20) partidaVivo.situacoesRecentes.splice(0, partidaVivo.situacoesRecentes.length - 20);
     }
     // foto do mundo 1x por segundo

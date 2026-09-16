@@ -137,6 +137,7 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 .situ{display:flex;gap:8px;font-size:12px;color:var(--texto);padding:4px 8px;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-s)}
 .situ span{color:var(--apagado);font-variant-numeric:tabular-nums}
 .situ.quieta{color:var(--apagado)} .situ.p3{border-color:#5c2226}
+.situ .aval{margin-left:auto;display:flex;gap:6px;font-weight:normal} .situ .aval i{cursor:pointer;font-style:normal;opacity:.45;filter:grayscale(1)} .situ .aval i:hover{opacity:1;filter:none} .situ .aval.bom i[data-n="1"],.situ .aval.ruim i[data-n="-1"]{opacity:1;filter:none}
 .linha .visto.agora{color:var(--ouro-claro)}
 .time h3 small{font-weight:400;color:var(--apagado);font-size:9.5px;text-transform:none;letter-spacing:0;margin-left:6px}
 .jgLinha{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--borda);font-size:12px;color:var(--fraco)}
@@ -277,6 +278,17 @@ function desenharVoz(){
 }
 desenharVoz();
 let ultimaFalaSeq = 0, ultimaSugestaoFalada = '';
+// 👍/👎 numa fala do minimapa: ensina o cérebro (fica gravado e vai pro Gabriel)
+const avaliadas = new Map();
+let pastaSituAtual = null, ultimoDado = null;
+document.addEventListener('click', async (ev) => {
+  const i = ev.target.closest('.aval i'); if (!i) return;
+  const b = i.parentElement, k = b.dataset.k, nota = Number(i.dataset.n);
+  const [t, ...resto] = k.split('|'); const chave = resto.join('|');
+  const s = (ultimoDado?.situacoes ?? []).find((x) => `${x.t}|${x.chave}` === k);
+  avaliadas.set(k, nota); b.classList.toggle('bom', nota === 1); b.classList.toggle('ruim', nota === -1);
+  try { await fetch('/api/situacoes/avaliar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pasta: pastaSituAtual, chave, t: Number(t), nota, texto: s?.texto, tipo: s?.tipo }) }); } catch {}
+});
 function falarNovas(falas){
   for (const f of falas ?? []) {
     if (f.seq <= ultimaFalaSeq) continue;
@@ -430,7 +442,7 @@ function desenhar(d){
 
       <h2 class="sec">Onde estão</h2>
       <div class="vistos">${vistos}</div>
-      ${(d.situacoes ?? []).length ? `<h2 class="sec">Minimapa</h2><div class="situs">${d.situacoes.slice().reverse().map(s => `<div class="situ ${s.falada ? '' : 'quieta'} p${s.prioridade}"><span>${mmss(s.t)}</span>${esc(s.texto)}</div>`).join('')}</div>` : ''}
+      ${(d.situacoes ?? []).length ? `<h2 class="sec">Minimapa</h2><div class="situs">${d.situacoes.slice().reverse().map(s => `<div class="situ ${s.falada ? '' : 'quieta'} p${s.prioridade}"><span>${mmss(s.t)}</span>${esc(s.texto)}${s.falada ? `<b class="aval ${avaliadas.get(`${s.t}|${s.chave}`) === 1 ? 'bom' : avaliadas.get(`${s.t}|${s.chave}`) === -1 ? 'ruim' : ''}" data-k="${esc(`${s.t}|${s.chave}`)}"><i data-n="1" title="boa">👍</i><i data-n="-1" title="lixo">👎</i></b>` : ''}</div>`).join('')}</div>` : ''}
       </div>
 
       <div class="col">
@@ -461,7 +473,7 @@ async function tick(){
     if (json === ultimoJson) return;
     ultimoJson = json;
     desenhar(d);
-    if (d.emJogo) falarNovas(d.falas);
+    if (d.emJogo) { falarNovas(d.falas); pastaSituAtual = d.pastaSitu ?? pastaSituAtual; } ultimoDado = d;
   } catch { /* painel caiu; a próxima tentativa resolve */ }
 }
 tick();
