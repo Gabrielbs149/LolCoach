@@ -59,11 +59,23 @@ function compilar(extra) {
   return { re, mapa };
 }
 
+/** "3:51" lido pela voz vira "3 horas e 51". Aqui vira "3 minutos e 51 segundos". */
+export function tempoPorExtenso(texto) {
+  return String(texto ?? '').replace(/(\d{1,2}):(\d{2})/g, (m, mi, se) => {
+    const min = Number(mi), seg = Number(se);
+    const pm = min === 1 ? '1 minuto' : `${min} minutos`;
+    const ps = seg === 1 ? '1 segundo' : `${seg} segundos`;
+    if (min === 0) return ps;
+    if (seg === 0) return pm;
+    return seg === 1 ? `${pm} e 1 segundo` : `${pm} e ${seg}`;
+  });
+}
+
 /** Texto pronto pra voz. `extra` = correções do config, por cima das nossas. */
 export function pronunciar(texto, extra = null) {
   const marca = JSON.stringify(extra ?? {});
   if (!compilado || compiladoDe !== marca) { compilado = compilar(extra); compiladoDe = marca; }
-  return String(texto ?? '').replace(compilado.re, (m) => {
+  return tempoPorExtenso(String(texto ?? '')).replace(compilado.re, (m) => {
     const troca = compilado.mapa.get(m.toLowerCase());
     if (troca == null) return m;
     // Mantém a inicial maiúscula se estava assim (começo de frase).
