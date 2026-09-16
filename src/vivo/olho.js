@@ -5,6 +5,8 @@
  * falas do jungler — o que o ABSOL chama de jungle tracking.
  */
 
+import { F } from './texto.js';
+
 const BARAO = { x: 0.334, y: 0.302 };
 const DRAGAO = { x: 0.666, y: 0.703 };
 const BASE_AZUL = { x: 0.105, y: 0.90 };
@@ -66,19 +68,19 @@ export function falasDoOlho({ vistos, eu, estado, agora = Date.now() }, mem) {
       if (!novo || agora - r.faladoEm < 6000 || j.morto) continue;
       if (ehJungler) {
         r.faladoEm = agora;
-        if (perto) dizer('jungler', `Jungler deles perto de você, ${l.texto}. Recua!`, `Jungler ${l.texto}, do seu lado. Sai daí!`, 3);
-        else if (l.lane === 'base') dizer('jungler', 'Jungler deles na base.', 'Jungler deles foi pra base. Janela livre.', 1);
-        else dizer('jungler', `Jungler deles ${l.texto}.`, `Jungler ${l.texto}. Olho nele.`, 2);
+        if (perto) dizer('jungler', F`Jungler deles perto de você, ${l.texto}. Recua!`, F`Jungler ${l.texto}, do seu lado. Sai daí!`, 3);
+        else if (l.lane === 'base') dizer('jungler', F('Jungler deles na base.'), F('Jungler deles foi pra base. Janela livre.'), 1);
+        else dizer('jungler', F`Jungler deles ${l.texto}.`, F`Jungler ${l.texto}. Olho nele.`, 2);
       } else if ((perto || noMeuLado) && LANE_DE[j.role] !== minhaLane && l.lane !== 'base') {
         // Laner de outra rota chegando no meu lado: roam.
         r.faladoEm = agora;
-        if (perto) dizer('mapa', `${j.campeao} perto de você, ${l.texto}.`, `${j.campeao} veio te visitar, ${l.texto}. Cuidado.`, 3);
-        else dizer('mapa', `${j.campeao} chegando ${l.texto}.`, `${j.campeao} veio passear ${l.texto}. Cuidado.`, 3);
+        if (perto) dizer('mapa', F`${j.campeao} perto de você, ${l.texto}.`, F`${j.campeao} veio te visitar, ${l.texto}. Cuidado.`, 3);
+        else dizer('mapa', F`${j.campeao} chegando ${l.texto}.`, F`${j.campeao} veio passear ${l.texto}. Cuidado.`, 3);
       }
     } else if (r.vistoEm && !r.sumiuDito && agora - r.vistoEm > (ehJungler ? 20000 : 30000) && !j.morto) {
       r.sumiuDito = true;
-      if (ehJungler) dizer('jungler', `Jungler sumiu. Última vez ${r.texto ?? 'no mapa'}.`, `Perdi o jungler. Tava ${r.texto ?? 'por aí'}.`, 1);
-      else if (j.role === 'mid' && r.lane === 'mid' && agora - r.sumiuEm > 60000 && minhaLane !== 'mid') { r.sumiuEm = agora; dizer('mapa', `${j.campeao} sumiu do mid. Cuidado com roam.`, `Mid deles sumiu. Se ele aparecer aí, não foi passear.`, 2); }
+      if (ehJungler) dizer('jungler', F`Jungler sumiu. Última vez ${r.texto ?? 'no mapa'}.`, F`Perdi o jungler. Tava ${r.texto ?? 'por aí'}.`, 1);
+      else if (j.role === 'mid' && r.lane === 'mid' && agora - r.sumiuEm > 60000 && minhaLane !== 'mid') { r.sumiuEm = agora; dizer('mapa', F`${j.campeao} sumiu do mid. Cuidado com roam.`, F`Mid deles sumiu. Se ele aparecer aí, não foi passear.`, 2); }
     }
   }
 
@@ -87,7 +89,7 @@ export function falasDoOlho({ vistos, eu, estado, agora = Date.now() }, mem) {
     const n = vistos.filter((v) => dist(v, pit) < 0.1).length;
     if (n >= 3 && agora - mem.grupoEm > 30000) {
       mem.grupoEm = agora;
-      dizer('mapa', `${n === 5 ? 'Os cinco' : n === 4 ? 'Quatro deles' : 'Três deles'} no ${nome}.`, `${n} deles no ${nome}. Ou junta o time ou pega o outro lado.`, 3);
+      dizer('mapa', F`${n === 5 ? 'Os cinco' : n === 4 ? 'Quatro deles' : 'Três deles'} no ${nome}.`, F`${n} deles no ${nome}. Ou junta o time ou pega o outro lado.`, 3);
     }
   }
   return saida;

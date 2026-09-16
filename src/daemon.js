@@ -7,6 +7,7 @@ import { coletarPendentes } from './dados/coletor.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
 import { resolve } from 'node:path';
+import { F, render as renderFala, personalizar as personalizarFalas } from './vivo/texto.js';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { release as versaoDoWindows } from 'node:os';
@@ -387,6 +388,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   // memória do rastreio (eventos já lidos, itens e níveis da última leitura).
   // Zera quando o relógio do jogo volta pra trás — é uma partida nova.
   let partidaVivo = null;
+  // Toda fala passa por aqui antes de ir pra tela: aplica o texto que o admin
+  // personalizou (config.voz.falas) e preenche os {n}.
+  const prontaFala = (f) => { personalizarFalas(config.voz?.falas ?? {}); return { ...f, serio: renderFala(f.serio), divertido: renderFala(f.divertido ?? f.serio) }; };
 
   async function vivo() {
     const [{ lerEstado }, { montarPerfil }, { montarConselhos }, { fichasDaPartida }, R] = await Promise.all([
@@ -447,7 +451,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { falasNovas } = await import('./vivo/falas.js');
     partidaVivo.ultimoEstado = estado;
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
-      partidaVivo.falas.push({ ...f, seq: ++seqFalas, t: estado.tempo });
+      partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: estado.tempo }));
     }
 
     return {
@@ -486,9 +490,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const temIonia = (alvo.itens ?? []).some((i) => i.id === IONIA);
     const volta = e.tempo + (temIonia ? 268 : 300);
     partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
-    partidaVivo.falas.push({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
-      serio: `Flash do ${alvo.campeao} marcado. Volta em ${temIonia ? 'quatro e meio' : 'cinco'} minutos.`,
-      divertido: `${alvo.campeao} sem flash. Cinco minutos de temporada de caça.` });
+    partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
+      serio: F`Flash do ${alvo.campeao} marcado. Volta em ${temIonia ? 'quatro e meio' : 'cinco'} minutos.`,
+      divertido: F`${alvo.campeao} sem flash. Cinco minutos de temporada de caça.` }));
     log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')}`);
     return { ok: true, campeao: alvo.campeao, volta };
   }
@@ -510,7 +514,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { falasDoOlho } = await import('./vivo/olho.js');
     const e = partidaVivo.ultimoEstado;
     for (const f of falasDoOlho({ vistos: dados.vistos ?? [], eu: dados.eu ?? null, estado: e }, partidaVivo.memOlho)) {
-      partidaVivo.falas.push({ ...f, seq: ++seqFalas, t: e.tempo });
+      partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: e.tempo }));
     }
   }
   function resumoDoOlho(estado) {
@@ -526,8 +530,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const novas = [];
     for (const f of partidaVivo.flashes.values()) {
       const em = f.volta - tempo;
-      if (!f.avisado60 && em <= 60 && em > 0) { f.avisado60 = true; novas.push({ modulo: 'flash', prioridade: 1, serio: `Flash do ${f.campeao} volta em um minuto.`, divertido: `Um minuto e o ${f.campeao} tem flash de novo. Aproveita agora.` }); }
-      if (!f.avisadoVolta && em <= 0) { f.avisadoVolta = true; novas.push({ modulo: 'flash', prioridade: 2, serio: `Flash do ${f.campeao} está de volta.`, divertido: `${f.campeao} tem flash de novo. Acabou a farra.` }); }
+      if (!f.avisado60 && em <= 60 && em > 0) { f.avisado60 = true; novas.push({ modulo: 'flash', prioridade: 1, serio: F`Flash do ${f.campeao} volta em um minuto.`, divertido: F`Um minuto e o ${f.campeao} tem flash de novo. Aproveita agora.` }); }
+      if (!f.avisadoVolta && em <= 0) { f.avisadoVolta = true; novas.push({ modulo: 'flash', prioridade: 2, serio: F`Flash do ${f.campeao} está de volta.`, divertido: F`${f.campeao} tem flash de novo. Acabou a farra.` }); }
     }
     return novas;
   }
@@ -570,12 +574,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { falasDaSelecao } = await import('./vivo/falas.js');
     const runas = ultimasRunas && meuCampeao && ultimasRunas.campeao === meuCampeao ? ultimasRunas : null;
     for (const f of falasDaSelecao({ rota, inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados, meuCampeao, sugestaoBan, runas }, selecaoMem)) {
-      selecaoMem.falas.push({ ...f, seq: ++seqFalas });
+      selecaoMem.falas.push(prontaFala({ ...f, seq: ++seqFalas }));
     }
     return {
       fase: s.timer?.phase ?? '', rota, meuCampeao,
       inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados: aliados.map((id) => ({ id, nome: nomeDe(id) })),
-      sugestao: selecaoCache.chave === chave ? selecaoCache.sugestao : null,
+      sugestao: selecaoCache.chave === chave && selecaoCache.sugestao ? { ...selecaoCache.sugestao, fala: selecaoCache.sugestao.fala ? prontaFala(selecaoCache.sugestao.fala) : null } : null,
       sugestaoBan, falas: selecaoMem.falas.slice(-8),
     };
   }
@@ -986,6 +990,16 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { VOZES } = await import('./vivo/voz.js');
     return { vozes: VOZES, ...vozCfg() };
   }
+  /** Catálogo de todas as falas (lido do próprio código) + o que o admin mudou. */
+  async function vozFalas() {
+    if (config.admin !== true) throw new Error('só pra admin');
+    const { catalogo } = await import('./vivo/texto.js');
+    const fontes = [];
+    for (const [arquivo, opcoes] of [['./vivo/falas.js', {}], ['./vivo/olho.js', { secaoFixa: 'olho no minimapa' }], ['./daemon.js', { moduloFixo: 'flash', secaoFixa: 'flash' }]]) {
+      fontes.push({ src: await readFile(new URL(arquivo, import.meta.url), 'utf8'), arquivo, ...opcoes });
+    }
+    return { catalogo: catalogo(fontes), personalizadas: config.voz?.falas ?? {} };
+  }
   const vozEmAndamento = new Map();
   /** `voz`/`ritmo` opcionais servem pra ouvir uma voz antes de escolher. */
   async function vozFalar({ texto, voz, ritmo } = {}) {
@@ -1157,7 +1171,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     campeoes, lerConfig, salvarConfig, vivo,
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
-    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar,
+    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas,
     adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
@@ -1204,6 +1218,6 @@ const ACOES_DO_PAINEL = [
   'vivo', 'arte', 'campeoes', 'lerConfig', 'salvarConfig',
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
-  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar',
+  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash',
 ];

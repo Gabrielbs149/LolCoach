@@ -287,6 +287,10 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       }
 
       // Voz do coach (neural do Edge): lista de vozes e o mp3 de uma frase.
+      if (url.pathname === '/api/voz/falas' && acoes.vozFalas) {
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.vozFalas())); }
+        catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       if (url.pathname === '/api/voz/vozes' && acoes.vozVozes) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.vozVozes())); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }

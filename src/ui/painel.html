@@ -644,6 +644,27 @@ h2:first-child{margin-top:0}
 .linhaCfg:last-child{border-bottom:0}
 .linhaCfg .txt{flex:1;min-width:0}
 .linhaCfg .cfgSel{margin:0;width:240px}
+/* Falas: caixa retrátil com todas as frases da voz, editáveis. {1} {2} são os pedaços que mudam. */
+.falasCaixa{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);margin-top:var(--e3)}
+.falasCaixa summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:10px;padding:12px 14px;font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--apagado);font-weight:700}
+.falasCaixa summary::-webkit-details-marker{display:none}
+.falasCaixa summary::before{content:"▸";font-size:12px;transition:transform .12s}
+.falasCaixa[open] summary::before{transform:rotate(90deg)}
+.falasCaixa summary small{text-transform:none;letter-spacing:0;font-weight:500;color:var(--apagado)}
+.falasTopo{display:flex;gap:10px;align-items:center;padding:0 14px 10px;flex-wrap:wrap;border-bottom:1px solid var(--borda)}
+.falasTopo .busca{max-width:220px;margin:0}
+.falasTopo .cfgSel{width:200px}
+.falasSo{font-size:12px;color:var(--fraco);display:flex;align-items:center;gap:6px;cursor:pointer}
+.falasGrupo{padding:10px 14px 2px;font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--ouro);font-weight:700}
+.fala{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 26px;gap:10px;align-items:center;padding:6px 14px;border-bottom:1px solid var(--borda)}
+.fala .orig{font-size:12px;color:var(--fraco);line-height:1.35}
+.fala .orig b{color:var(--ouro-claro);font-weight:600}
+.fala input{width:100%;background:var(--f2);border:1px solid var(--borda);color:var(--texto);font:inherit;font-size:12.5px;padding:6px 9px;border-radius:var(--r-s)}
+.fala input:focus{outline:none;border-color:var(--ouro)}
+.fala.mudada input{border-color:var(--ouro);color:var(--ouro-claro)}
+.fala button{background:none;border:0;color:var(--apagado);cursor:pointer;font:inherit;font-size:14px;visibility:hidden}
+.fala.mudada button{visibility:visible} .fala button:hover{color:var(--der)}
+.falasVazio{padding:16px 14px;color:var(--apagado);font-size:12.5px}
 .pronuncias{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px}
 .pronuncias:not(:empty){padding-bottom:10px}
 .pronuncias span{background:var(--f2);border:1px solid var(--borda);border-radius:99px;padding:3px 9px;font-size:11.5px;color:var(--fraco)}
@@ -1125,6 +1146,16 @@ h2{letter-spacing:1px}
       <div class="pronuncias vozEdge" id="vPronuncias"></div>
       <div id="vAviso"></div>
     </div>
+
+    <details class="falasCaixa soAdmin" id="falasCaixa" hidden ontoggle="if(this.open) carregarFalas()">
+      <summary><span>Falas</span><small id="falasResumo"></small></summary>
+      <div class="falasTopo">
+        <input class="busca" id="falasBusca" placeholder="procurar…" autocomplete="off" oninput="desenharFalas()">
+        <select class="contaSel cfgSel" id="falasModulo" onchange="desenharFalas()"></select>
+        <label class="falasSo"><input type="checkbox" id="falasSoMudadas" onchange="desenharFalas()"> só as mudadas</label>
+      </div>
+      <div id="falasLista"></div>
+    </details>
 
     <h2>Teclas</h2>
     <div class="painelCfg">
@@ -2882,6 +2913,51 @@ async function vozMudar(){
   $('#vAviso').innerHTML = '';
   try { await postConfig({ voz }); } catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
   document.querySelectorAll('.vozEdge').forEach(el => { el.hidden = voz.motor !== 'edge'; });
+}
+/* ------------------------------------------------------------ falas */
+let falasCat = null, falasPers = {};
+const MODULO_NOME = { timers: 'Timers', flash: 'Flash', kills: 'Kills e mortes', jungler: 'Jungler', spikes: 'Itens e nível', economia: 'Gold', lane: 'Lane', mapa: 'Mapa', selecao: 'Seleção', outros: 'Outras' };
+async function carregarFalas(){
+  if(falasCat) return;
+  try {
+    const r = await pegar('/api/voz/falas');
+    if(r.erro) throw new Error(r.erro);
+    falasCat = r.catalogo; falasPers = r.personalizadas ?? {};
+    const mods = [...new Set(falasCat.map(f => f.modulo))];
+    $('#falasModulo').innerHTML = '<option value="">todos os módulos</option>' + mods.map(m => `<option value="${m}">${MODULO_NOME[m] ?? m}</option>`).join('');
+    desenharFalas();
+  } catch(e){ $('#falasLista').innerHTML = `<div class="falasVazio">${esc(e.message)}</div>`; }
+}
+const marcarChaves = (t) => esc(t).replace(/\{(\d+)\}/g, '<b>{$1}</b>');
+function desenharFalas(){
+  if(!falasCat) return;
+  const q = ($('#falasBusca').value ?? '').trim().toLowerCase();
+  const mod = $('#falasModulo').value;
+  const so = $('#falasSoMudadas').checked;
+  const lista = falasCat.filter(f => (!mod || f.modulo === mod) && (!so || falasPers[f.modelo]) && (!q || f.modelo.toLowerCase().includes(q) || (falasPers[f.modelo] ?? '').toLowerCase().includes(q)));
+  const n = Object.keys(falasPers).filter(k => falasPers[k]).length;
+  $('#falasResumo').textContent = `${falasCat.length} frases${n ? ` · ${n} mudada${n > 1 ? 's' : ''}` : ''}`;
+  if(!lista.length){ $('#falasLista').innerHTML = '<div class="falasVazio">nada aqui</div>'; return; }
+  let html = '', grupo = '';
+  lista.forEach((f) => {
+    const g = `${MODULO_NOME[f.modulo] ?? f.modulo}${f.secao ? ' · ' + f.secao : ''}`;
+    if(g !== grupo){ grupo = g; html += `<div class="falasGrupo">${esc(g)}</div>`; }
+    const i = falasCat.indexOf(f);
+    const v = falasPers[f.modelo] ?? '';
+    html += `<div class="fala ${v ? 'mudada' : ''}" data-i="${i}"><div class="orig">${marcarChaves(f.modelo)}</div><input value="${esc(v)}" placeholder="${esc(f.modelo)}" onchange="falaMudar(${i}, this.value)" onkeydown="if(event.key==='Escape'){this.value='';falaMudar(${i},'')}"><button title="voltar ao original" onclick="falaMudar(${i}, '')">×</button></div>`;
+  });
+  $('#falasLista').innerHTML = html;
+}
+async function falaMudar(i, texto){
+  const f = falasCat[i]; if(!f) return;
+  texto = String(texto ?? '').trim();
+  const falas = { ...falasPers };
+  if(!texto || texto === f.modelo) delete falas[f.modelo]; else falas[f.modelo] = texto;
+  try {
+    await postConfig({ voz: { ...(cfg.voz ?? {}), falas } });
+    falasPers = falas; cfg.voz.falas = falas;
+    desenharFalas();
+  } catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
 }
 let vozTesteAudio = null;
 async function vozTestar(b){
