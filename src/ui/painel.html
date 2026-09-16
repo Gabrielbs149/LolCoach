@@ -1160,7 +1160,7 @@ h2{letter-spacing:1px}
     <h2>Teclas</h2>
     <div class="painelCfg">
       <div class="linhaCfg">
-        <div class="txt"><b>Marcar flash</b><i>1º ao 5º inimigo</i></div>
+        <div class="txt"><b>Marcar flash</b><i>top · jungle · mid · adc · sup</i></div>
         <div class="teclas5"><button class="tecla" id="tFlash0" onclick="capturarTecla(0, this)"></button><button class="tecla" id="tFlash1" onclick="capturarTecla(1, this)"></button><button class="tecla" id="tFlash2" onclick="capturarTecla(2, this)"></button><button class="tecla" id="tFlash3" onclick="capturarTecla(3, this)"></button><button class="tecla" id="tFlash4" onclick="capturarTecla(4, this)"></button></div>
       </div>
       <div class="linhaCfg">
@@ -2822,7 +2822,7 @@ const teclaBonita = (a) => String(a ?? '').replace('Control', 'Ctrl').replace(/\
 function desenharTeclas(){
   const at = { ...ATALHO_PADRAO, ...(cfg.atalhos ?? {}) };
   const fl = Array.isArray(at.flashes) && at.flashes.length === 5 ? at.flashes : ATALHO_PADRAO.flashes;
-  fl.forEach((a, i) => { const b = $('#tFlash' + i); b.textContent = teclaBonita(a); b.dataset.n = (i + 1) + 'º'; b.dataset.acel = a; });
+  fl.forEach((a, i) => { const b = $('#tFlash' + i); b.textContent = teclaBonita(a); b.dataset.n = ['top', 'jg', 'mid', 'adc', 'sup'][i]; b.dataset.acel = a; });
   $('#tOverlay').textContent = teclaBonita(at.overlay); $('#tOverlay').dataset.acel = at.overlay;
   $('#tPainel').textContent = teclaBonita(at.painel); $('#tPainel').dataset.acel = at.painel;
 }

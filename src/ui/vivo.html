@@ -298,8 +298,9 @@ const linhaJogador = (j, souEu, posicao = 0, flash = null) => `
     ${icone(j.campeao)}<span class="n">${esc(j.campeao)}${vistoTxt(j.visto)}</span>
     <span class="kda">${j.kills}/${j.mortes}/${j.assists}</span>
     <span class="cs">${j.cs} cs</span>
-    ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash (Ctrl+Alt+${posicao})" onclick="marcarFlash(${posicao})">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}</div>`;
+    ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash" onclick="marcarFlashDe('${esc(j.campeao).replace(/'/g, '&#39;')}')">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}</div>`;
 async function marcarFlash(posicao){ try { await fetch('/api/flash?posicao=' + posicao, { method: 'POST' }); } catch {} }
+async function marcarFlashDe(campeao){ try { await fetch('/api/flash?nome=' + encodeURIComponent(campeao), { method: 'POST' }); } catch {} }
 
 /** A ficha de um adversário: seu histórico contra ele, o que dele te mata, e como jogar. */
 function fichaContra(f, eu){

@@ -468,7 +468,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const f = partidaVivo.flashes.get(j.nome);
         const r = partidaVivo.memOlho?.porCampeao.get(j.nome);
         return { posicao: i + 1, campeao: j.campeao, role: j.role, morto: j.morto, nivel: j.nivel,
-          tecla: config.atalhos?.flashes?.[i] ?? null, flashEm: f ? Math.max(0, Math.round(f.volta - estado.tempo)) : null, flashMarcado: !!f,
+          tecla: config.atalhos?.flashes?.[['top', 'jungle', 'mid', 'adc', 'sup'].indexOf(j.role) >= 0 ? ['top', 'jungle', 'mid', 'adc', 'sup'].indexOf(j.role) : i] ?? null, flashEm: f ? Math.max(0, Math.round(f.volta - estado.tempo)) : null, flashMarcado: !!f,
           visto: r?.vistoEm ? { texto: r.texto, lane: r.lane, lado: r.lado, ha: Math.round((Date.now() - r.vistoEm) / 1000), x: r.x, y: r.y } : null };
       }),
     };
@@ -485,7 +485,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (!partidaVivo?.ultimoEstado) throw new Error('sem partida rodando');
     const e = partidaVivo.ultimoEstado;
     const inimigos = e.jogadores.filter((j) => j.time !== e.eu.time);
-    const alvo = nome ? inimigos.find((j) => j.nome === nome || j.campeao === nome) : inimigos[Number(posicao) - 1];
+    // Tecla por FUNÇÃO (1 top, 2 jungle, 3 mid, 4 adc, 5 sup), não pela ordem da lista.
+    const ROTA_DA_TECLA = ['top', 'jungle', 'mid', 'adc', 'sup'];
+    const rota = ROTA_DA_TECLA[Number(posicao) - 1];
+    const alvo = nome ? inimigos.find((j) => j.nome === nome || j.campeao === nome) : (inimigos.find((j) => j.role === rota) ?? inimigos[Number(posicao) - 1]);
     if (!alvo) throw new Error('inimigo não achado');
     const temIonia = (alvo.itens ?? []).some((i) => i.id === IONIA);
     const volta = e.tempo + (temIonia ? 268 : 300);
