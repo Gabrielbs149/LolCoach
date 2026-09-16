@@ -150,6 +150,34 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (!tokenControle()) throw new Error('sem token do controle nesta versão');
     return tokenControle();
   };
+  /* ---- situações gravadas: ver e avaliar (base do aprendizado) ---- */
+  const pastaSituacoes = () => resolve(pastaBase(), 'dados', 'situacoes');
+  const lerJsonl = async (arquivo) => (await readFile(arquivo, 'utf8').catch(() => '')).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+  async function situacoesPartidas() {
+    if (config.admin !== true) throw new Error('só pra admin');
+    const pastas = (await readdir(pastaSituacoes()).catch(() => [])).sort().reverse();
+    const saida = [];
+    for (const p of pastas.slice(0, 30)) {
+      const info = (await lerJsonl(resolve(pastaSituacoes(), p, 'partida.json')))[0] ?? {};
+      const n = (await lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl'))).length;
+      saida.push({ pasta: p, inicio: info.inicio ?? null, campeao: info.eu?.campeao ?? null, role: info.eu?.role ?? null, situacoes: n });
+    }
+    return saida;
+  }
+  async function situacoesDe({ pasta } = {}) {
+    if (config.admin !== true) throw new Error('só pra admin');
+    if (!pasta || /[\\/]/.test(pasta)) throw new Error('pasta inválida');
+    const base = resolve(pastaSituacoes(), pasta);
+    const [partida, situacoes, falas, avaliacoes] = await Promise.all([lerJsonl(resolve(base, 'partida.json')), lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'avaliacoes.jsonl'))]);
+    const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+    return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null })), falas };
+  }
+  async function avaliarSituacao({ pasta, chave, t, nota } = {}) {
+    if (config.admin !== true) throw new Error('só pra admin');
+    if (!pasta || /[\\/]/.test(pasta)) throw new Error('pasta inválida');
+    await appendFile(resolve(pastaSituacoes(), pasta, 'avaliacoes.jsonl'), JSON.stringify({ t, chave, nota, em: new Date().toISOString() }) + '\n');
+    return { ok: true };
+  }
   async function adminUsuarios() {
     const token = exigirAdmin();
     const [usuarios, controle, downloads] = await Promise.all([
@@ -1243,7 +1271,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
-    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -1290,5 +1318,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao',
 ];

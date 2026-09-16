@@ -665,6 +665,14 @@ h2:first-child{margin-top:0}
 .fala button{background:none;border:0;color:var(--apagado);cursor:pointer;font:inherit;font-size:14px;visibility:hidden}
 .fala.mudada button{visibility:visible} .fala button:hover{color:var(--der)}
 .falasVazio{padding:16px 14px;color:var(--apagado);font-size:12.5px}
+.situ{display:grid;grid-template-columns:44px 1fr auto auto;gap:10px;align-items:center;padding:5px 14px;border-bottom:1px solid var(--borda);font-size:12.5px}
+.situ .t{color:var(--apagado);font-variant-numeric:tabular-nums}
+.situ .chave{display:block;font-size:10.5px;color:var(--apagado)}
+.situ.falada .txt{color:var(--texto)} .situ:not(.falada) .txt{color:var(--fraco)}
+.situ .p{font-size:10px;font-weight:700;color:var(--apagado);padding:1px 6px;border:1px solid var(--borda);border-radius:99px}
+.situ .p3{color:var(--der);border-color:#5c2226} .situ .p2{color:var(--g2)}
+.situ .nota button{background:var(--f2);border:1px solid var(--borda);color:var(--fraco);font:inherit;font-size:12px;padding:2px 7px;border-radius:var(--r-s);cursor:pointer}
+.situ .nota button.on{border-color:var(--ouro);color:var(--ouro-claro)}
 .pronuncias{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px}
 .pronuncias:not(:empty){padding-bottom:10px}
 .pronuncias span{background:var(--f2);border:1px solid var(--borda);border-radius:99px;padding:3px 9px;font-size:11.5px;color:var(--fraco)}
@@ -1056,6 +1064,15 @@ h2{letter-spacing:1px}
     <div class="titulo">Admin <span id="admSalvo" class="salvo"></span></div>
     <div class="acoes"><button class="acao" onclick="modoEdicao(true)">Entrar no modo edição</button></div>
     <div id="admAviso"></div>
+
+    <details class="falasCaixa" id="situCaixa" ontoggle="if(this.open) carregarSituacoes()">
+      <summary><span>Situações da partida</span><small id="situResumo"></small></summary>
+      <div class="falasTopo">
+        <select class="contaSel cfgSel" id="situPartida" onchange="abrirSituacoes(this.value)"></select>
+        <label class="falasSo"><input type="checkbox" id="situSoFaladas" onchange="desenharSituacoes()"> só as faladas</label>
+      </div>
+      <div id="situLista"></div>
+    </details>
 
     <h2>Todo mundo</h2>
     <div class="painelCfg">
@@ -2972,6 +2989,37 @@ async function vozTestar(b){
     vozTesteAudio?.pause(); vozTesteAudio = new Audio(url); await vozTesteAudio.play();
   } catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
   b.disabled = false; b.textContent = antes;
+}
+
+/* ------------------------------------------------------- situações gravadas */
+let situPartidas = [], situAtual = null, situDados = null;
+async function carregarSituacoes(){
+  try { situPartidas = await pegar('/api/situacoes'); } catch { situPartidas = []; }
+  const sel = $('#situPartida');
+  sel.innerHTML = situPartidas.length ? situPartidas.map(p => `<option value="${esc(p.pasta)}">${esc((p.inicio ?? p.pasta).slice(0, 16).replace('T', ' '))} · ${esc(p.campeao ?? '?')} ${esc(role(p.role ?? ''))} · ${p.situacoes}</option>`).join('') : '<option value="">nenhuma partida gravada</option>';
+  $('#situResumo').textContent = situPartidas.length ? `${situPartidas.length} partida${situPartidas.length > 1 ? 's' : ''}` : '';
+  if(situPartidas.length) abrirSituacoes(situPartidas[0].pasta);
+}
+async function abrirSituacoes(pasta){
+  if(!pasta) return;
+  situAtual = pasta;
+  try { situDados = await pegar('/api/situacoes?pasta=' + encodeURIComponent(pasta)); } catch { situDados = null; }
+  desenharSituacoes();
+}
+function desenharSituacoes(){
+  const el = $('#situLista'); if(!situDados){ el.innerHTML = '<div class="falasVazio">nada aqui</div>'; return; }
+  const so = $('#situSoFaladas').checked;
+  const lista = situDados.situacoes.filter(s => !so || s.falada);
+  const mm = (t) => `${Math.floor(t/60)}:${String(Math.floor(t%60)).padStart(2,'0')}`;
+  el.innerHTML = lista.length ? lista.map((s, i) => `<div class="situ ${s.falada ? 'falada' : ''}"><span class="t">${mm(s.t)}</span><span class="txt">${esc(s.texto)}<span class="chave">${esc(s.chave)}${s.falada ? '' : ' · não falada'}</span></span><span class="p p${s.prioridade}">p${s.prioridade}</span><span class="nota"><button class="${s.nota === 1 ? 'on' : ''}" onclick="avaliarSitu(${i}, 1)">👍</button> <button class="${s.nota === -1 ? 'on' : ''}" onclick="avaliarSitu(${i}, -1)">👎</button></span></div>`).join('') : '<div class="falasVazio">nada aqui</div>';
+}
+async function avaliarSitu(i, nota){
+  const so = $('#situSoFaladas').checked;
+  const lista = situDados.situacoes.filter(s => !so || s.falada);
+  const s = lista[i]; if(!s) return;
+  s.nota = s.nota === nota ? 0 : nota;
+  try { await fetch('/api/situacoes/avaliar', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ pasta: situAtual, chave: s.chave, t: s.t, nota: s.nota }) }); } catch {}
+  desenharSituacoes();
 }
 
 /* =============================================================== atividade */

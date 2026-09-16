@@ -174,6 +174,16 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
 
       // Painel admin: quem usa e o controle. Só responde pra quem é admin
       // (o daemon confere) — pra todo o resto é 403.
+      // Situações gravadas (admin): lista de partidas, uma partida, avaliação.
+      if (url.pathname === '/api/situacoes' && acoes.situacoesPartidas) {
+        try { const pasta = url.searchParams.get('pasta'); return enviar(200, 'application/json', JSON.stringify(pasta ? await acoes.situacoesDe({ pasta }) : await acoes.situacoesPartidas())); }
+        catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
+      if (req.method === 'POST' && url.pathname === '/api/situacoes/avaliar' && acoes.avaliarSituacao) {
+        const pedacos = []; for await (const p of req) pedacos.push(p);
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.avaliarSituacao(JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}')))); }
+        catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       if (url.pathname === '/api/admin/usuarios' && acoes.adminUsuarios) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.adminUsuarios())); }
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
