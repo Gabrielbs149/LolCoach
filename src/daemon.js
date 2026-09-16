@@ -756,6 +756,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       (partidaVivo.torresEstranhas ??= new Set());
       if (!partidaVivo.torresEstranhas.has(ev.torre)) { partidaVivo.torresEstranhas.add(ev.torre); log(`torre com nome desconhecido: ${ev.torre} (por ${ev.autor})`); }
     }
+    // Eventos novos (kills, torres, dragões…) vão inteiros pro eventos.jsonl: o replay precisa deles pros timers.
+    if (partidaVivo.pastaSitu) {
+      partidaVivo.eventosGravados ??= new Set();
+      for (const ev of estado.eventos ?? []) { if (ev.id == null || partidaVivo.eventosGravados.has(ev.id)) continue; partidaVivo.eventosGravados.add(ev.id); appendFile(resolve(partidaVivo.pastaSitu, 'eventos.jsonl'), JSON.stringify(ev) + '\n').catch(() => {}); }
+    }
     // Retrato da API do jogo a cada 5 s (placar, itens, níveis, gold): contexto pras situações.
     if (partidaVivo.pastaSitu && Date.now() - ultimoRetrato >= 5000) {
       ultimoRetrato = Date.now();

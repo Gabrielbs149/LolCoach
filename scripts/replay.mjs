@@ -8,7 +8,7 @@
  *
  * As leituras guardam o mundo já digerido (x, y, "há quanto tempo"); aqui a
  * leitura crua é reconstruída como "quem foi visto neste segundo" (ha ≤ 1).
- * Eventos (dragão, torre…) não estão gravados: objetivos ficam no padrão.
+ * Eventos (dragão, torre…) vêm de eventos.jsonl quando a partida os gravou.
  */
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -21,7 +21,7 @@ import { conferir } from '../src/vivo/conferir.js';
 const lerJsonl = async (p) => (await readFile(p, 'utf8').catch(() => '')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
 
 async function replay(pasta) {
-  const [partida, leituras, estados] = await Promise.all([lerJsonl(resolve(pasta, 'partida.json')), lerJsonl(resolve(pasta, 'leituras.jsonl')), lerJsonl(resolve(pasta, 'estado.jsonl'))]);
+  const [partida, leituras, estados, eventos] = await Promise.all([lerJsonl(resolve(pasta, 'partida.json')), lerJsonl(resolve(pasta, 'leituras.jsonl')), lerJsonl(resolve(pasta, 'estado.jsonl')), lerJsonl(resolve(pasta, 'eventos.jsonl'))]);
   const p = partida[0];
   if (!p?.eu || !leituras.length) { console.log(`${pasta}: sem gravação completa`); return null; }
   const LANE_DE = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'bot', sup: 'bot' };
@@ -37,7 +37,7 @@ async function replay(pasta) {
       return { ...j, nivel: s.nivel ?? 1, kills: s.k ?? 0, mortes: s.m ?? 0, assists: s.a ?? 0, cs: s.cs ?? 0, morto: !!s.morto, renasceEm: s.renasce ?? 0, itens: (s.itens ?? []).map((id) => ({ id })), spells: j.nome === p.eu.nome ? p.eu.spells : [] };
     });
     const eu = { ...jogadores.find((j) => j.nome === p.eu.nome), ouro: e?.eu?.ouro ?? 0, vida: e?.eu?.vida ?? 1, vidaMax: e?.eu?.vidaMax ?? 1 };
-    const estado = { tempo: l.t, eu, jogadores, eventos: [], vidaMax: eu.vidaMax };
+    const estado = { tempo: l.t, eu, jogadores, eventos: eventos.filter((ev) => (ev.t ?? 0) <= l.t), vidaMax: eu.vidaMax };
     const vistoAgora = (c) => c.x != null && c.ha != null && c.ha <= 1;
     const leitura = {
       vistos: l.campeoes.filter((c) => c.time !== p.eu.time && vistoAgora(c)).map((c) => ({ campeao: c.c, x: c.x, y: c.y })),
