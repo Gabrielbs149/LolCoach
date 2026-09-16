@@ -164,7 +164,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       for (const o of objetivos) if ((o.vivo || o.em <= 45) && dist(jg.ultimo, pitDe(o.nome)) < 0.09) situ(`jg-obj-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`Jungler deles no ${o.nome}.`, cooldown: 40 });
       if (l.lane === 'jungle' && l.lado === 'nosso') situ('jg-nossa-jungle', { tipo: 'jungler', prioridade: 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}. Camps em risco.`, cooldown: 45 });
       else if (l.lane === 'base') situ('jg-base', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F('Jungler deles na base. Uns 40 segundos livres.'), cooldown: 60 });
-      else if (mudou && !alvo && !primeira && t - (mundo.ditas.get('jg-em') ?? -99) >= 12 && mundo.ditas.set('jg-em', t)) situ(`jg-em-${l.chave}`, { tipo: 'jungler', prioridade: l.lane === 'jungle' && l.lado === 'deles' ? 0 : 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}.`, cooldown: 20 });
+      else if (mudou && !alvo && !primeira && t - (mundo.ditas.get('jg-em') ?? -99) >= 12 && mundo.ditas.set('jg-em', t)) situ(`jg-em-${l.chave}`, { tipo: 'jungler', prioridade: l.lane === 'jungle' && l.lado === 'deles' ? 0 : (l.lado === 'nosso' || l.lane === minhaLane || ['rio', 'barao', 'dragao'].includes(l.lane)) ? 2 : 1, modulo: 'jungler', serio: F`Jungler deles ${l.texto}.`, cooldown: 20 });
       if (t > 180 && minhaPos && seg(dist(jg.ultimo, minhaPos)) >= 25 && minhaLane && minhaLane !== 'jungle') situ('jg-lado-livre', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles ${l.texto}, longe. Seu lado livre por uns ${seg(dist(jg.ultimo, minhaPos))} segundos.`, cooldown: 75 });
       // pra quem é jungle: o lado da jungle dele que está livre pra invadir
       if (minhaLane === 'jungle' && t > 150) {
@@ -258,7 +258,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   }
   // contagem de sumidos, quando você está avançado
   const sumidos = fIni.filter((f) => !f.morto && vistoHa(f, t) > 15);
-  if (sumidos.length >= 3 && minhaPos && !ladoNosso(minhaPos)) situ('sumidos', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${sumidos.length} deles sumidos e você no lado deles.`, cooldown: 45, dados: { sumidos: sumidos.map((f) => f.campeao) } });
+  if (t > 180 && sumidos.length >= 3 && minhaPos && !ladoNosso(minhaPos)) situ('sumidos', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${sumidos.length} deles sumidos e você no lado deles.`, cooldown: 45, dados: { sumidos: sumidos.map((f) => f.campeao) } });
   // split push: um deles sozinho numa lane lateral, 3+ juntos em outro lugar
   {
     const vis = fIni.filter((f) => visivel(f, t));
@@ -294,7 +294,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         else if (visivel(jg, t) && seg(dist(jg.ultimo, pit)) >= 25) situ(`livre-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles a ${seg(dist(jg.ultimo, pit))} segundos do pit.`, cooldown: 90 });
       }
       // A gente fazendo o objetivo e o jungler deles chegando: risco de roubo
-      if (o.vivo && nossos.length >= 2 && jg && visivel(jg, t) && seg(dist(jg.ultimo, pit)) <= 12 && deles.length <= 1) situ(`roubo-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`Jungler deles a ${seg(dist(jg.ultimo, pit))} segundos do ${o.nome}. Cuidado com o roubo.`, divertido: F`Jungler deles chegando no ${o.nome} em ${seg(dist(jg.ultimo, pit))} segundos. Smite na hora ou perde.`, cooldown: 30 });
+      if (o.vivo && nossos.length >= 2 && jg && visivel(jg, t) && seg(dist(jg.ultimo, pit)) <= 12 && deles.length <= 1) situ(`roubo-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`Jungler deles a ${seg(dist(jg.ultimo, pit))} segundos do ${o.nome}. Cuidado com o roubo.`, divertido: F`Jungler deles chegando no ${o.nome} em ${seg(dist(jg.ultimo, pit))} segundos. Smite na hora ou perde.`, cooldown: 75 });
       if (o.vivo && deles.length >= 2 && nossos.length === 0) situ(`furtivo-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome} e ninguém nosso lá!`, divertido: F`${deles.length} deles roubando o ${o.nome} na cara dura!`, cooldown: 30 });
       if (o.vivo && deles.length >= 2 && nossos.length >= 2) situ(`contest-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`Luta no ${o.nome}: ${deles.length} deles, ${nossos.length} nossos.`, cooldown: 30 });
       if (o.vivo && nossos.length >= 3 && jg && !visivel(jg, t) && vistoHa(jg, t) > 20) situ(`obj-sem-jg-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} sem saber do jungler deles. Ward no pit.`, cooldown: 60 });
@@ -309,12 +309,14 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       const grupoApertado = alVis.every((f) => dist(f.ultimo, centro) < 0.14);
       const pertoNosso = grupoApertado ? vis.filter((f) => dist(f.ultimo, centro) < 0.18) : [];
       const restoDeles = vis.filter((f) => !pertoNosso.includes(f));
+      const flanqueadores = [];
       for (const f of pertoNosso) {
         if (restoDeles.length < 2) continue;
         const rc = { x: restoDeles.reduce((s, g) => s + g.ultimo.x, 0) / restoDeles.length, y: restoDeles.reduce((s, g) => s + g.ultimo.y, 0) / restoDeles.length };
         const lado = (f.ultimo.x - centro.x) * (rc.x - centro.x) + (f.ultimo.y - centro.y) * (rc.y - centro.y);
-        if (lado < 0 && pertoNosso.length >= 2) situ(`flanco-${f.nome}`, { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`Flanco: ${f.campeao} atrás do time.`, divertido: F`${f.campeao} por trás! Flanco.`, cooldown: 40 });
+        if (lado < 0 && pertoNosso.length >= 2) flanqueadores.push(f);
       }
+      if (flanqueadores.length) situ('flanco', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`Flanco: ${flanqueadores.map((f) => f.campeao).join(' e ')} atrás do time.`, divertido: F`${flanqueadores.map((f) => f.campeao).join(' e ')} por trás! Flanco.`, cooldown: 40, dados: { quem: flanqueadores.map((f) => f.campeao) } });
     }
     // base sendo empurrada
     const naBase = vis.filter((f) => dist(f.ultimo, minhaBase) < 0.16);
@@ -366,7 +368,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) situ('perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: perto.length >= 2 ? F`${perto.length} deles a menos de 8 segundos de você.` : F`${perto[0].campeao} a menos de 8 segundos de você, com o ${pertoTodos.find((f) => f !== perto[0]).campeao}.`, divertido: F`${pertoTodos.length} deles vindo te buscar. Sai.`, cooldown: 30, dados: { quem: pertoTodos.map((f) => f.campeao) } });
     const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
     if (vidaPct < 0.35 && perto.length) situ('vida-baixa-vindo', { tipo: 'perigo', prioridade: 3, modulo: 'kills', serio: F`Vida baixa e ${perto[0].campeao} vindo. Sai.`, cooldown: 20 });
-    if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 120) situ('na-frente-sem-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 60 });
+    if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 180) situ('na-frente-sem-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 60 });
     const pertoLane = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 20);
     if (!pertoLane.length && minhaLane && minhaLane !== 'jungle' && ['top', 'mid', 'bot'].includes(lugar(minhaPos.x, minhaPos.y, meuTime).lane)) {
       const desde = mundo.lanesLivres.get('eu') ?? t; mundo.lanesLivres.set('eu', desde);
