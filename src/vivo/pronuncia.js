@@ -32,6 +32,10 @@ const CAMPEOES = {
   'Urgot': 'Úrgot', 'Vayne': 'Vêin', 'Veigar': 'Vêigar', "Vel'Koz": 'Vélcoz', 'Vex': 'Vécs',
   'Volibear': 'Vólibér', 'Warwick': 'Uóruik', 'Wukong': 'Uucong', 'Xayah': 'Záia', 'Xerath': 'Zéraf',
   'Xin Zhao': 'Xin Jáo', 'Yorick': 'Iórik', 'Yuumi': 'Iúmi', 'Zac': 'Zác', 'Ziggs': 'Zígs', 'Zoe': 'Zôi',
+  'Alistar': 'Alistár', 'Ambessa': 'Ambéssa', 'Gnar': 'Nár', 'Lillia': 'Lília', 'Milio': 'Mílio', 'Rakan': 'Racân',
+  'Rengar': 'Rêngar', 'Riven': 'Ríven', 'Sejuani': 'Sejuâni', 'Senna': 'Sêna', 'Skarner': 'Scárner', 'Varus': 'Várus',
+  'Viego': 'Viêgo', 'Viktor': 'Víctor', 'Vladimir': 'Vladimír', 'Yasuo': 'Iássuo', 'Yone': 'Iône',
+  'Yunara': 'Iunára', 'Zeri': 'Zéri', 'Mel': 'Mél', 'Kalista': 'Calísta', 'Lissandra': 'Lissândra', 'Olaf': 'Ólaf',
 };
 const GIRIAS = {
   'jungler': 'jângler', 'jungle': 'jângol', 'gank': 'guênk', 'ganks': 'guênks', 'gankar': 'guenkár',
@@ -45,6 +49,11 @@ const GIRIAS = {
   'first blood': 'fêrst blâd', 'pick': 'pík', 'ban': 'bân', 'support': 'sapórt', 'sup': 'sup', 'mid': 'míd',
   'ult': 'ult', 'stun': 'stân', 'slow': 'slôu', 'dash': 'désh', 'hook': 'rúk', 'tank': 'tânk', 'tanque': 'tanque',
   'off': 'óf', 'dive': 'dáiv', 'dar dive': 'dar dáiv', 'backdoor': 'bécdor', 'splitpush': 'split púsh', 'split': 'split',
+  'lane': 'lêin', 'lanes': 'lêins', 'TP': 'tê pê', 'recall': 'ricól', 'leash': 'líxe', 'invade': 'invêid', 'bush': 'búxe',
+  'cheese': 'chíz', 'swap': 'suóp', 'pit': 'pít', 'nexus': 'nécsus', 'krugs': 'crâgs', 'raptors': 'ráptors', 'gromp': 'grômp',
+  'cooldown': 'cúldaun', 'kite': 'cáit', 'kitar': 'caitár', 'burst': 'bârst', 'call': 'cól', 'cleanse': 'clêns', 'ignite': 'ignáit',
+  'exhaust': 'ecsáust', 'heal': 'ríl', 'ghost': 'gôust', 'barrier': 'bérier', 'red': 'réd', 'reds': 'réds', 'scuttle': 'scâtol',
+  'drake': 'drêik', 'baron': 'bâron', 'nash': 'néxi', 'proc': 'próc', 'stack': 'stéc', 'stacks': 'stécs', 'clear': 'clír', 'cs': 'cê ésse',
 };
 
 const escapar = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
