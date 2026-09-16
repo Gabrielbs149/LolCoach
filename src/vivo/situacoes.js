@@ -246,6 +246,15 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     const alVis = fAli.filter((f) => visivel(f, t));
     for (const o of objetivos) {
       const pit = pitDe(o.nome);
+      // Um minuto antes: o quadro do objetivo numa frase (jungler deles, quantos deles perto, seu jungler).
+      if (!o.vivo && o.em > 50 && o.em <= 62 && ['Dragão', 'Barão', 'Ancião', 'Arauto'].includes(o.nome)) {
+        const partes = [];
+        if (jg) partes.push(visivel(jg, t) ? `jungler deles ${lugarTxt(jg.ultimo)}` : jg.morto ? 'jungler deles morto' : jg.ultimo ? `jungler deles sumido há ${Math.round(vistoHa(jg, t))} segundos` : 'jungler deles não visto');
+        const pertoPit = vis.filter((f) => dist(f.ultimo, pit) < 0.2).length;
+        if (pertoPit) partes.push(`${pertoPit} deles perto do pit`);
+        if (meuJg && visivel(meuJg, t)) partes.push(`seu jungler a ${seg(dist(meuJg.ultimo, pit))} segundos`);
+        if (partes.length) situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} em um minuto: ${partes.join(', ')}.`, cooldown: 100 });
+      }
       const deles = vis.filter((f) => dist(f.ultimo, pit) < 0.12), nossos = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.12);
       if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 60 });
       if (o.vivo && jg && deles.length === 0) {
