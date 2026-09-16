@@ -516,6 +516,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
       // O olho: minimapa achado? onde cada um foi visto pela última vez.
       olho: resumoDoOlho(estado),
+      situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10),
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
         const f = partidaVivo.flashes.get(j.nome);
@@ -602,6 +603,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
         contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
       if (sit.falar) partidaVivo.falas.push(pronta);
+      (partidaVivo.situacoesRecentes ??= []).push({ t: Math.round(e.tempo), chave: sit.chave, prioridade: sit.prioridade, texto: pronta.serio, falada: sit.falar });
+      if (partidaVivo.situacoesRecentes.length > 20) partidaVivo.situacoesRecentes.splice(0, partidaVivo.situacoesRecentes.length - 20);
     }
     // foto do mundo 1x por segundo
     if (Date.now() - partidaVivo.ultimoInstantaneo >= 1000) {

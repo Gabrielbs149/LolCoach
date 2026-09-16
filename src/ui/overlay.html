@@ -96,7 +96,7 @@ function desenhar(d){
       <span class="kda">${eu.kills}/${eu.mortes}/${eu.assists}<span>${eu.cs ?? 0} cs</span></span></div>
     <div class="objs">${objs}</div>
     ${jgLinha(d)}
-    <div class="cab"><span>Inimigos</span><span>flash</span></div>
+    <div class="cab"><span>Inimigos${(() => { const n = (d.inimigos ?? []).filter(j => !j.morto && (!j.visto || j.visto.ha > 15)).length; return n >= 2 ? ` · <em style="font-style:normal;color:var(--g2)">${n} sumidos</em>` : ''; })()}</span><span>flash</span></div>
     ${inis}
     ${mostraFala ? `<div class="fala u${ultimaFala.prioridade ?? 1}">${esc(ultimaFala.serio)}</div>` : (urgente ? `<div class="fala u3">${esc(urgente.titulo)}</div>` : '')}`;
 }
