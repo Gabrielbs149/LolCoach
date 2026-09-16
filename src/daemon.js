@@ -173,11 +173,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     return { partida: partida[0] ?? null, situacoes: situacoes.map((s) => ({ ...s, nota: notas.get(`${s.t}|${s.chave}`) ?? null })), falas };
   }
   /** Resumo por tipo de situação em todas as partidas gravadas: quantas, quantas faladas, 👍/👎. */
+  const baseChave = (chave) => String(chave).split('-').filter((p) => !/#|^d+$/.test(p)).join('-');
   async function situacoesResumo() {
     if (config.admin !== true) throw new Error('só pra admin');
+    return resumoInterno();
+  }
+  async function resumoInterno() {
     const pastas = (await readdir(pastaSituacoes()).catch(() => []));
     const porChave = new Map();
-    const base = (chave) => String(chave).replace(/-d+$/, '').replace(/-(id|[A-Za-z' ]+#[^-]+)$/, '');
+    const base = baseChave;
     for (const p of pastas) {
       const [situacoes, avaliacoes] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl'))]);
       const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
@@ -188,7 +192,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const nota = notas.get(`${s.t}|${s.chave}`); if (nota === 1) r.bom++; else if (nota === -1) r.ruim++;
       }
     }
-    return { partidas: pastas.length, tipos: [...porChave.values()].sort((a, b) => b.n - a.n) };
+    const tipos = [...porChave.values()].sort((a, b) => b.n - a.n);
+    // Aprendizado v0: tipo com 3+ 👎 e nenhum 👍 deixa de ser falado (continua gravado).
+    for (const t of tipos) t.silenciada = t.ruim >= 3 && t.bom === 0;
+    return { partidas: pastas.length, tipos };
   }
   async function avaliarSituacao({ pasta, chave, t, nota } = {}) {
     if (config.admin !== true) throw new Error('só pra admin');
@@ -453,6 +460,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /** Pasta da partida em dados/situacoes: criada na primeira leitura, com o elenco. */
   async function garantirPastaSitu(e) {
     if (!partidaVivo || partidaVivo.pastaSitu) return;
+    resumoInterno().then((r) => { partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
     partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
     await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
     await appendFile(resolve(partidaVivo.pastaSitu, 'partida.json'), JSON.stringify({ inicio: new Date().toISOString(), eu: e.eu, jogadores: e.jogadores.map((j) => ({ nome: j.nome, campeao: j.campeao, time: j.time, role: j.role })), modo: e.modo }) + '\n').catch(() => {});
@@ -640,6 +648,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });
       gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
         contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
+      if (sit.falar && partidaVivo.silenciadas?.has(baseChave(sit.chave))) sit.falar = false;
       if (sit.falar) partidaVivo.falas.push(pronta);
       const cs = (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() });
       cs.total++; if (sit.falar) cs.faladas++; cs.porTipo.set(sit.tipo, (cs.porTipo.get(sit.tipo) ?? 0) + 1);

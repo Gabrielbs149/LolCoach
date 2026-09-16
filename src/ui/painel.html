@@ -3020,7 +3020,7 @@ async function situResumoAbrir(){
   if(!el.hidden){ el.hidden = true; return; }
   try {
     const r = await pegar('/api/situacoes/resumo');
-    el.innerHTML = `<table class="amTabela" style="margin:10px 14px;width:auto"><tr><th>Situação</th><th>Vezes</th><th>Faladas</th><th>👍</th><th>👎</th><th>Exemplo</th></tr>${r.tipos.map(t => `<tr><td>${esc(t.chave)}</td><td>${t.n}</td><td>${t.faladas}</td><td>${t.bom || ''}</td><td>${t.ruim || ''}</td><td style="color:var(--apagado);font-weight:400;white-space:normal">${esc(t.exemplo)}</td></tr>`).join('')}</table>`;
+    el.innerHTML = `<table class="amTabela" style="margin:10px 14px;width:auto"><tr><th>Situação</th><th>Vezes</th><th>Faladas</th><th>👍</th><th>👎</th><th>Exemplo</th></tr>${r.tipos.map(t => `<tr><td>${esc(t.chave)}${t.silenciada ? ' <span style="color:var(--der);font-size:10px">silenciada</span>' : ''}</td><td>${t.n}</td><td>${t.faladas}</td><td>${t.bom || ''}</td><td>${t.ruim || ''}</td><td style="color:var(--apagado);font-weight:400;white-space:normal">${esc(t.exemplo)}</td></tr>`).join('')}</table>`;
     el.hidden = false;
   } catch(e){ el.innerHTML = `<div class="falasVazio">${esc(e.message)}</div>`; el.hidden = false; }
 }
