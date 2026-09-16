@@ -238,13 +238,16 @@ function tocarProxima(){
   a.onerror = () => { fim(); falarWindows(texto); };
   a.play().catch(() => { fim(); falarWindows(texto); });
 }
-function falar(texto, forcar = false){
+// Urgente (prioridade 3) fura a fila: vai pra frente e corta o que está tocando.
+function falar(texto, forcar = false, prioridade = 1){
   if ((!voz.ligada && !forcar) || !texto) return;
   if (motorVoz === 'edge') {
+    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto }); if (tocando) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
     if (filaMp3.length >= 3) filaMp3.shift();
     filaMp3.push({ texto }); tocarProxima();
     return;
   }
+  if (prioridade >= 3 && 'speechSynthesis' in window) { speechSynthesis.cancel(); filaFalas.length = 0; }
   falarWindows(texto);
 }
 function falarWindows(texto){
@@ -275,7 +278,7 @@ function falarNovas(falas){
     if (f.seq <= ultimaFalaSeq) continue;
     ultimaFalaSeq = f.seq;
     if (!voz.modulos[f.modulo]) continue;
-    falar(voz.modo === 'divertido' ? f.divertido : f.serio);
+    falar(voz.modo === 'divertido' ? f.divertido : f.serio, false, f.prioridade ?? 1);
   }
 }
 const esc = (s) => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));

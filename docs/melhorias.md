@@ -16,3 +16,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.15 — `npm test` (scripts/testar-voz.mjs): objetivos, falas da API (time pelo nome, sem enfeite), lugares do mapa, situações (início do jungler, previsão de gank, distância em segundos), pronúncia (tempo) e catálogo. Roda antes de cada publicação daqui pra frente.
 - v2.28.16 — Situação "zona onde você morre muito": pega do banco (últimas 60 partidas na sua rota) quantas mortes por jogo em cada zona; se você entra numa zona com 0,5+ mortes/jogo, fora da sua lane e com o jungler deles sumido, avisa (uma vez a cada 4 min). Testado: npm test.
 - v2.28.17 — Aprendizado v0: tipo de situação com 3+ 👎 e nenhum 👍 nas suas avaliações deixa de ser falado (continua gravado); aparece como "silenciada" no Resumo por tipo. Testado: npm test.
+- v2.28.18 — Voz: fala urgente (prioridade 3 — "Recua!", "Dive vindo", "Eles no Barão") fura a fila e corta o que está tocando. Testado: sintaxe.
