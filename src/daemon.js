@@ -329,6 +329,17 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     subirAvaliacoes(pasta, { t, chave, nota, texto, tipo }).catch((erro) => log(`avaliação não subiu: ${erro.message}`));
     return { ok: true };
   }
+  /** Tecla no jogo: tamanho do overlay em ciclo 100% → 80% → 65% → 50% → 100%. */
+  async function overlayTamanho() {
+    const passos = [1, 0.8, 0.65, 0.5];
+    const atual = Number(config.overlay?.escala) || 1;
+    const i = passos.findIndex((p) => Math.abs(p - atual) < 0.01);
+    const nova = passos[(i + 1) % passos.length];
+    config.overlay = { ...(config.overlay ?? {}), escala: nova };
+    await salvarConfig({ overlay: config.overlay }).catch(() => {});
+    log(`overlay: ${Math.round(nova * 100)}%`);
+    return { escala: nova };
+  }
   /** Tecla no jogo: 👍/👎 na última fala do minimapa (a que acabou de sair). */
   async function avaliarUltima(nota) {
     if (![1, -1].includes(nota) || !partidaVivo?.pastaSitu) return { ok: false };
@@ -800,6 +811,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
       // O olho: minimapa achado? onde cada um foi visto pela última vez.
       olho: resumoDoOlho(estado, objs),
+      overlayEscala: Number(config.overlay?.escala) || 1,
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
@@ -1674,7 +1686,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
-    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, avaliarUltima, situacoesResumo,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, avaliarUltima, overlayTamanho, situacoesResumo,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -1721,5 +1733,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'situacoesResumo',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
 ];

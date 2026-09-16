@@ -183,6 +183,10 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         try { const pasta = url.searchParams.get('pasta'), gameId = url.searchParams.get('gameId'); return enviar(200, 'application/json', JSON.stringify(pasta || gameId ? await acoes.situacoesDe({ pasta, gameId }) : await acoes.situacoesPartidas())); }
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
+      if (req.method === 'POST' && url.pathname === '/api/overlay/tamanho' && acoes.overlayTamanho) {
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.overlayTamanho())); }
+        catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       if (req.method === 'POST' && url.pathname === '/api/situacoes/avaliar-ultima' && acoes.avaliarUltima) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.avaliarUltima(Number(url.searchParams.get('nota'))))); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
