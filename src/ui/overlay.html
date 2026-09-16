@@ -72,7 +72,9 @@ function jgLinha(d){
   if (!v) return `<div class="jg">${icone(jg.campeao)}<span>Jungler <b>não visto</b></span></div>`;
   const onde = `${LUG[v.lane] ?? v.lane}${v.lado === 'deles' ? ' deles' : v.lado === 'nosso' ? ' nosso' : ''}`;
   const cls = v.ha <= 3 ? (v.lado === 'nosso' ? 'perigo' : '') : v.ha >= 20 ? 'sumido' : '';
-  return `<div class="jg ${cls}">${icone(jg.campeao)}<span>Jungler <b>${esc(onde)}</b></span><span class="ha">${v.ha <= 3 ? 'agora' : `há ${v.ha}s`}</span></div>`;
+  const pg = d.olho?.gankPrevisto;
+  const prev = pg ? `<div class="jg" style="font-size:11px;color:var(--fraco)"><span></span><span>gank previsto: <b>${esc(pg.lane)}</b> ${mmss(pg.de)}–${mmss(pg.ate)}</span></div>` : '';
+  return `<div class="jg ${cls}">${icone(jg.campeao)}<span>Jungler <b>${esc(onde)}</b></span><span class="ha">${v.ha <= 3 ? 'agora' : `há ${v.ha}s`}</span></div>${prev}`;
 }
 function desenhar(d){
   const hud = document.getElementById('hud');

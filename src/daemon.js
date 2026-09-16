@@ -665,7 +665,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const o = partidaVivo?.olho;
     if (!o) return { ligado: false };
     const velho = Date.now() - o.recebidoEm > 5000;
+    const pg = partidaVivo.mundo?.previsaoGank;
     return { ligado: !velho, minimapa: !!o.calib, icone: o.escala?.d ?? null, confiavel: !!o.escala?.confiavel,
+      gankPrevisto: pg && !pg.dito && (estado?.tempo ?? 0) < pg.ate + 30 ? { lane: pg.lane, de: pg.de, ate: pg.ate } : null,
       eu: o.eu ?? null,
       vistos: (o.vistos ?? []).map((v) => ({ campeao: v.campeao, x: v.x, y: v.y })),
       ha: Math.round((Date.now() - o.recebidoEm) / 1000) };
