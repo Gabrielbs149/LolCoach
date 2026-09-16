@@ -33,7 +33,7 @@ export function novaMemoriaFalas() {
  * `objetivos`: de objetivos.js; `conselhos`: de conselhos.js.
  * Devolve só as falas NOVAS desde a última chamada.
  */
-export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, mem) {
+export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olho = false }, mem) {
   const { tempo, eu, jogadores, eventos } = estado;
   const novas = [];
   const dizer = (id, modulo, serio, divertido, prioridade = 1) => {
@@ -57,7 +57,8 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras }, m
   for (const o of objetivos ?? []) {
     const chave = `${o.nome}-${Math.round((tempo + o.em) / 60)}`;
     if (o.em > 55 && o.em <= 62) {
-      if (o.nome === 'Dragão') dizer(`t60-${chave}`, 'timers', F('Dragão em um minuto.'), F('Dragão em um minuto. Vai pro rio.'), 2);
+      if (olho && ['Dragão', 'Barão', 'Ancião', 'Arauto'].includes(o.nome)) { /* o quadro do olho fala esse */ }
+      else if (o.nome === 'Dragão') dizer(`t60-${chave}`, 'timers', F('Dragão em um minuto.'), F('Dragão em um minuto. Vai pro rio.'), 2);
       else if (o.nome === 'Barão') dizer(`t60-${chave}`, 'timers', F('Barão em um minuto. Visão no pit.'), F('Barão em um minuto. Junta o time.'), 2);
       else if (o.nome === 'Ancião') dizer(`t60-${chave}`, 'timers', F('Ancião em um minuto. Time inteiro no pit.'), F('Ancião em um minuto. Quem pegar ganha.'), 3);
       else if (o.nome === 'Vastilarvas') dizer(`t60-${chave}`, 'timers', F('Vastilarvas em um minuto.'), F('Vastilarvas em um minuto.'), 1);

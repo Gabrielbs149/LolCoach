@@ -282,8 +282,9 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         const pertoPit = vis.filter((f) => dist(f.ultimo, pit) < 0.2).length;
         if (pertoPit) partes.push(`${pertoPit} deles perto do pit`);
         if (meuJg && visivel(meuJg, t)) partes.push(`seu jungler a ${seg(dist(meuJg.ultimo, pit))} segundos`);
-        if (partes.length) situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome}: ${partes.join(', ')}.`, cooldown: 100 });
-        if (mundo.wards && leitura.wards && !mundo.wards.nossas.some((w) => dist(w, pit) < 0.14)) situ(`sem-ward-${o.nome}`, { tipo: 'visao', prioridade: minhaLane === 'jungle' || eu.role === 'sup' ? 2 : 1, modulo: 'timers', serio: F`${o.nome} em um minuto e sem ward no pit.`, cooldown: 100, dados: { objetivo: o.nome } });
+        const semWard = !!mundo.wards && !mundo.wards.nossas.some((w) => dist(w, pit) < 0.14);
+        if (semWard) partes.push('sem ward no pit');
+        situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: partes.length ? F`${o.nome} em um minuto: ${partes.join(', ')}.` : F`${o.nome} em um minuto.`, cooldown: 100, dados: { semWard } });
       }
       const deles = vis.filter((f) => dist(f.ultimo, pit) < 0.12), nossos = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.12);
       if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 60 });

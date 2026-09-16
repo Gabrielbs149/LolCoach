@@ -693,7 +693,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         jogadores: estado.jogadores.map((j) => ({ c: j.campeao, time: j.time, role: j.role, nivel: j.nivel, k: j.kills, m: j.mortes, a: j.assists, cs: j.cs, morto: j.morto, renasce: j.renasceEm, itens: (j.itens ?? []).map((i) => i.id) })),
         eventos: (estado.eventos ?? []).length }) + '\n').catch(() => {});
     }
-    for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
+    for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras, olho: !!partidaVivo.olho?.calib && Date.now() - partidaVivo.olho.recebidoEm < 5000 }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: estado.tempo }));
     }
 
