@@ -135,6 +135,9 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 .linha .visto{margin-left:6px;font-size:10px;color:var(--apagado);font-weight:500}
 .linha .visto.agora{color:var(--ouro-claro)}
 .time h3 small{font-weight:400;color:var(--apagado);font-size:9.5px;text-transform:none;letter-spacing:0;margin-left:6px}
+.jgLinha{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--borda);font-size:12px;color:var(--fraco)}
+.jgLinha b{color:var(--ouro-claro)} .jgLinha .ha{margin-left:auto;font-variant-numeric:tabular-nums}
+.jgLinha.sumido{background:rgba(224,160,63,.08)} .jgLinha.perigo{background:rgba(240,122,122,.12)}
 .vistos{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden}
 .visto{display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;
   padding:5px 10px;border-bottom:1px solid #161f2b;font-size:11.5px}
@@ -289,6 +292,15 @@ const URGENTE = { 3: 'agora', 2: 'atenção', 1: 'lembrete' };
 const ROLE_NOME = { top:'top', jungle:'jungle', mid:'mid', adc:'adc', sup:'sup', middle:'mid', bottom:'adc', utility:'sup' };
 
 const mmssF = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+/* Jungler deles: onde foi visto e há quanto tempo (do olho no minimapa). */
+function jgLinhaVivo(d){
+  const jg = (d.inimigos ?? []).find(j => j.role === 'jungle'); if (!jg) return '';
+  const v = jg.visto; const L = { top: 'top', mid: 'mid', bot: 'bot', jungle: 'jungle', rio: 'rio', barao: 'barão', dragao: 'dragão', base: 'base' };
+  if (jg.morto) return `<div class="jgLinha">${icone(jg.campeao)}<span>Jungler deles <b>morto</b></span></div>`;
+  if (!v) return `<div class="jgLinha">${icone(jg.campeao)}<span>Jungler deles <b>não visto</b></span></div>`;
+  const cls = v.ha <= 3 ? (v.lado === 'nosso' ? 'perigo' : '') : v.ha >= 20 ? 'sumido' : '';
+  return `<div class="jgLinha ${cls}">${icone(jg.campeao)}<span>Jungler deles <b>${esc(L[v.lane] ?? v.lane)}${v.lado === 'deles' ? ' deles' : v.lado === 'nosso' ? ' nosso' : ''}</b></span><span class="ha">${v.ha <= 3 ? 'agora' : 'há ' + v.ha + 's'}</span></div>`;
+}
 /* Inimigo ganha o botão F: marca o flash dele (ou Ctrl+Alt+N pela posição). */
 const LUGAR = { top: 'top', mid: 'mid', bot: 'bot', jungle: 'jungle', rio: 'rio', barao: 'barão', dragao: 'dragão', base: 'base' };
 /* O olho viu o cara no minimapa: onde e há quanto tempo. */
@@ -419,7 +431,7 @@ function desenhar(d){
       <h2 class="sec">Placar</h2>
       <div class="placar">
         <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador(j, j.souEu)).join('')}</div>
-        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
+        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${jgLinhaVivo(d)}${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
       </div>
 
       </div>

@@ -390,7 +390,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   let partidaVivo = null;
   // Toda fala passa por aqui antes de ir pra tela: aplica o texto que o admin
   // personalizou (config.voz.falas) e preenche os {n}.
-  const prontaFala = (f) => { personalizarFalas(config.voz?.falas ?? {}); return { ...f, serio: renderFala(f.serio), divertido: renderFala(f.divertido ?? f.serio) }; };
+  const prontaFala = (f) => {
+    personalizarFalas(config.voz?.falas ?? {});
+    const pronta = { ...f, serio: renderFala(f.serio), divertido: renderFala(f.divertido ?? f.serio) };
+    // Tudo que a voz diz fica gravado junto com as situações: material pra aprender o que vale falar.
+    if (partidaVivo?.pastaSitu && pronta.seq) appendFile(resolve(partidaVivo.pastaSitu, 'falas.jsonl'), JSON.stringify({ t: Math.round((pronta.t ?? 0) * 10) / 10, modulo: pronta.modulo, prioridade: pronta.prioridade, serio: pronta.serio, divertido: pronta.divertido }) + '\n').catch(() => {});
+    return pronta;
+  };
+  let ultimoRetrato = 0;
+  /** Pasta da partida em dados/situacoes: criada na primeira leitura, com o elenco. */
+  async function garantirPastaSitu(e) {
+    if (!partidaVivo || partidaVivo.pastaSitu) return;
+    partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
+    await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
+    await appendFile(resolve(partidaVivo.pastaSitu, 'partida.json'), JSON.stringify({ inicio: new Date().toISOString(), eu: e.eu, jogadores: e.jogadores.map((j) => ({ nome: j.nome, campeao: j.campeao, time: j.time, role: j.role })), modo: e.modo }) + '\n').catch(() => {});
+    // limpa partidas velhas (fica com 30)
+    const pastas = (await readdir(resolve(pastaBase(), 'dados', 'situacoes')).catch(() => [])).sort();
+    for (const velha of pastas.slice(0, -30)) await rm(resolve(pastaBase(), 'dados', 'situacoes', velha), { recursive: true, force: true }).catch(() => {});
+  }
 
   async function vivo() {
     const [{ lerEstado }, { montarPerfil }, { montarConselhos }, { fichasDaPartida }, R] = await Promise.all([
@@ -450,6 +467,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     // falar uma vez só.
     const { falasNovas } = await import('./vivo/falas.js');
     partidaVivo.ultimoEstado = estado;
+    await garantirPastaSitu(estado);
+    // Retrato da API do jogo a cada 5 s (placar, itens, níveis, gold): contexto pras situações.
+    if (partidaVivo.pastaSitu && Date.now() - ultimoRetrato >= 5000) {
+      ultimoRetrato = Date.now();
+      appendFile(resolve(partidaVivo.pastaSitu, 'estado.jsonl'), JSON.stringify({ t: Math.round(estado.tempo), eu: { ouro: estado.eu.ouro, vida: estado.eu.vida, vidaMax: estado.eu.vidaMax },
+        jogadores: estado.jogadores.map((j) => ({ c: j.campeao, time: j.time, role: j.role, nivel: j.nivel, k: j.kills, m: j.mortes, a: j.assists, cs: j.cs, morto: j.morto, renasce: j.renasceEm, itens: (j.itens ?? []).map((i) => i.id) })),
+        eventos: (estado.eventos ?? []).length }) + '\n').catch(() => {});
+    }
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: estado.tempo }));
     }
@@ -539,15 +564,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const S = await import('./vivo/situacoes.js');
     const { objetivos } = await import('./vivo/objetivos.js');
     const e = partidaVivo.ultimoEstado;
-    if (!partidaVivo.mundo) {
-      partidaVivo.mundo = S.novoMundo();
-      partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
-      await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
-      await appendFile(resolve(partidaVivo.pastaSitu, 'partida.json'), JSON.stringify({ inicio: new Date().toISOString(), eu: e.eu, jogadores: e.jogadores.map((j) => ({ nome: j.nome, campeao: j.campeao, time: j.time, role: j.role })), modo: e.modo }) + '\n').catch(() => {});
-      // limpa partidas velhas (fica com 30)
-      const pastas = (await readdir(resolve(pastaBase(), 'dados', 'situacoes')).catch(() => [])).sort();
-      for (const velha of pastas.slice(0, -30)) await rm(resolve(pastaBase(), 'dados', 'situacoes', velha), { recursive: true, force: true }).catch(() => {});
-    }
+    if (!partidaVivo.mundo) partidaVivo.mundo = S.novoMundo();
+    await garantirPastaSitu(e);
     const objs = objetivos(e);
     const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null }, e, objs);
     const gravar = (arquivo, obj) => appendFile(resolve(partidaVivo.pastaSitu, arquivo), JSON.stringify(obj) + '\n').catch(() => {});

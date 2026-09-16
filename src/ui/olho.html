@@ -36,6 +36,7 @@ const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
 const N = 48;                          // grade da calibração do minimapa
 const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.72, LIMIAR_SEGUIDO = 0.62, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.55, MARGEM = 0.04;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
+let cegoDesde = 0, cegoAvisado = 0;
 
 const $log = document.getElementById('log');
 const log = (...a) => { const t = a.join(' '); $log.textContent = (t + '\n' + $log.textContent).slice(0, 3000); console.log('[olho]', t); };
@@ -372,6 +373,9 @@ async function quadro() {
     const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));
     rodada++;
     enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu });
+    // Cego: minimapa calibrado mas nada reconhecido (nem eu, nem aliados) por 15 s → outra janela na frente do jogo?
+    if (!eu && !vistosAli.length && !limpos.length) { cegoDesde ||= agora; if (agora - cegoDesde > 15000 && agora - cegoAvisado > 60000) { cegoAvisado = agora; log('cego há 15 s: nada reconhecido no minimapa (outra janela na frente do jogo?)'); } }
+    else cegoDesde = 0;
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
       log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
