@@ -132,6 +132,8 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 .linha .flash:hover{border-color:var(--ouro);color:var(--ouro-claro)}
 .linha .flash.usado{background:#3a1618;border-color:#5c2226;color:#f07a7a}
 .linha .flash.voltou{background:#123a28;border-color:#1e5c40;color:#4ed093}
+.linha .visto{margin-left:6px;font-size:10px;color:var(--apagado);font-weight:500}
+.linha .visto.agora{color:var(--ouro-claro)}
 .time h3 small{font-weight:400;color:var(--apagado);font-size:9.5px;text-transform:none;letter-spacing:0;margin-left:6px}
 .vistos{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden}
 .visto{display:grid;grid-template-columns:24px minmax(0,1fr) auto;align-items:center;gap:8px;
@@ -264,9 +266,12 @@ const ROLE_NOME = { top:'top', jungle:'jungle', mid:'mid', adc:'adc', sup:'sup',
 
 const mmssF = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 /* Inimigo ganha o botão F: marca o flash dele (ou Ctrl+Alt+N pela posição). */
+const LUGAR = { top: 'top', mid: 'mid', bot: 'bot', jungle: 'jungle', rio: 'rio', barao: 'barão', dragao: 'dragão', base: 'base' };
+/* O olho viu o cara no minimapa: onde e há quanto tempo. */
+const vistoTxt = (v) => !v ? '' : v.ha <= 3 ? `<small class="visto agora">${LUGAR[v.lane] ?? v.lane}${v.lado === 'deles' ? ' deles' : v.lado === 'nosso' ? ' nosso' : ''}</small>` : v.ha < 90 ? `<small class="visto">${LUGAR[v.lane] ?? v.lane} há ${v.ha}s</small>` : '';
 const linhaJogador = (j, souEu, posicao = 0, flash = null) => `
   <div class="linha ${j.morto ? 'morto' : ''} ${souEu ? 'eu' : ''}">
-    ${icone(j.campeao)}<span class="n">${esc(j.campeao)}</span>
+    ${icone(j.campeao)}<span class="n">${esc(j.campeao)}${vistoTxt(j.visto)}</span>
     <span class="kda">${j.kills}/${j.mortes}/${j.assists}</span>
     <span class="cs">${j.cs} cs</span>
     ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash (Ctrl+Alt+${posicao})" onclick="marcarFlash(${posicao})">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}</div>`;
@@ -389,7 +394,7 @@ function desenhar(d){
       <h2 class="sec">Placar</h2>
       <div class="placar">
         <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador(j, j.souEu)).join('')}</div>
-        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${deles.map((j, i) => linhaJogador(j, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
+        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
       </div>
 
       </div>

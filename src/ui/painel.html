@@ -1046,6 +1046,10 @@ h2{letter-spacing:1px}
         <div class="txt"><b>Banir campeão</b></div>
         <label class="chave"><input type="checkbox" id="cBanir"><span class="pino"></span></label>
       </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Olho no minimapa</b></div>
+        <label class="chave"><input type="checkbox" id="cOlho"><span class="pino"></span></label>
+      </div>
     </div>
 
     <h2>Teclas</h2>
@@ -2468,6 +2472,7 @@ function gravar(){
       const corpo = {
         autoAceitar: { ativo: cfg.autoAceitar.ativo, atrasoMs: 0 },
         atalhos: cfg.atalhos ?? {},
+        olho: { ligado: cfg.olho?.ligado !== false },
         champSelect: {
           ativo: cfg.champSelect.escolher !== false || cfg.champSelect.banir !== false,
           escolher: cfg.champSelect.escolher !== false,
@@ -2686,6 +2691,8 @@ async function carregarConfig(){
   $('#cAceitar').onchange = e => { cfg.autoAceitar.ativo = e.target.checked; gravar(); };
   $('#cChamp').onchange = e => { cfg.champSelect.escolher = e.target.checked; gravar(); };
   $('#cBanir').onchange = e => { cfg.champSelect.banir = e.target.checked; gravar(); };
+  $('#cOlho').checked = cfg.olho?.ligado !== false;
+  $('#cOlho').onchange = e => { cfg.olho = { ...(cfg.olho ?? {}), ligado: e.target.checked }; gravar(); };
   desenharRotas(); desenharTeclas();
   if(!listaCampeoes.length) document.querySelectorAll('.rotas input').forEach(i => i.placeholder = 'abra o League uma vez');
 }

@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>LolCoach — olho</title>
+<style>
+body{margin:0;background:#000;color:#9ab;font:12px/1.4 Consolas,monospace}
+canvas,video{display:block}
+#log{white-space:pre-wrap;padding:6px}
+</style>
+</head>
+<body>
+<video id="v" muted autoplay playsinline></video>
+<canvas id="tela"></canvas>
+<pre id="log"></pre>
+<script>
+/*
+ * O olho: captura a tela (como o OBS), acha o minimapa no canto, e procura
+ * nele o ícone de cada inimigo — igual a olhar o minimapa, só que 10x por
+ * segundo e sem perder um. Nada de memória do jogo: só pixels da sua tela.
+ *
+ *   1. calibrar: onde está o minimapa (canto de baixo, tamanho) — casa o
+ *      quadrado com a textura do mapa (recursos do Community Dragon).
+ *   2. escala: que tamanho os ícones têm — procura o MEU ícone em vários
+ *      tamanhos; o que casar melhor é o tamanho de todos.
+ *   3. cada quadro: pra cada inimigo vivo, procura o ícone dele (correlação
+ *      normalizada, meia resolução; confirma em cor na resolução cheia).
+ *      Quem foi visto há pouco é procurado só em volta de onde estava.
+ *   4. manda pro daemon (POST /api/olho) 5x por segundo.
+ */
+const Q = new URLSearchParams(location.search);
+const TESTE = Q.get('teste') === '1';
+const SO_TELA = Q.get('tela') === '1';
+const FINGIR = Q.get('fingir') === '1';   // captura de verdade, inimigos de mentira (teste com ?tela=1 aberto)
+const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
+const N = 48;                          // grade da calibração do minimapa
+const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.5, LIMIAR_NOVO = 0.74, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.45;
+
+const $log = document.getElementById('log');
+const log = (...a) => { const t = a.join(' '); $log.textContent = (t + '\n' + $log.textContent).slice(0, 3000); console.log('[olho]', t); };
+const semAcento = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[^a-z]/g, '');
+const carregar = (src) => new Promise((ok, erro) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => erro(new Error('imagem ' + src)); i.src = src; });
+
+/* ------------------------------------------------------------ imagem */
+function cinzaDe(data, w, h) {
+  const g = new Float32Array(w * h);
+  for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = 0.299 * data[j] + 0.587 * data[j + 1] + 0.114 * data[j + 2];
+  return g;
+}
+function meia(g, w, h) {                // 2x2 média
+  const w2 = w >> 1, h2 = h >> 1, m = new Float32Array(w2 * h2);
+  for (let y = 0; y < h2; y++) for (let x = 0; x < w2; x++) {
+    const i = (2 * y) * w + 2 * x;
+    m[y * w2 + x] = (g[i] + g[i + 1] + g[i + w] + g[i + w + 1]) * 0.25;
+  }
+  return { g: m, w: w2, h: h2 };
+}
+function sat(g, w, h) {                 // tabela de soma acumulada (w+1)x(h+1)
+  const W1 = w + 1, s = new Float64Array(W1 * (h + 1));
+  for (let y = 1; y <= h; y++) { let linha = 0; for (let x = 1; x <= w; x++) { linha += g[(y - 1) * w + (x - 1)]; s[y * W1 + x] = s[(y - 1) * W1 + x] + linha; } }
+  return { s, W1 };
+}
+const caixa = (S, x1, y1, x2, y2) => S.s[y2 * S.W1 + x2] - S.s[y1 * S.W1 + x2] - S.s[y2 * S.W1 + x1] + S.s[y1 * S.W1 + x1];
+function zeroMedia(a) {
+  let s = 0; for (const v of a) s += v; const m = s / a.length;
+  const z = new Float32Array(a.length); let n2 = 0;
+  for (let i = 0; i < a.length; i++) { z[i] = a[i] - m; n2 += z[i] * z[i]; }
+  return { z, norma: Math.sqrt(n2) + 1e-6 };
+}
+function ncc(a, tpl) {                  // a: valores; tpl: {z, norma}
+  let s = 0; for (const v of a) s += v; const m = s / a.length;
+  let num = 0, da = 0;
+  for (let i = 0; i < a.length; i++) { const x = a[i] - m; num += x * tpl.z[i]; da += x * x; }
+  return num / (Math.sqrt(da) * tpl.norma + 1e-6);
+}
+
+/* ------------------------------------------------------- fonte de vídeo */
+const video = document.getElementById('v');
+const tela = document.getElementById('tela');
+let W = 0, H = 0, fonte = null;          // fonte: o que desenhar (video ou canvas de teste)
+async function abrirCaptura() {
+  if (TESTE) { fonte = telaFalsa(1920, 1080); W = 1920; H = 1080; return; }
+  const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 20 } }, audio: false });
+  video.srcObject = stream;
+  await new Promise((ok) => { video.onloadedmetadata = ok; });
+  await video.play().catch(() => {});
+  W = video.videoWidth; H = video.videoHeight; fonte = video;
+  stream.getVideoTracks()[0].onended = () => { log('captura encerrada'); fonte = null; };
+}
+const ctxDe = (c) => c.getContext('2d', { willReadFrequently: true });
+function pedaco(x, y, w, h) {           // ImageData de um retângulo da fonte
+  if (tela.width !== w || tela.height !== h) { tela.width = w; tela.height = h; }
+  const c = ctxDe(tela);
+  c.drawImage(fonte, x, y, w, h, 0, 0, w, h);
+  return c.getImageData(0, 0, w, h).data;
+}
+
+/* ------------------------------------------------------- 1. calibrar */
+let mapaTpl = null, calib = null, tentativasCalib = 0;
+async function prepararMapa() {
+  const img = await carregar('/minimapa.png');
+  const c = new OffscreenCanvas(N, N); const x = ctxDe(c); x.drawImage(img, 0, 0, N, N);
+  mapaTpl = zeroMedia(cinzaDe(x.getImageData(0, 0, N, N).data, N, N));
+}
+function pontuarQuadrado(S, x, y, s) {
+  const cel = new Float32Array(N * N);
+  for (let j = 0; j < N; j++) {
+    const y1 = y + Math.round(j * s / N), y2 = y + Math.round((j + 1) * s / N);
+    for (let i = 0; i < N; i++) {
+      const x1 = x + Math.round(i * s / N), x2 = x + Math.round((i + 1) * s / N);
+      cel[j * N + i] = caixa(S, x1, y1, x2, y2) / ((x2 - x1) * (y2 - y1));
+    }
+  }
+  return ncc(cel, mapaTpl);
+}
+function calibrar() {
+  const R = Math.min(H, Math.round(H * 0.52) + 20);
+  let melhor = { score: -1 };
+  for (const canto of ['dir', 'esq']) {
+    const ox = canto === 'dir' ? W - R : 0, oy = H - R;
+    const g = cinzaDe(pedaco(ox, oy, R, R), R, R);
+    const S = sat(g, R, R);
+    const sMin = Math.round(H * 0.16), sMax = Math.round(H * 0.5);
+    for (let s = sMin; s <= sMax; s += 2) for (let p = 0; p <= 16; p += 2) {
+      const x = canto === 'dir' ? R - p - s : p, y = R - p - s;
+      if (x < 0 || y < 0) continue;
+      const score = pontuarQuadrado(S, x, y, s);
+      if (score > melhor.score) melhor = { score, s, p, canto, x: ox + x, y: oy + y, lx: x, ly: y, S };
+    }
+  }
+  if (melhor.score < 0) return null;
+  // refina em volta do melhor, passo 1
+  const { S, canto } = melhor;
+  const ox = canto === 'dir' ? W - R : 0, oy = H - R;
+  let fino = { ...melhor };
+  for (let s = melhor.s - 3; s <= melhor.s + 3; s++) for (let p = Math.max(0, melhor.p - 2); p <= melhor.p + 2; p++) {
+    const x = canto === 'dir' ? R - p - s : p, y = R - p - s;
+    if (x < 0 || y < 0 || s < 8) continue;
+    const score = pontuarQuadrado(S, x, y, s);
+    if (score > fino.score) fino = { score, s, p, canto, x: ox + x, y: oy + y };
+  }
+  return { x: fino.x, y: fino.y, s: fino.s, canto, score: Math.round(fino.score * 100) / 100 };
+}
+
+/**
+ * Anéis vermelhos: o ícone de inimigo tem borda vermelha. Contar pixels
+ * vermelhos em células do tamanho de meio ícone dá, quase de graça, os
+ * poucos lugares onde vale procurar quem não está sendo seguido. Ward e
+ * ping também são vermelhos — a correlação depois separa.
+ */
+function manchasVermelhas(rgba, s, d) {
+  const cel = Math.max(4, Math.round(d / 2)), nc = Math.ceil(s / cel), cont = new Uint16Array(nc * nc);
+  for (let y = 0; y < s; y += 2) for (let x = 0; x < s; x += 2) {
+    const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
+    if (r > 110 && r > g * 1.7 && r > b * 1.5) cont[((y / cel) | 0) * nc + ((x / cel) | 0)]++;
+  }
+  const pontos = [];
+  for (let j = 0; j < nc; j++) for (let i = 0; i < nc; i++) {
+    // soma 2x2 de células (o anel cruza várias)
+    const n = cont[j * nc + i] + (i + 1 < nc ? cont[j * nc + i + 1] : 0) + (j + 1 < nc ? cont[(j + 1) * nc + i] : 0) + (i + 1 < nc && j + 1 < nc ? cont[(j + 1) * nc + i + 1] : 0);
+    if (n >= 8) pontos.push({ x: (i + 1) * cel, y: (j + 1) * cel, n });   // centro do bloco 2x2
+  }
+  // junta vizinhos
+  const juntos = [];
+  for (const p of pontos.sort((a, b) => b.n - a.n)) if (!juntos.some((q) => Math.abs(q.x - p.x) < d && Math.abs(q.y - p.y) < d)) juntos.push(p);
+  return juntos.slice(0, 12);
+}
+const d0 = () => escala?.d ?? 24;
+
+/* ------------------------------------------------- 2. ícones e escala */
+let porNome = new Map();                 // nome normalizado -> id
+const icones = new Map();                // id -> Image
+const templates = new Map();             // `${nome}@${d}` -> template
+async function iconeDe(nome) {
+  const id = porNome.get(semAcento(nome));
+  if (!id) return null;
+  if (!icones.has(id)) icones.set(id, carregar(`/icone/${id}`).catch(() => null));
+  return icones.get(id);
+}
+/** Template do ícone com diâmetro d: meia resolução em cinza (busca) e cheia em cor (confirmação). */
+async function template(nome, d) {
+  const chave = `${nome}@${d}`;
+  if (templates.has(chave)) return templates.get(chave);
+  const img = await iconeDe(nome);
+  if (!img) return null;
+  const c = new OffscreenCanvas(d, d); const x = ctxDe(c);
+  x.drawImage(img, 0, 0, d, d);
+  const rgba = x.getImageData(0, 0, d, d).data;
+  const r = d / 2, rMask = r - Math.max(2, d * 0.09);       // sem a borda colorida
+  // cheia (cor)
+  const idxC = [], valC = [];
+  for (let j = 0; j < d; j++) for (let i = 0; i < d; i++) {
+    if (Math.hypot(i + 0.5 - r, j + 0.5 - r) > rMask) continue;
+    idxC.push(j * d + i); const k = (j * d + i) * 4; valC.push(rgba[k], rgba[k + 1], rgba[k + 2]);
+  }
+  // meia (cinza)
+  const g = cinzaDe(rgba, d, d); const m = meia(g, d, d);
+  const rm = m.w / 2, rMaskM = rm - Math.max(1, m.w * 0.09);
+  const idxM = [], valM = [];
+  for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) {
+    if (Math.hypot(i + 0.5 - rm, j + 0.5 - rm) > rMaskM) continue;
+    idxM.push([i, j]); valM.push(m.g[j * m.w + i]);
+  }
+  const t = { nome, d, cheia: { w: d, idx: idxC, ...zeroMedia(Float32Array.from(valC)) }, meiaRes: { w: m.w, idx: idxM, ...zeroMedia(Float32Array.from(valM)) } };
+  templates.set(chave, t);
+  return t;
+}
+/** Procura o template (meia res) em `img` = {g, w, h}; devolve os melhores pontos. */
+function buscar(img, tpl, area = null, quantos = 3, passo = 1) {
+  const { w: tw, idx, z, norma } = tpl.meiaRes;
+  const n = idx.length;
+  const offs = new Int32Array(n);
+  for (let k = 0; k < n; k++) offs[k] = idx[k][1] * img.w + idx[k][0];
+  const x0 = Math.max(0, Math.round(area?.x0 ?? 0)), y0 = Math.max(0, Math.round(area?.y0 ?? 0));
+  const x1 = Math.min(img.w - tw, Math.round(area?.x1 ?? img.w - tw)), y1 = Math.min(img.h - tw, Math.round(area?.y1 ?? img.h - tw));
+  const top = [];
+  for (let py = y0; py <= y1; py += passo) for (let px = x0; px <= x1; px += passo) {
+    const base = py * img.w + px;
+    let s = 0, sq = 0, num = 0;
+    for (let k = 0; k < n; k++) { const v = img.g[base + offs[k]]; s += v; sq += v * v; num += v * z[k]; }
+    const varn = sq - s * s / n;
+    if (varn <= 1) continue;
+    const score = num / (Math.sqrt(varn) * norma);
+    if (top.length < quantos || score > top[top.length - 1].score) {
+      // ignora vizinho do mesmo pico
+      const viz = top.find((t) => Math.abs(t.x - px) <= tw && Math.abs(t.y - py) <= tw);
+      if (viz) { if (score > viz.score) { viz.score = score; viz.x = px; viz.y = py; } }
+      else top.push({ x: px, y: py, score });
+      top.sort((a, b) => b.score - a.score); if (top.length > quantos) top.pop();
+    }
+  }
+  return top;
+}
+/** Confirma na resolução cheia, em cor, em volta de (x, y) (coordenadas cheias). */
+function confirmar(rgba, s, tpl, x, y) {
+  const { w: tw, idx, z, norma } = tpl.cheia;
+  let melhor = { score: -1, x, y };
+  for (let py = y - 4; py <= y + 4; py++) for (let px = x - 4; px <= x + 4; px++) {
+    if (px < 0 || py < 0 || px + tw > s || py + tw > s) continue;
+    const vals = new Float32Array(idx.length * 3);
+    for (let k = 0; k < idx.length; k++) {
+      const q = (((py + (idx[k] / tw | 0)) * s) + px + (idx[k] % tw)) * 4;
+      vals[3 * k] = rgba[q]; vals[3 * k + 1] = rgba[q + 1]; vals[3 * k + 2] = rgba[q + 2];
+    }
+    const score = ncc(vals, { z, norma });
+    if (score > melhor.score) melhor = { score, x: px, y: py };
+  }
+  // borda do ícone: inimigo tem anel vermelho — um reforço contra "sósias" no terreno
+  const cx = melhor.x + tw / 2, cy = melhor.y + tw / 2, raio = tw / 2 - 1.5;
+  let r = 0, g = 0, b = 0, n = 0;
+  for (let a = 0; a < 360; a += 12) {
+    const px = Math.round(cx + Math.cos(a / 57.3) * raio), py = Math.round(cy + Math.sin(a / 57.3) * raio);
+    if (px < 0 || py < 0 || px >= s || py >= s) continue;
+    const q = (py * s + px) * 4; r += rgba[q]; g += rgba[q + 1]; b += rgba[q + 2]; n++;
+  }
+  melhor.anelVermelho = n > 0 && r / n > 90 && r / n > (g / n) * 1.6 && r / n > (b / n) * 1.4;
+  return melhor;
+}
+
+/* ------------------------------------------------------------- estado */
+let inimigos = [], meuCampeao = null, meuTime = 100;
+let escala = null;                       // {d, score, confiavel}
+let ultimoEnvio = '', ultimoEnvioEm = 0, ultimaCalibEm = 0;
+const rastros = new Map();               // nome -> {x, y, em} (cheia, dentro do recorte)
+let rodada = 0;
+async function lerPartida() {
+  try {
+    const d = await fetch('/api/vivo').then((r) => r.json());
+    if (!d.emJogo) { inimigos = []; meuCampeao = null; return; }
+    inimigos = (d.inimigos ?? []).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
+    meuCampeao = d.estado?.eu?.campeao ?? null; meuTime = d.estado?.eu?.time ?? 100;
+  } catch { /* daemon ocupado */ }
+}
+
+/* ------------------------------------------------------- 3. cada quadro */
+let ocupado = false;
+async function quadro() {
+  if (ocupado || !fonte || !mapaTpl) return;
+  ocupado = true;
+  try {
+    const agora = Date.now();
+    if (!calib || (agora - ultimaCalibEm > 60000 && rastros.size === 0)) {
+      if (agora - ultimaCalibEm > 3000) {
+        ultimaCalibEm = agora; tentativasCalib++;
+        const c = calibrar();
+        if (c && c.score >= LIMIAR_MAPA) { if (!calib || calib.x !== c.x || calib.s !== c.s) log(`minimapa: ${c.canto} ${c.s}px em ${c.x},${c.y} (score ${c.score})`); calib = c; }
+        else if (!calib) { if (tentativasCalib % 5 === 1) log(`minimapa não achado (melhor ${c?.score ?? '-'})`); enviar({ calib: null, escala, vistos: [], eu: null }); }
+      }
+      if (!calib) return;
+    }
+    const { x, y, s } = calib;
+    const rgba = pedaco(x, y, s, s);
+    const g = cinzaDe(rgba, s, s);
+    const m = meia(g, s, s);
+    const vermelhos = manchasVermelhas(rgba, s, d0());
+
+    // escala dos ícones pelo MEU ícone
+    if ((!escala || (!escala.confiavel && agora - escala.em > 5000)) && meuCampeao) {
+      escala = { ...(escala ?? {}), em: agora };
+      let melhor = { score: -1 };
+      for (let d = Math.round(s * 0.06); d <= Math.round(s * 0.12); d += 1) {
+        const t = await template(meuCampeao, d); if (!t) break;
+        const [p] = buscar(m, t, null, 1);
+        if (p && p.score > melhor.score) melhor = { ...p, d };
+      }
+      if (melhor.score >= LIMIAR_EU) { escala = { d: melhor.d, score: Math.round(melhor.score * 100) / 100, confiavel: true, em: agora }; log(`ícone: ${melhor.d}px (score ${escala.score})`); }
+      else if (!escala.d) { escala = { d: Math.round(s * 0.085), score: 0, confiavel: false, em: agora }; log(`meu ícone não achado (melhor ${Math.round(melhor.score * 100) / 100}); usando ${escala.d}px`); }
+    }
+    if (!escala?.d) return;
+    const d = escala.d;
+
+    // eu
+    let eu = null;
+    if (meuCampeao) {
+      const t = await template(meuCampeao, d);
+      if (t) { const p = procurar(m, rgba, s, t, 'eu', agora, rodada % 4 === 0); if (p) eu = p; }
+    }
+    // inimigos vivos: quem está sendo seguido é procurado em volta de onde
+    // estava; quem não, nas manchas vermelhas e — um por quadro, em rodízio —
+    // no minimapa inteiro (garantia pra quem joga sem anel vermelho).
+    const vistos = [];
+    const soltos = inimigos.filter((j) => !j.morto && !rastros.has(j.campeao));
+    const daVez = soltos.length ? soltos[rodada % soltos.length].campeao : null;
+    for (const j of inimigos) {
+      if (j.morto) { rastros.delete(j.campeao); continue; }
+      const t = await template(j.campeao, d); if (!t) continue;
+      const p = procurar(m, rgba, s, t, j.campeao, agora, j.campeao === daVez, vermelhos);
+      if (p) vistos.push({ campeao: j.campeao, x: p.x, y: p.y, score: p.score });
+    }
+    // dois ícones no mesmo lugar: fica o de maior score
+    const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));
+    rodada++;
+    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, eu });
+  } catch (erro) { log('erro: ' + erro.message); }
+  finally { ocupado = false; }
+}
+/** Procura um ícone: perto de onde estava, senão (se pode) no minimapa todo. Devolve posição 0..1. */
+function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
+  const rastro = rastros.get(chave);
+  const seguindo = rastro && agora - rastro.em < 2000;
+  const tw = t.meiaRes.w;
+  let cand = [];
+  if (seguindo) {
+    const cx = rastro.x / 2, cy = rastro.y / 2, r = 14;
+    cand = buscar(m, t, { x0: cx - r, y0: cy - r, x1: cx + r, y1: cy + r }, 2);
+  } else {
+    for (const p of manchas) {
+      const cx = p.x / 2 - tw / 2, cy = p.y / 2 - tw / 2, r = 4;
+      cand = cand.concat(buscar(m, t, { x0: cx - r, y0: cy - r, x1: cx + r, y1: cy + r }, 1));
+    }
+  }
+  if (podeCheia) cand = cand.concat(buscar(m, t, null, 3, 1));
+  // confirma em cor todos os candidatos razoáveis e fica com o melhor
+  let melhor = null;
+  for (const c of cand) {
+    if (c.score < LIMIAR_MEIO) continue;
+    const ok = confirmar(rgba, s, t, c.x * 2, c.y * 2);
+    if (ok.anelVermelho) ok.score += 0.08;
+    if (!melhor || ok.score > melhor.score) melhor = ok;
+  }
+  const perto = melhor && seguindo && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 40;
+  if (melhor && melhor.score >= (perto ? LIMIAR_SEGUIDO : LIMIAR_NOVO)) {
+    rastros.set(chave, { x: melhor.x, y: melhor.y, em: agora });
+    return { x: (melhor.x + t.d / 2) / s, y: (melhor.y + t.d / 2) / s, score: Math.round(melhor.score * 100) / 100 };
+  }
+  if (rastro && agora - rastro.em > 2000) rastros.delete(chave);
+  return null;
+}
+function enviar(dados) {
+  const agora = Date.now();
+  const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
+  if (chave === ultimoEnvio && agora - ultimoEnvioEm < 1000) return;
+  ultimoEnvio = chave; ultimoEnvioEm = agora;
+  if (TESTE || FINGIR) { log(`${dados.vistos.map((v) => `${v.campeao} ${v.x.toFixed(2)},${v.y.toFixed(2)} (${v.score})`).join(' · ') || 'ninguém'}${dados.eu ? ` | eu ${dados.eu.x.toFixed(2)},${dados.eu.y.toFixed(2)}` : ''}`); return; }
+  fetch('/api/olho', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...dados, t: agora }) }).catch(() => {});
+}
+
+/* --------------------------------------------------------------- teste */
+/** Uma "tela do jogo" desenhada: minimapa no canto com ícones andando. Serve pro ?teste=1 e pra ?tela=1. */
+const FALSOS = { eu: 'Amumu', inimigos: ['Kha\'Zix', 'Zed', 'Cassiopeia', 'Jinx', 'Nami'] };
+let falsa = null;
+function telaFalsa(w, h) {
+  falsa = document.createElement('canvas'); falsa.width = w; falsa.height = h;
+  return falsa;
+}
+async function desenharFalsa(t) {
+  const w = falsa.width, h = falsa.height;
+  const buf = new OffscreenCanvas(w, h), c = ctxDe(buf);   // desenha inteiro, depois copia (sem quadro pela metade)
+  const s = Math.round(h * 0.28), p = 6, x0 = w - p - s, y0 = h - p - s;
+  c.fillStyle = '#1b2a1b'; c.fillRect(0, 0, w, h);
+  for (let i = 0; i < 400; i++) { c.fillStyle = `hsl(${100 + Math.random() * 40},30%,${10 + Math.random() * 25}%)`; c.fillRect(Math.random() * w, Math.random() * h, 40, 40); }
+  const mapa = await carregar('/minimapa.png');
+  c.drawImage(mapa, x0, y0, s, s);
+  c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x0, y0, s, s * 0.5);   // "fog"
+  const d = Math.round(s * 0.085);
+  const pos = (i) => ({ x: 0.5 + 0.35 * Math.cos(t / 4000 + i * 1.3), y: 0.5 + 0.35 * Math.sin(t / 5000 + i * 1.7) });
+  const icone = async (nome, pt, cor) => {
+    const img = await iconeDe(nome); if (!img) return;
+    const cx = x0 + pt.x * s, cy = y0 + pt.y * s;
+    c.save(); c.beginPath(); c.arc(cx, cy, d / 2, 0, Math.PI * 2); c.clip(); c.drawImage(img, cx - d / 2, cy - d / 2, d, d); c.restore();
+    c.strokeStyle = cor; c.lineWidth = 2; c.beginPath(); c.arc(cx, cy, d / 2 - 1, 0, Math.PI * 2); c.stroke();
+  };
+  for (const [i, n] of FALSOS.inimigos.entries()) if (i !== 3) await icone(n, pos(i), '#e03030');   // Jinx "na fog"
+  await icone(FALSOS.eu, { x: 0.3, y: 0.7 }, '#fff');
+  c.fillStyle = '#e03030'; c.beginPath(); c.arc(x0 + s * 0.6, y0 + s * 0.4, 4, 0, Math.PI * 2); c.fill();   // ward
+  ctxDe(falsa).drawImage(buf, 0, 0);
+  return { s, d, pos };
+}
+
+/* ---------------------------------------------------------------- vai */
+(async () => {
+  porNome = new Map((await fetch('/api/campeoes').then((r) => r.json()).catch(() => [])).map((c) => [semAcento(c.nome), c.id]));
+  if (SO_TELA) {
+    telaFalsa(innerWidth, innerHeight); document.body.appendChild(falsa); falsa.style.position = 'fixed'; falsa.style.inset = '0';
+    const t0 = Date.now(); setInterval(() => desenharFalsa(Date.now() - t0), 200);
+    return;
+  }
+  await prepararMapa();
+  await abrirCaptura();
+  log(`captura ${W}x${H}${TESTE ? ' (teste)' : ''}`);
+  if (TESTE || FINGIR) inimigos = FALSOS.inimigos.map((n) => ({ campeao: n, morto: false })), meuCampeao = FALSOS.eu;
+  if (TESTE) {
+    const t0 = Date.now();
+    setInterval(async () => { const r = await desenharFalsa(Date.now() - t0); window.esperado = r; }, INTERVALO);
+  } else if (!FINGIR) { await lerPartida(); setInterval(lerPartida, 2000); }
+  setInterval(quadro, INTERVALO);
+})().catch((erro) => log('falhou: ' + erro.message));
+</script>
+</body>
+</html>

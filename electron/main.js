@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut, screen, session, desktopCapturer } from 'electron';
 import { cp, mkdir, readdir } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -287,6 +287,38 @@ function fecharOverlay() {
 }
 
 /**
+ * O olho: janela escondida que captura a tela do jogo (como o OBS, pela
+ * API de captura do Chromium — nada de memória) e procura os ícones dos
+ * inimigos no minimapa. É o "jungle tracking" do ABSOL. Só existe durante a
+ * partida; nunca aparece nem pega foco. Desliga em config.olho.ligado=false.
+ */
+let janelaOlho = null;
+function abrirOlho() {
+  if (!endereco || daemon?.config?.olho?.ligado === false) return;
+  if (janelaOlho && !janelaOlho.isDestroyed()) return;
+  janelaOlho = new BrowserWindow({
+    width: 400, height: 300, show: false, skipTaskbar: true, focusable: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
+  });
+  janelaOlho.loadURL(`${endereco}/olho`);
+  janelaOlho.on('closed', () => { janelaOlho = null; });
+}
+function fecharOlho() {
+  if (janelaOlho && !janelaOlho.isDestroyed()) janelaOlho.close();
+  janelaOlho = null;
+}
+/** A captura pede "qual tela?"; respondemos sozinhos: a tela principal, onde o jogo roda. */
+function prepararCaptura() {
+  session.defaultSession.setDisplayMediaRequestHandler((_pedido, responder) => {
+    desktopCapturer.getSources({ types: ['screen'], thumbnailSize: { width: 0, height: 0 } }).then((fontes) => {
+      const principal = String(screen.getPrimaryDisplay().id);
+      const fonte = fontes.find((f) => f.display_id === principal) ?? fontes[0];
+      if (fonte) responder({ video: fonte, audio: false }); else responder(null);
+    }).catch(() => responder(null));
+  }, { useSystemPicker: false });
+}
+
+/**
  * Atalhos globais, configuráveis na aba Configuração (config.atalhos). O do
  * flash vale pra posição 1; as outras seguem: se termina em dígito, 1..5;
  * se termina em F-tecla, F(n)..F(n+4). Só escuta a tecla — nada entra no jogo.
@@ -390,8 +422,8 @@ app.whenReady().then(async () => {
         // Saiu da partida: se o painel estava esperando pra aparecer, agora pode.
         if (fase !== 'InProgress') mostrarPainelSeSeguro();
         // Overlay: nasce quando o jogo carrega e some quando acaba.
-        if (fase === 'InProgress' || fase === 'GameStart') abrirOverlay();
-        else if (antes === 'InProgress' || antes === 'GameStart') fecharOverlay();
+        if (fase === 'InProgress' || fase === 'GameStart') { abrirOverlay(); abrirOlho(); }
+        else if (antes === 'InProgress' || antes === 'GameStart') { fecharOverlay(); fecharOlho(); }
         // Acabou uma partida: boa hora pra procurar (e instalar) atualização.
         if (antes === 'InProgress' && fase !== 'InProgress' && app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
       },
@@ -412,6 +444,8 @@ app.whenReady().then(async () => {
   criarBandeja();
   ligarAtualizacao();
   registrarAtalhos(daemon.config);
+  prepararCaptura();
+  if (faseAtual === 'InProgress') { abrirOverlay(); abrirOlho(); }
 
   setTimeout(() => {
     if (!painelPendente) return;

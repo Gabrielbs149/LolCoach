@@ -406,7 +406,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
     if (!partidaVivo || estado.tempo < partidaVivo.memoria.ultimoTempo - 5) {
       const { novaMemoriaFalas } = await import('./vivo/falas.js');
-      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null, extras: null, montandoExtras: null };
+      partidaVivo = { memoria: R.novaMemoria(), fichas: null, montandoFichas: null, memFalas: novaMemoriaFalas(), falas: [], seq: 0, flashes: new Map(), ultimoEstado: null, extras: null, montandoExtras: null, olho: null, memOlho: null, olhoLog: 0 };
     }
 
     // Extras da voz (build, tipo de dano deles, quem está de main): uma vez
@@ -457,11 +457,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       objetivos: objs,
       falas: partidaVivo.falas.slice(-12),
       flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
+      // O olho: minimapa achado? onde cada um foi visto pela última vez.
+      olho: resumoDoOlho(estado),
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
         const f = partidaVivo.flashes.get(j.nome);
+        const r = partidaVivo.memOlho?.porCampeao.get(j.nome);
         return { posicao: i + 1, campeao: j.campeao, role: j.role, morto: j.morto, nivel: j.nivel,
-          tecla: config.atalhos?.flashes?.[i] ?? null, flashEm: f ? Math.max(0, Math.round(f.volta - estado.tempo)) : null, flashMarcado: !!f };
+          tecla: config.atalhos?.flashes?.[i] ?? null, flashEm: f ? Math.max(0, Math.round(f.volta - estado.tempo)) : null, flashMarcado: !!f,
+          visto: r?.vistoEm ? { texto: r.texto, lane: r.lane, lado: r.lado, ha: Math.round((Date.now() - r.vistoEm) / 1000), x: r.x, y: r.y } : null };
       }),
     };
   }
@@ -487,6 +491,36 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       divertido: `${alvo.campeao} sem flash. Cinco minutos de temporada de caça.` });
     log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')}`);
     return { ok: true, campeao: alvo.campeao, volta };
+  }
+  /**
+   * O olho (janela escondida olho.html) manda 5x por segundo o que viu no
+   * minimapa. As falas do jungler saem daqui na hora, sem esperar a próxima
+   * leitura da janela ao vivo.
+   */
+  async function receberOlho(dados) {
+    if (!partidaVivo?.ultimoEstado) return;
+    if (!partidaVivo.memOlho) {
+      const { novaMemoriaOlho } = await import('./vivo/olho.js');
+      partidaVivo.memOlho = novaMemoriaOlho();
+    }
+    const antes = partidaVivo.olho;
+    partidaVivo.olho = { ...dados, recebidoEm: Date.now() };
+    if (dados.calib && (!antes?.calib || antes.calib.s !== dados.calib.s)) log(`olho: minimapa ${dados.calib.s}px (score ${dados.calib.score})${dados.escala ? `, ícone ${dados.escala.d}px` : ''}`);
+    if (!dados.calib && antes?.calib !== null && Date.now() - partidaVivo.olhoLog > 30000) { partidaVivo.olhoLog = Date.now(); log('olho: não achei o minimapa (jogo em tela cheia exclusiva? overlay por cima?)'); }
+    const { falasDoOlho } = await import('./vivo/olho.js');
+    const e = partidaVivo.ultimoEstado;
+    for (const f of falasDoOlho({ vistos: dados.vistos ?? [], eu: dados.eu ?? null, estado: e }, partidaVivo.memOlho)) {
+      partidaVivo.falas.push({ ...f, seq: ++seqFalas, t: e.tempo });
+    }
+  }
+  function resumoDoOlho(estado) {
+    const o = partidaVivo?.olho;
+    if (!o) return { ligado: false };
+    const velho = Date.now() - o.recebidoEm > 5000;
+    return { ligado: !velho, minimapa: !!o.calib, icone: o.escala?.d ?? null, confiavel: !!o.escala?.confiavel,
+      eu: o.eu ?? null,
+      vistos: (o.vistos ?? []).map((v) => ({ campeao: v.campeao, x: v.x, y: v.y })),
+      ha: Math.round((Date.now() - o.recebidoEm) / 1000) };
   }
   function falasDeFlash(tempo) {
     const novas = [];
@@ -1034,7 +1068,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo,
-    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),

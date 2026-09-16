@@ -33,6 +33,8 @@ body{font:12.5px/1.3 "Segoe UI",system-ui,sans-serif;color:var(--texto);-webkit-
 .ini.morto img{filter:grayscale(1);opacity:.5}
 .ini .n{font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .ini .n small{color:var(--apagado);font-weight:500;margin-left:4px}
+.ini .n .v{font-style:normal;font-size:10.5px;color:var(--fraco);margin-left:6px;font-variant-numeric:tabular-nums}
+.ini .n .v.agora{color:var(--ouro-claro);font-weight:700}
 .ini kbd{font:700 10px/1 "Segoe UI",system-ui;color:var(--fraco);background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:4px;padding:2px 5px;white-space:nowrap}
 .ini .f{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;font-size:12px}
 .ini .f .bar{display:block;height:3px;border-radius:2px;background:rgba(255,255,255,.1);margin-top:3px;overflow:hidden}
@@ -53,6 +55,8 @@ let porNome = new Map(), ultimaFala = null, ultimaFalaEm = 0, ultimoJson = '';
 fetch('/api/campeoes').then(r => r.json()).then(l => { porNome = new Map(l.map(c => [c.nome.toLowerCase().replace(/[^a-z]/g,''), c.id])); }).catch(() => {});
 const icone = (nome) => { const id = porNome.get(String(nome ?? '').toLowerCase().replace(/[^a-z]/g,'')); return id ? `<img src="/icone/${id}" alt="">` : '<span></span>'; };
 const CLS = { 'Dragão': 'dragao', 'Arauto': 'arauto', 'Barão': 'barao' };
+const LUGAR = { top: 'top', mid: 'mid', bot: 'bot', jungle: 'jg', rio: 'rio', barao: 'barão', dragao: 'dragão', base: 'base' };
+const visto = (v) => !v || v.ha >= 90 ? '' : v.ha <= 3 ? `<em class="v agora">${LUGAR[v.lane] ?? v.lane}${v.lado === 'deles' ? ' deles' : ''}</em>` : `<em class="v">${LUGAR[v.lane] ?? v.lane} ${v.ha}s</em>`;
 
 function desenhar(d){
   const hud = document.getElementById('hud');
@@ -64,7 +68,7 @@ function desenhar(d){
     const f = j.flashMarcado ? (j.flashEm > 0 ? 'usado' : 'voltou') : 'livre';
     const txt = j.flashMarcado ? (j.flashEm > 0 ? mmss(j.flashEm) : 'flash ✓') : 'flash?';
     const pct = j.flashMarcado && j.flashEm > 0 ? Math.round(j.flashEm / 300 * 100) : 0;
-    return `<div class="ini ${j.morto ? 'morto' : ''}">${icone(j.campeao)}<span class="n">${esc(j.campeao)}<small>${esc(j.role ?? '')}</small></span>
+    return `<div class="ini ${j.morto ? 'morto' : ''}">${icone(j.campeao)}<span class="n">${esc(j.campeao)}<small>${esc(j.role ?? '')}</small>${visto(j.visto)}</span>
       ${j.tecla ? `<kbd>${esc(tecla(j.tecla))}</kbd>` : '<span></span>'}
       <span class="f ${f}">${txt}${pct ? `<span class="bar"><i style="width:${pct}%"></i></span>` : ''}</span></div>`;
   }).join('');
@@ -82,7 +86,7 @@ function desenhar(d){
 async function tick(){
   try {
     const d = await fetch('/api/vivo').then(r => r.json());
-    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos, d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
+    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos?.map((j) => [j.morto, j.flashEm, j.visto?.lane, j.visto?.ha]), d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
     if (json === ultimoJson && Date.now() - ultimaFalaEm > 13000) return;
     ultimoJson = json;
     desenhar(d);

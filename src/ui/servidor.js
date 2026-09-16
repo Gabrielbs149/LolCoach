@@ -135,6 +135,14 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      // O olho (janela escondida) viu o minimapa: posições dos inimigos.
+      if (req.method === 'POST' && url.pathname === '/api/olho' && acoes.olho) {
+        const pedacos = [];
+        for await (const p of req) pedacos.push(p);
+        try { acoes.olho(JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}')); } catch { /* leitura torta */ }
+        return enviar(200, 'application/json', '{"ok":true}');
+      }
+
       // O vigia de teclas viu uma tecla configurada.
       if (req.method === 'POST' && url.pathname === '/api/tecla' && acoes.tecla) {
         try { acoes.tecla(url.searchParams.get('acao')); } catch { /* ação sem efeito agora */ }
@@ -371,6 +379,13 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
           res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' });
           return res.end(png);
         } catch { return enviar(404, 'text/plain', 'sem emblema'); }
+      }
+      if (url.pathname === '/olho') {
+        return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'olho.html'), 'utf8'));
+      }
+      if (url.pathname === '/minimapa.png') {
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' });
+        return res.end(await readFile(join(AQUI, 'minimapa.png')));
       }
       if (url.pathname === '/overlay') {
         return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'overlay.html'), 'utf8'));
