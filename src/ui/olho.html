@@ -34,7 +34,7 @@ const SO_TELA = Q.get('tela') === '1';
 const FINGIR = Q.get('fingir') === '1';   // captura de verdade, inimigos de mentira (teste com ?tela=1 aberto)
 const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
 const N = 48;                          // grade da calibração do minimapa
-const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.72, LIMIAR_SEGUIDO = 0.62, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.55, MARGEM = 0.04;
+const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.76, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.74, MARGEM = 0.04;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
 let cegoDesde = 0, cegoAvisado = 0, fracoDesde = 0;
 
@@ -153,7 +153,7 @@ function calibrar() {
  */
 function manchasVermelhas(rgba, s, d, cor = 'vermelho') {
   const cel = Math.max(4, Math.round(d / 2)), nc = Math.ceil(s / cel), cont = new Uint16Array(nc * nc);
-  const bate = cor === 'azul' ? (r, g, b) => b > 130 && b > r * 1.8 && b > g * 1.25 && g < 170 : (r, g, b) => r > 110 && r > g * 1.7 && r > b * 1.5;
+  const bate = cor === 'azul' ? (r, g, b) => b > 100 && b > r * 1.5 && b >= g * 1.1 : (r, g, b) => r > 100 && r > g * 1.5 && r > b * 1.2;
   for (let y = 0; y < s; y += 2) for (let x = 0; x < s; x += 2) {
     const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
     if (bate(r, g, b)) cont[((y / cel) | 0) * nc + ((x / cel) | 0)]++;
@@ -162,12 +162,13 @@ function manchasVermelhas(rgba, s, d, cor = 'vermelho') {
   for (let j = 0; j < nc; j++) for (let i = 0; i < nc; i++) {
     // soma 2x2 de células (o anel cruza várias)
     const n = cont[j * nc + i] + (i + 1 < nc ? cont[j * nc + i + 1] : 0) + (j + 1 < nc ? cont[(j + 1) * nc + i] : 0) + (i + 1 < nc && j + 1 < nc ? cont[(j + 1) * nc + i + 1] : 0);
-    if (n >= 8 && n <= 70) pontos.push({ x: (i + 1) * cel, y: (j + 1) * cel, n });   // centro do bloco 2x2 (cheio demais = rio, não anel)
+    if (n >= 8 && n <= 90) pontos.push({ x: (i + 1) * cel, y: (j + 1) * cel, n });   // centro do bloco 2x2 (cheio demais = rio, não anel)
   }
   // junta vizinhos
   const juntos = [];
-  for (const p of pontos.sort((a, b) => b.n - a.n)) if (!juntos.some((q) => Math.abs(q.x - p.x) < d && Math.abs(q.y - p.y) < d)) juntos.push(p);
-  return juntos.slice(0, 8);
+  // anel de campeão tem ~24 pixels contados: os mais parecidos com isso primeiro (torre e ping ficam pro fim)
+  for (const p of pontos.sort((a, b) => Math.abs(a.n - 24) - Math.abs(b.n - 24))) if (!juntos.some((q) => Math.abs(q.x - p.x) < d && Math.abs(q.y - p.y) < d)) juntos.push(p);
+  return juntos.slice(0, 14);
 }
 const d0 = () => escala?.d ?? 24;
 
@@ -388,6 +389,14 @@ async function quadro() {
     const tplsAli = new Map();
     for (const j of aliados.filter((j) => !j.morto)) { const t = await template(j.campeao, d); if (t) tplsAli.set(j.campeao, t); }
     const vistosAli = reconhecerEmManchas(azuis, tplsAli, m, rgba, s, null);
+    {
+      const faltam = [...tplsAli.keys()].filter((n) => !vistosAli.some((v) => v.campeao === n));
+      for (const nome of faltam.slice(rodada % Math.max(1, faltam.length)).slice(0, 1)) {   // um aliado por quadro no mapa todo
+        const p = procurar(m, rgba, s, tplsAli.get(nome), 'ali-' + nome, agora, true, []);
+        if (p) vistosAli.push({ campeao: nome, x: p.x, y: p.y, score: p.score });
+      }
+      for (const nome of tplsAli.keys()) if (!faltam.includes(nome)) { const v = vistosAli.find((x) => x.campeao === nome); const t = tplsAli.get(nome); rastros.set('ali-' + nome, { x: v.x * s - t.d / 2, y: v.y * s - t.d / 2, em: agora }); }
+    }
     // (a) cada mancha vermelha: pontua os 5 e fica com o mais parecido, se ganhar com margem
     const tomados = new Set();
     const manchasAvaliadas = [];
@@ -418,10 +427,12 @@ async function quadro() {
     }
     // (b) quem não caiu em mancha nenhuma: segue de onde estava; um por quadro procura o mapa todo
     const soltos = vivos.filter((j) => !tomados.has(j.campeao));
-    const daVez = soltos.length ? soltos[rodada % soltos.length].campeao : null;
+    const semRastro = soltos.filter((j) => !rastros.has(j.campeao));
+    const ini = semRastro.length ? rodada % semRastro.length : 0;
+    const daVez = new Set(semRastro.slice(ini, ini + 2).concat(semRastro.slice(0, Math.max(0, ini + 2 - semRastro.length))).map((j) => j.campeao));
     for (const j of soltos) {
       const t = tpls.get(j.campeao); if (!t) continue;
-      const p = procurar(m, rgba, s, t, j.campeao, agora, j.campeao === daVez, []);
+      const p = procurar(m, rgba, s, t, j.campeao, agora, daVez.has(j.campeao), []);
       if (p) vistos.push({ campeao: j.campeao, x: p.x, y: p.y, score: p.score });
     }
     // dois ícones no mesmo lugar: fica o de maior score
