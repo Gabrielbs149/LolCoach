@@ -141,6 +141,14 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       }
 
       // O olho (janela escondida) viu o minimapa: posições dos inimigos.
+      // Amostra do minimapa (png) pra ajustar o reconhecimento em casa.
+      if (req.method === 'POST' && url.pathname === '/api/olho/foto' && acoes.olhoFoto) {
+        const pedacos = [];
+        for await (const p of req) pedacos.push(p);
+        let meta = {}; try { meta = JSON.parse(url.searchParams.get('meta') || '{}'); } catch { /* sem meta */ }
+        try { await acoes.olhoFoto(Buffer.concat(pedacos), meta); } catch { /* disco cheio? segue */ }
+        return enviar(200, 'application/json', '{"ok":true}');
+      }
       if (req.method === 'POST' && url.pathname === '/api/olho' && acoes.olho) {
         const pedacos = [];
         for await (const p of req) pedacos.push(p);

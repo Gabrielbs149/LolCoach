@@ -61,14 +61,20 @@ export function falasDoOlho({ vistos, eu, estado, agora = Date.now() }, mem) {
     const ehJungler = j === jungler;
     if (v) {
       const l = lugar(v.x, v.y, meuTime);
-      const novo = !r.vistoEm || agora - r.vistoEm > 10000 || l.chave !== r.chave;
+      const primeiraVez = !r.vistoEm;
+      const novo = primeiraVez || agora - r.vistoEm > 10000 || l.chave !== r.chave;
       const perto = eu ? Math.hypot(v.x - eu.x, v.y - eu.y) < 0.16 : false;
       const noMeuLado = minhaLane && l.lane === minhaLane && l.lane !== 'jungle';
       r.x = v.x; r.y = v.y; r.chave = l.chave; r.lane = l.lane; r.texto = l.texto; r.vistoEm = agora; r.sumiuDito = false;
       if (!novo || agora - r.faladoEm < 6000 || j.morto) continue;
       if (ehJungler) {
         r.faladoEm = agora;
-        if (perto) dizer('jungler', F`Jungler deles perto de você, ${l.texto}. Recua!`, F`Jungler ${l.texto}, do seu lado. Sai daí!`, 3);
+        const tj = estado.tempo ?? 0, mmss = `${Math.floor(tj / 60)}:${String(Math.floor(tj % 60)).padStart(2, '0')}`;
+        // Primeira vez que ele aparece: onde começou (antes de 2:30) ou, no
+        // fim do primeiro clear (2:30–4:30), o lado oposto ao que apareceu.
+        if (primeiraVez && tj < 150 && l.lane !== 'base') dizer('jungler', F`Jungler deles começou ${l.texto}.`, F`Jungler deles começou ${l.texto}.`, 3);
+        else if (primeiraVez && tj < 270 && ['jungle', 'top', 'bot', 'rio'].includes(l.lane)) dizer('jungler', F`Jungler deles ${l.texto} aos ${mmss}. Começou ${v.x + v.y < 1 ? 'embaixo' : 'em cima'}.`, F`Jungler deles ${l.texto} aos ${mmss}. Começou ${v.x + v.y < 1 ? 'embaixo' : 'em cima'}.`, 3);
+        else if (perto) dizer('jungler', F`Jungler deles perto de você, ${l.texto}. Recua!`, F`Jungler ${l.texto}, do seu lado. Sai daí!`, 3);
         else if (l.lane === 'base') dizer('jungler', F('Jungler deles na base.'), F('Jungler deles foi pra base. Janela livre.'), 1);
         else dizer('jungler', F`Jungler deles ${l.texto}.`, F`Jungler ${l.texto}. Olho nele.`, 2);
       } else if ((perto || noMeuLado) && LANE_DE[j.role] !== minhaLane && l.lane !== 'base') {

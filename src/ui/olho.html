@@ -34,7 +34,8 @@ const SO_TELA = Q.get('tela') === '1';
 const FINGIR = Q.get('fingir') === '1';   // captura de verdade, inimigos de mentira (teste com ?tela=1 aberto)
 const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
 const N = 48;                          // grade da calibração do minimapa
-const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.5, LIMIAR_NOVO = 0.74, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.45;
+const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.68, LIMIAR_SEGUIDO = 0.6, LIMIAR_EU = 0.45;
+let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
 
 const $log = document.getElementById('log');
 const log = (...a) => { const t = a.join(' '); $log.textContent = (t + '\n' + $log.textContent).slice(0, 3000); console.log('[olho]', t); };
@@ -332,6 +333,16 @@ async function quadro() {
     const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));
     rodada++;
     enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, eu });
+    if (agora - ultimoDiag > 20000) {
+      ultimoDiag = agora;
+      log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · manchas ${vermelhos.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
+      melhoresDoQuadro.clear();
+    }
+    if (!TESTE && agora - ultimaFoto > 30000 && fotos < 40) {
+      ultimaFoto = agora; fotos++;
+      const meta = { t: agora, s, d, inimigos: inimigos.map((j) => j.campeao), eu: meuCampeao, vistos: limpos, manchas: vermelhos };
+      tela.toBlob((blob) => { if (blob) fetch('/api/olho/foto?meta=' + encodeURIComponent(JSON.stringify(meta)), { method: 'POST', body: blob }).catch(() => {}); }, 'image/png');
+    }
   } catch (erro) { log('erro: ' + erro.message); }
   finally { ocupado = false; }
 }
@@ -359,6 +370,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
     if (ok.anelVermelho) ok.score += 0.08;
     if (!melhor || ok.score > melhor.score) melhor = ok;
   }
+  if (melhor) melhoresDoQuadro.set(chave, Math.round(melhor.score * 100) / 100);
   const perto = melhor && seguindo && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 40;
   if (melhor && melhor.score >= (perto ? LIMIAR_SEGUIDO : LIMIAR_NOVO)) {
     rastros.set(chave, { x: melhor.x, y: melhor.y, em: agora });

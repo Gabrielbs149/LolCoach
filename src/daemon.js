@@ -4,7 +4,7 @@ import { autoAceitar } from './features/auto-aceitar.js';
 import { autoChampSelect } from './features/champ-select.js';
 import { abrirBanco } from './dados/banco.js';
 import { coletarPendentes } from './dados/coletor.js';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, rm } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
 import { resolve } from 'node:path';
 import { F, render as renderFala, personalizar as personalizarFalas } from './vivo/texto.js';
@@ -501,6 +501,18 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * minimapa. As falas do jungler saem daqui na hora, sem esperar a próxima
    * leitura da janela ao vivo.
    */
+  /** Guarda o recorte do minimapa em dados/olho/<partida>/ — no máximo 40 por partida, 6 partidas. */
+  async function olhoFoto(png, meta) {
+    const id = partidaVivo?.ultimoEstado ? `${new Date().toISOString().slice(0, 10)}-${(partidaVivo.ultimoEstado.eu?.campeao ?? 'x').toLowerCase()}` : 'sem-partida';
+    const pasta = resolve(pastaBase(), 'dados', 'olho', id);
+    await mkdir(pasta, { recursive: true });
+    const n = String(Math.floor((partidaVivo?.ultimoEstado?.tempo ?? 0))).padStart(4, '0');
+    await writeFile(resolve(pasta, `${n}.png`), png);
+    await writeFile(resolve(pasta, `${n}.json`), JSON.stringify({ ...meta, tempo: partidaVivo?.ultimoEstado?.tempo ?? null, jogadores: partidaVivo?.ultimoEstado?.jogadores?.map((j) => ({ campeao: j.campeao, time: j.time, role: j.role, morto: j.morto })) ?? [] }));
+    // limpa partidas velhas
+    const pastas = (await readdir(resolve(pastaBase(), 'dados', 'olho')).catch(() => [])).sort();
+    for (const velha of pastas.slice(0, -6)) await rm(resolve(pastaBase(), 'dados', 'olho', velha), { recursive: true, force: true }).catch(() => {});
+  }
   async function receberOlho(dados) {
     if (dados?.erro) { log(`olho: ${dados.erro}`); return; }
     if (!partidaVivo?.ultimoEstado) return;
@@ -1172,7 +1184,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     campeoes, lerConfig, salvarConfig, vivo,
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
-    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas,
+    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
     adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
