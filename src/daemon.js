@@ -464,13 +464,38 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
   let faseAnterior = null;
   let sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };   // flash compartilhado (partidas/<gameId>.json)
+  /**
+   * Aquece a voz na seleção: as falas mais comuns das últimas partidas viram
+   * mp3 no cache antes do jogo começar (a Microsoft leva 0,3–1 s por frase;
+   * "jungler deles em cima de você" não pode esperar). Uma a cada 1,2 s, só
+   * enquanto não está em partida.
+   */
+  let aquecendo = false;
+  async function aquecerVoz() {
+    if (aquecendo || (config.voz?.motor ?? 'edge') !== 'edge') return;
+    aquecendo = true;
+    try {
+      const pastas = (await readdir(pastaSituacoes()).catch(() => [])).sort().slice(-10);
+      const cont = new Map();
+      for (const p of pastas) for (const f of await lerJsonl(resolve(pastaSituacoes(), p, 'falas.jsonl'))) if (f.serio) cont.set(f.serio, (cont.get(f.serio) ?? 0) + 1);
+      const textos = [...cont].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([t]) => t);
+      let feitas = 0;
+      for (const texto of textos) {
+        const fase = estado?.instantaneo?.().fase;
+        if (fase === 'InProgress' || fase === 'GameStart') break;
+        try { await vozFalar({ texto }); feitas++; } catch { break; }   // sem rede: para
+        await new Promise((r) => setTimeout(r, 1200));
+      }
+      if (feitas) log(`voz aquecida: ${feitas} frase(s) em cache`);
+    } finally { aquecendo = false; }
+  }
   lcu.observar('/lol-gameflow/v1/gameflow-phase', (fase) => {
     if (fase === faseAnterior) return;
     estado?.set('fase', fase);
     log(`fase: ${fase}`);
     // A janela ao vivo abre na seleção, nunca com o jogo rodando: mexer em
     // janela durante a partida rouba o foco e minimiza o jogo em tela cheia.
-    if (fase === 'ChampSelect') aoSelecionar?.();
+    if (fase === 'ChampSelect') { aoSelecionar?.(); aquecerVoz().catch(() => {}); }
     aoFase?.(fase);
     if (faseAnterior === 'EndOfGame' || (faseAnterior === 'InProgress' && fase === 'None')) coletar();
     // Acabou: resumo do que o olho viu e falou, pra conferir no registro.
