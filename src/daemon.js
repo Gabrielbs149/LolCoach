@@ -1232,5 +1232,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto',
 ];

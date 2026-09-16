@@ -34,7 +34,7 @@ const SO_TELA = Q.get('tela') === '1';
 const FINGIR = Q.get('fingir') === '1';   // captura de verdade, inimigos de mentira (teste com ?tela=1 aberto)
 const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
 const N = 48;                          // grade da calibração do minimapa
-const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.68, LIMIAR_SEGUIDO = 0.6, LIMIAR_EU = 0.45;
+const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.72, LIMIAR_SEGUIDO = 0.62, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.55, MARGEM = 0.04;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
 
 const $log = document.getElementById('log');
@@ -165,7 +165,7 @@ function manchasVermelhas(rgba, s, d) {
   // junta vizinhos
   const juntos = [];
   for (const p of pontos.sort((a, b) => b.n - a.n)) if (!juntos.some((q) => Math.abs(q.x - p.x) < d && Math.abs(q.y - p.y) < d)) juntos.push(p);
-  return juntos.slice(0, 12);
+  return juntos.slice(0, 8);
 }
 const d0 = () => escala?.d ?? 24;
 
@@ -306,7 +306,7 @@ async function quadro() {
         if (p && p.score > melhor.score) melhor = { ...p, d };
       }
       if (melhor.score >= LIMIAR_EU) { escala = { d: melhor.d, score: Math.round(melhor.score * 100) / 100, confiavel: true, em: agora }; log(`ícone: ${melhor.d}px (score ${escala.score})`); }
-      else if (!escala.d) { escala = { d: Math.round(s * 0.085), score: 0, confiavel: false, em: agora }; log(`meu ícone não achado (melhor ${Math.round(melhor.score * 100) / 100}); usando ${escala.d}px`); }
+      else if (!escala.d) { escala = { d: Math.round(s * 0.081), score: 0, confiavel: false, em: agora }; log(`meu ícone ainda não achado (melhor ${Math.round(melhor.score * 100) / 100} com ${melhor.d ?? '?'}px); usando ${escala.d}px por enquanto`); }
     }
     if (!escala?.d) return;
     const d = escala.d;
@@ -321,12 +321,44 @@ async function quadro() {
     // estava; quem não, nas manchas vermelhas e — um por quadro, em rodízio —
     // no minimapa inteiro (garantia pra quem joga sem anel vermelho).
     const vistos = [];
-    const soltos = inimigos.filter((j) => !j.morto && !rastros.has(j.campeao));
+    const vivos = inimigos.filter((j) => !j.morto);
+    for (const j of inimigos) if (j.morto) rastros.delete(j.campeao);
+    const tpls = new Map();
+    for (const j of vivos) { const t = await template(j.campeao, d); if (t) tpls.set(j.campeao, t); }
+    // (a) cada mancha vermelha: pontua os 5 e fica com o mais parecido, se ganhar com margem
+    const tomados = new Set();
+    const manchasAvaliadas = [];
+    for (const p of vermelhos) {
+      const notas = [];
+      for (const [nome, t] of tpls) {
+        const tw = t.meiaRes.w, cx = p.x / 2 - tw / 2, cy = p.y / 2 - tw / 2;
+        const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
+        if (!cand.length || cand[0].score < 0.3) continue;
+        const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
+        notas.push({ nome, score: ok.score, x: ok.x, y: ok.y });
+      }
+      notas.sort((a, b) => b.score - a.score);
+      if (notas.length) manchasAvaliadas.push({ p, notas });
+    }
+    // melhores manchas primeiro; cada campeão só pode estar num lugar
+    manchasAvaliadas.sort((a, b) => b.notas[0].score - a.notas[0].score);
+    for (const { notas } of manchasAvaliadas) {
+      const livres = notas.filter((n) => !tomados.has(n.nome));
+      if (!livres.length) continue;
+      const [a, b] = livres;
+      melhoresDoQuadro.set(a.nome, Math.max(melhoresDoQuadro.get(a.nome) ?? -1, Math.round(a.score * 100) / 100));
+      if (a.score < LIMIAR_MANCHA || (b && b.score > a.score - MARGEM && a.score < 0.85)) continue;
+      tomados.add(a.nome);
+      const t = tpls.get(a.nome);
+      rastros.set(a.nome, { x: a.x, y: a.y, em: agora });
+      vistos.push({ campeao: a.nome, x: (a.x + t.d / 2) / s, y: (a.y + t.d / 2) / s, score: Math.round(a.score * 100) / 100 });
+    }
+    // (b) quem não caiu em mancha nenhuma: segue de onde estava; um por quadro procura o mapa todo
+    const soltos = vivos.filter((j) => !tomados.has(j.campeao));
     const daVez = soltos.length ? soltos[rodada % soltos.length].campeao : null;
-    for (const j of inimigos) {
-      if (j.morto) { rastros.delete(j.campeao); continue; }
-      const t = await template(j.campeao, d); if (!t) continue;
-      const p = procurar(m, rgba, s, t, j.campeao, agora, j.campeao === daVez, vermelhos);
+    for (const j of soltos) {
+      const t = tpls.get(j.campeao); if (!t) continue;
+      const p = procurar(m, rgba, s, t, j.campeao, agora, j.campeao === daVez, []);
       if (p) vistos.push({ campeao: j.campeao, x: p.x, y: p.y, score: p.score });
     }
     // dois ícones no mesmo lugar: fica o de maior score
