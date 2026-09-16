@@ -852,7 +852,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    */
   /** Guarda o recorte do minimapa em dados/olho/<partida>/ — no máximo 40 por partida, 6 partidas. */
   async function olhoFoto(png, meta) {
-    const id = partidaVivo?.ultimoEstado ? `${new Date().toISOString().slice(0, 10)}-${(partidaVivo.ultimoEstado.eu?.campeao ?? 'x').toLowerCase()}` : 'sem-partida';
+    // mesma pasta da gravação da partida (data+hora+campeão): duas partidas do mesmo campeão no dia não se misturam
+    const id = partidaVivo?.pastaSitu ? basename(partidaVivo.pastaSitu) : partidaVivo?.ultimoEstado ? `${new Date().toISOString().slice(0, 10)}-${(partidaVivo.ultimoEstado.eu?.campeao ?? 'x').toLowerCase()}` : 'sem-partida';
     const pasta = resolve(pastaBase(), 'dados', 'olho', id);
     await mkdir(pasta, { recursive: true });
     const n = String(Math.floor((partidaVivo?.ultimoEstado?.tempo ?? 0))).padStart(4, '0');
