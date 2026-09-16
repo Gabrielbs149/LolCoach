@@ -35,6 +35,7 @@ export function decidir(situacoes, ctx, mem) {
     // o que você avaliou
     const n = ctx.notas?.get(base);
     if (n) nota += Math.max(-1, Math.min(1, (n.bom - n.ruim) * 0.3));
+    if (n?.precisao != null) nota += (n.precisao - 0.5) * 2;
     if (ctx.silenciadas?.has(base)) nota = -9;
     s.nota = Math.round(nota * 10) / 10;
   }

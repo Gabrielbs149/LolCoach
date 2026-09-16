@@ -214,6 +214,50 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const emNumero = mortes.filter((m) => m.perto.length >= 2).length;
     return { lista: mortes, total: mortes.length, semJg, avancado, emNumero };
   }
+/**
+   * Auto-avaliação: situação que PREVÊ algo ("jungler indo pro bot", "Ahri
+   * indo pro mid", "X a 6 s de você", "jungler começou… aparece no top") é
+   * conferida depois contra as leituras: aconteceu ou não? Vai pra
+   * acertos.jsonl e vira precisão por tipo — o cérebro aprende sem ninguém
+   * clicar em nada.
+   */
+  async function conferirPrevisoes(base) {
+    const [partida, situacoes, leituras] = await Promise.all([lerJsonl(resolve(base, 'partida.json')), lerJsonl(resolve(base, 'situacoes.jsonl')), lerJsonl(resolve(base, 'leituras.jsonl'))]);
+    const p = partida[0]; if (!p?.eu || !leituras.length) return null;
+    const meuTime = p.eu.time, meuC = p.eu.campeao;
+    const campeaoDe = new Map(p.jogadores.map((j) => [j.nome, j.campeao]));
+    const jgDeles = p.jogadores.find((j) => j.time !== meuTime && j.role === 'jungle')?.campeao ?? null;
+    const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+    const janela = (t0, t1) => leituras.filter((l) => l.t > t0 && l.t <= t1);
+    const chegouNaLane = (campeao, lane, t0, t1) => janela(t0, t1).some((l) => l.campeoes.some((c) => c.c === campeao && c.ha != null && c.ha <= 3 && String(c.regiao ?? '').startsWith(lane)));
+    // "X vindo em cima de você": acertou se ele chegou de fato mais perto do que estava na hora (mesmo você recuando)
+    const distDeMim = (l, campeao) => { const me = l.campeoes.find((c) => c.c === meuC && c.time === meuTime), o = l.campeoes.find((c) => c.c === campeao); return me?.x != null && o?.x != null && o.ha <= 3 ? dist(me, o) : null; };
+    const aproximou = (campeao, t0, t1) => {
+      const na = janela(t0 - 2, t0 + 0.5).map((l) => distDeMim(l, campeao)).filter((d) => d != null); if (!na.length) return null;
+      const depois = janela(t0 + 0.5, t1).map((l) => distDeMim(l, campeao)).filter((d) => d != null); if (!depois.length) return false;
+      return Math.min(...depois) < na[na.length - 1] - 0.03 || Math.min(...depois) < 0.07;
+    };
+    const saida = [];
+    for (const s of situacoes) {
+      let acertou = null;
+      let m;
+      if ((m = s.chave.match(/^jg-indo-(top|mid|bot)$/)) && jgDeles) acertou = chegouNaLane(jgDeles, m[1], s.t, s.t + 30);
+      else if ((m = s.chave.match(/^roam-(.+)-(top|mid|bot)$/))) { const c = campeaoDe.get(m[1]); if (c) acertou = chegouNaLane(c, m[2], s.t, s.t + 35); }
+      else if ((m = s.chave.match(/^perto-(.+)$/))) { const c = campeaoDe.get(m[1]); if (c) acertou = aproximou(c, s.t, s.t + 10); }
+      else if (s.chave === 'jg-vindo' && jgDeles) acertou = aproximou(jgDeles, s.t, s.t + 12);
+      else if (s.chave === 'jg-inicio' && jgDeles && s.dados?.laneGank) acertou = chegouNaLane(jgDeles, s.dados.laneGank, 170, 250);
+      else if (s.chave === 'jg-gank-previsto' && jgDeles && s.dados?.lane) acertou = chegouNaLane(jgDeles, s.dados.lane, s.t - 10, s.t + 40);
+      if (acertou == null) continue;
+      saida.push({ t: s.t, chave: s.chave, falada: !!s.falada, acertou });
+    }
+    if (!saida.length) return null;
+    await writeFile(resolve(base, 'acertos.jsonl'), saida.map((a) => JSON.stringify(a)).join('\n') + '\n');
+    const porTipo = new Map();
+    for (const a of saida) { const k = baseChave(a.chave); const r = porTipo.get(k) ?? porTipo.set(k, { n: 0, ok: 0 }).get(k); r.n++; if (a.acertou) r.ok++; }
+    const certas = saida.filter((a) => a.acertou).length;
+    log(`previsões: ${certas}/${saida.length} certas (${[...porTipo].map(([k, r]) => `${k} ${r.ok}/${r.n}`).join(', ')})`);
+    return { total: saida.length, certas };
+  }
   /** Resumo por tipo de situação em todas as partidas gravadas: quantas, quantas faladas, 👍/👎. */
   const { baseChave } = await import('./vivo/cerebro.js');
   async function situacoesResumo() {
@@ -239,8 +283,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (a.nota === 1) r.bom++; else if (a.nota === -1) r.ruim++;
     }
     for (const p of pastas) {
-      const [situacoes, avaliacoes] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl'))]);
+      const [situacoes, avaliacoes, acertos] = await Promise.all([lerJsonl(resolve(pastaSituacoes(), p, 'situacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'avaliacoes.jsonl')), lerJsonl(resolve(pastaSituacoes(), p, 'acertos.jsonl'))]);
       const notas = new Map(avaliacoes.map((a) => [`${a.t}|${a.chave}`, a.nota]));
+      for (const a of acertos) { const k = base(a.chave); const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: '?', n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: '' }).get(k); r.previstas = (r.previstas ?? 0) + 1; if (a.acertou) r.certas = (r.certas ?? 0) + 1; }
       for (const s of situacoes) {
         const k = base(s.chave);
         const r = porChave.get(k) ?? porChave.set(k, { chave: k, tipo: s.tipo, n: 0, faladas: 0, bom: 0, ruim: 0, exemplo: s.texto }).get(k);
@@ -250,7 +295,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     const tipos = [...porChave.values()].sort((a, b) => b.n - a.n);
     // Aprendizado v0: tipo com 3+ 👎 e nenhum 👍 deixa de ser falado (continua gravado).
-    for (const t of tipos) t.silenciada = t.ruim >= 3 && t.bom === 0;
+    for (const t of tipos) { t.silenciada = t.ruim >= 3 && t.bom === 0; if (t.previstas >= 5) t.precisao = Math.round(100 * (t.certas ?? 0) / t.previstas) / 100; }
     return { partidas: pastas.length, tipos };
   }
   async function avaliarSituacao({ pasta, chave, t, nota, texto, tipo } = {}) {
@@ -385,6 +430,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const c = partidaVivo.contSitu;
       const top = [...c.porTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
       log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
+      if (partidaVivo.pastaSitu) conferirPrevisoes(partidaVivo.pastaSitu).catch((erro) => log(`previsões: ${erro.message}`));
     }
     if (fase !== 'InProgress' && fase !== 'GameStart') sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };
     faseAnterior = fase;
@@ -552,7 +598,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /** Pasta da partida em dados/situacoes: criada na primeira leitura, com o elenco. */
   async function garantirPastaSitu(e) {
     if (!partidaVivo || partidaVivo.pastaSitu) return;
-    resumoInterno().then((r) => { partidaVivo.notas = new Map(r.tipos.map((t) => [t.chave, { bom: t.bom, ruim: t.ruim }])); partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
+    resumoInterno().then((r) => { partidaVivo.notas = new Map(r.tipos.map((t) => [t.chave, { bom: t.bom, ruim: t.ruim, precisao: t.precisao ?? null }])); partidaVivo.silenciadas = new Set(r.tipos.filter((t) => t.silenciada).map((t) => t.chave)); if (partidaVivo.silenciadas.size) log(`olho: ${partidaVivo.silenciadas.size} tipo(s) de situação silenciados pelas suas avaliações`); }).catch(() => {});
     partidaVivo.pastaSitu = resolve(pastaBase(), 'dados', 'situacoes', `${new Date().toISOString().slice(0, 16).replace(':', '-')}-${String(e.eu?.campeao ?? 'x').toLowerCase()}`);
     await mkdir(partidaVivo.pastaSitu, { recursive: true }).catch(() => {});
     const gameId = await lcu.get('/lol-gameflow/v1/session').then((s) => s?.gameData?.gameId ?? null).catch(() => null);
