@@ -260,6 +260,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     log(`previsões: ${certas}/${saida.length} certas (${[...porTipo].map(([k, r]) => `${k} ${r.ok}/${r.n}`).join(', ')})`);
     return { total: saida.length, certas };
   }
+  // Faxina: leituras/estado (3–4 MB por partida) só das últimas 30 (depois de conferir as previsões).
+  // situações, falas, avaliações e acertos (pequenos) ficam pra sempre — é o que ensina.
+  setTimeout(async () => {
+    const pastas = (await readdir(pastaSituacoes()).catch(() => [])).sort();
+    for (const p of pastas.slice(0, Math.max(0, pastas.length - 30))) for (const arq of ['leituras.jsonl', 'estado.jsonl']) await rm(resolve(pastaSituacoes(), p, arq), { force: true }).catch(() => {});
+  }, 10 * 60_000).unref?.();
   // Partidas gravadas antes disso existir: confere uma vez, aos poucos, depois de abrir
   setTimeout(async () => {
     for (const p of (await readdir(pastaSituacoes()).catch(() => []))) {
