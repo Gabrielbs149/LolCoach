@@ -24,6 +24,9 @@ const PONTOS = {
   // buffs: [azul do time azul, red do time azul, azul do time vermelho, red do time vermelho]
   buffAzulA: { x: 0.256, y: 0.469 }, buffRedA: { x: 0.526, y: 0.731 }, buffAzulV: { x: 0.742, y: 0.530 }, buffRedV: { x: 0.479, y: 0.267 },
 };
+// Camps pequenos do lado azul (aproximados); do vermelho é o espelho (1-x, 1-y). Renascem em 2:15.
+const CAMPS_AZUL = { gromp: { x: 0.14, y: 0.43 }, lobos: { x: 0.25, y: 0.58 }, raptors: { x: 0.47, y: 0.62 }, krugs: { x: 0.58, y: 0.80 } };
+const campsDe = (time) => Object.fromEntries(Object.entries(CAMPS_AZUL).map(([n, p]) => [n, time === 100 ? p : { x: 1 - p.x, y: 1 - p.y }]));
 const LANE_DE = { top: 'top', mid: 'mid', adc: 'bot', sup: 'bot', jungle: 'jungle' };
 const OBJETIVOS = ['Dragão', 'Barão', 'Arauto', 'Vastilarvas', 'Ancião'];
 const pitDe = (nome) => (nome === 'Dragão' || nome === 'Ancião' ? PONTOS.dragao : PONTOS.barao);
@@ -32,7 +35,7 @@ export function novoMundo() {
   return {
     inicio: Date.now(), campeoes: new Map(), leituras: 0, ultimaLeituraT: 0,
     ditas: new Map(), ultimaFalaEm: 0, buffs: [], ganksPorLane: new Map(), invadeDito: false,
-    duo: { primeiraVezNaLane: null, dito: false }, lanesLivres: new Map(), snapshotEm: 0, waves: {},
+    duo: { primeiraVezNaLane: null, dito: false }, lanesLivres: new Map(), snapshotEm: 0, waves: {}, camps: [],
   };
 }
 
@@ -126,6 +129,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       else if (primeira && t < 270 && ['jungle', 'top', 'bot', 'rio'].includes(l.lane)) situ('jg-inicio', { tipo: 'jungler', prioridade: 3, modulo: 'jungler', serio: F`Jungler deles ${l.texto} aos ${mmss(t)}. Começou ${jg.ultimo.x + jg.ultimo.y < 1 ? 'embaixo' : 'em cima'}.`, dados: { x: jg.ultimo.x, y: jg.ultimo.y } });
       // buff deles: viu no buff → renasce 5 min depois
       for (const [nome, p] of Object.entries(buffsDeles)) if (dist(jg.ultimo, p) < 0.05 && !mundo.buffs.some((b) => b.nome === nome && t - b.em < 240)) { mundo.buffs.push({ nome, em: t, avisado: false }); situ(`jg-buff-${nome}-${Math.floor(t / 240)}`, { tipo: 'jungler', prioridade: 0, modulo: 'jungler', serio: F`Jungler deles no ${nome} deles. Renasce às ${mmss(t + 300)}.`, cooldown: 200 }); }
+      // camps deles: viu o jungler num camp → renasce 2:15 depois (só registro; fala se você é jungle)
+      for (const [nome, p] of Object.entries(campsDe(meuTime === 100 ? 200 : 100))) if (dist(jg.ultimo, p) < 0.045 && !mundo.camps.some((c) => c.nome === nome && t - c.em < 100)) { mundo.camps.push({ nome, em: t, avisado: false }); situ(`jg-camp-${nome}-${Math.floor(t / 100)}`, { tipo: 'jungler', prioridade: 0, modulo: 'jungler', serio: F`Jungler deles nos ${nome} dele. Renascem às ${mmss(t + 135)}.`, cooldown: 90 }); }
       // perto de você (em segundos)
       if (minhaPos) {
         const s = seg(dist(jg.ultimo, minhaPos));
@@ -154,6 +159,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       const ha = Math.round(vistoHa(jg, t));
       if (ha >= 20 && ha <= 180 && ha - jg.sumidoDito >= 30) { jg.sumidoDito = ha; situ('jg-sumido', { tipo: 'jungler', prioridade: ha < 40 ? 1 : 2, modulo: 'jungler', serio: F`Jungler sumido há ${ha} segundos. Última vez ${lugarTxt(jg.ultimo)}.`, cooldown: 25, dados: { ha } }); }
     }
+    for (const c of mundo.camps) if (!c.avisado && t >= c.em + 115) { c.avisado = true; if (minhaLane === 'jungle') situ(`camp-nasce-${c.nome}-${c.em}`, { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`${c.nome} deles nascem em 20 segundos.`, cooldown: 1 }); }
     // buffs deles renascendo
     for (const b of mundo.buffs) if (!b.avisado && t >= b.em + 270) { b.avisado = true; situ(`buff-nasce-${b.nome}-${b.em}`, { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`${b.nome === 'red' ? 'Red' : 'Azul'} deles nasce em 30 segundos.`, cooldown: 1 }); }
   }
@@ -229,6 +235,10 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       const pit = pitDe(o.nome);
       const deles = vis.filter((f) => dist(f.ultimo, pit) < 0.12), nossos = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.12);
       if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 60 });
+      if (o.vivo && jg && deles.length === 0) {
+        if (jg.morto && (estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0) >= 25) situ(`livre-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles morto por ${Math.round(estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0)} segundos.`, cooldown: 90 });
+        else if (visivel(jg, t) && seg(dist(jg.ultimo, pit)) >= 25) situ(`livre-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles a ${seg(dist(jg.ultimo, pit))} segundos do pit.`, cooldown: 90 });
+      }
       if (o.vivo && deles.length >= 2 && nossos.length === 0) situ(`furtivo-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome} e ninguém nosso lá!`, cooldown: 30 });
       if (o.vivo && deles.length >= 2 && nossos.length >= 2) situ(`contest-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`Luta no ${o.nome}: ${deles.length} deles, ${nossos.length} nossos.`, cooldown: 30 });
       if (o.vivo && nossos.length >= 3 && jg && !visivel(jg, t) && vistoHa(jg, t) > 20) situ(`obj-sem-jg-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} sem saber do jungler deles. Ward no pit.`, cooldown: 60 });
