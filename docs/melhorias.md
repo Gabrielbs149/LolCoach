@@ -11,3 +11,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.10 — Admin → Situações → "Resumo por tipo": tabela com quantas vezes cada situação aconteceu em todas as partidas gravadas, quantas foram faladas e os 👍/👎 — a primeira visão pra decidir o que falar. Testado: sintaxe.
 - v2.28.11 — Modo divertido: variantes pras 12 situações principais do minimapa (jungler começou/vindo/em cima/indo/sumido, dive, roam, furtivo, invade, perigo perto, flanco, seu jungler). Testado: sintaxe.
 - v2.28.12 — Olho: ritmo adaptável (quadro pesado → espera até 250 ms; leve → volta a 100 ms) pra não pesar no FPS do jogo. Testado: sintaxe.
+- v2.28.13 — Fim de partida: linha no registro com o resumo do olho (leituras, situações, quantas faladas, tipos mais comuns). Testado: sintaxe.

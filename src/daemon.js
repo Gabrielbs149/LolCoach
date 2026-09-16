@@ -282,6 +282,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (fase === 'ChampSelect') aoSelecionar?.();
     aoFase?.(fase);
     if (faseAnterior === 'EndOfGame' || (faseAnterior === 'InProgress' && fase === 'None')) coletar();
+    // Acabou: resumo do que o olho viu e falou, pra conferir no registro.
+    if (faseAnterior === 'InProgress' && fase !== 'InProgress' && partidaVivo?.contSitu) {
+      const c = partidaVivo.contSitu;
+      const top = [...c.porTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
+      log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
+    }
     faseAnterior = fase;
   });
 
@@ -614,6 +620,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (!partidaVivo.mundo) partidaVivo.mundo = S.novoMundo();
     await garantirPastaSitu(e);
     const objs = objetivos(e);
+    (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() }).leituras++;
     const situacoes = S.processar(partidaVivo.mundo, { vistos: dados.vistos ?? [], aliados: dados.aliados ?? [], eu: dados.eu ?? null, waves: dados.waves ?? null }, e, objs);
     const gravar = (arquivo, obj) => appendFile(resolve(partidaVivo.pastaSitu, arquivo), JSON.stringify(obj) + '\n').catch(() => {});
     for (const sit of situacoes) {
@@ -621,6 +628,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
         contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
       if (sit.falar) partidaVivo.falas.push(pronta);
+      const cs = (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() });
+      cs.total++; if (sit.falar) cs.faladas++; cs.porTipo.set(sit.tipo, (cs.porTipo.get(sit.tipo) ?? 0) + 1);
       (partidaVivo.situacoesRecentes ??= []).push({ t: Math.round(e.tempo), chave: sit.chave, prioridade: sit.prioridade, texto: pronta.serio, falada: sit.falar });
       if (partidaVivo.situacoesRecentes.length > 20) partidaVivo.situacoesRecentes.splice(0, partidaVivo.situacoesRecentes.length - 20);
     }
