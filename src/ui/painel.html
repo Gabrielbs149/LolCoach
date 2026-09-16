@@ -477,6 +477,18 @@ h2:first-child{margin-top:0}
  * 96px de altura — op.gg usa 109, u.gg 100.
  */
 .listaP{display:flex;flex-direction:column;gap:var(--e1)}
+.temporadas button small{display:block;font-size:10px;color:var(--apagado);font-weight:500;margin-top:1px}
+.temporadas button.on small{color:var(--fraco)}
+.evolucao{margin-bottom:var(--e2)}
+.evolucao tr{cursor:pointer} .evolucao tr:hover td{background:var(--f2)}
+.evolucao tr.on td{background:#241f16} .evolucao tr.on td:first-child{color:var(--ouro-claro)}
+.evolucao .wr{font-weight:700} .evolucao .d{font-size:11px;margin-left:5px;font-weight:600}
+.evolucao .d.mais{color:var(--vit)} .evolucao .d.menos{color:var(--der)} .evolucao .d.igual{color:var(--apagado)}
+.evolucao .camps{display:flex;gap:4px;justify-content:flex-end}
+.evolucao .camps img{width:22px;height:22px;border-radius:4px;border:1px solid var(--borda)}
+.evolucao .barra{display:inline-block;width:56px;height:5px;border-radius:3px;background:var(--f2);vertical-align:middle;margin-right:8px;overflow:hidden}
+.evolucao .barra i{display:block;height:100%;background:var(--vit)}
+.evolucao .barra.ruim i{background:var(--der)}
 .cartaoP{display:grid;grid-template-columns:104px 48px minmax(0,1fr) 96px 96px 52px;
   align-items:center;gap:12px;background:var(--f1);
   border-left:6px solid var(--borda);border-radius:0 var(--r-s) var(--r-s) 0;
@@ -982,6 +994,8 @@ h2{letter-spacing:1px}
       <input class="busca" id="pBusca" placeholder="campeão ou rival…" autocomplete="off" oninput="mostrando = POR_PAGINA; desenharPartidas()">
       <select class="contaSel" id="pCamp" style="margin:0;width:180px" onchange="mostrando = POR_PAGINA; desenharPartidas()"></select>
     </div>
+    <div class="filtros temporadas" id="temporadas"></div>
+    <div id="evolucao"></div>
     <div class="filtros" id="filtros"></div>
     <div id="lista"></div>
   </section>
@@ -1367,7 +1381,7 @@ function cartaoDePartida(p){
 }
 
 const POR_PAGINA = 50;
-let todasPartidas = [], mostrando = POR_PAGINA, filtro = 'todas';
+let todasPartidas = [], mostrando = POR_PAGINA, filtro = 'todas', temporada = '', temporadas = [];
 
 const FILTROS = [['todas','Todas'],['v','Vitórias'],['d','Derrotas'],
   ['jungle','jungle'],['mid','mid'],['adc','adc'],['top','top'],['sup','sup'],['marcadas','★ Estudar']];
@@ -1379,6 +1393,7 @@ function filtrar(){
   const camp = $('#pCamp')?.value ?? '';
   if(busca) ps = ps.filter(p => String(p.meuCampeao).toLowerCase().includes(busca) || String(p.rival ?? '').toLowerCase().includes(busca));
   if(camp) ps = ps.filter(p => p.meuCampeao === camp);
+  if(temporada) ps = ps.filter(p => p.temporada === temporada);
   if(filtro === 'todas') return ps;
   if(filtro === 'v') return ps.filter(p => p.venci);
   if(filtro === 'd') return ps.filter(p => !p.venci);
@@ -1399,8 +1414,30 @@ function desenharSeletorCamp(){
 }
 
 function trocarFiltro(f){ filtro = f; mostrando = POR_PAGINA; desenharPartidas(); }
+function trocarTemporada(t){ temporada = temporada === t ? '' : t; mostrando = POR_PAGINA; desenharPartidas(); }
+
+/* Splits: um chip por split (jogos · winrate) e a tabela de evolução. */
+function desenharTemporadas(){
+  const el = $('#temporadas'); if(!el) return;
+  if(temporadas.length < 2){ el.innerHTML = ''; $('#evolucao').innerHTML = ''; return; }
+  el.innerHTML = `<button class="${temporada===''?'on':''}" onclick="trocarTemporada('')">Todos os splits<small>${todasPartidas.length} jogos</small></button>` +
+    temporadas.map(t => `<button class="${temporada===t.chave?'on':''}" onclick="trocarTemporada('${t.chave}')">${esc(t.nome)}<small>${t.jogos} · ${t.winrate}%</small></button>`).join('');
+  const delta = (d) => d == null ? '' : `<span class="d ${d > 0 ? 'mais' : d < 0 ? 'menos' : 'igual'}">${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${Math.abs(d)}</span>`;
+  $('#evolucao').innerHTML = `<div style="overflow-x:auto;margin-bottom:var(--e2)"><table class="amTabela evolucao" style="margin:0">
+    <tr><th>Split</th><th>Jogos</th><th>Winrate</th><th>KDA</th><th>CS/min</th><th>Part.</th><th>Erros graves</th><th>Main</th><th>Mais jogados</th></tr>
+    ${temporadas.map(t => `<tr class="${temporada===t.chave?'on':''}" onclick="trocarTemporada('${t.chave}')">
+      <td>${esc(t.nome)}</td><td>${t.jogos}</td>
+      <td><span class="barra ${t.winrate < 50 ? 'ruim' : ''}"><i style="width:${t.winrate}%"></i></span><span class="wr">${t.winrate}%</span>${delta(t.deltaWinrate)}</td>
+      <td>${t.kda} <span style="color:var(--apagado);font-size:11px">${t.kills}/${t.mortes}/${t.assists}</span></td>
+      <td>${t.csMin ?? '–'}</td><td>${t.participacao != null ? t.participacao + '%' : '–'}</td><td>${t.gravesPorJogo}/jogo</td>
+      <td>${esc(role(t.role))}</td>
+      <td><span class="camps">${t.campeoes.map(c => `<img src="/icone/${c.championId}" title="${esc(c.nome)} · ${c.n} jogos · ${Math.round(100*c.v/c.n)}%" alt="">`).join('')}</span></td>
+    </tr>`).join('')}
+  </table></div>`;
+}
 
 function desenharPartidas(){
+  desenharTemporadas();
   $('#filtros').innerHTML = FILTROS.map(([k,rot]) =>
     `<button class="${filtro===k?'on':''}" onclick="trocarFiltro('${k}')">${rot}</button>`).join('');
 
@@ -1421,8 +1458,9 @@ function desenharPartidas(){
 function maisPartidas(){ mostrando += POR_PAGINA; desenharPartidas(); }
 
 async function carregarPartidas(){
-  const [ps, m] = await Promise.all([pegar(comConta('/api/partidas')), pegar('/api/marcadas').catch(() => [])]);
-  todasPartidas = ps; marcadasIds = new Set(m);
+  const [ps, m, ts] = await Promise.all([pegar(comConta('/api/partidas')), pegar('/api/marcadas').catch(() => []), pegar(comConta('/api/temporadas')).catch(() => [])]);
+  todasPartidas = ps; marcadasIds = new Set(m); temporadas = ts;
+  if(temporada && !ts.some(t => t.chave === temporada)) temporada = '';
   desenharSeletorCamp();
   desenharPartidas();
 }

@@ -2,6 +2,7 @@ import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { temporadaDe, resumoPorTemporada } from '../dados/temporadas.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
@@ -61,7 +62,11 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       return { geral: g, porRole, campeoes };
     },
 
-    '/api/partidas': (q) => db.prepare(`
+    '/api/partidas': (q) => partidas(q),
+    // Evolução por split: winrate, KDA, cs/min, participação, erros graves.
+    '/api/temporadas': (q) => resumoPorTemporada(partidas(q)),
+  };
+  const partidas = (q) => db.prepare(`
       SELECT p.gameId, p.quando, p.fila, p.duracaoS, p.meuCampeao, p.minhaRole, p.venci,
              (SELECT COUNT(*) FROM achados a WHERE a.gameId = p.gameId) achados,
              (SELECT COUNT(*) FROM achados a WHERE a.gameId = p.gameId AND a.gravidade = 3) graves,
@@ -87,8 +92,8 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
              (SELECT j.nome FROM jogadores j
               WHERE j.gameId = p.gameId AND j.participantId = p.meuId) conta
       FROM partidas p WHERE p.duracaoS >= 300${filtroConta(q.get('conta'))}
-      ORDER BY p.quando DESC`).all(),
-
+      ORDER BY p.quando DESC`).all().map((p) => ({ ...p, temporada: temporadaDe(p.quando) }));
+  Object.assign(rotas, {
     '/api/padroes': (q) => {
       const fc = filtroConta(q.get('conta'));
       const ids = `SELECT p.gameId FROM partidas p WHERE p.duracaoS >= 300${fc}`;
@@ -107,7 +112,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         total: db.prepare(`SELECT COUNT(*) n FROM partidas p WHERE p.duracaoS >= 300${fc}`).get().n,
       };
     },
-  };
+  });
 
   const servidor = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
