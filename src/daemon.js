@@ -185,8 +185,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    */
   async function mortesCruzadas(base, partida) {
     if (!partida?.eu) return null;
-    const [estados, leituras, falasP] = await Promise.all([lerJsonl(resolve(base, 'estado.jsonl')), lerJsonl(resolve(base, 'leituras.jsonl')), lerJsonl(resolve(base, 'falas.jsonl'))]);
+    const [estados, leituras, falasP, eventosP] = await Promise.all([lerJsonl(resolve(base, 'estado.jsonl')), lerJsonl(resolve(base, 'leituras.jsonl')), lerJsonl(resolve(base, 'falas.jsonl')), lerJsonl(resolve(base, 'eventos.jsonl'))]);
     if (!estados.length || !leituras.length) return null;
+    // com eventos gravados, a hora da morte é exata (ChampionKill em cima de você) e vem quem matou
+    const mortesEv = eventosP.filter((ev) => ev.tipo === 'ChampionKill' && ev.vitima === partida.eu.nome).map((ev) => ({ t: ev.t, por: partida.jogadores.find((j) => j.nome === ev.autor)?.campeao ?? ev.autor ?? null }));
     // o que a voz avisou nos 25 s antes de cada morte (jungler, mapa, perigo) — a voz ajudou ou ficou muda?
     const avisosAntes = (t) => falasP.filter((f) => f.t >= t - 25 && f.t <= t - 1 && (f.prioridade ?? 1) >= 2 && ['jungler', 'mapa'].includes(f.modulo)).map((f) => ({ t: f.t, texto: f.serio }));
     const { lugar } = await import('./vivo/olho.js');
@@ -195,8 +197,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
     const mortes = [];
     let antes = 0;
-    for (const e of estados) {
-      const eu = e.jogadores?.find((j) => j.c === meuC && j.time === meuTime); if (!eu) continue;
+    const marcos = mortesEv.length ? mortesEv.map((m, i) => ({ t: m.t, m: i + 1, por: m.por })) : null;
+    for (const e of marcos ?? estados) {
+      const eu = marcos ? { m: e.m } : e.jogadores?.find((j) => j.c === meuC && j.time === meuTime); if (!eu) continue;
       if (eu.m > antes) {
         antes = eu.m;
         // a leitura de uns 3 s antes da morte (a morte em si já tira você do mapa)
@@ -207,7 +210,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const jg = jgDeles ? l.campeoes.find((c) => c.c === jgDeles) : null;
         const perto = minhaPos ? l.campeoes.filter((c) => c.time !== meuTime && c.x != null && c.ha != null && c.ha <= 5 && dist(c, minhaPos) < 0.16).map((c) => c.c) : [];
         const onde = minhaPos ? lugar(minhaPos.x, minhaPos.y, meuTime) : null;
-        mortes.push({ n: eu.m, t: e.t, avisos: avisosAntes(e.t),
+        mortes.push({ n: eu.m, t: e.t, por: e.por ?? null, avisos: avisosAntes(e.t),
           onde: onde?.texto ?? null, avancado: onde?.lado === 'deles' && onde.lane !== 'base',
           jg: jg ? { campeao: jg.c, morto: jg.morto, ha: jg.ha, regiao: jg.regiao } : null,
           perto });

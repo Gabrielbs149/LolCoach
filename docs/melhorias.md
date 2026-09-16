@@ -73,3 +73,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.74 — `src/vivo/conferir.js`: a conferência das previsões virou módulo (daemon e replay usam o mesmo); o replay agora mostra precisão com as regras atuais ("das faladas 5/12"). Hoje, nas 5 partidas: 12–26 previsões por partida (eram 120–190) e 45–65% das faladas confirmadas.
 - v2.28.75 — Admin → Situações: tabela com todas as partidas gravadas (falas/min, faladas/situações, previsões certas %, 👍/👎); clicar abre a partida. Janela de conferência das previsões: 40 s pro jungler, 45 s pra roam.
 - v2.28.76 — Eventos da partida (kills, torres, dragões, barão…) gravados inteiros em eventos.jsonl; o replay usa pros timers de objetivo (antes ficava no padrão).
+- v2.28.77 — "Suas mortes" com eventos.jsonl: hora exata da morte e quem matou ("Morte 3: por Xin Zhao · no bot…"); sem eventos (partidas antigas) continua pelo placar de 5 em 5 s.
