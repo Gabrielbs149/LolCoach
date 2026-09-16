@@ -133,7 +133,10 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   if (jg) {
     const agora = visivel(jg, t);
     if (agora) {
-      const l = jg.regiao, mudou = l.chave !== jg.regiaoAntes?.chave;
+      const l = jg.regiao;
+      if (l.chave !== jg.regiaoFirme?.chave) { if (jg.regiaoPendente?.chave !== l.chave) jg.regiaoPendente = { chave: l.chave, desde: t }; }
+      let mudou = false;
+      if (jg.regiaoPendente && jg.regiaoPendente.chave === l.chave && t - jg.regiaoPendente.desde >= 2) { mudou = l.chave !== jg.regiaoFirme?.chave; jg.regiaoFirme = l; jg.regiaoPendente = null; }
       const primeira = jg.hist.length === 1;
       // onde começou
       if (primeira && t < 150 && l.lane !== 'base') {
@@ -288,10 +291,10 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: partes.length ? F`${o.nome} em um minuto: ${partes.join(', ')}.` : F`${o.nome} em um minuto.`, cooldown: 100, dados: { semWard } });
       }
       const deles = vis.filter((f) => dist(f.ultimo, pit) < 0.12), nossos = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.12);
-      if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 60 });
+      if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 240 });
       if (o.vivo && jg && deles.length === 0) {
-        if (jg.morto && (estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0) >= 25) situ(`livre-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles morto por ${Math.round(estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0)} segundos.`, cooldown: 90 });
-        else if (visivel(jg, t) && seg(dist(jg.ultimo, pit)) >= 25) situ(`livre-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles a ${seg(dist(jg.ultimo, pit))} segundos do pit.`, cooldown: 90 });
+        if (jg.morto && (estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0) >= 25) situ(`livre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles morto por ${Math.round(estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0)} segundos.`, cooldown: 90 });
+        else if (visivel(jg, t) && seg(dist(jg.ultimo, pit)) >= 25) situ(`livre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles a ${seg(dist(jg.ultimo, pit))} segundos do pit.`, cooldown: 90 });
       }
       // A gente fazendo o objetivo e o jungler deles chegando: risco de roubo
       if (o.vivo && nossos.length >= 2 && jg && visivel(jg, t) && seg(dist(jg.ultimo, pit)) <= 12 && deles.length <= 1) situ(`roubo-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`Jungler deles a ${seg(dist(jg.ultimo, pit))} segundos do ${o.nome}. Cuidado com o roubo.`, divertido: F`Jungler deles chegando no ${o.nome} em ${seg(dist(jg.ultimo, pit))} segundos. Smite na hora ou perde.`, cooldown: 75 });
