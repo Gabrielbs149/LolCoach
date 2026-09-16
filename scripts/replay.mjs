@@ -16,6 +16,7 @@ import * as S from '../src/vivo/situacoes.js';
 import * as Cb from '../src/vivo/cerebro.js';
 import { objetivos } from '../src/vivo/objetivos.js';
 import { render } from '../src/vivo/texto.js';
+import { conferir } from '../src/vivo/conferir.js';
 
 const lerJsonl = async (p) => (await readFile(p, 'utf8').catch(() => '')).split('\n').filter(Boolean).map((l) => JSON.parse(l));
 
@@ -26,7 +27,7 @@ async function replay(pasta) {
   const LANE_DE = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'bot', sup: 'bot' };
   const mundo = S.novoMundo();
   const mem = Cb.novaMemoriaCerebro();
-  const porTipo = new Map(), faladas = [];
+  const porTipo = new Map(), faladas = [], todas = [];
   let total = 0, ie = 0;
   for (const l of leituras) {
     while (ie + 1 < estados.length && estados[ie + 1].t <= l.t) ie++;
@@ -51,11 +52,18 @@ async function replay(pasta) {
       const k = Cb.baseChave(s.chave);
       const r = porTipo.get(k) ?? porTipo.set(k, { n: 0, faladas: 0 }).get(k);
       r.n++; if (s.falar) { r.faladas++; faladas.push({ t: l.t, texto: render(s.serio) }); }
+      todas.push({ t: l.t, chave: s.chave, falada: !!s.falar, dados: s.dados });
     }
   }
   const min = (leituras.at(-1).t - leituras[0].t) / 60;
   console.log(`${pasta.split(/[\\/]/).at(-1)}: ${total} situações, ${faladas.length} faladas em ${min.toFixed(0)} min (${(faladas.length / min).toFixed(1)}/min)`);
   console.log('  ' + [...porTipo].sort((a, b) => b[1].faladas - a[1].faladas).slice(0, 12).map(([k, r]) => `${k} ${r.faladas}/${r.n}`).join(', '));
+  const conf = conferir(todas, leituras, p);
+  if (conf.length) {
+    const pt = new Map(); for (const a of conf) { const k = Cb.baseChave(a.chave); const q = pt.get(k) ?? pt.set(k, { n: 0, ok: 0, fn: 0, fok: 0 }).get(k); q.n++; if (a.acertou) q.ok++; if (a.falada) { q.fn++; if (a.acertou) q.fok++; } }
+    const fal = conf.filter((a) => a.falada);
+    console.log(`  previsões: ${conf.filter((a) => a.acertou).length}/${conf.length} certas; das faladas ${fal.filter((a) => a.acertou).length}/${fal.length} — ` + [...pt].map(([k, q]) => `${k} ${q.fok}/${q.fn} (todas ${q.ok}/${q.n})`).join(', '));
+  }
   if (process.argv.includes('--falas')) for (const f of faladas) console.log(`  ${Math.floor(f.t / 60)}:${String(Math.floor(f.t % 60)).padStart(2, '0')} ${f.texto}`);
   return { total, faladas: faladas.length, min };
 }
