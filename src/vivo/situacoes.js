@@ -153,6 +153,13 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       else if (l.lane === 'base') situ('jg-base', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F('Jungler deles na base. Uns 40 segundos livres.'), cooldown: 60 });
       else if (mudou && !alvo && !primeira && t - (mundo.ditas.get('jg-em') ?? -99) >= 12 && mundo.ditas.set('jg-em', t)) situ(`jg-em-${l.chave}`, { tipo: 'jungler', prioridade: 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}.`, cooldown: 20 });
       if (t > 180 && minhaPos && seg(dist(jg.ultimo, minhaPos)) >= 25 && minhaLane && minhaLane !== 'jungle') situ('jg-lado-livre', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles ${l.texto}, longe. Seu lado livre por uns ${seg(dist(jg.ultimo, minhaPos))} segundos.`, cooldown: 75 });
+      // pra quem é jungle: o lado da jungle dele que está livre pra invadir
+      if (minhaLane === 'jungle' && t > 150) {
+        const emCima = jg.ultimo.x + jg.ultimo.y < 1;
+        const alvo = emCima ? buffsDeles.azul : buffsDeles.red;   // quadrante oposto ao que ele está
+        const sAlvo = seg(dist(jg.ultimo, alvo));
+        if (sAlvo >= 22 && (!minhaPos || seg(dist(minhaPos, alvo)) <= sAlvo - 8)) situ(`invade-${emCima ? 'baixo' : 'cima'}`, { tipo: 'oportunidade', prioridade: 1, modulo: 'jungler', serio: F`Jungle de ${emCima ? 'baixo' : 'cima'} dele livre: ele está a ${sAlvo} segundos de lá.`, cooldown: 90, dados: { lado: emCima ? 'baixo' : 'cima', s: sAlvo } });
+      }
       // nível 6 perto de você
       if (jg.nivel >= 6 && minhaPos && seg(dist(jg.ultimo, minhaPos)) <= 15) situ('jg-6-perto', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles com ult, a ${seg(dist(jg.ultimo, minhaPos))} segundos.`, cooldown: 120 });
       // dive: jungler + laner deles perto de você no nosso lado

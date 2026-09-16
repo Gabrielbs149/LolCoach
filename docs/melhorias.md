@@ -19,3 +19,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.18 — Voz: fala urgente (prioridade 3 — "Recua!", "Dive vindo", "Eles no Barão") fura a fila e corta o que está tocando. Testado: sintaxe.
 - v2.28.19 — "Jungler deles nasce em N segundos" (respawn pela API) — janela pra sair da jungle dele/terminar o objetivo. Testado: npm test.
 - v2.28.20 — Quadro do objetivo um minuto antes, numa frase: "Dragão em um minuto: jungler deles no rio do dragão, 2 deles perto do pit, seu jungler a 17 segundos." Testado: simulação + npm test.
+- v2.28.21 — Pra jungle: "Jungle de baixo dele livre: ele está a 30 segundos de lá" quando o jungler deles é visto do outro lado e você chega antes. Testado: npm test.
