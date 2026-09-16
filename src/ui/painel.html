@@ -1190,6 +1190,10 @@ h2{letter-spacing:1px}
         <div class="txt"><b>Abrir/fechar o painel</b></div>
         <button class="tecla" id="tPainel" onclick="capturarTecla('painel', this)"></button>
       </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Última fala foi boa / foi lixo</b><i>ensina o que vale falar</i></div>
+        <div class="teclas5"><button class="tecla" id="tBom" onclick="capturarTecla('bom', this)"></button><button class="tecla" id="tRuim" onclick="capturarTecla('ruim', this)"></button></div>
+      </div>
     </div>
 
     <h2>Por rota</h2>
@@ -2858,7 +2862,7 @@ function ligarLupa(tipo, rota, i){
 }
 
 /* ---- teclas: clica, aperta a combinação, pronto ---- */
-const ATALHO_PADRAO = { flashes: ['Control+Alt+1','Control+Alt+2','Control+Alt+3','Control+Alt+4','Control+Alt+5'], overlay: 'Control+Shift+O', painel: 'Control+Shift+L' };
+const ATALHO_PADRAO = { flashes: ['Control+Alt+1','Control+Alt+2','Control+Alt+3','Control+Alt+4','Control+Alt+5'], overlay: 'Control+Shift+O', painel: 'Control+Shift+L', bom: 'num6', ruim: 'num9' };
 const teclaBonita = (a) => String(a ?? '').replace('Control', 'Ctrl').replace(/\+/g, '+').replace('num', 'Num ');
 function desenharTeclas(){
   const at = { ...ATALHO_PADRAO, ...(cfg.atalhos ?? {}) };
@@ -2866,6 +2870,8 @@ function desenharTeclas(){
   fl.forEach((a, i) => { const b = $('#tFlash' + i); b.textContent = teclaBonita(a); b.dataset.n = ['top', 'jg', 'mid', 'adc', 'sup'][i]; b.dataset.acel = a; });
   $('#tOverlay').textContent = teclaBonita(at.overlay); $('#tOverlay').dataset.acel = at.overlay;
   $('#tPainel').textContent = teclaBonita(at.painel); $('#tPainel').dataset.acel = at.painel;
+  $('#tBom').textContent = teclaBonita(at.bom); $('#tBom').dataset.acel = at.bom;
+  $('#tRuim').textContent = teclaBonita(at.ruim); $('#tRuim').dataset.acel = at.ruim;
 }
 function capturarTecla(qual, botao){
   botao.classList.add('gravando'); botao.textContent = 'aperta a combinação… (Esc cancela)';

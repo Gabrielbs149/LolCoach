@@ -353,6 +353,8 @@ function acoesDasTeclas() {
       if (overlayLigado && (faseAtual === 'InProgress' || faseAtual === 'GameStart')) abrirOverlay(); else fecharOverlay();
       estado.log(`overlay ${overlayLigado ? 'ligado' : 'desligado'}`);
     },
+    bom: () => { if (endereco) fetch(`${endereco}/api/situacoes/avaliar-ultima?nota=1`, { method: 'POST' }).catch(() => {}); },
+    ruim: () => { if (endereco) fetch(`${endereco}/api/situacoes/avaliar-ultima?nota=-1`, { method: 'POST' }).catch(() => {}); },
     painel: () => {
       if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
       if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
@@ -367,9 +369,9 @@ function teclaApertada(acao) {
   if (f[acao]) return f[acao]();
 }
 function registrarAtalhos(cfg) {
-  const at = { overlay: 'Control+Shift+O', painel: 'Control+Shift+L', ...(cfg?.atalhos ?? {}) };
+  const at = { overlay: 'Control+Shift+O', painel: 'Control+Shift+L', bom: 'num6', ruim: 'num9', ...(cfg?.atalhos ?? {}) };
   const flashes = Array.isArray(at.flashes) && at.flashes.length ? at.flashes : variantesDoFlash(at.flash);
-  const pares = [...flashes.slice(0, 5).map((acel, i) => `flash${i + 1}=${acel}`), `overlay=${at.overlay}`, `painel=${at.painel}`]
+  const pares = [...flashes.slice(0, 5).map((acel, i) => `flash${i + 1}=${acel}`), `overlay=${at.overlay}`, `painel=${at.painel}`, `bom=${at.bom}`, `ruim=${at.ruim}`]
     .filter((p) => !p.endsWith('=') && !p.endsWith('=null') && !p.endsWith('=undefined'));
   if (vigia) { try { vigia.kill(); } catch { /* já morreu */ } vigia = null; }
   const script = app.isPackaged ? join(process.resourcesPath, 'teclas.ps1') : join(AQUI, 'teclas.ps1');

@@ -442,7 +442,7 @@ function desenhar(d){
 
       <h2 class="sec">Onde estão</h2>
       <div class="vistos">${vistos}</div>
-      ${(d.situacoes ?? []).length ? `<h2 class="sec">Minimapa</h2><div class="situs">${d.situacoes.slice().reverse().map(s => `<div class="situ ${s.falada ? '' : 'quieta'} p${s.prioridade}"><span>${mmss(s.t)}</span>${esc(s.texto)}${s.falada ? `<b class="aval ${avaliadas.get(`${s.t}|${s.chave}`) === 1 ? 'bom' : avaliadas.get(`${s.t}|${s.chave}`) === -1 ? 'ruim' : ''}" data-k="${esc(`${s.t}|${s.chave}`)}"><i data-n="1" title="boa">👍</i><i data-n="-1" title="lixo">👎</i></b>` : ''}</div>`).join('')}</div>` : ''}
+      ${(d.situacoes ?? []).length ? `<h2 class="sec">Minimapa</h2><div class="situs">${d.situacoes.slice().reverse().map(s => `<div class="situ ${s.falada ? '' : 'quieta'} p${s.prioridade}"><span>${mmss(s.t)}</span>${esc(s.texto)}${s.falada ? `<b class="aval ${(avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === 1 ? 'bom' : (avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === -1 ? 'ruim' : ''}" data-k="${esc(`${s.t}|${s.chave}`)}"><i data-n="1" title="boa">👍</i><i data-n="-1" title="lixo">👎</i></b>` : ''}</div>`).join('')}</div>` : ''}
       </div>
 
       <div class="col">

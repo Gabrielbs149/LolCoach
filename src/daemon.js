@@ -261,6 +261,18 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     subirAvaliacoes(pasta, { t, chave, nota, texto, tipo }).catch((erro) => log(`avaliação não subiu: ${erro.message}`));
     return { ok: true };
   }
+  /** Tecla no jogo: 👍/👎 na última fala do minimapa (a que acabou de sair). */
+  async function avaliarUltima(nota) {
+    if (![1, -1].includes(nota) || !partidaVivo?.pastaSitu) return { ok: false };
+    const ult = (partidaVivo.situacoesRecentes ?? []).filter((s) => s.falada).at(-1);
+    if (!ult || (partidaVivo.ultimoEstado?.tempo ?? 0) - ult.t > 45) return { ok: false };   // só vale nos 45 s seguintes
+    const pasta = basename(partidaVivo.pastaSitu);
+    await avaliarSituacao({ pasta, chave: ult.chave, t: ult.t, nota, texto: ult.texto, tipo: ult.tipo });
+    ult.aval = nota;
+    partidaVivo.avaliadaAgora = { t: Date.now(), nota, texto: ult.texto };
+    log(`${nota === 1 ? '👍' : '👎'} "${ult.texto}"`);
+    return { ok: true, texto: ult.texto };
+  }
   // Avaliações vão pro repositório de controle (uma gravação por vez, juntando o que chegou no meio)
   const filaAval = new Map();   // pasta → lista pendente
   let subindoAval = null;
@@ -772,6 +784,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       // buffs e camps deles vistos com o jungler: quando renascem
       timers: [...(partidaVivo.mundo?.buffs ?? []).map((b) => ({ nome: b.nome === 'red' ? 'Red deles' : 'Azul deles', em: b.em + 300 })), ...(partidaVivo.mundo?.camps ?? []).map((c) => ({ nome: `${c.nome} deles`, em: c.em + 135 }))].filter((x) => x.em - (estado?.tempo ?? 0) > -20 && x.em - (estado?.tempo ?? 0) < 300).map((x) => ({ nome: x.nome, em: Math.round(x.em - (estado?.tempo ?? 0)) })),
       eu: o.eu ?? null, cego: !!o.calib && (o.cego ?? 0) >= 15,
+      avaliada: partidaVivo.avaliadaAgora && Date.now() - partidaVivo.avaliadaAgora.t < 4000 ? partidaVivo.avaliadaAgora : null,
       vistos: (o.vistos ?? []).map((v) => ({ campeao: v.campeao, x: v.x, y: v.y })),
       ha: Math.round((Date.now() - o.recebidoEm) / 1000) };
   }
@@ -1494,7 +1507,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
-    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, situacoesResumo,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, avaliarUltima, situacoesResumo,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -1541,5 +1554,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'situacoesResumo',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'situacoesResumo',
 ];
