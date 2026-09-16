@@ -750,7 +750,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       falas: partidaVivo.falas.slice(-12),
       flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
       // O olho: minimapa achado? onde cada um foi visto pela última vez.
-      olho: resumoDoOlho(estado),
+      olho: resumoDoOlho(estado, objs),
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
@@ -880,16 +880,21 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       gravar('leituras.jsonl', S.instantaneo(partidaVivo.mundo, e));
     }
   }
-  function resumoDoOlho(estado) {
+  function resumoDoOlho(estado, objs = []) {
     const o = partidaVivo?.olho;
     if (!o) return { ligado: false };
+    // ward nossa no pit do próximo objetivo grande (dragão/barão) quando falta menos de 2 min
+    const PIT = { 'Dragão': { x: 0.666, y: 0.703 }, 'Ancião': { x: 0.666, y: 0.703 }, 'Barão': { x: 0.334, y: 0.302 } };
+    const prox = objs.find((x) => PIT[x.nome] && !x.vivo && x.em > 0 && x.em <= 120) ?? objs.find((x) => PIT[x.nome] && x.vivo);
+    const wardsNossas = partidaVivo.mundo?.wards?.nossas ?? null;
+    const pitWard = prox && wardsNossas ? { objetivo: prox.nome, em: Math.round(prox.em), ward: wardsNossas.some((w) => Math.hypot(w.x - PIT[prox.nome].x, w.y - PIT[prox.nome].y) < 0.14) } : null;
     const velho = Date.now() - o.recebidoEm > 5000;
     const pg = partidaVivo.mundo?.previsaoGank;
     return { ligado: !velho, minimapa: !!o.calib, icone: o.escala?.d ?? null, confiavel: !!o.escala?.confiavel,
       gankPrevisto: pg && !pg.dito && (estado?.tempo ?? 0) < pg.ate + 30 ? { lane: pg.lane, de: pg.de, ate: pg.ate } : null,
       // buffs e camps deles vistos com o jungler: quando renascem
       timers: [...(partidaVivo.mundo?.buffs ?? []).map((b) => ({ nome: b.nome === 'red' ? 'Red deles' : 'Azul deles', em: b.em + 300 })), ...(partidaVivo.mundo?.camps ?? []).map((c) => ({ nome: `${c.nome} deles`, em: c.em + 135 }))].filter((x) => x.em - (estado?.tempo ?? 0) > -20 && x.em - (estado?.tempo ?? 0) < 300).map((x) => ({ nome: x.nome, em: Math.round(x.em - (estado?.tempo ?? 0)) })),
-      eu: o.eu ?? null, cego: !!o.calib && (o.cego ?? 0) >= 15,
+      eu: o.eu ?? null, cego: !!o.calib && (o.cego ?? 0) >= 15, pitWard, wards: wardsNossas ? wardsNossas.length : null,
       avaliada: partidaVivo.avaliadaAgora && Date.now() - partidaVivo.avaliadaAgora.t < 4000 ? partidaVivo.avaliadaAgora : null,
       vistos: (o.vistos ?? []).map((v) => ({ campeao: v.campeao, x: v.x, y: v.y })),
       ha: Math.round((Date.now() - o.recebidoEm) / 1000) };

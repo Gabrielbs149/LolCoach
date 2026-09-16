@@ -73,7 +73,9 @@ function jgLinha(d){
   const onde = `${LUG[v.lane] ?? v.lane}${v.lado === 'deles' ? ' deles' : v.lado === 'nosso' ? ' nosso' : ''}`;
   const cls = v.ha <= 3 ? (v.lado === 'nosso' ? 'perigo' : '') : v.ha >= 20 ? 'sumido' : '';
   const tm = (d.olho?.timers ?? []).map(x => `<span style="margin-right:8px">${esc(x.nome)} <b>${x.em <= 0 ? 'nasceu' : mmss(x.em)}</b></span>`).join('');
-  const timersLinha = tm ? `<div class="jg" style="font-size:11px;color:var(--fraco)"><span></span><span>${tm}</span></div>` : '';
+  const pw = d.olho?.pitWard;
+  const wardLinha = pw ? `<div class="jg ${pw.ward ? '' : 'perigo'}" style="font-size:11px"><span></span><span>${esc(pw.objetivo)} ${pw.em > 0 ? 'em ' + mmss(pw.em) : 'no mapa'}: ${pw.ward ? 'ward no pit' : '<b>sem ward no pit</b>'}</span></div>` : '';
+  const timersLinha = (tm ? `<div class="jg" style="font-size:11px;color:var(--fraco)"><span></span><span>${tm}</span></div>` : '') + wardLinha;
   const pg = d.olho?.gankPrevisto;
   const prev = pg ? `<div class="jg" style="font-size:11px;color:var(--fraco)"><span></span><span>gank previsto: <b>${esc(pg.lane)}</b> ${mmss(pg.de)}–${mmss(pg.ate)}</span></div>` : '';
   return `<div class="jg ${cls}">${icone(jg.campeao)}<span>Jungler <b>${esc(onde)}</b></span><span class="ha">${v.ha <= 3 ? 'agora' : `há ${v.ha}s`}</span></div>${prev}${timersLinha}`;
