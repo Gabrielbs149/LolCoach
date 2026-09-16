@@ -644,6 +644,13 @@ h2:first-child{margin-top:0}
 .linhaCfg:last-child{border-bottom:0}
 .linhaCfg .txt{flex:1;min-width:0}
 .linhaCfg .cfgSel{margin:0;width:240px}
+.pronuncias{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px}
+.pronuncias:not(:empty){padding-bottom:10px}
+.pronuncias span{background:var(--f2);border:1px solid var(--borda);border-radius:99px;padding:3px 9px;font-size:11.5px;color:var(--fraco)}
+.pronuncias span b{color:var(--texto);font-weight:600}
+.pronuncias span i{font-style:normal;color:var(--apagado);margin:0 5px}
+.pronuncias span button{background:none;border:0;color:var(--apagado);cursor:pointer;font:inherit;padding:0 0 0 4px}
+.pronuncias span button:hover{color:var(--der)}
 #vAviso .aviso{margin:8px 14px}
 .linhaCfg b{display:block;font-weight:650;font-size:13px}
 .linhaCfg i{display:block;font-style:normal;color:var(--apagado);font-size:11.5px;margin-top:2px}
@@ -1109,6 +1116,13 @@ h2{letter-spacing:1px}
         </select>
         <button class="acao" onclick="vozTestar(this)">Ouvir</button>
       </div>
+      <div class="linhaCfg vozEdge">
+        <div class="txt"><b>Corrigir pronúncia</b></div>
+        <input class="busca" id="vPalavra" placeholder="palavra" autocomplete="off" style="max-width:150px;margin:0">
+        <input class="busca" id="vComo" placeholder="como falar" autocomplete="off" style="max-width:150px;margin:0" onkeydown="if(event.key==='Enter')vozPronuncia()">
+        <button class="acao" onclick="vozPronuncia()">Salvar</button>
+      </div>
+      <div class="pronuncias vozEdge" id="vPronuncias"></div>
       <div id="vAviso"></div>
     </div>
 
@@ -2837,6 +2851,24 @@ async function desenharVozCfg(){
   sel.innerHTML = vozesEdge.map(x => `<option value="${esc(x.id)}">${esc(x.nome)} · ${x.genero}${x.sotaque ? ` · sotaque ${x.sotaque}` : ''}</option>`).join('');
   sel.value = vozesEdge.some(x => x.id === v.vozId) ? v.vozId : 'pt-BR-AntonioNeural';
   document.querySelectorAll('.vozEdge').forEach(el => { el.hidden = $('#vMotor').value !== 'edge'; });
+  desenharPronuncias();
+}
+function desenharPronuncias(){
+  const pr = cfg.voz?.pronuncia ?? {};
+  $('#vPronuncias').innerHTML = Object.entries(pr).map(([k, v]) => `<span><b>${esc(k)}</b><i>→</i>${esc(v)}<button onclick="vozPronuncia('${esc(k).replace(/'/g, '&#39;')}', null)" title="tirar">×</button></span>`).join('');
+}
+async function vozPronuncia(palavra, como){
+  if(palavra === undefined){ palavra = $('#vPalavra').value.trim(); como = $('#vComo').value.trim(); if(!palavra || !como) return; }
+  const pronuncia = { ...(cfg.voz?.pronuncia ?? {}) };
+  if(como === null) delete pronuncia[palavra]; else pronuncia[palavra] = como;
+  $('#vAviso').innerHTML = '';
+  try {
+    // Manda o objeto inteiro: o config junta um nível só, e a lista é esse nível.
+    await postConfig({ voz: { ...(cfg.voz ?? {}), pronuncia } });
+    cfg.voz.pronuncia = pronuncia;
+    $('#vPalavra').value = ''; $('#vComo').value = '';
+    desenharPronuncias();
+  } catch(e){ $('#vAviso').innerHTML = `<div class="aviso">${esc(e.message)}</div>`; }
 }
 async function postConfig(corpo){
   const r = await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(corpo) }).then(x => x.json());

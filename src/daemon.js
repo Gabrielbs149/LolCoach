@@ -988,7 +988,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   const vozEmAndamento = new Map();
   /** `voz`/`ritmo` opcionais servem pra ouvir uma voz antes de escolher. */
   async function vozFalar({ texto, voz, ritmo } = {}) {
-    const { falarEdge } = await import('./vivo/voz.js');
+    const [{ falarEdge }, { pronunciar }] = await Promise.all([import('./vivo/voz.js'), import('./vivo/pronuncia.js')]);
+    texto = pronunciar(texto, config.voz?.pronuncia ?? null);   // "Kha'Zix" vira "Cazícs" só no áudio
     const v = { ...vozCfg(), ...(voz ? { vozId: voz } : {}), ...(ritmo ? { ritmo } : {}) };
     const chave = `${v.vozId}|${v.ritmo}|${texto}`;
     if (!vozEmAndamento.has(chave)) {
