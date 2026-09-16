@@ -183,8 +183,11 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         try { const pasta = url.searchParams.get('pasta'), gameId = url.searchParams.get('gameId'); return enviar(200, 'application/json', JSON.stringify(pasta || gameId ? await acoes.situacoesDe({ pasta, gameId }) : await acoes.situacoesPartidas())); }
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
+      if (url.pathname === '/api/overlay/ajustar' && acoes.overlayAjustar) return enviar(200, 'application/json', JSON.stringify(acoes.overlayAjustar({ ligar: url.searchParams.get('ligar') })));
+      if (url.pathname === '/api/overlay/mover' && acoes.overlayMover) return enviar(200, 'application/json', JSON.stringify(acoes.overlayMover(Object.fromEntries(url.searchParams))));
+      if (url.pathname === '/api/overlay/estado' && acoes.overlayEstado) return enviar(200, 'application/json', JSON.stringify(acoes.overlayEstado()));
       if (req.method === 'POST' && url.pathname === '/api/overlay/tamanho' && acoes.overlayTamanho) {
-        try { return enviar(200, 'application/json', JSON.stringify(await acoes.overlayTamanho())); }
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.overlayTamanho(Object.fromEntries(url.searchParams)))); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
       if (req.method === 'POST' && url.pathname === '/api/situacoes/avaliar-ultima' && acoes.avaliarUltima) {

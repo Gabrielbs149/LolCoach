@@ -268,14 +268,15 @@ function abrirOverlay() {
   if (!overlayLigado || !endereco) return;
   if (janelaOverlay && !janelaOverlay.isDestroyed()) { if (!janelaOverlay.isVisible()) janelaOverlay.showInactive(); return; }
   const tela = screen.getPrimaryDisplay().workArea;
+  const salvo = daemon?.config?.overlay?.posicao;
   janelaOverlay = new BrowserWindow({
-    width: 344, height: 330, x: tela.x + 10, y: tela.y + Math.round(tela.height * 0.28),
+    width: salvo?.w || 344, height: salvo?.h || 330, x: salvo?.x ?? tela.x + 10, y: salvo?.y ?? tela.y + Math.round(tela.height * 0.28),
     transparent: true, frame: false, alwaysOnTop: true, skipTaskbar: true, focusable: false,
     resizable: false, hasShadow: false, show: false,
     webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
   });
   janelaOverlay.setAlwaysOnTop(true, 'screen-saver');
-  janelaOverlay.setIgnoreMouseEvents(true);
+  janelaOverlay.setIgnoreMouseEvents(!overlayAjuste);
   janelaOverlay.setVisibleOnAllWorkspaces(true);
   janelaOverlay.loadURL(`${endereco}/overlay`);
   janelaOverlay.once('ready-to-show', () => { if (janelaOverlay && !janelaOverlay.isDestroyed()) janelaOverlay.showInactive(); });
@@ -285,6 +286,35 @@ function fecharOverlay() {
   if (janelaOverlay && !janelaOverlay.isDestroyed()) janelaOverlay.close();
   janelaOverlay = null;
 }
+/**
+ * Modo ajuste do overlay: a janela passa a receber o mouse (sem pegar foco),
+ * a página mostra uma barra pra arrastar, um canto pra redimensionar e
+ * botões de escala; ao terminar, salva posição/tamanho no config e volta a
+ * ser transparente ao mouse. Fora da partida abre o overlay só pra ajustar.
+ */
+let overlayAjuste = false;
+function overlayAjustar({ ligar } = {}) {
+  overlayAjuste = ligar !== false && ligar !== 'false' && ligar !== '0';
+  if (overlayAjuste) {
+    if (!janelaOverlay || janelaOverlay.isDestroyed()) { const antes = overlayLigado; overlayLigado = true; abrirOverlay(); overlayLigado = antes; }
+    else janelaOverlay.setIgnoreMouseEvents(false);
+    estado.log('overlay: modo ajuste (arrasta, redimensiona, escala; "Pronto" salva)');
+  } else if (janelaOverlay && !janelaOverlay.isDestroyed()) {
+    janelaOverlay.setIgnoreMouseEvents(true);
+    const b = janelaOverlay.getBounds();
+    daemon.acoes.salvarConfig({ overlay: { posicao: { x: b.x, y: b.y, w: b.width, h: b.height } } }).catch(() => {});
+    estado.log(`overlay: posição salva (${b.x},${b.y} ${b.width}×${b.height})`);
+    if (faseAtual !== 'InProgress' && faseAtual !== 'GameStart') fecharOverlay();
+  }
+  return { ajuste: overlayAjuste };
+}
+function overlayMover({ dx = 0, dy = 0, dw = 0, dh = 0 } = {}) {
+  if (!janelaOverlay || janelaOverlay.isDestroyed() || !overlayAjuste) return { ok: false };
+  const b = janelaOverlay.getBounds();
+  janelaOverlay.setBounds({ x: b.x + Number(dx), y: b.y + Number(dy), width: Math.max(220, b.width + Number(dw)), height: Math.max(160, b.height + Number(dh)) });
+  return { ok: true };
+}
+const overlayEstado = () => ({ ajuste: overlayAjuste, aberto: !!(janelaOverlay && !janelaOverlay.isDestroyed()) });
 
 /**
  * O olho: janela escondida que captura a tela do jogo (como o OBS, pela
@@ -396,6 +426,7 @@ function criarBandeja() {
   bandeja.setContextMenu(Menu.buildFromTemplate([
     { label: 'Abrir painel', click: () => (janela ? janela.show() : criarJanela()) },
     { label: 'Abrir tela ao vivo', click: () => abrirVivo() },
+    { label: 'Ajustar overlay (posição e tamanho)', click: () => overlayAjustar({ ligar: true }) },
     { label: 'Overlay no jogo (Ctrl+Shift+O)', type: 'checkbox', checked: true, click: (item) => { overlayLigado = item.checked; if (!overlayLigado) fecharOverlay(); else if (faseAtual === 'InProgress') abrirOverlay(); } },
     { type: 'separator' },
     { label: 'Sair', click: () => { app.saindo = true; app.quit(); } },
@@ -437,7 +468,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada },
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.

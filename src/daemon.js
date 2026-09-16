@@ -330,11 +330,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     return { ok: true };
   }
   /** Tecla no jogo: tamanho do overlay em ciclo 100% → 80% → 65% → 50% → 100%. */
-  async function overlayTamanho() {
+  async function overlayTamanho({ escala } = {}) {
     const passos = [1, 0.8, 0.65, 0.5];
     const atual = Number(config.overlay?.escala) || 1;
     const i = passos.findIndex((p) => Math.abs(p - atual) < 0.01);
-    const nova = passos[(i + 1) % passos.length];
+    const nova = Number(escala) ? Math.min(1.6, Math.max(0.4, Number(escala))) : passos[(i + 1) % passos.length];
     config.overlay = { ...(config.overlay ?? {}), escala: nova };
     await salvarConfig({ overlay: config.overlay }).catch(() => {});
     log(`overlay: ${Math.round(nova * 100)}%`);

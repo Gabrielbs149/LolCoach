@@ -11,6 +11,12 @@
 *{box-sizing:border-box}
 html,body{margin:0;background:transparent;overflow:hidden}
 body{font:12.5px/1.3 "Segoe UI",system-ui,sans-serif;color:var(--texto);-webkit-font-smoothing:antialiased;padding:4px}
+body.ajuste .hud{outline:2px dashed var(--ouro-claro);outline-offset:2px}
+.ajusteBarra{display:flex;align-items:center;gap:6px;padding:6px 8px;background:rgba(200,170,110,.25);border-bottom:1px solid rgba(200,170,110,.5);font-size:12px}
+.ajusteBarra .pega{flex:1;cursor:move;user-select:none;font-weight:700}
+.ajusteBarra button{background:var(--fundo);color:var(--texto);border:1px solid rgba(200,170,110,.6);border-radius:4px;padding:2px 8px;cursor:pointer;font-weight:700}
+.ajusteBarra button.ok{background:var(--ouro-claro);color:#111}
+.canto{position:fixed;right:6px;bottom:6px;cursor:nwse-resize;color:var(--ouro-claro);font-size:18px;user-select:none}
 .hud{width:332px;background:var(--fundo);border:1px solid rgba(200,170,110,.5);border-radius:8px;overflow:hidden;
   box-shadow:0 6px 18px rgba(0,0,0,.55);text-shadow:0 1px 1px rgba(0,0,0,.8)}
 .hud.oculto{display:none}
@@ -83,12 +89,31 @@ function jgLinha(d){
 // Olho cego: outra janela na frente do jogo (o olho lê a tela, não o jogo)
 function linhaAvaliada(d){ const a = d.olho?.avaliada; return a ? `<div class="jg" style="font-size:11px;color:var(--fraco)"><span></span><span>${a.nota === 1 ? '👍' : '👎'} ${esc(a.texto)}</span></div>` : ''; }
 function linhaCego(d){ return d.olho?.cego ? `<div class="jg perigo"><span></span><span>Olho cego: <b>janela na frente do jogo</b></span></div>` : ''; }
-let escalaAtual = 1;
+let escalaAtual = 1, ajuste = false;
+/* ---- modo ajuste: arrastar, redimensionar, escala ---- */
+async function lerAjuste(){
+  try { const a = await fetch('/api/overlay/estado').then(r => r.json()); if (a.ajuste !== ajuste) { ajuste = a.ajuste; document.body.classList.toggle('ajuste', ajuste); } } catch {}
+}
+let arr = null;
+function comecarArrasto(ev, tipo){ ev.preventDefault(); arr = { tipo, x: ev.screenX, y: ev.screenY, t: 0 }; }
+window.addEventListener('mousemove', (ev) => {
+  if (!arr) return; const dx = ev.screenX - arr.x, dy = ev.screenY - arr.y; if (!dx && !dy) return;
+  if (Date.now() - arr.t < 25) return; arr.t = Date.now(); arr.x = ev.screenX; arr.y = ev.screenY;
+  const q = arr.tipo === 'mover' ? `dx=${dx}&dy=${dy}` : `dw=${dx}&dh=${dy}`;
+  fetch('/api/overlay/mover?' + q).catch(() => {});
+});
+window.addEventListener('mouseup', () => { arr = null; });
+async function escalar(delta){ const nova = Math.round((escalaAtual + delta) * 100) / 100; await fetch('/api/overlay/tamanho?escala=' + nova, { method: 'POST' }).catch(() => {}); }
+async function pronto(){ await fetch('/api/overlay/ajustar?ligar=0', { method: 'POST' }).catch(() => {}); ajuste = false; document.body.classList.remove('ajuste'); }
+function barraAjuste(){
+  return `<div class="ajusteBarra"><span class="pega" onmousedown="comecarArrasto(event,'mover')">⠿ arrasta pra mover</span><button onclick="escalar(-0.1)">−</button><b>${Math.round(escalaAtual * 100)}%</b><button onclick="escalar(0.1)">+</button><button class="ok" onclick="pronto()">Pronto</button></div><div class="canto" onmousedown="comecarArrasto(event,'tamanho')" title="arrasta pra redimensionar">◢</div>`;
+}
 function desenhar(d){
   const esc0 = Number(d.overlayEscala) || 1;
   if (esc0 !== escalaAtual) { escalaAtual = esc0; document.body.style.zoom = String(esc0); }
   const hud = document.getElementById('hud');
-  if(!d.emJogo){ hud.classList.add('oculto'); return; }
+  if(!d.emJogo && !ajuste){ hud.classList.add('oculto'); return; }
+  if(!d.emJogo){ hud.classList.remove('oculto'); hud.innerHTML = barraAjuste() + `<div class="topo"><span></span><span class="t">12:34</span><span class="kda">3/1/7<span>142 cs</span></span></div><div class="jg"><span></span><span>Jungler <b>no bot, nosso lado</b></span><span class="ha">agora</span></div><div class="cab"><span>Inimigos</span></div><div class="jg"><span></span><span>exemplo — o overlay de verdade aparece na partida</span></div>`; return; }
   hud.classList.remove('oculto');
   const e = d.estado, eu = e.eu;
   const objs = (d.objetivos ?? []).map(o => `<div class="obj ${CLS[o.nome] ?? ''} ${o.vivo ? 'vivo' : (o.em <= 60 ? 'perto' : '')}"><i></i><div><b>${esc(o.nome)}</b><span>${o.vivo ? 'no mapa' : mmss(o.em)}</span></div></div>`).join('');
@@ -104,7 +129,7 @@ function desenhar(d){
   if (ultima && ultima.seq !== ultimaFala?.seq) { ultimaFala = ultima; ultimaFalaEm = Date.now(); }
   const mostraFala = ultimaFala && Date.now() - ultimaFalaEm < 12000;
   const urgente = (d.conselhos ?? []).find(c => c.urgencia === 3);
-  hud.innerHTML = `<div class="topo">${icone(eu.campeao)}<span class="t">${mmss(e.tempo)}</span>
+  hud.innerHTML = (ajuste ? barraAjuste() : '') + `<div class="topo">${icone(eu.campeao)}<span class="t">${mmss(e.tempo)}</span>
       <span class="kda">${eu.kills}/${eu.mortes}/${eu.assists}<span>${eu.cs ?? 0} cs</span></span></div>
     <div class="objs">${objs}</div>
     ${linhaCego(d)}${jgLinha(d)}${linhaAvaliada(d)}
@@ -114,7 +139,9 @@ function desenhar(d){
 }
 async function tick(){
   try {
+    await lerAjuste();
     const d = await fetch('/api/vivo').then(r => r.json());
+    if (ajuste) { desenhar(d); return; }
     const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos?.map((j) => [j.morto, j.flashEm, j.visto?.lane, j.visto?.ha]), d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
     if (json === ultimoJson && Date.now() - ultimaFalaEm > 13000) return;
     ultimoJson = json;

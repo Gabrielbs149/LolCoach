@@ -1196,7 +1196,7 @@ h2{letter-spacing:1px}
         <div class="teclas5"><button class="tecla" id="tBom" onclick="capturarTecla('bom', this)"></button><button class="tecla" id="tRuim" onclick="capturarTecla('ruim', this)"></button></div>
       </div>
       <div class="linhaCfg">
-        <div class="txt"><b>Tamanho do overlay</b><i>a tecla alterna 100 → 80 → 65 → 50%</i></div>
+        <div class="txt"><b>Tamanho do overlay</b><i>a tecla alterna 100 → 80 → 65 → 50% · <a href="#" onclick="fetch('/api/overlay/ajustar?ligar=1',{method:'POST'});return false">ajustar posição e tamanho</a> (arrasta o overlay, canto redimensiona, Pronto salva)</i></div>
         <div class="teclas5"><select class="contaSel cfgSel" id="overlayEscala" onchange="cfg.overlay = { ...(cfg.overlay ?? {}), escala: Number(this.value) }; gravar()"><option value="1">100%</option><option value="0.8">80%</option><option value="0.65">65%</option><option value="0.5">50%</option></select><button class="tecla" id="tHud" onclick="capturarTecla('hud', this)"></button></div>
       </div>
     </div>
