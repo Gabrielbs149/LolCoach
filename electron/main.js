@@ -443,6 +443,17 @@ function registrarAtalhos(cfg) {
   }
 }
 
+/**
+ * Abre junto com o Windows (padrão: ligado pra todo mundo — ninguém joga sem o app). Quando o Windows
+ * abre o app, ele nasce só na bandeja, sem painel na cara. Desliga pelo menu da bandeja (fica no config).
+ */
+const ABERTO_PELO_WINDOWS = process.argv.includes('--iniciado-pelo-windows');
+function ligarInicioComWindows(ligar) {
+  if (!app.isPackaged || process.env.PORTABLE_EXECUTABLE_DIR) return;
+  try {
+    app.setLoginItemSettings({ openAtLogin: !!ligar, path: process.execPath, args: ['--iniciado-pelo-windows'] });
+  } catch (e) { estado.log(`abrir com o Windows: ${e.message}`); }
+}
 function criarBandeja() {
   const icone = nativeImage.createFromPath(join(AQUI, 'icone-bandeja.png'));
   bandeja = new Tray(icone.isEmpty() ? nativeImage.createEmpty() : icone);
@@ -451,6 +462,7 @@ function criarBandeja() {
     { label: 'Abrir painel', click: () => (janela ? janela.show() : criarJanela()) },
     { label: 'Abrir tela ao vivo', click: () => abrirVivo() },
     { label: 'Ajustar overlay (posição e tamanho)', click: () => overlayAjustar({ ligar: true }) },
+    { label: 'Abrir com o Windows', type: 'checkbox', checked: daemon?.config?.iniciarComWindows !== false, click: (item) => { ligarInicioComWindows(item.checked); daemon?.acoes?.salvarConfig?.({ iniciarComWindows: item.checked }).catch(() => {}); estado.log(item.checked ? 'abre com o Windows: ligado' : 'abre com o Windows: desligado'); } },
     { label: 'Overlay no jogo (Ctrl+Shift+O)', type: 'checkbox', checked: true, click: (item) => { overlayLigado = item.checked; if (!overlayLigado) fecharOverlay(); else if (faseAtual === 'InProgress') abrirOverlay(); } },
     { type: 'separator' },
     { label: 'Sair', click: () => { app.saindo = true; app.quit(); } },
@@ -507,6 +519,8 @@ app.whenReady().then(async () => {
   // em 4s se não houver client nenhum pra perguntar.
   criarJanela({ esconder: true });
   criarBandeja();
+  ligarInicioComWindows(daemon?.config?.iniciarComWindows !== false);
+  if (ABERTO_PELO_WINDOWS) { painelPendente = false; estado.log('aberto junto com o Windows — fica na bandeja'); }
   ligarAtualizacao();
   registrarAtalhos(daemon.config);
   prepararCaptura();
