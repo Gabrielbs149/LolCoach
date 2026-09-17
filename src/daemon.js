@@ -1036,6 +1036,17 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * confrontos do op.gg, qual dos seus picks da rota ganha mais deles.
    */
   let selecaoCache = { chave: null, sugestao: null };
+  /** Seus jogos com cada candidato ao lado desse parceiro (adc↔sup), pelo banco. */
+  function duoHistorico(rota, candidatos, parceiro) {
+    try {
+      const minha = rota === 'utility' ? 'SUPORTE' : 'ADC', dele = rota === 'utility' ? 'ADC' : 'SUPORTE';
+      const chave = (n) => String(n ?? '').toLowerCase().replace(/[^a-z]/g, '');
+      const linhas = db.prepare("select p.meuCampeao adc, j.campeao par, count(*) n, sum(p.venci) v from partidas p join jogadores me on me.gameId=p.gameId and me.participantId=p.meuId join jogadores j on j.gameId=p.gameId and j.time=me.time and j.role=? and j.participantId<>p.meuId where p.minhaRole=? group by adc, par").all(dele, minha);
+      const saida = {};
+      for (const nome of candidatos) { const l = linhas.find((x) => chave(x.adc) === chave(nome) && chave(x.par) === chave(parceiro)); if (l) saida[nome] = { jogos: l.n, vitorias: l.v }; }
+      return saida;
+    } catch { return null; }
+  }
   let selecaoMem = { gameId: null, ditas: new Set(), falas: [] };
   async function selecaoAtual() {
     if (!lcu.conectado) return null;
@@ -1048,12 +1059,20 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const nomeDe = (id) => tabela?.porId.get(id) ?? null;
     const inimigos = (s.theirTeam ?? []).map((c) => c.championId).filter((id) => id > 0);
     const aliados = (s.myTeam ?? []).map((c) => c.championId || c.championPickIntent).filter((id) => id > 0);
-    const candidatos = (config.champSelect?.picks?.[rota] ?? []).filter(Boolean);
-    const chave = `${rota}|${inimigos.join(',')}|${candidatos.join(',')}`;
-    if (inimigos.length && candidatos.length && tabela && selecaoCache.chave !== chave) {
+    // Candidatos: os picks que você configurou pra rota; sem configuração, os seus 6 mais jogados nessa rota (banco)
+    let candidatos = (config.champSelect?.picks?.[rota] ?? []).filter(Boolean);
+    if (!candidatos.length && tabela) { try { const chaveDb = { top: 'TOP', jungle: 'JUNGLE', middle: 'MID', bottom: 'ADC', utility: 'SUPORTE' }[rota]; const nomeTabela = (n) => [...tabela.porId.values()].find((x) => String(x).toLowerCase().replace(/[^a-z]/g, '') === String(n).toLowerCase().replace(/[^a-z]/g, '')) ?? n; candidatos = db.prepare('select meuCampeao c, count(*) n from partidas where minhaRole = ? group by c order by n desc limit 6').all(chaveDb).map((r) => nomeTabela(r.c)); } catch { /* sem banco */ } }
+    // Duo: quem é adc olha o sup do time (e vice-versa) — pick tem que combinar com o parceiro, não só contra eles
+    const posParceiro = rota === 'bottom' ? 'utility' : rota === 'utility' ? 'bottom' : null;
+    const cellParceiro = posParceiro ? (s.myTeam ?? []).find((c) => c.assignedPosition === posParceiro && c.cellId !== s.localPlayerCellId) : null;
+    let parceiro = cellParceiro ? nomeDe(cellParceiro.championId || cellParceiro.championPickIntent) : null;
+    if (!parceiro && posParceiro) { const Sin = await import('./dados/sinergia.js'); const teste = posParceiro === 'utility' ? Sin.ehSup : Sin.ehAdc; parceiro = (s.myTeam ?? []).filter((c) => c.cellId !== s.localPlayerCellId).map((c) => nomeDe(c.championId || c.championPickIntent)).find((n) => n && teste(n)) ?? null; }
+    const chave = `${rota}|${inimigos.join(',')}|${candidatos.join(',')}|${parceiro ?? ''}`;
+    if ((inimigos.length || parceiro) && candidatos.length && tabela && selecaoCache.chave !== chave) {
       selecaoCache = { ...selecaoCache, chave, sugestao: null };
-      const [{ confrontoContra }, { sugerirPick }] = await Promise.all([import('./dados/confrontos.js'), import('./vivo/falas.js')]);
-      selecaoCache.sugestao = await sugerirPick({ candidatos, rota, inimigosIds: inimigos, confrontoContra, tabela, opcoes: { regiao: config.runas?.regiao ?? 'br' } }).catch(() => null);
+      const [{ confrontoContra }, { sugerirPick }, Sin] = await Promise.all([import('./dados/confrontos.js'), import('./vivo/falas.js'), import('./dados/sinergia.js')]);
+      const historico = parceiro ? duoHistorico(rota, candidatos, parceiro) : null;
+      selecaoCache.sugestao = await sugerirPick({ candidatos, rota, inimigosIds: inimigos, confrontoContra, tabela, opcoes: { regiao: config.runas?.regiao ?? 'br' }, parceiro, sinergia: parceiro ? Sin.melhoresCom({ candidatos, parceiro, souSup: rota === 'utility' }) : null, historico }).catch(() => null);
     }
     const meuCampeao = nomeDe(meu?.championId || meu?.championPickIntent) ?? null;
     // Seleção nova: zera o que já foi dito.

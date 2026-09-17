@@ -232,7 +232,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
  * Na seleção de campeão: com quem dos seus picks você ganha dos inimigos já
  * travados, pelos confrontos do op.gg. Devolve a lista ordenada e uma fala.
  */
-export async function sugerirPick({ candidatos, rota, inimigosIds, confrontoContra, tabela, opcoes }) {
+export async function sugerirPick({ candidatos, rota, inimigosIds, confrontoContra, tabela, opcoes, parceiro = null, sinergia = null, historico = null }) {
   const resultado = [];
   for (const nome of candidatos) {
     const linhas = [];
@@ -241,16 +241,28 @@ export async function sugerirPick({ candidatos, rota, inimigosIds, confrontoCont
       if (c) linhas.push({ id, campeao: tabela.porId.get(id) ?? String(id), taxa: c.taxa, jogos: c.jogos });
     }
     const media = linhas.length ? linhas.reduce((s, l) => s + l.taxa, 0) / linhas.length : null;
-    resultado.push({ nome, media, contra: linhas });
+    const sin = sinergia?.find((x) => x.nome === nome) ?? null;
+    const hist = historico?.[nome] ?? null;
+    // nota final: confrontos (metade), duo (um terço), seu histórico com esse parceiro (o resto, encolhido)
+    const histTaxa = hist && hist.jogos >= 2 ? (hist.vitorias + 1) / (hist.jogos + 2) : null;
+    const partes = [[media, 0.5], [sin?.nota ?? null, 0.35], [histTaxa, 0.15]].filter(([v]) => v != null);
+    const peso = partes.reduce((s, [, w]) => s + w, 0);
+    const total = peso ? partes.reduce((s, [v, w]) => s + v * w, 0) / peso : null;
+    resultado.push({ nome, media, contra: linhas, sinergia: sin?.nota ?? null, motivo: sin?.motivo ?? null, historico: hist, total });
   }
-  resultado.sort((a, b) => (b.media ?? -1) - (a.media ?? -1));
-  const melhor = resultado.find((r) => r.media != null);
-  const pior = melhor?.contra.sort((a, b) => a.taxa - b.taxa)[0];
-  const fala = melhor
-    ? { serio: F`Pelos confrontos, ${melhor.nome} é o melhor pick contra o que eles travaram${pior && pior.taxa < 0.47 ? `; cuidado com ${pior.campeao}` : ''}.`,
-        divertido: F`${melhor.nome} come esse time deles${pior && pior.taxa < 0.47 ? `, menos o ${pior.campeao}, que é chato` : ''}.` }
-    : null;
-  return { lista: resultado, fala, mmss };
+  resultado.sort((a, b) => (b.total ?? -1) - (a.total ?? -1));
+  const melhor = resultado.find((r) => r.total != null);
+  const pior = melhor?.contra.slice().sort((a, b) => a.taxa - b.taxa)[0];
+  let fala = null;
+  if (melhor && parceiro && melhor.sinergia != null) {
+    const parceiroRole = rota === 'utility' ? 'adc' : 'sup';
+    fala = { serio: F`Com ${parceiro} no ${parceiroRole}, ${melhor.nome}${melhor.motivo ? ': ' + melhor.motivo : ''}${pior && pior.taxa < 0.47 ? '. Cuidado com ' + pior.campeao : ''}.`,
+            divertido: F`${parceiro} no ${parceiroRole} pede ${melhor.nome}${melhor.motivo ? ': ' + melhor.motivo : ''}.` };
+  } else if (melhor && melhor.media != null) {
+    fala = { serio: F`Pelos confrontos, ${melhor.nome} é o melhor pick contra o que eles travaram${pior && pior.taxa < 0.47 ? `; cuidado com ${pior.campeao}` : ''}.`,
+            divertido: F`${melhor.nome} come esse time deles${pior && pior.taxa < 0.47 ? `, menos o ${pior.campeao}, que é chato` : ''}.` };
+  }
+  return { lista: resultado, fala, mmss, parceiro };
 }
 
 /* Campeões com muito controle de grupo: com três ou mais no time deles, vale Purificar/Mercúrio. */

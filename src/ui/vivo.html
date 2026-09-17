@@ -387,9 +387,9 @@ function desenharSelecao(sel){
     </div>
     ${sel.sugestaoBan?.length ? `<div class="sug" style="border-color:#5c2226"><b>Quem mais te ganha de ${esc(ROLE_NOME[sel.rota] ?? sel.rota)} — ban</b>
       <div class="lista" style="margin-top:6px">${sel.sugestaoBan.map(b => `<span>${icone(b.campeao, b.championId)}${esc(b.campeao)} <em style="color:var(--der);font-style:normal;margin-left:4px">${Math.round(b.taxa*100)}% em ${b.jogos}j</em></span>`).join('')}</div></div>` : ''}
-    ${sug?.lista?.length ? `<div class="sug"><b>Seus picks de ${esc(ROLE_NOME[sel.rota] ?? sel.rota)} contra o que eles travaram</b>
-      ${sug.lista.map(r => `<div class="cand"><span>${icone(r.nome, porNome.get(chave(r.nome)))} ${esc(r.nome)} <b class="${r.media>=.52?'v':r.media<=.48?'d':''}">${r.media == null ? '—' : Math.round(r.media*100) + '%'}</b></span>
-        <span class="vs">${r.contra.map(c => `${esc(c.campeao)} ${Math.round(c.taxa*100)}%`).join(' · ') || 'sem amostra'}</span></div>`).join('')}</div>`
+    ${sug?.lista?.length ? `<div class="sug"><b>Seus picks de ${esc(ROLE_NOME[sel.rota] ?? sel.rota)}${sug.parceiro ? ` com ${esc(sug.parceiro)}` : ''}${sel.inimigos.length ? ' contra o que eles travaram' : ''}</b>
+      ${sug.lista.map(r => `<div class="cand"><span>${icone(r.nome, porNome.get(chave(r.nome)))} ${esc(r.nome)} <b class="${(r.total ?? r.media)>=.52?'v':(r.total ?? r.media)<=.48?'d':''}">${(r.total ?? r.media) == null ? '—' : Math.round((r.total ?? r.media)*100) + '%'}</b></span>
+        <span class="vs">${[r.sinergia != null ? `duo ${Math.round(r.sinergia*100)}%${r.motivo ? ' — ' + esc(r.motivo) : ''}` : '', r.historico ? `você: ${r.historico.vitorias}/${r.historico.jogos} com ${esc(sug.parceiro)}` : '', ...r.contra.map(c => `${esc(c.campeao)} ${Math.round(c.taxa*100)}%`)].filter(Boolean).join(' · ') || 'sem amostra'}</span></div>`).join('')}</div>`
       : (sel.inimigos.length ? '<div class="montando">calculando confrontos…</div>' : '')}
   </div>`;
 }
