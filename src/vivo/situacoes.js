@@ -280,7 +280,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   }
   // contagem de sumidos, quando você está avançado
   const sumidos = fIni.filter((f) => !f.morto && vistoHa(f, t) > 15);
-  if (t > 180 && sumidos.length >= 3 && minhaPos && !ladoNosso(minhaPos)) situ('sumidos', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${sumidos.length} deles sumidos e você no lado deles.`, cooldown: 45, dados: { sumidos: sumidos.map((f) => f.campeao) } });
+  if (t > 180 && sumidos.length >= 3 && minhaPos && !ladoNosso(minhaPos)) situ('sumidos', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${sumidos.length} deles sumidos e você no lado deles.`, cooldown: 120, dados: { sumidos: sumidos.map((f) => f.campeao) } });
   // split push: um deles sozinho numa lane lateral, 3+ juntos em outro lugar
   {
     const vis = fIni.filter((f) => visivel(f, t));
@@ -390,7 +390,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) situ('perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: perto.length >= 2 ? F`${perto.length} deles a menos de 8 segundos de você.` : F`${perto[0].campeao} a menos de 8 segundos de você, com o ${pertoTodos.find((f) => f !== perto[0]).campeao}.`, divertido: F`${pertoTodos.length} deles vindo te buscar. Sai.`, cooldown: 30, dados: { quem: pertoTodos.map((f) => f.campeao) } });
     const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
     if (vidaPct < 0.35 && perto.length) situ('vida-baixa-vindo', { tipo: 'perigo', prioridade: 3, modulo: 'kills', serio: F`Vida baixa e ${perto[0].campeao} vindo. Sai.`, cooldown: 20 });
-    if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 180) situ('na-frente-sem-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 60 });
+    if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 180) situ('na-frente-sem-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 150 });
     const pertoLane = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 20);
     if (!pertoLane.length && minhaLane && minhaLane !== 'jungle' && ['top', 'mid', 'bot'].includes(lugar(minhaPos.x, minhaPos.y, meuTime).lane)) {
       const desde = mundo.lanesLivres.get('eu') ?? t; mundo.lanesLivres.set('eu', desde);

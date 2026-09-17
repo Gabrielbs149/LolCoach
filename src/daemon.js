@@ -824,6 +824,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras, olho: !!partidaVivo.olho?.calib && Date.now() - partidaVivo.olho.recebidoEm < 5000 }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       if (f.id && partidaVivo.silenciadas?.has(baseChave(f.id))) continue;
+      if ((f.prioridade ?? 1) <= 0) { prontaFala({ ...f, seq: 0, t: estado.tempo }); continue; }   // prioridade 0 = só registro, não fala
       if (!cabeFala(f.prioridade, estado.tempo)) continue;
       partidaVivo.falas.push(prontaFala({ ...f, seq: ++seqFalas, t: estado.tempo }));
     }
