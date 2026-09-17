@@ -38,6 +38,26 @@ const N = 48;                          // grade da calibração do minimapa
 const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.76, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.74, MARGEM = 0.04;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
 let cegoDesde = 0, cegoAvisado = 0, fracoDesde = 0;
+/**
+ * Cores dos anéis APRENDIDAS nesta instalação. O LoL de cada pessoa é
+ * diferente (modo daltônico troca vermelho/azul, HUD e minimapa mudam de
+ * tamanho), então as regras fixas são só o ponto de partida: cada ícone
+ * confirmado com nota alta (≥ 0,85) doa a cor da sua borda, e depois de 25
+ * amostras a cor média passa a valer no lugar da regra. Fica no localStorage
+ * da janela do olho, de uma partida pra outra.
+ */
+const cores = (() => { try { return JSON.parse(localStorage.getItem('olho.cores') || 'null') ?? {}; } catch { return {}; } })();
+for (const k of ['inimigo', 'aliado', 'eu']) cores[k] ??= { r: 0, g: 0, b: 0, n: 0 };
+const corPronta = (k) => cores[k].n >= 25;
+const distCor = (r, g, b, c) => Math.hypot(r - c.r, g - c.g, b - c.b);
+let coresAvisadas = false;
+function aprenderCor(k, cor) {
+  if (!cor) return;
+  const c = cores[k], w = Math.min(c.n, 60);   // média corrida (as últimas ~60 pesam mais)
+  c.r = (c.r * w + cor[0]) / (w + 1); c.g = (c.g * w + cor[1]) / (w + 1); c.b = (c.b * w + cor[2]) / (w + 1); c.n++;
+  if (c.n % 10 === 0) { try { localStorage.setItem('olho.cores', JSON.stringify(cores)); } catch { /* sem espaço */ } }
+  if (!coresAvisadas && ['inimigo', 'aliado', 'eu'].every(corPronta)) { coresAvisadas = true; log(`cores calibradas nesta tela: inimigo ${[cores.inimigo.r, cores.inimigo.g, cores.inimigo.b].map(Math.round)}, aliado ${[cores.aliado.r, cores.aliado.g, cores.aliado.b].map(Math.round)}, eu ${[cores.eu.r, cores.eu.g, cores.eu.b].map(Math.round)}`); }
+}
 
 const $log = document.getElementById('log');
 const log = (...a) => { const t = a.join(' '); $log.textContent = (t + '\n' + $log.textContent).slice(0, 3000); console.log('[olho]', t); };
@@ -161,7 +181,10 @@ function calibrar() {
  */
 function manchasVermelhas(rgba, s, d, cor = 'vermelho') {
   const cel = Math.max(4, Math.round(d / 2)), nc = Math.ceil(s / cel), cont = new Uint16Array(nc * nc);
-  const bate = cor === 'azul' ? (r, g, b) => b > 100 && b > r * 1.5 && b >= g * 1.1 : (r, g, b) => r > 100 && r > g * 1.5 && r > b * 1.2;
+  const k = cor === 'azul' ? 'aliado' : 'inimigo';
+  // a regra fixa continua valendo; a cor aprendida só ACRESCENTA (nunca tira) — assim o modo daltônico/tema não zera a leitura
+  const fixa = cor === 'azul' ? (r, g, b) => b > 100 && b > r * 1.5 && b >= g * 1.1 : (r, g, b) => r > 100 && r > g * 1.5 && r > b * 1.2;
+  const bate = corPronta(k) ? (r, g, b) => fixa(r, g, b) || distCor(r, g, b, cores[k]) < 40 : fixa;
   for (let y = 0; y < s; y += 2) for (let x = 0; x < s; x += 2) {
     const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
     if (bate(r, g, b)) cont[((y / cel) | 0) * nc + ((x / cel) | 0)]++;
@@ -393,7 +416,15 @@ function confirmar(rgba, s, tpl, x, y) {
     if (px < 0 || py < 0 || px >= s || py >= s) continue;
     const q = (py * s + px) * 4; r += rgba[q]; g += rgba[q + 1]; b += rgba[q + 2]; n++;
   }
-  melhor.anelVermelho = n > 0 && r / n > 90 && r / n > (g / n) * 1.6 && r / n > (b / n) * 1.4;
+  // cor da BORDA (raio d/2): é onde o anel de cada time fica; é isso que se aprende por instalação
+  let r2 = 0, g2 = 0, b2 = 0, n2 = 0;
+  for (let a = 0; a < 360; a += 12) {
+    const px = Math.round(cx + Math.cos(a / 57.3) * (tw / 2)), py = Math.round(cy + Math.sin(a / 57.3) * (tw / 2));
+    if (px < 0 || py < 0 || px >= s || py >= s) continue;
+    const q = (py * s + px) * 4; r2 += rgba[q]; g2 += rgba[q + 1]; b2 += rgba[q + 2]; n2++;
+  }
+  melhor.anelCor = n2 > 0 ? [r2 / n2, g2 / n2, b2 / n2] : null;
+  melhor.anelVermelho = n > 0 && ((r / n > 90 && r / n > (g / n) * 1.6 && r / n > (b / n) * 1.4) || (corPronta('inimigo') && n2 > 0 && distCor(r2 / n2, g2 / n2, b2 / n2, cores.inimigo) < 35));
   // O MEU ícone tem um anel teal (~116,152,175) logo na borda (medido: 70% dos pixels a raio d/2; 0% nos outros)
   const teal = (r, g, b) => b > 150 && g > 130 && r > 95 && r < 150 && b > r * 1.25;
   let melhorTeal = 0;
@@ -405,6 +436,16 @@ function confirmar(rgba, s, tpl, x, y) {
       const q = (py * s + px) * 4; nn++; if (teal(rgba[q], rgba[q + 1], rgba[q + 2])) k++;
     }
     if (nn) melhorTeal = Math.max(melhorTeal, k / nn);
+  }
+  // aprendida: a borda a raio d/2 perto da cor média do meu anel conta como teal
+  if (corPronta('eu')) {
+    let k2 = 0, nn2 = 0;
+    for (let a = 0; a < 360; a += 8) {
+      const px = Math.round(cx + Math.cos(a / 57.3) * (tw / 2)), py = Math.round(cy + Math.sin(a / 57.3) * (tw / 2));
+      if (px < 0 || py < 0 || px >= s || py >= s) continue;
+      const q = (py * s + px) * 4; nn2++; if (distCor(rgba[q], rgba[q + 1], rgba[q + 2], cores.eu) < 45) k2++;
+    }
+    if (nn2) melhorTeal = Math.max(melhorTeal, k2 / nn2);
   }
   melhor.anelTeal = melhorTeal;
   return melhor;
@@ -488,7 +529,7 @@ async function quadro() {
     let eu = null;
     if (meuCampeao) {
       const t = await template(meuCampeao, d);
-      if (t) { const p = procurar(m, rgba, s, t, 'eu', agora, rodada % 4 === 0); if (p) eu = p; }
+      if (t) { const p = procurar(m, rgba, s, t, 'eu', agora, rodada % 4 === 0); if (p) { eu = p; if (p.crua >= 0.72 && p.teal >= 0.4) aprenderCor('eu', p.cor); } }
       if (!eu && rodada % 4 === 2) for (const dd of [d - 2, d + 2]) { const t2 = await template(meuCampeao, dd); if (!t2) continue; const p = procurar(m, rgba, s, t2, 'eu', agora, true); if (p && (!eu || p.score > eu.score)) eu = p; }
     }
     // Câmera travada? Enquanto o ícone aparece, mede se o retângulo fica em cima dele.
@@ -510,12 +551,12 @@ async function quadro() {
     // aliados (anel azul): mesmo reconhecimento, sem rastro
     const tplsAli = new Map();
     for (const j of aliados.filter((j) => !j.morto)) { const t = await template(j.campeao, d); if (t) tplsAli.set(j.campeao, t); }
-    const vistosAli = reconhecerEmManchas(azuis, tplsAli, m, rgba, s, null);
+    const vistosAli = reconhecerEmManchas(azuis, tplsAli, m, rgba, s, null, 'aliado');
     {
       const faltam = [...tplsAli.keys()].filter((n) => !vistosAli.some((v) => v.campeao === n));
       for (const nome of faltam.slice(rodada % Math.max(1, faltam.length)).slice(0, 1)) {   // um aliado por quadro no mapa todo
         const p = procurar(m, rgba, s, tplsAli.get(nome), 'ali-' + nome, agora, true, []);
-        if (p) vistosAli.push({ campeao: nome, x: p.x, y: p.y, score: p.score });
+        if (p) { vistosAli.push({ campeao: nome, x: p.x, y: p.y, score: p.score }); if (p.crua >= 0.85) aprenderCor('aliado', p.cor); }
       }
       for (const nome of tplsAli.keys()) if (!faltam.includes(nome)) { const v = vistosAli.find((x) => x.campeao === nome); const t = tplsAli.get(nome); rastros.set('ali-' + nome, { x: v.x * s - t.d / 2, y: v.y * s - t.d / 2, em: agora }); }
     }
@@ -529,7 +570,7 @@ async function quadro() {
         const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
         if (!cand.length || cand[0].score < 0.3) continue;
         const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
-        notas.push({ nome, score: ok.score, x: ok.x, y: ok.y });
+        notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, cor: ok.anelCor });
       }
       notas.sort((a, b) => b.score - a.score);
       if (notas.length) manchasAvaliadas.push({ p, notas });
@@ -546,6 +587,7 @@ async function quadro() {
       const t = tpls.get(a.nome);
       rastros.set(a.nome, { x: a.x, y: a.y, em: agora });
       vistos.push({ campeao: a.nome, x: (a.x + t.d / 2) / s, y: (a.y + t.d / 2) / s, score: Math.round(a.score * 100) / 100 });
+      if (a.score >= 0.85) aprenderCor('inimigo', a.cor);
     }
     // (b) quem não caiu em mancha nenhuma: segue de onde estava; um por quadro procura o mapa todo
     const soltos = vivos.filter((j) => !tomados.has(j.campeao));
@@ -555,7 +597,7 @@ async function quadro() {
     for (const j of soltos) {
       const t = tpls.get(j.campeao); if (!t) continue;
       const p = procurar(m, rgba, s, t, j.campeao, agora, daVez.has(j.campeao), []);
-      if (p) vistos.push({ campeao: j.campeao, x: p.x, y: p.y, score: p.score });
+      if (p) { vistos.push({ campeao: j.campeao, x: p.x, y: p.y, score: p.score }); if (p.crua >= 0.85) aprenderCor('inimigo', p.cor); }
     }
     // dois ícones no mesmo lugar: fica o de maior score
     const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));
@@ -581,7 +623,7 @@ async function quadro() {
 }
 /** Procura um ícone: perto de onde estava, senão (se pode) no minimapa todo. Devolve posição 0..1. */
 /** Em cada mancha, o campeão mais parecido (entre os templates) leva, se ganhar com margem. */
-function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora) {
+function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora, classe = null) {
   const saida = [], tomados = tomadosFora ?? new Set(), avaliadas = [];
   for (const p of manchas) {
     const notas = [];
@@ -590,7 +632,7 @@ function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora) {
       const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
       if (!cand.length || cand[0].score < 0.3) continue;
       const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
-      notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, d: t.d });
+      notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, d: t.d, cor: ok.anelCor });
     }
     notas.sort((a, b) => b.score - a.score);
     if (notas.length) avaliadas.push(notas);
@@ -603,6 +645,7 @@ function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora) {
     if (a.score < LIMIAR_MANCHA || (b && b.score > a.score - MARGEM && a.score < 0.85)) continue;
     tomados.add(a.nome);
     saida.push({ campeao: a.nome, x: (a.x + a.d / 2) / s, y: (a.y + a.d / 2) / s, score: Math.round(a.score * 100) / 100 });
+    if (classe && a.score >= 0.85) aprenderCor(classe, a.cor);
   }
   return saida;
 }
@@ -626,6 +669,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   for (const c of cand) {
     if (c.score < LIMIAR_MEIO) continue;
     const ok = confirmar(rgba, s, t, c.x * 2, c.y * 2);
+    ok.crua = ok.score;
     if (ok.anelVermelho) ok.score += 0.08;
     if (chave === 'eu' && ok.anelTeal >= 0.4) ok.score += 0.15;   // anel teal = sou eu mesmo com seta/linha por cima
     if (!melhor || ok.score > melhor.score) melhor = ok;
@@ -634,7 +678,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   const perto = melhor && seguindo && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 40;
   if (melhor && melhor.score >= (perto ? LIMIAR_SEGUIDO : LIMIAR_NOVO)) {
     rastros.set(chave, { x: melhor.x, y: melhor.y, em: agora });
-    return { x: (melhor.x + t.d / 2) / s, y: (melhor.y + t.d / 2) / s, score: Math.round(melhor.score * 100) / 100 };
+    return { x: (melhor.x + t.d / 2) / s, y: (melhor.y + t.d / 2) / s, score: Math.round(melhor.score * 100) / 100, crua: melhor.crua, cor: melhor.anelCor, teal: melhor.anelTeal };
   }
   if (rastro && agora - rastro.em > 2000) rastros.delete(chave);
   return null;
