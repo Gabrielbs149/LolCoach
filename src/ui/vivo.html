@@ -214,6 +214,7 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 .vazio ul li::before{content:"→ ";color:var(--ouro)}
 .aviso{color:var(--apagado);font-size:10px;text-align:center;margin-top:var(--e3);
   line-height:1.6;border-top:1px solid var(--borda);padding-top:10px}
+.linha .fx{font-size:.78em;color:var(--vit,#9c6);margin-left:6px;opacity:.9}
 </style>
 </head>
 <body>
@@ -373,7 +374,7 @@ const linhaJogador = (j, souEu, posicao = 0, flash = null, intel = null) => `
     ${icone(j.campeao)}<span class="n">${esc(j.campeao)}${vistoTxt(j.visto)}</span>
     <span class="kda">${j.kills}/${j.mortes}/${j.assists}</span>
     <span class="cs">${j.cs} cs</span>
-    ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash" onclick="marcarFlashDe('${esc(j.campeao).replace(/'/g, '&#39;')}')">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}</div>${intel?.marcas?.length ? `<div class="intel ${intel.forte ? 'forte' : intel.fraco ? 'fraco' : ''}">${intel.marcas.map(esc).join(' · ')}</div>` : ''}`;
+    ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash" onclick="marcarFlashDe('${esc(j.campeao).replace(/'/g, '&#39;')}')">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}${j.feiticoEm ? `<span class="fx" title="lido no Tab">${esc(j.feiticoEm.nome)} ${j.feiticoEm.aproximado ? '≤' : ''}${mmssF(j.feiticoEm.em)}</span>` : ''}</div>${intel?.marcas?.length ? `<div class="intel ${intel.forte ? 'forte' : intel.fraco ? 'fraco' : ''}">${intel.marcas.map(esc).join(' · ')}</div>` : ''}`;
 async function marcarFlash(posicao){ try { await fetch('/api/flash?posicao=' + posicao, { method: 'POST' }); } catch {} }
 async function marcarFlashDe(campeao){ try { await fetch('/api/flash?nome=' + encodeURIComponent(campeao), { method: 'POST' }); } catch {} }
 
@@ -514,7 +515,7 @@ function desenhar(d){
       <h2 class="sec">Placar</h2>
       <div class="placar">
         <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador(j, j.souEu)).join('')}</div>
-        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${jgLinhaVivo(d)}${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null, d.intelDeles?.[j.nome] ?? null)).join('')}</div>
+        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${jgLinhaVivo(d)}${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null, feiticoEm: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.feiticoEm ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null, d.intelDeles?.[j.nome] ?? null)).join('')}</div>
       </div>
 
       </div>

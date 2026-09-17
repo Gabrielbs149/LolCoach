@@ -382,6 +382,12 @@ async function template(nome, d) {
  * na ordem do placar (top, jungle, mid, adc, sup).
  */
 let flashTpls = null, flashImg = null, fotosPlacar = 0, ultimaFotoPlacar = 0, placarCanvas = null;
+const feiticoTpls = new Map();   // 'id@d' -> template do ícone do feitiço (TP, Ignite…)
+async function templateFeitico(id, d) {
+  const k = `${id}@${d}`;
+  if (!feiticoTpls.has(k)) feiticoTpls.set(k, carregar(`/feitico/${id}`).then((img) => templateDeImagem(img, d, 'feitico' + id)));
+  return feiticoTpls.get(k);
+}
 async function templateDeImagem(img, d, nome) {
   const c = new OffscreenCanvas(d, d); const x = ctxDe(c); x.drawImage(img, 0, 0, d, d);
   const rgba = x.getImageData(0, 0, d, d).data;
@@ -409,6 +415,69 @@ function nccCor(rgba, w, h, tpl, x, y) {
     if (score > melhor.score) melhor = { score, x: px, y: py };
   }
   return melhor;
+}
+/**
+ * Lê o número branco em cima de um ícone em recarga (o tempo que falta, 1–3 dígitos). Binariza o branco,
+ * separa os dígitos por coluna vazia, encolhe cada um numa grade 5×8 e compara com os dígitos 0–9
+ * desenhados com fonte bold (mesma grade). Devolve o número ou null se não parecer número.
+ */
+let digitosTpl = null;
+const GX = 6, GY = 10;
+function gradeDe(bits, w, x0, x1, y0, y1) {
+  const g = new Float32Array(GX * GY); const cw = (x1 - x0 + 1) / GX, ch = (y1 - y0 + 1) / GY;
+  for (let j = 0; j < GY; j++) for (let i = 0; i < GX; i++) {
+    let n = 0, tot = 0;
+    for (let y = Math.floor(y0 + j * ch); y < Math.min(y1 + 1, Math.ceil(y0 + (j + 1) * ch)); y++) for (let x = Math.floor(x0 + i * cw); x < Math.min(x1 + 1, Math.ceil(x0 + (i + 1) * cw)); x++) { tot++; if (bits[y * w + x]) n++; }
+    g[j * GX + i] = tot ? n / tot : 0;
+  }
+  return g;
+}
+function prepararDigitos() {
+  digitosTpl = [];   // [{n, g}] — cada dígito em várias fontes
+  for (const font of ['bold 28px Arial', 'bold 28px Verdana', '600 28px "Segoe UI"', 'bold 28px Tahoma']) for (let n = 0; n <= 9; n++) {
+    const c = new OffscreenCanvas(32, 40); const x = ctxDe(c);
+    x.fillStyle = '#000'; x.fillRect(0, 0, 32, 40); x.fillStyle = '#fff'; x.font = font; x.textBaseline = 'top'; x.fillText(String(n), 4, 2);
+    const d = x.getImageData(0, 0, 32, 40).data; const bits = new Uint8Array(32 * 40);
+    let x0 = 32, x1 = -1, y0 = 40, y1 = -1;
+    for (let j = 0; j < 40; j++) for (let i = 0; i < 32; i++) if (d[(j * 32 + i) * 4] > 128) { bits[j * 32 + i] = 1; if (i < x0) x0 = i; if (i > x1) x1 = i; if (j < y0) y0 = j; if (j > y1) y1 = j; }
+    if (x1 < 0) continue;
+    digitosTpl.push({ n, g: gradeDe(bits, 32, x0, x1, y0, y1), fino: (x1 - x0 + 1) / (y1 - y0 + 1) });
+  }
+}
+function lerNumero(rgba, w, px, py, d) {
+  if (!digitosTpl) prepararDigitos();
+  const bits = new Uint8Array(d * d); let n = 0;
+  for (let j = 0; j < d; j++) for (let i = 0; i < d; i++) { const q = ((py + j) * w + px + i) * 4; if (rgba[q] > 185 && rgba[q + 1] > 185 && rgba[q + 2] > 185) { bits[j * d + i] = 1; n++; } }
+  if (n < 6) return null;
+  // caixa do texto todo
+  let ty0 = d, ty1 = -1; for (let j = 0; j < d; j++) for (let i = 0; i < d; i++) if (bits[j * d + i]) { if (j < ty0) ty0 = j; if (j > ty1) ty1 = j; }
+  const alt = ty1 - ty0 + 1; if (alt < 5) return null;
+  // colunas com branco → segmentos; segmento largo demais (dígitos grudados) é partido em partes iguais
+  const col = new Uint8Array(d); for (let i = 0; i < d; i++) for (let j = 0; j < d; j++) if (bits[j * d + i]) { col[i] = 1; break; }
+  const segs = []; let ini = -1;
+  for (let i = 0; i <= d; i++) { const on = i < d && col[i]; if (on && ini < 0) ini = i; if (!on && ini >= 0) { segs.push([ini, i - 1]); ini = -1; } }
+  const larguraDigito = alt * 0.62;
+  const digitos = [];
+  for (const [x0, x1] of segs) {
+    const larg = x1 - x0 + 1, partes = Math.max(1, Math.round(larg / larguraDigito));
+    if (partes === 1 || larg < larguraDigito * 1.3) { digitos.push([x0, x1]); continue; }
+    for (let p = 0; p < partes; p++) digitos.push([Math.round(x0 + p * larg / partes), Math.round(x0 + (p + 1) * larg / partes) - 1]);
+  }
+  if (!digitos.length || digitos.length > 3) return null;
+  let texto = '';
+  for (const [x0, x1] of digitos) {
+    let y0 = d, y1 = -1; for (let j = 0; j < d; j++) for (let i = x0; i <= x1; i++) if (bits[j * d + i]) { if (j < y0) y0 = j; if (j > y1) y1 = j; }
+    if (y1 < 0 || y1 - y0 < 4) return null;
+    const fino = (x1 - x0 + 1) / (y1 - y0 + 1);
+    if (fino <= 0.45) { texto += '1'; continue; }   // traço fino e alto = 1
+    const g = gradeDe(bits, d, x0, x1, y0, y1);
+    let melhor = -1, melhorS = -1;
+    for (const t of digitosTpl) { let s = 0, na = 0, nb = 0; for (let q = 0; q < GX * GY; q++) { s += g[q] * t.g[q]; na += g[q] * g[q]; nb += t.g[q] * t.g[q]; } const sc = na && nb ? s / Math.sqrt(na * nb) : 0; if (sc > melhorS) { melhorS = sc; melhor = t.n; } }
+    if (melhorS < 0.8) return null;
+    texto += String(melhor);
+  }
+  const v = Number(texto);
+  return Number.isFinite(v) && v >= 1 && v <= 999 ? v : null;
 }
 async function lerPlacar(agora) {
   if (!flashImg) { flashImg = await carregar('/feitico/4').catch(() => null); if (!flashImg) return null; }
@@ -482,7 +551,7 @@ async function lerPlacar(agora) {
     for (let cx = est - faixa; cx <= est + faixa; cx++) {
       let soma = 0;
       for (let k = 0; k < 5; k++) for (const sl of [0, 1]) {
-        if (slots[k] != null && slots[k] !== sl) continue;   // só o espaço onde o Flash desse jogador está
+        if (slots[k]?.flash != null && slots[k].flash !== sl) continue;   // só o espaço onde o Flash desse jogador está
         const cy = base + k * P + sl * off; if (cy < 0 || cy + dm > m.h || cx < 0 || cx + dm > m.w) continue;
         const a = buscar(m, t, { x0: cx, y0: cy - 1, x1: cx, y1: cy + 1 }, 1, 1)[0]; if (a) soma += a.score;
       }
@@ -495,11 +564,11 @@ async function lerPlacar(agora) {
   // de cada um dos 10 (padraoPlacar); a hipótese (base de cima ou de baixo, janela) que mais casa com isso ganha:
   // o espaço do Flash tem que parecer Flash (claro ou escuro) e o outro NÃO pode parecer Flash claro.
   if (!padraoPlacar?.esq || !padraoPlacar?.dir) return null;
-  const medir = (cx, cy) => {
+  const medir = (cx, cy, tpl = t) => {
     if (cy < 0 || cy + dm > m.h || cx < 0 || cx + dm > m.w) return null;
-    const a = buscar(m, t, { x0: cx - 2, y0: cy - 2, x1: cx + 2, y1: cy + 2 }, 1, 1)[0];
+    const a = buscar(m, tpl, { x0: cx - 2, y0: cy - 2, x1: cx + 2, y1: cy + 2 }, 1, 1)[0];
     if (!a) return null;
-    const cor = nccCor(rgba, w, h, t, a.x * 2, a.y * 2);
+    const cor = nccCor(rgba, w, h, tpl, a.x * 2, a.y * 2);
     const px = cor.x, py = cor.y;
     // mediana do brilho (o número branco em cima é minoria e não engana a mediana) + fração de brancos
     const lums = []; let brancos = 0;
@@ -509,7 +578,8 @@ async function lerPlacar(agora) {
       if (r > 200 && gg > 200 && b > 200) brancos++;
     }
     lums.sort((p, q) => p - q);
-    return { x: x0 + px + d / 2, y: y0 + py + d / 2, cinza: Math.round(a.score * 100) / 100, cor: Math.round(cor.score * 100) / 100, brilho: Math.round(lums[Math.floor(lums.length / 2)] / t.brilhoMediana * 100) / 100, brancos: Math.round(brancos / lums.length * 100) / 100 };
+    const numero = brancos >= 3 ? lerNumero(rgba, w, px, py, d) : null;
+    return { x: x0 + px + d / 2, y: y0 + py + d / 2, cinza: Math.round(a.score * 100) / 100, cor: Math.round(cor.score * 100) / 100, brilho: Math.round(lums[Math.floor(lums.length / 2)] / tpl.brilhoMediana * 100) / 100, brancos: Math.round(brancos / lums.length * 100) / 100, numero };
   };
   const claro = (s) => s && s.cinza >= 0.55 && s.cor >= 0.55;
   // escuro provisório (só pra pontuar a hipótese); o definitivo é relativo ao brilho dos claros da mesma coluna
@@ -525,11 +595,11 @@ async function lerPlacar(agora) {
     for (let i0 = 0; i0 + 5 <= linhas.length; i0++) {
       let pontos = 0; const saida = { esq: [], dir: [] };
       for (const lado of ['esq', 'dir']) for (let k = 0; k < 5; k++) {
-        const slot = padraoPlacar[lado][k], l = linhas[i0 + k][lado];
+        const pad = padraoPlacar[lado][k], slot = pad?.flash ?? null, l = linhas[i0 + k][lado];
         if (slot == null) { saida[lado].push(null); continue; }
         const meu = l[slot], outro = l[1 - slot];
         if (ehFlash(meu)) pontos++; if (claro(outro)) pontos--;
-        saida[lado].push(meu ? { slot, ...meu, claro: claro(meu), escuro: escuro(meu) } : null);
+        saida[lado].push(meu ? { slot, ...meu, claro: claro(meu), escuro: escuro(meu), cyLinha: b + (i0 - 2 + k) * grade.P } : null);
       }
       if (!melhorH || pontos > melhorH.pontos) melhorH = { pontos, base: b, ...saida };
     }
@@ -538,13 +608,28 @@ async function lerPlacar(agora) {
   // Escuro DEFINITIVO: no placar do jogo dele a coluna da esquerda vinha com o ícone escurecido (brilho 0,37 do
   // original) mesmo com o Flash na mão, e a da direita a 0,98 — brilho absoluto não serve. Referência = mediana do
   // brilho dos CLAROS da mesma coluna; escuro = não é claro, tem algo ali (cinza ≥ 0,3) e ou brilho < 0,6 da
-  // referência ou ≥ 5% de pixels brancos (o número da recarga). Sem claro na coluna: só pelo branco.
+  // referência E ≥ 4% de pixels brancos (o número da recarga). Sem claro na coluna: brilho < 0,5 e branco.
   for (const lado of ['esq', 'dir']) {
     const claros = melhorH[lado].filter((l) => l && l.claro).map((l) => l.brilho).sort((p, q) => p - q);
     const ref = claros.length ? claros[Math.floor(claros.length / 2)] : null;
-    for (const l of melhorH[lado]) if (l) l.escuro = !l.claro && l.cinza >= 0.3 && (l.brancos >= 0.05 || (ref != null && l.brilho < 0.6 * ref));
+    // o número branco é obrigatório: só 'escuro e parecido' pegava Ghost/Ignite (cinza 0,31, escuros) do espaço errado
+    for (const l of melhorH[lado]) if (l) l.escuro = !l.claro && l.cinza >= 0.3 && l.brancos >= 0.04 && (ref != null ? l.brilho < 0.75 * ref : l.brilho < 0.5);
   }
-  // cada linha: só o espaço do Flash daquele jogador (null = sem Flash / não medido), com claro/escuro decidido aqui
+  // O outro feitiço da linha (TP, Ignite, Exaust, Heal, Ghost, Barreira, Cleanse): mesmo teste, com o ícone dele.
+  // Claro = parece o ícone; escuro = tem o número branco em cima e não parece (recarga rodando).
+  for (const lado of ['esq', 'dir']) for (let k = 0; k < 5; k++) {
+    const l = melhorH[lado][k], pad = padraoPlacar[lado][k];
+    if (!l || !pad?.outro) continue;
+    const tplO = await templateFeitico(pad.outro.id, d).catch(() => null);
+    if (!tplO) continue;
+    const mo = medir(lado === 'esq' ? xEsq : xDir, l.cyLinha + pad.outro.slot * grade.off, tplO);
+    if (!mo) continue;
+    const claroO = mo.cinza >= 0.5 && mo.cor >= 0.45;
+    l.outro = { nome: pad.outro.nome, id: pad.outro.id, cinza: mo.cinza, cor: mo.cor, brilho: mo.brilho, brancos: mo.brancos, numero: mo.numero, claro: claroO, escuro: !claroO && mo.brancos >= 0.04 && mo.cinza >= 0.2 };
+    delete l.cyLinha;
+  }
+  for (const lado of ['esq', 'dir']) for (const l of melhorH[lado]) if (l) delete l.cyLinha;
+  // cada linha: o espaço do Flash daquele jogador (null = sem Flash / não medido) + o outro feitiço em .outro
   return { d, passo: grade.P * 2, off: grade.off * 2, pontos: melhorH.pontos, esq: melhorH.esq, dir: melhorH.dir };
 }
 /** Procura o template (meia res) em `img` = {g, w, h}; devolve os melhores pontos. */
@@ -642,9 +727,19 @@ async function lerPartida() {
     inimigos = (d.inimigos ?? []).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     meuCampeao = d.estado?.eu?.campeao ?? null; meuTime = d.estado?.eu?.time ?? 100;
     // Placar: cada lado são 5 linhas na ordem top/jungle/mid/adc/sup; em cada linha o Flash está no D (0) ou no F (1)
-    const slotDe = (j) => { const i = (j.spells ?? []).findIndex((sp) => /flash/i.test(sp ?? '')); return i >= 0 ? i : null; };
+    // Flash em qual espaço (D=0/F=1) e qual é o OUTRO feitiço (pra ler a recarga dele também: TP, Ignite, Exaust…)
+    const FEITICO_ID = [['flash', 4], ['teleport', 12], ['ignite', 14], ['exhaust', 3], ['heal', 7], ['ghost', 6], ['barrier', 21], ['cleanse', 1], ['smite', 11]];
+    const idDe = (nome) => (FEITICO_ID.find(([k]) => String(nome ?? '').toLowerCase().includes(k)) ?? [null, null])[1];
+    const slotDe = (j) => {
+      const sp = j.spells ?? [];
+      const i = sp.findIndex((s) => /flash/i.test(s ?? ''));
+      const outros = sp.map((s, k) => ({ slot: k, nome: s, id: idDe(s) })).filter((o) => o.slot !== i && o.id && o.id !== 4 && o.id !== 11);
+      return { flash: i >= 0 ? i : null, outro: outros[0] ?? null };
+    };
     const lado = (time) => { const ROLES = ['top', 'jungle', 'mid', 'adc', 'sup']; const js = (d.estado?.jogadores ?? []).filter((j) => j.time === time); const l = ROLES.map((r) => js.find((j) => j.role === r)); return l.every(Boolean) && new Set(js.map((j) => j.role)).size === 5 ? l.map(slotDe) : null; };
-    padraoPlacar = { esq: lado(meuTime), dir: lado(meuTime === 100 ? 200 : 100) };
+    // Lado do placar é pelo TIME, não por 'nós/eles': azul (100) à esquerda, vermelho (200) à direita — nas duas
+    // fotos do jogo dele (time 200) o time dele estava à direita e os deles à esquerda com retrato '?' (não vistos)
+    padraoPlacar = { esq: lado(100), dir: lado(200) };
     aliados = (d.estado?.jogadores ?? []).filter((j) => j.time === meuTime && j.campeao !== meuCampeao).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
   } catch { /* daemon ocupado */ }
 }

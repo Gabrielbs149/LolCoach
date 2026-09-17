@@ -53,6 +53,7 @@ body.ajuste .hud{outline:2px dashed var(--ouro-claro);outline-offset:2px}
 .fala{display:flex;gap:8px;align-items:flex-start;padding:7px 10px 8px;margin-top:3px;border-top:1px solid rgba(255,255,255,.08);font-size:12.5px;color:var(--texto)}
 .fala::before{content:"🔊";font-size:12px;opacity:.8}
 .fala.u3{color:var(--der)} .fala.u2{color:var(--g2)}
+.f .fx{display:block;font-size:.72em;opacity:.8;margin-top:1px}
 </style>
 </head>
 <body>
@@ -123,7 +124,7 @@ function desenhar(d){
     const pct = j.flashMarcado && j.flashEm > 0 ? Math.round(j.flashEm / 300 * 100) : 0;
     return `<div class="ini ${j.morto ? 'morto' : ''}">${icone(j.campeao)}<span class="n">${esc(j.campeao)}<small>${esc(j.role ?? '')}</small>${visto(j.visto)}</span>
       ${j.tecla ? `<kbd>${esc(tecla(j.tecla))}</kbd>` : '<span></span>'}
-      <span class="f ${f}">${txt}${pct ? `<span class="bar"><i style="width:${pct}%"></i></span>` : ''}</span></div>`;
+      <span class="f ${f}">${txt}${pct ? `<span class="bar"><i style="width:${pct}%"></i></span>` : ''}${j.feiticoEm ? `<small class="fx">${esc(j.feiticoEm.nome)} ${j.feiticoEm.aproximado ? '≤' : ''}${mmss(j.feiticoEm.em)}</small>` : ''}</span></div>`;
   }).join('');
   const ultima = (d.falas ?? []).at(-1);
   if (ultima && ultima.seq !== ultimaFala?.seq) { ultimaFala = ultima; ultimaFalaEm = Date.now(); }
@@ -142,7 +143,7 @@ async function tick(){
     await lerAjuste();
     const d = await fetch('/api/vivo').then(r => r.json());
     if (ajuste) { desenhar(d); return; }
-    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos?.map((j) => [j.morto, j.flashEm, j.visto?.lane, j.visto?.ha]), d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
+    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos?.map((j) => [j.morto, j.flashEm, j.feiticoEm?.em, j.visto?.lane, j.visto?.ha]), d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
     if (json === ultimoJson && Date.now() - ultimaFalaEm > 13000) return;
     ultimoJson = json;
     desenhar(d);

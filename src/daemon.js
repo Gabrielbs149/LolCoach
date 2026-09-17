@@ -846,6 +846,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const f = partidaVivo.flashes.get(j.nome);
         const r = partidaVivo.memOlho?.porCampeao.get(j.nome);
         return { posicao: i + 1, campeao: j.campeao, role: j.role, morto: j.morto, nivel: j.nivel,
+          feiticoEm: (() => { const q = partidaVivo.feiticos?.get(j.nome); return q && q.volta > estado.tempo ? { nome: q.feitico, em: Math.round(q.volta - estado.tempo), aproximado: !!q.aproximado } : null; })(),
           tecla: config.atalhos?.flashes?.[['top', 'jungle', 'mid', 'adc', 'sup'].indexOf(j.role) >= 0 ? ['top', 'jungle', 'mid', 'adc', 'sup'].indexOf(j.role) : i] ?? null, flashEm: f ? Math.max(0, Math.round(f.volta - estado.tempo)) : null, flashMarcado: !!f,
           visto: r?.vistoEm ? { texto: r.texto, lane: r.lane, lado: r.lado, ha: Math.round((Date.now() - r.vistoEm) / 1000), x: r.x, y: r.y } : null };
       }),
@@ -858,7 +859,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * janela ao vivo). Flash volta em 5:00 — 4:28 com bota da Ionia.
    */
   const IONIA = 3158;
-  async function marcarFlash({ posicao, nome, automatico = false, usadoEm = null, aproximado = false } = {}) {
+  async function marcarFlash({ posicao, nome, automatico = false, usadoEm = null, aproximado = false, numero = null } = {}) {
     if (!partidaVivo?.ultimoEstado) await vivo().catch(() => null);
     if (!partidaVivo?.ultimoEstado) throw new Error('sem partida rodando');
     const e = partidaVivo.ultimoEstado;
@@ -875,14 +876,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const temInspiracao = [alvo.runas?.primaria, alvo.runas?.secundaria].some((a) => /inspira/i.test(a ?? ''));
     const haste = (temIonia ? 12 : 0) + (temInspiracao ? 18 : 0);
     const cd = Math.round(300 / (1 + haste / 100));
-    const usado = usadoEm ?? e.tempo;
+    // número lido no Tab manda: volta em exatamente `numero` s (a recarga com haste já está embutida no número)
+    const usado = numero != null ? e.tempo + numero - cd : (usadoEm ?? e.tempo);
     const volta = usado + cd;
     const cdTxt = `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}`;
     const resta = Math.max(0, Math.round(volta - e.tempo)), restaTxt = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, '0')}`;
     partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: usado, volta, aproximado, avisado60: false, avisadoVolta: false });
     compartilharFlash(alvo, { ...e, tempo: usado }).catch((erro) => log(`flash compartilhado falhou: ${erro.message}`));
     partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
-      serio: aproximado ? F`Flash do ${alvo.campeao} gasto, visto no Tab. Volta em até ${cdTxt}.` : automatico ? F`Flash do ${alvo.campeao} marcado pelo olho. Volta em ${restaTxt}.` : F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
+      serio: numero != null ? F`Flash do ${alvo.campeao} gasto, visto no Tab. Volta em ${restaTxt}.` : aproximado ? F`Flash do ${alvo.campeao} gasto, visto no Tab. Volta em até ${cdTxt}.` : automatico ? F`Flash do ${alvo.campeao} marcado pelo olho. Volta em ${restaTxt}.` : F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
       divertido: aproximado ? F`${alvo.campeao} sem flash, no máximo ${cdTxt}.` : F`${alvo.campeao} sem flash por ${cdTxt}.` }));
     log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')} (volta em ${cdTxt}: ionia ${temIonia ? 'sim' : 'não'}, inspiração ${temInspiracao ? 'sim' : 'não'})`);
     return { ok: true, campeao: alvo.campeao, volta };
@@ -927,7 +929,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
   }
   /**
-   * Placar (Tab): o olho lê o ícone do Flash de cada um dos 5 deles (coluna da direita, ordem top/jungle/mid/adc/sup)
+   * Placar (Tab): o olho lê o ícone do Flash de cada um dos 5 deles (coluna do time deles: azul esq/vermelho dir; ordem top/jungle/mid/adc/sup)
    * e diz claro (disponível) ou escuro (em recarga: tinta preta + número). Quando um que estava claro aparece escuro,
    * o flash foi usado entre as duas leituras — marca com a hora do meio. Claro com marca ativa = marca errada, apaga.
    */
@@ -935,15 +937,19 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   async function lerPlacarDeles(placar, e) {
     const deles = e.jogadores.filter((j) => j.time !== e.eu.time);
     const porRole = ORDEM_PLACAR.map((r) => deles.find((j) => j.role === r)).filter(Boolean);
-    if (porRole.length !== 5 || (placar.dir ?? []).length !== 5) return;
+    // lado do placar é pelo time: azul (100) à esquerda, vermelho (200) à direita
+    const linhasDeles = e.eu.time === 100 ? placar.dir : placar.esq;
+    if (porRole.length !== 5 || (linhasDeles ?? []).length !== 5) return;
     partidaVivo.placar ??= new Map();
     const agora = e.tempo;
     for (let i = 0; i < 5; i++) {
-      const j = porRole[i], l = placar.dir[i];
+      const j = porRole[i], l = linhasDeles[i];
       if (!l || (!l.claro && !l.escuro)) continue;   // sem Flash, ou leitura ambígua: não decide
       const antes = partidaVivo.placar.get(j.nome) ?? { escuro: null, claroEm: null, avisadoGasto: false, seguidos: 0 };
       // uma leitura só não decide (linha vermelha de morto, sombra de tooltip): precisa de 2 iguais seguidas
       antes.seguidos = antes.ultimaLeitura === (l.escuro ? 'E' : 'C') ? antes.seguidos + 1 : 1; antes.ultimaLeitura = l.escuro ? 'E' : 'C';
+      const numeroAntes = antes.numero, numeroAntesEm = antes.numeroEm;
+      if (l.escuro && Number.isFinite(l.numero)) { antes.numero = l.numero; antes.numeroEm = agora; } else { antes.numero = null; antes.numeroEm = null; }
       if (antes.seguidos < 2) { partidaVivo.placar.set(j.nome, antes); continue; }
       if (l.claro) antes.claroEm = agora;
       const f = partidaVivo.flashes.get(j.nome);
@@ -953,11 +959,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         // com frequência) → meio do intervalo; gap longo → o mais CEDO possível (errar pra menos é o lado
         // seguro: o app diz que volta antes, nunca depois da verdade) e a fala diz "volta em até 5:00".
         const maisCedo = Math.max(antes.claroEm, agora - 300 + 15), incerteza = Math.round((agora - maisCedo) / 2);
-        const aproximado = incerteza > 45;
-        const usadoEm = aproximado ? maisCedo : agora - (agora - maisCedo) / 2;
+        // com o número da recarga lido no ícone, a hora é exata: volta em `numero` s
+        // número lido: confere com a leitura anterior (tem que cair junto com o relógio, ±6 s); 5↔6 e 9↔6 se confundem
+        let numero = Number.isFinite(l.numero) && l.numero >= 1 && l.numero <= 300 ? l.numero : null;
+        if (numero != null && numeroAntes != null && numeroAntesEm != null && Math.abs((numeroAntes - numero) - (agora - numeroAntesEm)) > 6) numero = null;
+        const aproximado = numero == null && incerteza > 45;
+        const usadoEm = numero != null ? agora + numero - 300 : aproximado ? maisCedo : agora - (agora - maisCedo) / 2;
         if (!(f && f.volta > agora)) {
-          log(`placar: flash do ${j.campeao} ficou escuro (brilho ${l.brilho}, ${Math.round(l.brancos * 100)}% branco) — usado há ${aproximado ? 'até' : '~'} ${Math.round(agora - usadoEm)} s (±${incerteza})`);
-          await marcarFlash({ nome: j.nome, automatico: true, usadoEm, aproximado }).catch(() => {});
+          log(`placar: flash do ${j.campeao} ficou escuro (brilho ${l.brilho}, ${Math.round(l.brancos * 100)}% branco${numero != null ? `, número ${numero}` : ''}) — usado há ${aproximado ? 'até' : '~'} ${Math.round(agora - usadoEm)} s (±${numero != null ? 2 : incerteza})`);
+          await marcarFlash({ nome: j.nome, automatico: true, usadoEm, aproximado, numero }).catch(() => {});
         }
       } else if (l.escuro && antes.escuro == null && !(f && f.volta > agora) && !antes.avisadoGasto) {
         antes.avisadoGasto = true;
@@ -969,7 +979,41 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       }
       antes.escuro = !!l.escuro;
       partidaVivo.placar.set(j.nome, antes);
+      // o outro feitiço dele (TP, Ignite, Exaust, Heal…): mesma regra, 2 leituras iguais, claro→escuro marca
+      if (l.outro && (l.outro.claro || l.outro.escuro)) lerFeiticoDele(j, l.outro, agora);
     }
+  }
+  const RECARGA_FEITICO = { teleport: 360, ignite: 180, exhaust: 210, heal: 240, ghost: 210, barrier: 180, cleanse: 210 };
+  const NOME_FEITICO = { teleport: 'TP', ignite: 'Ignite', exhaust: 'Exaust', heal: 'Heal', ghost: 'Ghost', barrier: 'Barreira', cleanse: 'Cleanse' };
+  function lerFeiticoDele(j, o, agora) {
+    const chave = Object.keys(RECARGA_FEITICO).find((k) => String(o.nome ?? '').toLowerCase().includes(k));
+    if (!chave) return;
+    partidaVivo.feiticos ??= new Map();   // nome do jogador -> { feitico, volta, usadoEm, aproximado }
+    partidaVivo.placarOutro ??= new Map();
+    const antes = partidaVivo.placarOutro.get(j.nome) ?? { escuro: null, claroEm: null, seguidos: 0, ultimaLeitura: null };
+    const leitura = o.escuro ? 'E' : 'C';
+    antes.seguidos = antes.ultimaLeitura === leitura ? antes.seguidos + 1 : 1; antes.ultimaLeitura = leitura;
+    if (antes.seguidos < 2) { partidaVivo.placarOutro.set(j.nome, antes); return; }
+    if (o.claro) antes.claroEm = agora;
+    const cd = RECARGA_FEITICO[chave], f = partidaVivo.feiticos.get(j.nome);
+    if (o.escuro && antes.escuro === false && antes.claroEm != null && !(f && f.volta > agora)) {
+      const numero = Number.isFinite(o.numero) && o.numero >= 1 && o.numero <= cd ? o.numero : null;
+      const maisCedo = Math.max(antes.claroEm, agora - cd + 15), incerteza = Math.round((agora - maisCedo) / 2);
+      const aproximado = numero == null && incerteza > 45;
+      const usadoEm = numero != null ? agora + numero - cd : aproximado ? maisCedo : agora - (agora - maisCedo) / 2;
+      const volta = usadoEm + cd, resta = Math.max(0, Math.round(volta - agora));
+      const rTxt = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, '0')}`, cdTxt = `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}`;
+      partidaVivo.feiticos.set(j.nome, { campeao: j.campeao, feitico: NOME_FEITICO[chave], volta, usadoEm, aproximado });
+      log(`placar: ${NOME_FEITICO[chave]} do ${j.campeao} gasto${numero != null ? ` (número ${numero})` : aproximado ? ' (hora aproximada)' : ''} — volta em ${rTxt}`);
+      // só os que mudam a jogada: TP (volta na lane), Ignite/Exaust (all-in), Heal/Barreira (trade)
+      partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: agora, modulo: 'flash', prioridade: 1, id: `feitico-${j.nome}-${chave}`,
+        serio: aproximado ? F`${NOME_FEITICO[chave]} do ${j.campeao} gasto. Volta em até ${cdTxt}.` : F`${NOME_FEITICO[chave]} do ${j.campeao} gasto. Volta em ${rTxt}.`,
+        divertido: F`${j.campeao} sem ${NOME_FEITICO[chave]} por ${aproximado ? 'até ' : ''}${aproximado ? cdTxt : rTxt}.` }));
+    } else if (o.claro && f && f.volta > agora + 20 && agora - f.usadoEm > 30) {
+      partidaVivo.feiticos.delete(j.nome);
+    }
+    antes.escuro = !!o.escuro;
+    partidaVivo.placarOutro.set(j.nome, antes);
   }
   async function receberOlhoInterno(dados) {
     if (dados?.erro) { log(`olho: ${dados.erro}`); return; }
