@@ -27,6 +27,9 @@ export function autoAceitar(lcu, { atrasoMs = 0, ativo = () => true, aoAceitar, 
     if (jaRespondido) return;
     if (!valor(ativo, true)) { jaRespondido = true; log('fila achou partida — aceitar sozinho está desligado'); return; }
 
+    // partida personalizada / treino não tem aceite (o client dispara o evento mesmo assim e responde 500)
+    const lobby = await lcu.get('/lol-lobby/v2/lobby').catch(() => null);
+    if (lobby?.gameConfig?.isCustom) { jaRespondido = true; return; }
     jaRespondido = true;
     const espera = valor(atrasoMs, 0);
     log(`fila achou partida — aceitando em ${espera}ms`);

@@ -922,7 +922,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const id = partidaVivo?.pastaSitu ? basename(partidaVivo.pastaSitu) : partidaVivo?.ultimoEstado ? `${new Date().toISOString().slice(0, 10)}-${(partidaVivo.ultimoEstado.eu?.campeao ?? 'x').toLowerCase()}` : 'sem-partida';
     const pasta = resolve(pastaBase(), 'dados', 'olho', id);
     await mkdir(pasta, { recursive: true });
-    const n = (meta?.placar ? 'placar-' : '') + String(Math.floor((partidaVivo?.ultimoEstado?.tempo ?? 0))).padStart(4, '0');
+    const n = (meta?.placar ? 'placar-' : meta?.escuro ? `escuro-${meta.numero ?? 'x'}-` : '') + String(Math.floor((partidaVivo?.ultimoEstado?.tempo ?? 0))).padStart(4, '0');
     await writeFile(resolve(pasta, `${n}.png`), png);
     await writeFile(resolve(pasta, `${n}.json`), JSON.stringify({ ...meta, tempo: partidaVivo?.ultimoEstado?.tempo ?? null, jogadores: partidaVivo?.ultimoEstado?.jogadores?.map((j) => ({ campeao: j.campeao, time: j.time, role: j.role, morto: j.morto })) ?? [] }));
     // limpa partidas velhas

@@ -381,7 +381,7 @@ async function template(nome, d) {
  * brancos no meio (o número). As linhas da coluna da direita são os inimigos
  * na ordem do placar (top, jungle, mid, adc, sup).
  */
-let flashTpls = null, flashImg = null, fotosPlacar = 0, ultimaFotoPlacar = 0, placarCanvas = null;
+let flashTpls = null, flashImg = null, fotosPlacar = 0, ultimaFotoPlacar = 0, placarCanvas = null, fotosEscuro = 0, ultimaFotoEscuro = 0;
 const feiticoTpls = new Map();   // 'id@d' -> template do ícone do feitiço (TP, Ignite…)
 async function templateFeitico(id, d) {
   const k = `${id}@${d}`;
@@ -614,6 +614,20 @@ async function lerPlacar(agora) {
     const ref = claros.length ? claros[Math.floor(claros.length / 2)] : null;
     // o número branco é obrigatório: só 'escuro e parecido' pegava Ghost/Ignite (cinza 0,31, escuros) do espaço errado
     for (const l of melhorH[lado]) if (l) l.escuro = !l.claro && l.cinza >= 0.3 && l.brancos >= 0.04 && (ref != null ? l.brilho < 0.75 * ref : l.brilho < 0.5);
+  }
+  // Recorte de cada ícone escuro (pra calibrar o leitor de dígitos com a fonte de verdade do jogo): 3× o ícone,
+  // até 20 por partida, 1 a cada 20 s
+  if (!TESTE && !AMOSTRA && fotosEscuro < 20 && agora - ultimaFotoEscuro > 20000) {
+    const esc = [...melhorH.esq, ...melhorH.dir].find((l) => l && l.escuro);
+    if (esc) {
+      ultimaFotoEscuro = agora; fotosEscuro++;
+      try {
+        const cx = Math.round(esc.x - d / 2) - 3, cy = Math.round(esc.y - d / 2) - 3, cw = d + 6;
+        const c = new OffscreenCanvas(cw * 3, cw * 3); const x = ctxDe(c); x.imageSmoothingEnabled = false; x.drawImage(fonte, cx, cy, cw, cw, 0, 0, cw * 3, cw * 3);
+        const blob = await c.convertToBlob({ type: 'image/png' });
+        fetch('/api/olho/foto?meta=' + encodeURIComponent(JSON.stringify({ escuro: true, d, numero: esc.numero ?? null, brilho: esc.brilho, brancos: esc.brancos, cinza: esc.cinza })), { method: 'POST', body: blob }).catch(() => {});
+      } catch { /* sem foto */ }
+    }
   }
   // O outro feitiço da linha (TP, Ignite, Exaust, Heal, Ghost, Barreira, Cleanse): mesmo teste, com o ícone dele.
   // Claro = parece o ícone; escuro = tem o número branco em cima e não parece (recarga rodando).
