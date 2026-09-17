@@ -68,6 +68,7 @@ header>*{position:relative}
 .voz .modulos.aberto{display:flex}
 .voz .modulos button{background:var(--f2);border:1px solid var(--borda);color:var(--apagado);font:inherit;font-size:10.5px;padding:3px 9px;border-radius:999px;cursor:pointer}
 .voz .modulos button.on{border-color:var(--ouro);color:var(--ouro-claro);background:#241f16}
+.time .intel{font-size:10.5px;color:var(--apagado);padding:0 10px 6px 42px;line-height:1.4} .time .intel.forte{color:var(--u3)} .time .intel.fraco{color:var(--vit)}
 .selecao{padding:14px}
 .selecao h1{font-size:16px;margin:0 0 10px;color:var(--ouro-claro)}
 .selecao .times{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -367,12 +368,12 @@ function jgLinhaVivo(d){
 const LUGAR = { top: 'top', mid: 'mid', bot: 'bot', jungle: 'jungle', rio: 'rio', barao: 'barão', dragao: 'dragão', base: 'base' };
 /* O olho viu o cara no minimapa: onde e há quanto tempo. */
 const vistoTxt = (v) => !v ? '' : v.ha <= 3 ? `<small class="visto agora">${LUGAR[v.lane] ?? v.lane}${v.lado === 'deles' ? ' deles' : v.lado === 'nosso' ? ' nosso' : ''}</small>` : v.ha < 90 ? `<small class="visto">${LUGAR[v.lane] ?? v.lane} há ${v.ha}s</small>` : '';
-const linhaJogador = (j, souEu, posicao = 0, flash = null) => `
-  <div class="linha ${j.morto ? 'morto' : ''} ${souEu ? 'eu' : ''}">
+const linhaJogador = (j, souEu, posicao = 0, flash = null, intel = null) => `
+  <div class="linha ${j.morto ? 'morto' : ''} ${souEu ? 'eu' : ''} ${intel?.forte ? 'forte' : intel?.fraco ? 'fraco' : ''}">
     ${icone(j.campeao)}<span class="n">${esc(j.campeao)}${vistoTxt(j.visto)}</span>
     <span class="kda">${j.kills}/${j.mortes}/${j.assists}</span>
     <span class="cs">${j.cs} cs</span>
-    ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash" onclick="marcarFlashDe('${esc(j.campeao).replace(/'/g, '&#39;')}')">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}</div>`;
+    ${posicao ? `<button class="flash ${flash ? (flash.em > 0 ? 'usado' : 'voltou') : ''}" title="marcar flash" onclick="marcarFlashDe('${esc(j.campeao).replace(/'/g, '&#39;')}')">${flash && flash.em > 0 ? 'F ' + mmssF(flash.em) : 'F'}</button>` : ''}</div>${intel?.marcas?.length ? `<div class="intel ${intel.forte ? 'forte' : intel.fraco ? 'fraco' : ''}">${intel.marcas.map(esc).join(' · ')}</div>` : ''}`;
 async function marcarFlash(posicao){ try { await fetch('/api/flash?posicao=' + posicao, { method: 'POST' }); } catch {} }
 async function marcarFlashDe(campeao){ try { await fetch('/api/flash?nome=' + encodeURIComponent(campeao), { method: 'POST' }); } catch {} }
 
@@ -512,7 +513,7 @@ function desenhar(d){
       <h2 class="sec">Placar</h2>
       <div class="placar">
         <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador(j, j.souEu)).join('')}</div>
-        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${jgLinhaVivo(d)}${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null)).join('')}</div>
+        <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${jgLinhaVivo(d)}${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null, d.intelDeles?.[j.nome] ?? null)).join('')}</div>
       </div>
 
       </div>

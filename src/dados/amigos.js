@@ -129,7 +129,7 @@ async function resumoRecente(riot, puuid, { quantas = QUANTAS, aoProgresso } = {
  * Perfil completo de uma conta pela Riot. Cache de 30 min em disco; `forcar`
  * ignora. Nunca lança por dado faltando — só por conta inexistente ou chave.
  */
-export async function perfilDeAmigo(riotConfig, { nome, tag }, { forcar = false, aoProgresso } = {}) {
+export async function perfilDeAmigo(riotConfig, { nome, tag }, { forcar = false, aoProgresso, quantas = QUANTAS } = {}) {
   const cache = await lerCache(nome, tag);
   if (cache && !forcar && Date.now() - cache.em < VALIDADE) return { ...cache, doCache: true };
 
@@ -157,7 +157,7 @@ export async function perfilDeAmigo(riotConfig, { nome, tag }, { forcar = false,
     riot.maestriaTop(conta.puuid).catch(() => []),
   ]);
 
-  const recente = await resumoRecente(riot, conta.puuid, { aoProgresso });
+  const recente = await resumoRecente(riot, conta.puuid, { aoProgresso, quantas });
 
   const dados = {
     em: Date.now(),

@@ -763,6 +763,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
     // As fichas dependem de rede (op.gg, Data Dragon) e do banco: montam uma
     // vez, em segundo plano, e a tela mostra assim que ficarem prontas.
+    if (!partidaVivo.intelJogadores && !partidaVivo.montandoIntel && config.riot?.apiKey) {
+      partidaVivo.intelJogadores = new Map();
+      const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time);
+      partidaVivo.montandoIntel = import('./vivo/intel-jogadores.js')
+        .then(({ intelDosJogadores }) => intelDosJogadores(config.riot, deles, { aoAtualizar: (nome, f) => { partidaVivo?.intelJogadores?.set(nome, f); } }))
+        .then((m) => { if (partidaVivo) { partidaVivo.intelJogadores = m; const prontos = [...m.values()].filter((f) => f && !f.erro).length; log(`intel deles: ${prontos}/${deles.length} perfis`); } })
+        .catch((erro) => log(`intel deles falhou: ${erro.message}`));
+    }
     if (!partidaVivo.fichas && !partidaVivo.montandoFichas) {
       partidaVivo.montandoFichas = fichasDaPartida(db, estado, { regiao: config.runas?.regiao ?? 'br' })
         .then((f) => { partidaVivo.fichas = f; })
@@ -796,6 +804,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         jogadores: estado.jogadores.map((j) => ({ c: j.campeao, time: j.time, role: j.role, nivel: j.nivel, k: j.kills, m: j.mortes, a: j.assists, cs: j.cs, morto: j.morto, renasce: j.renasceEm, itens: (j.itens ?? []).map((i) => i.id) })),
         eventos: (estado.eventos ?? []).length }) + '\n').catch(() => {});
     }
+    if (partidaVivo.intelJogadores?.size && estado.tempo < 150 && !partidaVivo.intelFalada) {
+      const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time);
+      const alvos = [deles.find((j) => j.role === estado.eu.role && estado.eu.role !== 'jungle'), deles.find((j) => j.role === 'jungle')].filter(Boolean);
+      const prontas = alvos.map((j) => [j, partidaVivo.intelJogadores.get(j.nome)]).filter(([, f]) => f && !f.erro);
+      if (prontas.length === alvos.length && alvos.length) {
+        partidaVivo.intelFalada = true;
+        for (const [j, f] of prontas) {
+          const quem = j.role === 'jungle' ? 'Jungler deles' : `${j.campeao} deles`;
+          const partes = [];
+          if (f.elo) partes.push(f.elo); else partes.push('sem ranqueada');
+          if (f.jogosRecentes) partes.push(`${Math.round(f.taxaRecente * 100)}% nas últimas ${f.jogosRecentes}`);
+          if (f.noCampeao) partes.push(`${f.noCampeao.jogos} de ${j.campeao} recente${f.noCampeao.jogos > 1 ? 's' : ''}`); else if (f.jogosRecentes) partes.push(`nenhum jogo recente de ${j.campeao}`);
+          if (f.foraDaRota) partes.push(`fora da rota dele, joga ${f.rotaPrincipal}`);
+          if (Math.abs(f.sequencia) >= 3) partes.push(f.sequencia > 0 ? `${f.sequencia} vitórias seguidas` : `${-f.sequencia} derrotas seguidas`);
+          partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 2, id: `intel-${j.role}`, serio: F`${quem}: ${partes.join(', ')}.`, divertido: F`${quem}: ${partes.join(', ')}.` }));
+        }
+      }
+    }
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras, olho: !!partidaVivo.olho?.calib && Date.now() - partidaVivo.olho.recebidoEm < 5000 }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       if (f.id && partidaVivo.silenciadas?.has(baseChave(f.id))) continue;
       if (!cabeFala(f.prioridade, estado.tempo)) continue;
@@ -814,6 +840,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       overlayEscala: Number(config.overlay?.escala) || 1,
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
+      intelDeles: partidaVivo.intelJogadores ? Object.fromEntries([...partidaVivo.intelJogadores].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
         const f = partidaVivo.flashes.get(j.nome);
         const r = partidaVivo.memOlho?.porCampeao.get(j.nome);
