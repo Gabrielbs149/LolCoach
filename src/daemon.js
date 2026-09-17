@@ -858,7 +858,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * janela ao vivo). Flash volta em 5:00 — 4:28 com bota da Ionia.
    */
   const IONIA = 3158;
-  async function marcarFlash({ posicao, nome, automatico = false, usadoEm = null } = {}) {
+  async function marcarFlash({ posicao, nome, automatico = false, usadoEm = null, aproximado = false } = {}) {
     if (!partidaVivo?.ultimoEstado) await vivo().catch(() => null);
     if (!partidaVivo?.ultimoEstado) throw new Error('sem partida rodando');
     const e = partidaVivo.ultimoEstado;
@@ -879,11 +879,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const volta = usado + cd;
     const cdTxt = `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}`;
     const resta = Math.max(0, Math.round(volta - e.tempo)), restaTxt = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, '0')}`;
-    partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: usado, volta, avisado60: false, avisadoVolta: false });
+    partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: usado, volta, aproximado, avisado60: false, avisadoVolta: false });
     compartilharFlash(alvo, { ...e, tempo: usado }).catch((erro) => log(`flash compartilhado falhou: ${erro.message}`));
     partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
-      serio: automatico ? F`Flash do ${alvo.campeao} marcado pelo olho. Volta em ${restaTxt}.` : F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
-      divertido: F`${alvo.campeao} sem flash por ${cdTxt}.` }));
+      serio: aproximado ? F`Flash do ${alvo.campeao} gasto, visto no Tab. Volta em até ${cdTxt}.` : automatico ? F`Flash do ${alvo.campeao} marcado pelo olho. Volta em ${restaTxt}.` : F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
+      divertido: aproximado ? F`${alvo.campeao} sem flash, no máximo ${cdTxt}.` : F`${alvo.campeao} sem flash por ${cdTxt}.` }));
     log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')} (volta em ${cdTxt}: ionia ${temIonia ? 'sim' : 'não'}, inspiração ${temInspiracao ? 'sim' : 'não'})`);
     return { ok: true, campeao: alvo.campeao, volta };
   }
@@ -948,11 +948,16 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (l.claro) antes.claroEm = agora;
       const f = partidaVivo.flashes.get(j.nome);
       if (l.escuro && antes.escuro === false && antes.claroEm != null) {
-        // estava claro há pouco e agora está escuro: usou o flash entre as duas leituras
-        const usadoEm = agora - (agora - antes.claroEm) / 2, incerteza = Math.round((agora - antes.claroEm) / 2);
+        // Estava claro na última leitura e agora está escuro: usou entre as duas. Como está escuro AGORA, foi
+        // usado nos últimos 300 s no máximo: usado ∈ [max(claroEm, agora − 300), agora]. Gap curto (Tab aberto
+        // com frequência) → meio do intervalo; gap longo → o mais CEDO possível (errar pra menos é o lado
+        // seguro: o app diz que volta antes, nunca depois da verdade) e a fala diz "volta em até 5:00".
+        const maisCedo = Math.max(antes.claroEm, agora - 300 + 15), incerteza = Math.round((agora - maisCedo) / 2);
+        const aproximado = incerteza > 45;
+        const usadoEm = aproximado ? maisCedo : agora - (agora - maisCedo) / 2;
         if (!(f && f.volta > agora)) {
-          log(`placar: flash do ${j.campeao} ficou escuro (brilho ${l.brilho}, ${Math.round(l.brancos * 100)}% branco) — usado há ~${Math.round(agora - usadoEm)} s (±${incerteza})`);
-          await marcarFlash({ nome: j.nome, automatico: true, usadoEm }).catch(() => {});
+          log(`placar: flash do ${j.campeao} ficou escuro (brilho ${l.brilho}, ${Math.round(l.brancos * 100)}% branco) — usado há ${aproximado ? 'até' : '~'} ${Math.round(agora - usadoEm)} s (±${incerteza})`);
+          await marcarFlash({ nome: j.nome, automatico: true, usadoEm, aproximado }).catch(() => {});
         }
       } else if (l.escuro && antes.escuro == null && !(f && f.volta > agora) && !antes.avisadoGasto) {
         antes.avisadoGasto = true;

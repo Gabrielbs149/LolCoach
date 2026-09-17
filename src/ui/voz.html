@@ -29,7 +29,9 @@ function tocarProxima() {
   const a = new Audio('/api/voz/falar?texto=' + encodeURIComponent(texto));
   a.volume = voz.volume; tocando = a;
   const fim = () => { tocando = null; tocarProxima(); };
-  const falhou = () => { console.log('[voz] falhou: ' + texto.slice(0, 40)); fim(); if (++errosSeguidos >= 4 && motorVoz === 'edge') { motorVoz = 'windows'; falarWindows(texto); } };
+  // Edge falha de vez em quando (3 em 100): a frase NÃO pode sumir — sai na voz do Windows na hora; 4 falhas seguidas trocam o motor de vez
+  let jaFalhou = false;
+  const falhou = () => { if (jaFalhou) return; jaFalhou = true; console.log('[voz] falhou: ' + texto.slice(0, 40) + ' → voz do Windows'); fim(); if (++errosSeguidos >= 4 && motorVoz === 'edge') motorVoz = 'windows'; falarWindows(texto); };
   a.onended = () => { errosSeguidos = 0; fim(); };
   a.onerror = falhou;
   a.play().catch(falhou);

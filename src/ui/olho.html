@@ -429,15 +429,14 @@ async function lerPlacar(agora) {
   if (!melhor || melhor.cand.length < 3) return null;
   const { t, cand } = melhor;
   const d = t.d, dm = t.meiaRes.w;
-  // foto do placar pro registro (calibrar depois): até 6 por partida, 1 a cada 60 s — antes da grade,
-  // pra ter a foto mesmo quando a grade falha
-  if (!TESTE && !AMOSTRA && fotosPlacar < 6 && agora - ultimaFotoPlacar > 60000) {
+  const tirarFoto = async () => {
+    if (TESTE || AMOSTRA || fotosPlacar >= 6 || agora - ultimaFotoPlacar < 60000) return;
     ultimaFotoPlacar = agora; fotosPlacar++;
     try {
       const blob = await placarCanvas.convertToBlob({ type: 'image/png' });
       fetch('/api/olho/foto?meta=' + encodeURIComponent(JSON.stringify({ placar: true, d, x0, y0, claros: cand.map((c) => ({ x: c.x * 2, y: c.y * 2, score: Math.round(c.score * 100) / 100, cor: Math.round(c.cor * 100) / 100 })) })), { method: 'POST', body: blob }).catch(() => {});
     } catch { /* sem foto */ }
-  }
+  };
   // 2. Grade (meia res). Layout do placar: cada linha tem os 2 feitiços EMPILHADOS (D em cima, F embaixo,
   // mesmo x), linhas a cada ~2,9 d. Um lado = uma coluna x. Os claros dizem x de cada lado; os y deles
   // caem em y_k ou y_k + off (off ≈ d + 3). Testa passo/off/base e fica com o que explica mais claros.
@@ -453,6 +452,9 @@ async function lerPlacar(agora) {
   if (xEsq == null && xDir == null) return null;
   const naColuna = cand.filter((c) => (xEsq != null && Math.abs(c.x - xEsq) <= 2) || (xDir != null && Math.abs(c.x - xDir) <= 2));
   if (naColuna.length < 3) return null;
+  // foto do placar pro registro (calibrar depois): até 6 por partida, 1 a cada 60 s — só com coluna de verdade
+  // (3 dourados soltos pela tela gastavam as 6 fotos sem placar nenhum)
+  await tirarFoto();
   const ys = [...new Set(naColuna.map((c) => c.y))].sort((a, b) => a - b);
   const grupos = []; for (const y of ys) { const gr = grupos[grupos.length - 1]; if (gr && y - gr[gr.length - 1] <= 2) gr.push(y); else grupos.push([y]); }
   const linhasY = grupos.map((gr) => gr[Math.floor(gr.length / 2)]);
