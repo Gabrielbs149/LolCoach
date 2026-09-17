@@ -53,11 +53,13 @@ function verVisto(f, v, t) {
   // TP de verdade: o novo lugar tem que se confirmar em 3 leituras seguidas (≥ 1,5 s) e
   // o campeão não pode ter dado TP nos últimos 300 s (o feitiço tem 6 min de recarga).
   // Um ícone parecido no lugar errado some em 1–2 leituras; um TP fica.
-  if (antes && t - antes.t < 6 && dist(antes, p) > 0.25) {
+  // Rápido demais também é suspeito: 0,08 do mapa por segundo é mais que qualquer dash (andar = 0,025/s).
+  const rapidoDemais = antes && t - antes.t < 6 && t - antes.t > 0 && dist(antes, p) / (t - antes.t) > 0.08 && dist(antes, p) > 0.06;
+  if (antes && t - antes.t < 6 && (dist(antes, p) > 0.25 || rapidoDemais)) {
     if (f.pendente && t - f.pendente.t < 4 && dist(f.pendente, p) < 0.08) {
       f.pendente.n = (f.pendente.n ?? 1) + 1;
       if (f.pendente.n >= 3 && t - f.pendente.t >= 1.5) {
-        if (!(f.ultimoTp != null && t - f.ultimoTp < 300)) { f.tp = t; f.ultimoTp = t; }
+        if (dist(antes, p) > 0.25 && !(f.ultimoTp != null && t - f.ultimoTp < 300)) { f.tp = t; f.ultimoTp = t; }
         f.pendente = null;
       } else return;
     } else { f.pendente = { ...p, n: 1 }; return; }
