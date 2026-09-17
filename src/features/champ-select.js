@@ -69,7 +69,7 @@ function primeiroLivre(nomes, tabela, fora, permitidos) {
  *    também é consultada de segundo em segundo. Se um evento do client se
  *    perder, a janela de ~30s do ban continua sendo pega.
  */
-export function autoChampSelect(lcu, config, { log = () => {}, permite = () => true, aoRunas = () => {} } = {}) {
+export function autoChampSelect(lcu, config, { log = () => {}, permite = () => true, aoRunas = () => {}, aoSkin = () => {} } = {}) {
   let tabela = null;
   let carregandoTabela = null;
   let fase = { acaoFeita: null, declarou: null, runasDe: null, anunciou: false, diagnostico: false, feiticosFeitos: false };
@@ -249,6 +249,8 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
     if (config.runas?.ativo !== false && permite('runas') && meuCampeaoId > 0 && fase.runasDe !== meuCampeaoId) {
       fase.runasDe = meuCampeaoId;
       const nome = tabela.porId.get(meuCampeaoId);
+      // skin só pra você (cslol) — sobe o patcher do mod escolhido pra esse campeão
+      try { aoSkin(nome); } catch { /* opcional */ }
       try {
         // Runa por confronto: quem provavelmente é o seu oponente de lane e o que ele faz (AP de poke → Segunda
         // Vento; all-in/assassino → Placa de Ossos) — só troca pra uma página que os jogadores já usam

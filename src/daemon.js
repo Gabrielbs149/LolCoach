@@ -2,6 +2,7 @@ import { LcuClient } from './lcu/client.js';
 import { carregarConfig } from './config.js';
 import { autoAceitar } from './features/auto-aceitar.js';
 import { autoChampSelect } from './features/champ-select.js';
+import { criarSkins } from './features/skins.js';
 import { abrirBanco } from './dados/banco.js';
 import { coletarPendentes } from './dados/coletor.js';
 import { readFile, writeFile, mkdir, readdir, rm, appendFile } from 'node:fs/promises';
@@ -443,8 +444,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
   // Últimas runas aplicadas na seleção — a voz anuncia (pedra angular e árvores).
   let ultimasRunas = null;
+  const skins = criarSkins({ config, salvarConfig, log, lcu });
   autoChampSelect(lcu, config, {
     log, permite,
+    aoSkin: (campeao) => { if (permite('skins')) skins.aplicar(campeao).catch((e) => log(`skins: ${e.message}`)); },
     aoRunas: async ({ campeao, build }) => {
       try {
         const [{ tabelaDeRunas }, { ESTILO }] = await Promise.all([import('./dados/ddragon.js'), import('./vivo/falas.js')]);
@@ -560,6 +563,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (faseAnterior === 'EndOfGame' || (faseAnterior === 'InProgress' && fase === 'None')) coletar();
     // Acabou: resumo do que o olho viu e falou, pra conferir no registro.
     if (faseAnterior === 'InProgress' && fase !== 'InProgress') encerrarPartidaVivo();
+    if (['None', 'Lobby', 'EndOfGame'].includes(fase)) skins.parar().catch(() => {});
     if (fase !== 'InProgress' && fase !== 'GameStart') sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };
     faseAnterior = fase;
   });
@@ -2033,6 +2037,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
+    skinsEstado: () => skins.estado(), skinsInstalar: () => skins.instalar(), skinsImportar: (o) => skins.importar(o), skinsRemover: (o) => skins.remover(o), skinsEscolher: (o) => skins.escolher(o), skinsTestar: (o) => skins.aplicar(o.campeao), skinsParar: () => skins.parar(),
     adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, avaliarUltima, overlayTamanho, situacoesResumo,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
@@ -2080,5 +2085,6 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
+  'skinsEstado', 'skinsInstalar', 'skinsImportar', 'skinsRemover', 'skinsEscolher', 'skinsTestar', 'skinsParar',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
 ];

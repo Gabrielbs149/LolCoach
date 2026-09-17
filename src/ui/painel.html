@@ -912,6 +912,8 @@ h2{letter-spacing:1px}
     <div class="grupo">Jogo</div>
     <button data-aba="builds" title="Builds">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
+    <button data-aba="skins" title="Skins">
+      <svg viewBox="0 0 24 24"><path d="M12 3l2.5 4.5L20 9l-4 4 1 5.5-5-2.6-5 2.6 1-5.5-4-4 5.5-1.5z"/></svg><span class="nome">Skins</span></button>
     <button data-aba="patch" title="Patch">
       <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
     <div class="grupo">App</div>
@@ -1033,6 +1035,14 @@ h2{letter-spacing:1px}
       </div>
       <div id="bCorpo"><div class="vazio">escolha um campeão</div></div>
     </div>
+  </section>
+
+  <section id="skins">
+    <div class="titulo">Skins só pra você</div>
+    <div class="aviso" style="margin-bottom:10px">Skin customizada: só você vê, ninguém mais. Quem aplica é o <b>cslol-manager</b> (código aberto), baixado do GitHub dele — o LolCoach só organiza e liga na hora que você trava o campeão. A Riot diz que não pune skin customizada, mas é modificação do cliente do jogo: use por sua conta.</div>
+    <div id="skTopo"></div>
+    <div id="skImport" style="margin:10px 0"></div>
+    <div id="skLista"></div>
   </section>
 
   <section id="patch">
@@ -2562,7 +2572,7 @@ async function estilosZerar(){ aplicarEstilos({}); await salvarControle({ estilo
  * vale pra todos. Só aparece pra quem tem admin: true no config.
  */
 let admDados = null;
-const FUNCOES_ADM = [['aceitar','Aceitar fila'],['escolher','Travar campeão'],['banir','Banir'],['runas','Runas'],['builds','Builds'],['amigos','Amigos']];
+const FUNCOES_ADM = [['aceitar','Aceitar fila'],['escolher','Travar campeão'],['banir','Banir'],['runas','Runas'],['builds','Builds'],['amigos','Amigos'],['skins','Skins (cslol)']];
 
 async function carregarAdmin(forcar = false){
   if(!admDados || forcar) $('#admUsuarios').innerHTML = carregando('lendo o repositório de controle…');
@@ -3162,8 +3172,47 @@ async function tick(){
  * abertura do app atrasaria a única tela que a maioria quer ver.
  */
 const CARREGADORES = {
-  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin,
+  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, skins: carregarSkins,
 };
+/* =================================================================== skins */
+let skDados = null;
+async function carregarSkins(){
+  $('#skTopo').innerHTML = carregando();
+  skDados = await pegar('/api/skins');
+  desenharSkins();
+}
+function desenharSkins(){
+  const d = skDados; if(!d) return;
+  if(d.erro){ $('#skTopo').innerHTML = `<div class="vazio">${esc(d.erro)}</div>`; return; }
+  $('#skTopo').innerHTML = `<div class="cartoes">
+    ${cartao('cslol-tools', d.instalado ? `<span class="v">instalado</span>` : `<span class="d">não instalado</span>`, d.versao ? 'versão ' + esc(d.versao) : (d.instalando ? 'baixando…' : 'necessário pra aplicar'))}
+    ${cartao('Pasta do jogo', d.jogo ? '<span class="v">achada</span>' : '<span class="d">não achei</span>', d.jogo ? esc(d.jogo) : 'abre o League uma vez')}
+    ${cartao('Patcher', d.patcher ? `<span class="v">ligado</span>` : 'parado', d.patcher ? esc(d.patcher.mod) : 'sobe sozinho quando você trava o campeão')}
+  </div>
+  <div style="margin-top:8px"><label style="margin-right:12px"><input type="checkbox" ${d.ativo ? 'checked' : ''} onchange="skLigar(this.checked)"> aplicar skin ao travar o campeão</label>${d.instalado ? `<button class="acao" onclick="skAcao('/api/skins/instalar')">Atualizar cslol-tools</button>` : `<button class="acao" onclick="skAcao('/api/skins/instalar')" ${d.instalando ? 'disabled' : ''}>Instalar cslol-tools (≈37 MB)</button>`}
+  ${d.patcher ? ` <button class="acao" onclick="skAcao('/api/skins/parar')">Parar patcher</button>` : ''}</div>`;
+  $('#skImport').innerHTML = `<label class="acao" style="cursor:pointer">Importar skin (.fantome / .zip)<input type="file" accept=".fantome,.zip" multiple hidden onchange="skImportar(this.files)"></label>
+    <span class="dica" style="margin-left:8px">baixe a skin em sites de custom skins (formato fantome) e importe aqui; o campeão é reconhecido sozinho</span>`;
+  const por = d.porCampeao ?? {};
+  $('#skLista').innerHTML = d.mods.length ? `<table class="admTabela"><thead><tr><th>Skin</th><th>Campeão</th><th>Autor</th><th>Usar</th><th></th></tr></thead><tbody>${d.mods.map(m => `<tr>
+      <td><b>${esc(m.titulo)}</b>${m.descricao ? `<div class="sub">${esc(String(m.descricao).slice(0, 90))}</div>` : ''}</td>
+      <td>${m.campeoes.map(c => `<span>${(() => { const k = String(c).toLowerCase().replace(/[^a-z]/g, ""); const cc = listaCampeoes.find(x => String(x.nome).toLowerCase().replace(/[^a-z]/g, "") === k); return cc ? icone(cc.id) : ""; })()} ${esc(c)}</span>`).join(', ') || '<span class="sub">?</span>'}</td>
+      <td class="sub">${esc(m.autor ?? '—')}</td>
+      <td>${m.campeoes.map(c => `<label style="display:block"><input type="checkbox" ${por[c] === m.nome ? 'checked' : ''} onchange="skAcao('/api/skins/escolher?campeao=${encodeURIComponent(c)}&mod=' + (this.checked ? encodeURIComponent('${esc(m.nome)}') : ''))"> ${esc(c)}</label>`).join('') || '—'}</td>
+      <td><button class="acao" onclick="skAcao('/api/skins/testar?campeao=${encodeURIComponent(m.campeoes[0] ?? '')}')" title="monta o overlay e sobe o patcher agora (pra testar no treino)">Testar</button> <button class="acao" onclick="if(confirm('Apagar ${esc(m.titulo)}?')) skAcao('/api/skins/remover?mod=${encodeURIComponent(m.nome)}')">Apagar</button></td>
+    </tr>`).join('')}</tbody></table>` : '<div class="vazio">nenhuma skin importada ainda</div>';
+}
+async function skLigar(ativo){ try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skins: { ...(skDados ?? {}), ativo, mods: undefined, patcher: undefined, instalado: undefined, versao: undefined, instalando: undefined } }) }); } catch(e){ alert(e.message); } skDados = await pegar('/api/skins'); desenharSkins(); }
+async function skAcao(url){
+  try { const r = await fetch(url, { method: 'POST' }).then(r => r.json()); if(r?.erro) alert(r.erro); } catch(e){ alert(e.message); }
+  skDados = await pegar('/api/skins'); desenharSkins();
+}
+async function skImportar(files){
+  for (const f of files) {
+    try { const r = await fetch('/api/skins/importar?nome=' + encodeURIComponent(f.name), { method: 'POST', body: await f.arrayBuffer() }).then(r => r.json()); if(r?.erro) alert(f.name + ': ' + r.erro); } catch(e){ alert(e.message); }
+  }
+  skDados = await pegar('/api/skins'); desenharSkins();
+}
 const jaCarregou = new Set();
 
 const abrirAbaOriginal = abrirAba;
