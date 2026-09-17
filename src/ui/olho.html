@@ -32,6 +32,7 @@ const Q = new URLSearchParams(location.search);
 const TESTE = Q.get('teste') === '1';
 const SO_TELA = Q.get('tela') === '1';
 const FINGIR = Q.get('fingir') === '1';   // captura de verdade, inimigos de mentira (teste com ?tela=1 aberto)
+const AMOSTRA = Q.get('amostra');         // ?amostra=/caminho/0425.png — roda a leitura numa foto gravada (e o .json do lado dá quem está na partida)
 const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
 const N = 48;                          // grade da calibração do minimapa
 const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.76, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.74, MARGEM = 0.04;
@@ -82,6 +83,13 @@ const tela = document.getElementById('tela');
 let W = 0, H = 0, fonte = null;          // fonte: o que desenhar (video ou canvas de teste)
 async function abrirCaptura() {
   if (TESTE) { fonte = telaFalsa(1920, 1080); W = 1920; H = 1080; return; }
+  if (AMOSTRA) {
+    // a foto do minimapa colada no canto de uma tela 1920×1080 (onde o jogo desenha o minimapa)
+    const img = new Image(); img.src = AMOSTRA; await new Promise((ok, erro) => { img.onload = ok; img.onerror = erro; });
+    const c = telaFalsa(1920, 1080); const x = c.getContext('2d'); x.fillStyle = '#000'; x.fillRect(0, 0, 1920, 1080);
+    x.drawImage(img, 1920 - img.width - 16, 1080 - img.height - 16);
+    fonte = c; W = 1920; H = 1080; return;
+  }
   const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 20 } }, audio: false });
   video.srcObject = stream;
   await new Promise((ok) => { video.onloadedmetadata = ok; });
@@ -386,6 +394,19 @@ function confirmar(rgba, s, tpl, x, y) {
     const q = (py * s + px) * 4; r += rgba[q]; g += rgba[q + 1]; b += rgba[q + 2]; n++;
   }
   melhor.anelVermelho = n > 0 && r / n > 90 && r / n > (g / n) * 1.6 && r / n > (b / n) * 1.4;
+  // O MEU ícone tem um anel teal (~116,152,175) logo na borda (medido: 70% dos pixels a raio d/2; 0% nos outros)
+  const teal = (r, g, b) => b > 150 && g > 130 && r > 95 && r < 150 && b > r * 1.25;
+  let melhorTeal = 0;
+  for (const raio of [tw / 2 - 1, tw / 2, tw / 2 + 1]) {
+    let k = 0, nn = 0;
+    for (let a = 0; a < 360; a += 8) {
+      const px = Math.round(cx + Math.cos(a / 57.3) * raio), py = Math.round(cy + Math.sin(a / 57.3) * raio);
+      if (px < 0 || py < 0 || px >= s || py >= s) continue;
+      const q = (py * s + px) * 4; nn++; if (teal(rgba[q], rgba[q + 1], rgba[q + 2])) k++;
+    }
+    if (nn) melhorTeal = Math.max(melhorTeal, k / nn);
+  }
+  melhor.anelTeal = melhorTeal;
   return melhor;
 }
 
@@ -468,6 +489,7 @@ async function quadro() {
     if (meuCampeao) {
       const t = await template(meuCampeao, d);
       if (t) { const p = procurar(m, rgba, s, t, 'eu', agora, rodada % 4 === 0); if (p) eu = p; }
+      if (!eu && rodada % 4 === 2) for (const dd of [d - 2, d + 2]) { const t2 = await template(meuCampeao, dd); if (!t2) continue; const p = procurar(m, rgba, s, t2, 'eu', agora, true); if (p && (!eu || p.score > eu.score)) eu = p; }
     }
     // Câmera travada? Enquanto o ícone aparece, mede se o retângulo fica em cima dele.
     // Se sim (≥ 70% das vezes), o retângulo vira a sua posição quando o ícone some.
@@ -549,7 +571,7 @@ async function quadro() {
       log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · eu ${eu ? (eu.fonte === 'camera' ? 'câmera' : 'ícone') : 'não'} (câmera travada ${camTravada.n ? Math.round(100 * camTravada.ok / camTravada.n) + '%' : '?'}) · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
       melhoresDoQuadro.clear();
     }
-    if (!TESTE && agora - ultimaFoto > 30000 && fotos < 40) {
+    if (!TESTE && !AMOSTRA && agora - ultimaFoto > 30000 && fotos < 40) {
       ultimaFoto = agora; fotos++;
       const meta = { t: agora, s, d, inimigos: inimigos.map((j) => j.campeao), eu: meuCampeao, vistos: limpos, manchas: vermelhos };
       tela.toBlob((blob) => { if (blob) fetch('/api/olho/foto?meta=' + encodeURIComponent(JSON.stringify(meta)), { method: 'POST', body: blob }).catch(() => {}); }, 'image/png');
@@ -598,13 +620,14 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
       cand = cand.concat(buscar(m, t, { x0: cx - r, y0: cy - r, x1: cx + r, y1: cy + r }, 1));
     }
   }
-  if (podeCheia) cand = cand.concat(buscar(m, t, null, 3, 1));
+  if (podeCheia) cand = cand.concat(buscar(m, t, null, chave === 'eu' ? 8 : 3, 1));   // eu: mais candidatos (seta/linha por cima derruba a nota em meia-resolução)
   // confirma em cor todos os candidatos razoáveis e fica com o melhor
   let melhor = null;
   for (const c of cand) {
     if (c.score < LIMIAR_MEIO) continue;
     const ok = confirmar(rgba, s, t, c.x * 2, c.y * 2);
     if (ok.anelVermelho) ok.score += 0.08;
+    if (chave === 'eu' && ok.anelTeal >= 0.4) ok.score += 0.15;   // anel teal = sou eu mesmo com seta/linha por cima
     if (!melhor || ok.score > melhor.score) melhor = ok;
   }
   if (melhor) melhoresDoQuadro.set(chave, Math.round(melhor.score * 100) / 100);
@@ -621,7 +644,7 @@ function enviar(dados) {
   const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.wards && [dados.wards.nossas.length, dados.wards.deles.length, dados.wards.nossas.map((w) => Math.round(w.x * 50 + w.y * 5000))], dados.waves && Object.values(dados.waves).map((w) => Math.round((w.frente ?? -1) * 20)), dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
   if (chave === ultimoEnvio && agora - ultimoEnvioEm < 1000) return;
   ultimoEnvio = chave; ultimoEnvioEm = agora;
-  if (TESTE || FINGIR) { log(`${dados.vistos.map((v) => `${v.campeao} ${v.x.toFixed(2)},${v.y.toFixed(2)} (${v.score})`).join(' · ') || 'ninguém'}${dados.eu ? ` | eu ${dados.eu.x.toFixed(2)},${dados.eu.y.toFixed(2)}` : ''}`); return; }
+  if (TESTE || FINGIR || AMOSTRA) { log(`${dados.vistos.map((v) => `${v.campeao} ${v.x.toFixed(2)},${v.y.toFixed(2)} (${v.score})`).join(' · ') || 'ninguém'}${dados.eu ? ` | eu ${dados.eu.x.toFixed(2)},${dados.eu.y.toFixed(2)}` : ''}`); return; }
   fetch('/api/olho', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...dados, t: agora }) }).catch(() => {});
 }
 
@@ -672,6 +695,12 @@ async function desenharFalsa(t) {
   if (TESTE) {
     const t0 = Date.now();
     setInterval(async () => { const r = await desenharFalsa(Date.now() - t0); window.esperado = r; }, INTERVALO);
+  } else if (AMOSTRA) {
+    const meta = await fetch(AMOSTRA.replace(/\.png$/, '.json')).then((r) => r.json());
+    meuCampeao = meta.eu; meuTime = (meta.jogadores ?? []).find((j) => j.campeao === meta.eu)?.time ?? 100;
+    inimigos = (meta.jogadores ?? []).filter((j) => j.time !== meuTime).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
+    aliados = (meta.jogadores ?? []).filter((j) => j.time === meuTime && j.campeao !== meuCampeao).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
+    log(`amostra: eu ${meuCampeao}, ${inimigos.length} inimigos, ${aliados.length} aliados`);
   } else if (!FINGIR) { await lerPartida(); setInterval(lerPartida, 2000); }
   // Ritmo adaptável: quadro pesado (muitos ícones) → espera mais, pra não roubar CPU do jogo.
   let intervalo = INTERVALO;
