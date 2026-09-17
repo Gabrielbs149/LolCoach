@@ -130,10 +130,18 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     return s;
   };
   const lugarTxt = (p) => lugar(p.x, p.y, meuTime).texto;
-  const laneAlvo = (f) => {                         // pra onde ele vai, se for pra uma lane (duas leituras seguidas concordando)
+  // Distância até a lane (mapa normalizado): bot corre pela borda de baixo e pela direita, top pela
+  // esquerda e por cima, mid é a diagonal. Medido na partida de 17/09: "indo pro bot" dito com o cara
+  // a 0,36 de distância (na jungle dele, limpando raptor) errou 9 de 11; de perto (rio, ≤ 0,3) acertou.
+  const distLane = (q, lane) => {
+    if (lane === 'mid') return Math.abs(q.x + q.y - 1) / Math.SQRT2;
+    if (lane === 'bot') return Math.min(q.x >= 0.3 ? Math.abs(0.92 - q.y) : 9, q.y >= 0.3 ? Math.abs(0.92 - q.x) : 9, dist(q, { x: 0.92, y: 0.92 }));
+    return Math.min(q.x <= 0.7 ? Math.abs(0.08 - q.y) : 9, q.y <= 0.7 ? Math.abs(0.08 - q.x) : 9, dist(q, { x: 0.08, y: 0.08 }));
+  };
+  const laneAlvo = (f) => {                         // pra onde ele vai, se for pra uma lane (duas leituras seguidas concordando, e já perto: ≤ 0,3 ≈ 12 s)
     const p = projecao(f, t, 12);
     const l = p ? lugar(p.x, p.y, meuTime) : null;
-    const lane = l && ['top', 'mid', 'bot'].includes(l.lane) && l.lane !== f.regiao?.lane ? l.lane : null;
+    const lane = l && ['top', 'mid', 'bot'].includes(l.lane) && l.lane !== f.regiao?.lane && distLane(f.ultimo, l.lane) <= 0.3 ? l.lane : null;
     const ok = lane && f.alvoAntes === lane;
     f.alvoAntes = lane;
     return ok ? l : null;
@@ -408,7 +416,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   if (meuJg && minhaPos && visivel(meuJg, t)) {
     const s = seg(dist(meuJg.ultimo, minhaPos));
     const v = velocidade(meuJg, t), vindo = v ? dist({ x: meuJg.ultimo.x + v.vx * 3, y: meuJg.ultimo.y + v.vy * 3 }, minhaPos) < dist(meuJg.ultimo, minhaPos) : false;
-    if (s <= 12 && vindo && minhaLane !== 'jungle') situ('meu-jg-vindo', { tipo: 'aliado', prioridade: 2, modulo: 'jungler', serio: F`Seu jungler a ${s} segundos, vindo. Prepara.`, divertido: F`Seu jungler chegando em ${s} segundos. Prepara o CC.`, cooldown: 45 });
+    if (s <= 12 && vindo && minhaLane !== 'jungle') situ('meu-jg-vindo', { tipo: 'aliado', prioridade: 2, modulo: 'jungler', serio: F`Seu jungler a ${s} segundos, vindo. Prepara.`, divertido: F`Seu jungler chegando em ${s} segundos. Prepara o CC.`, cooldown: 90 });
     else if (s >= 28 && minhaLane !== 'jungle') situ('meu-jg-longe', { tipo: 'aliado', prioridade: 0, modulo: 'jungler', serio: F`Seu jungler longe (${s} segundos). Não troca de graça.`, cooldown: 120 });
   }
   {
