@@ -46,12 +46,28 @@ header>*{position:relative}
 .numeros div b{font-size:15px;font-variant-numeric:tabular-nums;font-weight:700;
   letter-spacing:-.3px;line-height:1.3}
 
-.voz{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 10px;background:var(--f1);border-bottom:1px solid var(--borda);font-size:11.5px;flex:0 0 auto}
-.voz button{background:var(--f2);border:1px solid var(--borda);color:var(--fraco);font:inherit;font-size:11.5px;padding:4px 9px;border-radius:var(--r-s);cursor:pointer}
-.voz button.on{border-color:var(--ouro);color:var(--ouro-claro);background:#241f16}
-.voz .modo{display:flex;gap:0} .voz .modo button{border-radius:0} .voz .modo button:first-child{border-radius:var(--r-s) 0 0 var(--r-s)} .voz .modo button:last-child{border-radius:0 var(--r-s) var(--r-s) 0}
-.voz .modulos{display:flex;gap:4px;flex-wrap:wrap} .voz .modulos button{padding:3px 7px;font-size:10.5px}
-.voz input[type=range]{width:70px;accent-color:var(--ouro)}
+/* ---- barra da voz: um player ---- */
+.voz{display:flex;flex-direction:column;gap:0;background:linear-gradient(180deg,var(--f2),var(--f1));border-bottom:1px solid var(--borda);flex:0 0 auto}
+.voz .linha{display:flex;align-items:center;gap:12px;padding:10px 14px}
+.voz .play{width:46px;height:46px;border-radius:50%;border:2px solid var(--vit);background:radial-gradient(circle at 35% 35%,#2e6a4c,#153a29);color:#dff7ea;font-size:18px;cursor:pointer;display:grid;place-items:center;box-shadow:0 0 0 4px rgba(49,176,115,.12);transition:transform .1s,box-shadow .2s;flex:0 0 auto}
+.voz .play:hover{transform:scale(1.05)}
+.voz .play.off{border-color:var(--der);background:radial-gradient(circle at 35% 35%,#6a2e2e,#3a1515);color:#fde3e3;box-shadow:0 0 0 4px rgba(224,85,85,.12)}
+.voz .estado{display:flex;flex-direction:column;gap:2px;min-width:92px}
+.voz .estado b{font-size:13px;color:var(--texto)} .voz .estado small{font-size:10.5px;color:var(--apagado)}
+.voz .vol{display:flex;align-items:center;gap:8px;flex:1;min-width:140px}
+.voz .vol i{font-style:normal;font-size:14px;color:var(--fraco);width:18px;text-align:center}
+.voz .vol input[type=range]{flex:1;-webkit-appearance:none;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--ouro) var(--pct,90%),var(--f3) var(--pct,90%));outline:none;cursor:pointer}
+.voz .vol input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:var(--ouro-claro);border:2px solid var(--f0);box-shadow:0 0 0 2px var(--ouro-escuro)}
+.voz .vol em{font-style:normal;font-size:11px;color:var(--fraco);width:34px;text-align:right;font-variant-numeric:tabular-nums}
+.voz .modo{display:flex;background:var(--f0);border:1px solid var(--borda);border-radius:999px;padding:2px}
+.voz .modo button{background:transparent;border:0;color:var(--fraco);font:inherit;font-size:11px;padding:4px 10px;border-radius:999px;cursor:pointer}
+.voz .modo button.on{background:var(--ouro-escuro);color:#fff7e6}
+.voz .mini{background:transparent;border:1px solid var(--borda);color:var(--fraco);font:inherit;font-size:11px;padding:4px 9px;border-radius:var(--r-s);cursor:pointer}
+.voz .mini.on{border-color:var(--ouro);color:var(--ouro-claro)}
+.voz .modulos{display:none;flex-wrap:wrap;gap:6px;padding:0 14px 10px}
+.voz .modulos.aberto{display:flex}
+.voz .modulos button{background:var(--f2);border:1px solid var(--borda);color:var(--apagado);font:inherit;font-size:10.5px;padding:3px 9px;border-radius:999px;cursor:pointer}
+.voz .modulos button.on{border-color:var(--ouro);color:var(--ouro-claro);background:#241f16}
 .selecao{padding:14px}
 .selecao h1{font-size:16px;margin:0 0 10px;color:var(--ouro-claro)}
 .selecao .times{display:grid;grid-template-columns:1fr 1fr;gap:10px}
@@ -195,11 +211,15 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
 </head>
 <body>
 <div class="voz" id="voz">
-  <button id="vozLiga" onclick="vozAlternar()" title="ligar/desligar a voz">🔊 Voz</button>
-  <div class="modo"><button id="modoSerio" onclick="vozModo('serio')">Sério</button><button id="modoDiv" onclick="vozModo('divertido')">Divertido</button></div>
+  <div class="linha">
+    <button class="play" id="vozLiga" onclick="vozAlternar()" title="parar / voltar a ouvir">■</button>
+    <div class="estado"><b id="vozEstado">Ouvindo</b><small id="vozSub">a voz fala na partida</small></div>
+    <div class="vol"><i id="vozIcone">🔊</i><input type="range" min="0" max="1" step="0.05" id="vozVolume" title="volume" oninput="vozVolumeMudar(this.value)"><em id="vozPct">90%</em></div>
+    <div class="modo"><button id="modoSerio" onclick="vozModo('serio')">Sério</button><button id="modoDiv" onclick="vozModo('divertido')">Divertido</button></div>
+    <button class="mini" id="vozFiltros" onclick="vozFiltros()" title="o que a voz fala">Filtros ▾</button>
+    <button class="mini" onclick="falar('Voz do LolCoach ligada.', true)" title="ouvir um teste">testar</button>
+  </div>
   <div class="modulos" id="vozModulos"></div>
-  <input type="range" min="0" max="1" step="0.05" id="vozVolume" title="volume" oninput="vozVolumeMudar(this.value)">
-  <button onclick="falar('Voz do LolCoach ligada.', true)" title="testar">▶</button>
 </div>
 <div id="tudo" style="display:flex;flex-direction:column;height:100%">
   <div class="vazio"><div class="anel"></div><b>Esperando a partida</b>
@@ -268,10 +288,22 @@ function falarWindows(texto){
 }
 function vozAlternar(){ voz.ligada = !voz.ligada; if(!voz.ligada){ speechSynthesis.cancel(); filaMp3.length = 0; tocando?.pause(); tocando = null; } vozSalvar(); desenharVoz(); }
 function vozModo(m){ voz.modo = m; vozSalvar(); desenharVoz(); falar(m === 'serio' ? 'Modo sério.' : 'Modo divertido ligado. Bora zoar.', true); }
-function vozVolumeMudar(v){ voz.volume = Number(v); vozSalvar(); }
+function vozVolumeMudar(v){ voz.volume = Number(v); vozSalvar(); desenharVoz(); }
 function vozModulo(k){ voz.modulos[k] = !voz.modulos[k]; vozSalvar(); desenharVoz(); }
+function vozFiltros(){ $('#vozModulos').classList.toggle('aberto'); $('#vozFiltros').classList.toggle('on', $('#vozModulos').classList.contains('aberto')); }
 function desenharVoz(){
-  $('#vozLiga').classList.toggle('on', voz.ligada);
+  const liga = $('#vozLiga');
+  liga.classList.toggle('off', !voz.ligada);
+  liga.textContent = voz.ligada ? '■' : '▶';
+  liga.title = voz.ligada ? 'parar de ouvir' : 'voltar a ouvir';
+  $('#vozEstado').textContent = voz.ligada ? 'Ouvindo' : 'Parada';
+  $('#vozSub').textContent = voz.ligada ? (voz.modo === 'divertido' ? 'modo divertido' : 'modo sério') : 'aperta ▶ pra voltar';
+  const pct = Math.round(voz.volume * 100);
+  $('#vozPct').textContent = pct + '%';
+  $('#vozVolume').style.setProperty('--pct', pct + '%');
+  $('#vozIcone').textContent = !voz.ligada || pct === 0 ? '🔇' : pct < 40 ? '🔈' : pct < 75 ? '🔉' : '🔊';
+  const desligados = MODULOS.filter(([k]) => !voz.modulos[k]).length;
+  $('#vozFiltros').textContent = desligados ? `Filtros (${desligados} off) ▾` : 'Filtros ▾';
   $('#modoSerio').classList.toggle('on', voz.modo === 'serio');
   $('#modoDiv').classList.toggle('on', voz.modo === 'divertido');
   $('#vozVolume').value = voz.volume;
