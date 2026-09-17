@@ -575,7 +575,7 @@ async function quadro() {
     // melhores manchas primeiro; cada campeão só pode estar num lugar
     manchasAvaliadas.sort((a, b) => b.notas[0].score - a.notas[0].score);
     for (const { notas } of manchasAvaliadas) {
-      const livres = notas.filter((n) => !tomados.has(n.nome));
+      const livres = comHisterese(notas.filter((n) => !tomados.has(n.nome)), '', agora);
       if (!livres.length) continue;
       const [a, b] = livres;
       melhoresDoQuadro.set(a.nome, Math.max(melhoresDoQuadro.get(a.nome) ?? -1, Math.round(a.score * 100) / 100));
@@ -621,6 +621,14 @@ async function quadro() {
 }
 /** Procura um ícone: perto de onde estava, senão (se pode) no minimapa todo. Devolve posição 0..1. */
 /** Em cada mancha, o campeão mais parecido (entre os templates) leva, se ganhar com margem. */
+/** Quem já era seguido aqui há < 2,5 s fica com o lugar, salvo se o outro ganhar por 0,06+ (mata a troca Pantheon↔Fizz). */
+function comHisterese(livres, prefixo, agora) {
+  if (livres.length < 2) return livres;
+  const [a] = livres;
+  const dono = livres.find((n) => { const r = rastros.get(prefixo + n.nome); return r && agora - r.em < 2500 && Math.hypot(r.x - n.x, r.y - n.y) < 8; });
+  if (dono && dono !== a && a.score - dono.score < 0.06) return [dono, ...livres.filter((n) => n !== dono)];
+  return livres;
+}
 function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora, classe = null) {
   const saida = [], tomados = tomadosFora ?? new Set(), avaliadas = [];
   for (const p of manchas) {
@@ -638,7 +646,7 @@ function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora, classe = nu
   }
   avaliadas.sort((a, b) => b[0].score - a[0].score);
   for (const notas of avaliadas) {
-    const livres = notas.filter((n) => !tomados.has(n.nome));
+    const livres = comHisterese(notas.filter((n) => !tomados.has(n.nome)), classe === 'aliado' ? 'ali-' : '', Date.now());
     if (!livres.length) continue;
     const [a, b] = livres;
     if (a.score < LIMIAR_MANCHA || (b && b.score > a.score - MARGEM && a.score < 0.85)) continue;
