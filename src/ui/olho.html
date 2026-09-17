@@ -282,7 +282,7 @@ function retanguloCamera(rgba, s) {
   if (a.n >= s * 0.24) return { x: (a.x1 + a.x2) / 2 / s, y: Math.min(1, Math.max(0, (a.y + (a.y < s / 2 ? s * 0.078 : -s * 0.078)) / s)), w: a.n / s, h: 0.156, cortado: true };
   return null;
 }
-let camTravada = { ok: 0, n: 0 }, ultimaCam = null;
+let camTravada = { ok: 0, n: 0 }, ultimaCam = null, placarAvisado = false;
 const posAnterior = new Map();   // último lugar confirmado de cada ícone (pra ver pulo de flash)
 // O que é vermelho/azul sempre no mesmo pixel é torre/inibidor, não minion: máscara temporal.
 let fixoR = null, fixoA = null, fixoS = 0;
@@ -369,6 +369,170 @@ async function template(nome, d) {
   templates.set(chave, t);
   return t;
 }
+/**
+ * Placar (Tab): quando o placar está aberto, o ícone do Flash de cada um dos
+ * 10 aparece — e o de quem gastou fica ESCURO com o contador em cima. Isso é
+ * público, só não tinha ninguém lendo. Procura o ícone do Flash no meio da
+ * tela; 6+ achados em duas colunas = placar aberto. Pra cada achado: brilho
+ * relativo ao ícone original (escuro = em recarga) e quantidade de pixels
+ * brancos no meio (o número). As linhas da coluna da direita são os inimigos
+ * na ordem do placar (top, jungle, mid, adc, sup).
+ */
+let flashTpls = null, flashImg = null, fotosPlacar = 0, ultimaFotoPlacar = 0, placarCanvas = null;
+async function templateDeImagem(img, d, nome) {
+  const c = new OffscreenCanvas(d, d); const x = ctxDe(c); x.drawImage(img, 0, 0, d, d);
+  const rgba = x.getImageData(0, 0, d, d).data;
+  const idxC = [], valC = [];
+  for (let j = 1; j < d - 1; j++) for (let i = 1; i < d - 1; i++) { idxC.push(j * d + i); const k = (j * d + i) * 4; valC.push(rgba[k], rgba[k + 1], rgba[k + 2]); }
+  const g = cinzaDe(rgba, d, d); const m = meia(g, d, d);
+  const idxM = [], valM = [];
+  for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) { idxM.push([i, j]); valM.push(m.g[j * m.w + i]); }
+  const miolo = []; for (let j = 3; j < d - 3; j++) for (let i = 3; i < d - 3; i++) miolo.push(g[j * d + i]);
+  miolo.sort((p, q) => p - q);
+  return { nome, d, brilhoMediana: miolo[Math.floor(miolo.length / 2)], cheia: { w: d, idx: idxC, ...zeroMedia(Float32Array.from(valC)) }, meiaRes: { w: m.w, idx: idxM, ...zeroMedia(Float32Array.from(valM)) } };
+}
+/** NCC em cor (resolução cheia) do template quadrado em volta de (x, y) num pedaço w×h. */
+function nccCor(rgba, w, h, tpl, x, y) {
+  const { w: tw, idx, z, norma } = tpl.cheia;
+  let melhor = { score: -1, x, y };
+  const vals = new Float32Array(idx.length * 3);
+  for (let py = y - 3; py <= y + 3; py++) for (let px = x - 3; px <= x + 3; px++) {
+    if (px < 0 || py < 0 || px + tw > w || py + tw > h) continue;
+    for (let k = 0; k < idx.length; k++) {
+      const q = (((py + (idx[k] / tw | 0)) * w) + px + (idx[k] % tw)) * 4;
+      vals[3 * k] = rgba[q]; vals[3 * k + 1] = rgba[q + 1]; vals[3 * k + 2] = rgba[q + 2];
+    }
+    const score = ncc(vals, { z, norma });
+    if (score > melhor.score) melhor = { score, x: px, y: py };
+  }
+  return melhor;
+}
+async function lerPlacar(agora) {
+  if (!flashImg) { flashImg = await carregar('/feitico/4').catch(() => null); if (!flashImg) return null; }
+  if (!flashTpls) flashTpls = await Promise.all([0.022, 0.026].map((f) => templateDeImagem(flashImg, Math.round(H * f), 'flash' + f)));
+  // só o miolo da tela, onde o placar fica
+  const x0 = Math.round(W * 0.12), y0 = Math.round(H * 0.15), w = Math.round(W * 0.76), h = Math.round(H * 0.7);
+  // canvas próprio: o 'tela' é do minimapa e vira a foto de amostra no fim do quadro
+  placarCanvas ??= new OffscreenCanvas(w, h); if (placarCanvas.width !== w || placarCanvas.height !== h) { placarCanvas.width = w; placarCanvas.height = h; }
+  const pc = ctxDe(placarCanvas); pc.drawImage(fonte, x0, y0, w, h, 0, 0, w, h);
+  const rgba = pc.getImageData(0, 0, w, h).data;
+  const g = cinzaDe(rgba, w, h); const m = meia(g, w, h);
+  // 1. Flashes CLAROS (cinza ≥ 0,55 e cor ≥ 0,55): são as âncoras da grade
+  let melhor = null;
+  for (const t of flashTpls) {
+    const cand = buscar(m, t, null, 14, 2).filter((c) => c.score >= 0.55).map((c) => ({ ...c, cor: nccCor(rgba, w, h, t, c.x * 2, c.y * 2).score })).filter((c) => c.cor >= 0.55);
+    if (!melhor || cand.length > melhor.cand.length) melhor = { t, cand };
+  }
+  if (!melhor || melhor.cand.length < 3) return null;
+  const { t, cand } = melhor;
+  const d = t.d, dm = t.meiaRes.w;
+  // foto do placar pro registro (calibrar depois): até 6 por partida, 1 a cada 60 s — antes da grade,
+  // pra ter a foto mesmo quando a grade falha
+  if (!TESTE && !AMOSTRA && fotosPlacar < 6 && agora - ultimaFotoPlacar > 60000) {
+    ultimaFotoPlacar = agora; fotosPlacar++;
+    try {
+      const blob = await placarCanvas.convertToBlob({ type: 'image/png' });
+      fetch('/api/olho/foto?meta=' + encodeURIComponent(JSON.stringify({ placar: true, d, x0, y0, claros: cand.map((c) => ({ x: c.x * 2, y: c.y * 2, score: Math.round(c.score * 100) / 100, cor: Math.round(c.cor * 100) / 100 })) })), { method: 'POST', body: blob }).catch(() => {});
+    } catch { /* sem foto */ }
+  }
+  // 2. Grade (meia res). Layout do placar: cada linha tem os 2 feitiços EMPILHADOS (D em cima, F embaixo,
+  // mesmo x), linhas a cada ~2,9 d. Um lado = uma coluna x. Os claros dizem x de cada lado; os y deles
+  // caem em y_k ou y_k + off (off ≈ d + 3). Testa passo/off/base e fica com o que explica mais claros.
+  const meioM = (W / 2 - x0) / 2;
+  // coluna de cada lado = o maior aglomerado de x (±2) entre os claros; claro fora da coluna é ruído (item dourado etc.)
+  const colX = (lado) => {
+    const xs = cand.filter((c) => (c.x < meioM) === (lado === 'esq')).map((c) => c.x).sort((a, b) => a - b);
+    const gs = []; for (const x of xs) { const g = gs[gs.length - 1]; if (g && x - g[g.length - 1] <= 2) g.push(x); else gs.push([x]); }
+    const g = gs.sort((p, q) => q.length - p.length)[0];
+    return g && g.length >= 2 ? g[Math.floor(g.length / 2)] : null;   // 1 claro só não faz coluna
+  };
+  let xEsq = colX('esq'), xDir = colX('dir');
+  if (xEsq == null && xDir == null) return null;
+  const naColuna = cand.filter((c) => (xEsq != null && Math.abs(c.x - xEsq) <= 2) || (xDir != null && Math.abs(c.x - xDir) <= 2));
+  if (naColuna.length < 3) return null;
+  const ys = [...new Set(naColuna.map((c) => c.y))].sort((a, b) => a - b);
+  const grupos = []; for (const y of ys) { const gr = grupos[grupos.length - 1]; if (gr && y - gr[gr.length - 1] <= 2) gr.push(y); else grupos.push([y]); }
+  const linhasY = grupos.map((gr) => gr[Math.floor(gr.length / 2)]);
+  // passo P: diferenças entre claros do mesmo espaço são múltiplos de P → moda das estimativas
+  const est = [];
+  for (let a = 0; a < linhasY.length; a++) for (let b = a + 1; b < linhasY.length; b++) {
+    const dif = linhasY[b] - linhasY[a]; if (dif < dm * 2.4) continue;
+    const k = Math.round(dif / (dm * 2.9)); if (k >= 1 && Math.abs(dif / k - dm * 2.9) <= dm * 0.5) est.push(Math.round(dif / k));
+  }
+  let P = Math.round(dm * 2.9);
+  if (est.length) { const cont = new Map(); for (const e of est) cont.set(e, (cont.get(e) ?? 0) + 1); P = [...cont].sort((p, q) => q[1] - p[1] || Math.abs(p[0] - dm * 2.9) - Math.abs(q[0] - dm * 2.9))[0][0]; }
+  // off (F abaixo de D): resíduos dos claros que não caem na linha de cima
+  const yMin = linhasY[0];
+  const res = linhasY.map((y) => (y - yMin) % P).filter((r) => r > 2 && r < P - 2);
+  let off = Math.round(dm + 1.5), base = yMin;
+  if (res.length) { const md = res.sort((p, q) => p - q)[Math.floor(res.length / 2)]; if (md <= P / 2) off = md; else { off = P - md; base = yMin - off; } }
+  if (off < dm - 2 || off > dm + 6) return null;
+  const grade = { P, off, base };
+  // Um lado sem Flash claro (todos gastos, ou ninguém com Flash): a coluna dele fica a ~7,7 passos da outra
+  // (medido no placar); varre ±12 px em volta e fica com o x que mais parece Flash somando as 5 linhas
+  if (xEsq == null || xDir == null) {
+    // (a distância escala com o HUD como o passo das linhas: 587 px pra 76 px de passo a 1080p = 7,7 P)
+    const temEsq = xEsq != null, est = Math.round(temEsq ? xEsq + P * 7.72 : xDir - P * 7.72);
+    const slots = padraoPlacar?.[temEsq ? 'dir' : 'esq'] ?? [];
+    let melhorX = null;
+    for (let cx = est - 12; cx <= est + 12; cx++) {
+      let soma = 0;
+      for (let k = 0; k < 5; k++) for (const sl of [0, 1]) {
+        if (slots[k] != null && slots[k] !== sl) continue;   // só o espaço onde o Flash desse jogador está
+        const cy = base + k * P + sl * off; if (cy < 0 || cy + dm > m.h || cx < 0 || cx + dm > m.w) continue;
+        const a = buscar(m, t, { x0: cx, y0: cy - 1, x1: cx, y1: cy + 1 }, 1, 1)[0]; if (a) soma += a.score;
+      }
+      if (!melhorX || soma > melhorX.soma) melhorX = { cx, soma };
+    }
+    if (!melhorX) return null;
+    if (temEsq) xDir = melhorX.cx; else xEsq = melhorX.cx;
+  }
+  // 3. Janela de 5 linhas + qual espaço é o de cima. O daemon já disse em que espaço (D/F) está o Flash
+  // de cada um dos 10 (padraoPlacar); a hipótese (base de cima ou de baixo, janela) que mais casa com isso ganha:
+  // o espaço do Flash tem que parecer Flash (claro ou escuro) e o outro NÃO pode parecer Flash claro.
+  if (!padraoPlacar?.esq || !padraoPlacar?.dir) return null;
+  const medir = (cx, cy) => {
+    if (cy < 0 || cy + dm > m.h || cx < 0 || cx + dm > m.w) return null;
+    const a = buscar(m, t, { x0: cx - 2, y0: cy - 2, x1: cx + 2, y1: cy + 2 }, 1, 1)[0];
+    if (!a) return null;
+    const cor = nccCor(rgba, w, h, t, a.x * 2, a.y * 2);
+    const px = cor.x, py = cor.y;
+    // mediana do brilho (o número branco em cima é minoria e não engana a mediana) + fração de brancos
+    const lums = []; let brancos = 0;
+    for (let jj = 3; jj < d - 3; jj++) for (let ii = 3; ii < d - 3; ii++) {
+      const q = ((py + jj) * w + px + ii) * 4, r = rgba[q], gg = rgba[q + 1], b = rgba[q + 2];
+      lums.push(0.3 * r + 0.59 * gg + 0.11 * b);
+      if (r > 200 && gg > 200 && b > 200) brancos++;
+    }
+    lums.sort((p, q) => p - q);
+    return { x: x0 + px + d / 2, y: y0 + py + d / 2, cinza: Math.round(a.score * 100) / 100, cor: Math.round(cor.score * 100) / 100, brilho: Math.round(lums[Math.floor(lums.length / 2)] / t.brilhoMediana * 100) / 100, brancos: Math.round(brancos / lums.length * 100) / 100 };
+  };
+  const claro = (s) => s && s.cinza >= 0.55 && s.cor >= 0.55;
+  const escuro = (s) => s && s.cinza >= 0.3 && (s.brilho < 0.6 || s.brancos >= 0.08);
+  const ehFlash = (s) => claro(s) || escuro(s);
+  let melhorH = null;
+  for (const b of [grade.base, grade.base - grade.off]) {
+    const linhas = [];
+    for (let k = -2; k <= 6; k++) {
+      const cy = b + k * grade.P;
+      linhas.push({ esq: [medir(xEsq, cy), medir(xEsq, cy + grade.off)], dir: [medir(xDir, cy), medir(xDir, cy + grade.off)] });
+    }
+    for (let i0 = 0; i0 + 5 <= linhas.length; i0++) {
+      let pontos = 0; const saida = { esq: [], dir: [] };
+      for (const lado of ['esq', 'dir']) for (let k = 0; k < 5; k++) {
+        const slot = padraoPlacar[lado][k], l = linhas[i0 + k][lado];
+        if (slot == null) { saida[lado].push(null); continue; }
+        const meu = l[slot], outro = l[1 - slot];
+        if (ehFlash(meu)) pontos++; if (claro(outro)) pontos--;
+        saida[lado].push(meu ? { slot, ...meu, claro: claro(meu), escuro: escuro(meu) } : null);
+      }
+      if (!melhorH || pontos > melhorH.pontos) melhorH = { pontos, base: b, ...saida };
+    }
+  }
+  if (!melhorH || melhorH.pontos < 4) return null;
+  // cada linha: só o espaço do Flash daquele jogador (null = sem Flash / não medido), com claro/escuro decidido aqui
+  return { d, passo: grade.P * 2, off: grade.off * 2, pontos: melhorH.pontos, esq: melhorH.esq, dir: melhorH.dir };
+}
 /** Procura o template (meia res) em `img` = {g, w, h}; devolve os melhores pontos. */
 function buscar(img, tpl, area = null, quantos = 3, passo = 1) {
   const { w: tw, idx, z, norma } = tpl.meiaRes;
@@ -449,7 +613,7 @@ function confirmar(rgba, s, tpl, x, y) {
 }
 
 /* ------------------------------------------------------------- estado */
-let inimigos = [], aliados = [], meuCampeao = null, meuTime = 100;
+let inimigos = [], aliados = [], meuCampeao = null, meuTime = 100, padraoPlacar = null;
 let escala = null;                       // {d, score, confiavel}
 let ultimoEnvio = '', ultimoEnvioEm = 0, ultimaCalibEm = 0;
 const rastros = new Map();               // nome -> {x, y, em} (cheia, dentro do recorte)
@@ -460,6 +624,10 @@ async function lerPartida() {
     if (!d.emJogo) { inimigos = []; meuCampeao = null; return; }
     inimigos = (d.inimigos ?? []).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     meuCampeao = d.estado?.eu?.campeao ?? null; meuTime = d.estado?.eu?.time ?? 100;
+    // Placar: cada lado são 5 linhas na ordem top/jungle/mid/adc/sup; em cada linha o Flash está no D (0) ou no F (1)
+    const slotDe = (j) => { const i = (j.spells ?? []).findIndex((sp) => /flash/i.test(sp ?? '')); return i >= 0 ? i : null; };
+    const lado = (time) => { const ROLES = ['top', 'jungle', 'mid', 'adc', 'sup']; const js = (d.estado?.jogadores ?? []).filter((j) => j.time === time); const l = ROLES.map((r) => js.find((j) => j.role === r)); return l.every(Boolean) && new Set(js.map((j) => j.role)).size === 5 ? l.map(slotDe) : null; };
+    padraoPlacar = { esq: lado(meuTime), dir: lado(meuTime === 100 ? 200 : 100) };
     aliados = (d.estado?.jogadores ?? []).filter((j) => j.time === meuTime && j.campeao !== meuCampeao).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
   } catch { /* daemon ocupado */ }
 }
@@ -606,6 +774,8 @@ async function quadro() {
     if (!eu && !vistosAli.length && !limpos.length) { cegoDesde ||= agora; if (agora - cegoDesde > 15000 && agora - cegoAvisado > 60000) { cegoAvisado = agora; log('cego há 15 s: nada reconhecido no minimapa (outra janela na frente do jogo?)'); } }
     else cegoDesde = 0;
     if (rodada % 10 === 5) wardsVistas = wards(rgba, s, [...limpos, ...vistosAli, ...(eu ? [eu] : [])].map((v) => ({ x: v.x, y: v.y, d })));
+    let placar = null;
+    if (rodada % 5 === 2 && !TESTE && !AMOSTRA) { placar = await lerPlacar(agora).catch(() => null); if (placar && !placarAvisado) { placarAvisado = true; log(`placar lido: ícone ${placar.d}px, linha a cada ${placar.passo}px, F a +${placar.off}px`); } }
     // Flash automático (experimental): ícone confirmado em dois quadros seguidos (≤ 400 ms) que
     // pulou 2–5% do mapa de uma vez — andar é 0,7%/s; flash são 400 unidades ≈ 2,7%.
     const pulos = [];
@@ -618,7 +788,7 @@ async function quadro() {
       posAnterior.set(v.campeao, { x: v.x, y: v.y, em: agora, score: v.score ?? 0 });
     }
     if (pulos.length) { log(`pulo: ${pulos.map((p) => `${p.campeao} ${p.dist} em ${p.dt}ms`).join(', ')}`); (window.__pulos ??= []).push(...pulos.map((p) => ({ ...p, em: agora }))); }
-    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, wards: wardsVistas, pulos, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
+    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, wards: wardsVistas, pulos, placar, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
       log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · eu ${eu ? (eu.fonte === 'camera' ? 'câmera' : 'ícone') : 'não'} (câmera travada ${camTravada.n ? Math.round(100 * camTravada.ok / camTravada.n) + '%' : '?'}) · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
@@ -714,7 +884,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
 }
 function enviar(dados) {
   const agora = Date.now();
-  if (dados.pulos?.length) { ultimoEnvio = null; }   // pulo de flash nunca pode ser engolido pela dedupe
+  if (dados.pulos?.length || dados.placar) { ultimoEnvio = null; }   // pulo de flash / placar nunca podem ser engolidos pela dedupe
   const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.wards && [dados.wards.nossas.length, dados.wards.deles.length, dados.wards.nossas.map((w) => Math.round(w.x * 50 + w.y * 5000))], dados.waves && Object.values(dados.waves).map((w) => Math.round((w.frente ?? -1) * 20)), dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
   if (chave === ultimoEnvio && agora - ultimoEnvioEm < 1000) return;
   ultimoEnvio = chave; ultimoEnvioEm = agora;

@@ -858,7 +858,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * janela ao vivo). Flash volta em 5:00 — 4:28 com bota da Ionia.
    */
   const IONIA = 3158;
-  async function marcarFlash({ posicao, nome, automatico = false } = {}) {
+  async function marcarFlash({ posicao, nome, automatico = false, usadoEm = null } = {}) {
     if (!partidaVivo?.ultimoEstado) await vivo().catch(() => null);
     if (!partidaVivo?.ultimoEstado) throw new Error('sem partida rodando');
     const e = partidaVivo.ultimoEstado;
@@ -875,12 +875,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const temInspiracao = [alvo.runas?.primaria, alvo.runas?.secundaria].some((a) => /inspira/i.test(a ?? ''));
     const haste = (temIonia ? 12 : 0) + (temInspiracao ? 18 : 0);
     const cd = Math.round(300 / (1 + haste / 100));
-    const volta = e.tempo + cd;
+    const usado = usadoEm ?? e.tempo;
+    const volta = usado + cd;
     const cdTxt = `${Math.floor(cd / 60)}:${String(cd % 60).padStart(2, '0')}`;
-    partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
-    compartilharFlash(alvo, e).catch((erro) => log(`flash compartilhado falhou: ${erro.message}`));
+    const resta = Math.max(0, Math.round(volta - e.tempo)), restaTxt = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, '0')}`;
+    partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: usado, volta, avisado60: false, avisadoVolta: false });
+    compartilharFlash(alvo, { ...e, tempo: usado }).catch((erro) => log(`flash compartilhado falhou: ${erro.message}`));
     partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
-      serio: automatico ? F`Flash do ${alvo.campeao} marcado pelo olho. Volta em ${cdTxt}.` : F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
+      serio: automatico ? F`Flash do ${alvo.campeao} marcado pelo olho. Volta em ${restaTxt}.` : F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
       divertido: F`${alvo.campeao} sem flash por ${cdTxt}.` }));
     log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')} (volta em ${cdTxt}: ionia ${temIonia ? 'sim' : 'não'}, inspiração ${temInspiracao ? 'sim' : 'não'})`);
     return { ok: true, campeao: alvo.campeao, volta };
@@ -896,7 +898,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const id = partidaVivo?.pastaSitu ? basename(partidaVivo.pastaSitu) : partidaVivo?.ultimoEstado ? `${new Date().toISOString().slice(0, 10)}-${(partidaVivo.ultimoEstado.eu?.campeao ?? 'x').toLowerCase()}` : 'sem-partida';
     const pasta = resolve(pastaBase(), 'dados', 'olho', id);
     await mkdir(pasta, { recursive: true });
-    const n = String(Math.floor((partidaVivo?.ultimoEstado?.tempo ?? 0))).padStart(4, '0');
+    const n = (meta?.placar ? 'placar-' : '') + String(Math.floor((partidaVivo?.ultimoEstado?.tempo ?? 0))).padStart(4, '0');
     await writeFile(resolve(pasta, `${n}.png`), png);
     await writeFile(resolve(pasta, `${n}.json`), JSON.stringify({ ...meta, tempo: partidaVivo?.ultimoEstado?.tempo ?? null, jogadores: partidaVivo?.ultimoEstado?.jogadores?.map((j) => ({ campeao: j.campeao, time: j.time, role: j.role, morto: j.morto })) ?? [] }));
     // limpa partidas velhas
@@ -924,8 +926,49 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       await marcarFlash({ nome: alvo.nome, automatico: true }).catch((erro) => log(`flash automático falhou: ${erro.message}`));
     }
   }
+  /**
+   * Placar (Tab): o olho lê o ícone do Flash de cada um dos 5 deles (coluna da direita, ordem top/jungle/mid/adc/sup)
+   * e diz claro (disponível) ou escuro (em recarga: tinta preta + número). Quando um que estava claro aparece escuro,
+   * o flash foi usado entre as duas leituras — marca com a hora do meio. Claro com marca ativa = marca errada, apaga.
+   */
+  const ORDEM_PLACAR = ['top', 'jungle', 'mid', 'adc', 'sup'];
+  async function lerPlacarDeles(placar, e) {
+    const deles = e.jogadores.filter((j) => j.time !== e.eu.time);
+    const porRole = ORDEM_PLACAR.map((r) => deles.find((j) => j.role === r)).filter(Boolean);
+    if (porRole.length !== 5 || (placar.dir ?? []).length !== 5) return;
+    partidaVivo.placar ??= new Map();
+    const agora = e.tempo;
+    for (let i = 0; i < 5; i++) {
+      const j = porRole[i], l = placar.dir[i];
+      if (!l || (!l.claro && !l.escuro)) continue;   // sem Flash, ou leitura ambígua: não decide
+      const antes = partidaVivo.placar.get(j.nome) ?? { escuro: null, claroEm: null, avisadoGasto: false, seguidos: 0 };
+      // uma leitura só não decide (linha vermelha de morto, sombra de tooltip): precisa de 2 iguais seguidas
+      antes.seguidos = antes.ultimaLeitura === (l.escuro ? 'E' : 'C') ? antes.seguidos + 1 : 1; antes.ultimaLeitura = l.escuro ? 'E' : 'C';
+      if (antes.seguidos < 2) { partidaVivo.placar.set(j.nome, antes); continue; }
+      if (l.claro) antes.claroEm = agora;
+      const f = partidaVivo.flashes.get(j.nome);
+      if (l.escuro && antes.escuro === false && antes.claroEm != null) {
+        // estava claro há pouco e agora está escuro: usou o flash entre as duas leituras
+        const usadoEm = agora - (agora - antes.claroEm) / 2, incerteza = Math.round((agora - antes.claroEm) / 2);
+        if (!(f && f.volta > agora)) {
+          log(`placar: flash do ${j.campeao} ficou escuro (brilho ${l.brilho}, ${Math.round(l.brancos * 100)}% branco) — usado há ~${Math.round(agora - usadoEm)} s (±${incerteza})`);
+          await marcarFlash({ nome: j.nome, automatico: true, usadoEm }).catch(() => {});
+        }
+      } else if (l.escuro && antes.escuro == null && !(f && f.volta > agora) && !antes.avisadoGasto) {
+        antes.avisadoGasto = true;
+        log(`placar: flash do ${j.campeao} já estava gasto na primeira leitura (não dá pra saber desde quando)`);
+      } else if (l.claro && f && f.volta > agora + 20 && agora - f.usadoEm > 30) {
+        // marcado como gasto mas o placar mostra claro: a marca estava errada (ou já voltou) — limpa
+        log(`placar: flash do ${j.campeao} aparece disponível, marca de ${Math.round(f.volta - agora)} s apagada`);
+        partidaVivo.flashes.delete(j.nome);
+      }
+      antes.escuro = !!l.escuro;
+      partidaVivo.placar.set(j.nome, antes);
+    }
+  }
   async function receberOlhoInterno(dados) {
     if (dados?.erro) { log(`olho: ${dados.erro}`); return; }
+    if (dados?.placar && partidaVivo?.ultimoEstado) lerPlacarDeles(dados.placar, partidaVivo.ultimoEstado).catch(() => {});
     if (dados?.pulos?.length && partidaVivo?.ultimoEstado) flashAutomatico(dados.pulos, partidaVivo.ultimoEstado).catch(() => {});
     if (!partidaVivo?.ultimoEstado) return;
     if (!partidaVivo.memOlho) {
