@@ -77,6 +77,9 @@ header>*{position:relative}
 .selecao .sug{margin-top:12px;background:var(--f1);border:1px solid var(--ouro-escuro);border-radius:var(--r-m);padding:10px 12px}
 .selecao .anMeta{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px;font-size:11px;color:var(--fraco)} .selecao .anMeta span{background:var(--f2);border:1px solid var(--borda);border-radius:999px;padding:2px 8px} .selecao .anMeta .parcial{color:var(--u2);border-color:#5c4a22} .selecao .anMeta .completa{color:var(--vit)} .selecao .anMeta .aviso{color:var(--u3);border-color:#5c2226}
 .selecao .cand.top{background:#1a1810;border:1px solid var(--ouro-escuro);border-radius:var(--r-s)}
+.selecao .intel{border-color:#5c2226} .selecao .intel > b{display:flex;align-items:center;gap:8px} .selecao .intel > b small{color:var(--apagado);font-weight:400;text-transform:none;letter-spacing:0}
+.selecao .cand.ameaca > span:first-child{color:var(--u3)} .selecao .cand .rota{font-style:normal;color:var(--apagado);font-size:10.5px;margin-left:4px}
+.selecao .cand .vs i.dica{display:block;background:transparent;color:var(--apagado);padding:2px 0 0;white-space:normal}
 .selecao .cand .vs i{display:inline-block;font-style:normal;margin:2px 6px 0 0;padding:1px 6px;border-radius:4px;background:var(--f2);color:var(--fraco);font-size:10.5px} .selecao .cand .vs i.v{color:var(--vit)} .selecao .cand .vs i.d{color:var(--der)}
 .selecao .sug .cand{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;align-items:center;margin-top:6px;font-size:12.5px}
 .selecao .sug .cand b{font-variant-numeric:tabular-nums}
@@ -420,6 +423,12 @@ function desenharSelecao(sel){
       <div><h2 class="sec">Seu time</h2><div class="lista">${sel.aliados.length ? sel.aliados.map(chip).join('') : '<span>ninguém declarou ainda</span>'}</div></div>
       <div><h2 class="sec">Eles travaram</h2><div class="lista">${sel.inimigos.length ? sel.inimigos.map(chip).join('') : '<span>nada ainda</span>'}</div></div>
     </div>
+    ${sel.intel?.lista?.length ? `<div class="sug intel">
+      <b>O time deles</b> <small>${esc(sel.intel.resumo ?? '')}${sel.intel.completude < 1 ? ` · ${sel.intel.lista.length} de 5` : ''}</small>
+      ${sel.intel.avisos?.length ? `<div class="anMeta">${sel.intel.avisos.map(a => `<span class="${a.tipo === 'ruim' ? 'aviso' : a.tipo === 'bom' ? 'completa' : ''}">${esc(a.texto)}</span>`).join('')}</div>` : ''}
+      ${sel.intel.bans?.length ? `<div class="anMeta"><span>eles baniram: ${sel.intel.bans.map(esc).join(', ')}</span></div>` : ''}
+      ${sel.intel.lista.map(x => `<div class="cand ${x.ameaca ? 'ameaca' : ''}"><span>${icone(x.nome, porNome.get(chave(x.nome)))} ${esc(x.nome)} <em class="rota">${esc(x.rota ?? '?')}</em></span>
+        <span class="vs"><i>${esc(x.classe)}${x.dano ? ' · ' + x.dano.toUpperCase() : ''}</i>${x.ameaca ? '<i class="d">ameaça pra você</i>' : ''}${x.marcas.map(m => `<i>${esc(m)}</i>`).join('')}${x.contraMim ? `<i class="${x.contraMim.vitorias / x.contraMim.jogos >= .55 ? 'v' : x.contraMim.vitorias / x.contraMim.jogos <= .45 ? 'd' : ''}">você contra ele: ${x.contraMim.vitorias}/${x.contraMim.jogos}</i>` : ''}${x.dica ? `<i class="dica">${esc(x.dica)}</i>` : ''}</span></div>`).join('')}</div>` : ''}
     ${sel.sugestaoBan?.length ? `<div class="sug" style="border-color:#5c2226"><b>Quem mais te ganha de ${esc(ROLE_NOME[sel.rota] ?? sel.rota)} — ban</b>
       <div class="lista" style="margin-top:6px">${sel.sugestaoBan.map(b => `<span>${icone(b.campeao, b.championId)}${esc(b.campeao)} <em style="color:var(--der);font-style:normal;margin-left:4px">${Math.round(b.taxa*100)}% em ${b.jogos}j</em></span>`).join('')}</div></div>` : ''}
     ${sug?.lista?.length ? `<div class="sug">

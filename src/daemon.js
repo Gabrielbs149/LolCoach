@@ -1036,6 +1036,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * confrontos do op.gg, qual dos seus picks da rota ganha mais deles.
    */
   let selecaoCache = { chave: null, sugestao: null };
+  let intelCache = { chave: null, intel: null };
   /** Seus jogos com cada candidato ao lado desse parceiro (adc↔sup), pelo banco. */
   function duoHistorico(rota, candidatos, parceiro) {
     try {
@@ -1107,6 +1108,27 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     } catch { /* sem histórico */ }
     const { falasDaSelecao } = await import('./vivo/falas.js');
     const runas = ultimasRunas && meuCampeao && ultimasRunas.campeao === meuCampeao ? ultimasRunas : null;
+    // Intel do time deles: cada campeão travado (rota provável, classe, dano, CC, seu histórico contra, dica) e o time como um todo
+    let intel = null;
+    try {
+      const nomesDeles = inimigos.map((id) => nomeDe(id)).filter(Boolean);
+      const bansDeles = (s.bans?.theirTeamBans ?? []).map((id) => nomeDe(id)).filter(Boolean);
+      const chaveIntel = `${nomesDeles.join(',')}|${bansDeles.join(',')}|${rota}|${meuCampeao ?? ''}`;
+      if (intelCache.chave !== chaveIntel) {
+        const [{ intelDoTime }, { perfisDosCampeoes, fichaDoCampeao }] = await Promise.all([import('./vivo/intel-time.js'), import('./dados/ddragon.js')]);
+        const perfis = await perfisDosCampeoes().catch(() => new Map());
+        const k = (n) => String(n ?? '').toLowerCase().replace(/[^a-z]/g, '');
+        const contraMim = new Map();
+        try {
+          const linhas = db.prepare('select j.campeao c, count(*) n, sum(p.venci) v from partidas p join jogadores me on me.gameId = p.gameId and me.participantId = p.meuId join jogadores j on j.gameId = p.gameId and j.time <> me.time group by j.campeao').all();
+          for (const nome of nomesDeles) { const l = linhas.find((x) => k(x.c) === k(nome)); if (l) contraMim.set(nome, { jogos: l.n, vitorias: l.v }); }
+        } catch { /* sem banco */ }
+        const dicas = new Map();
+        for (const id of inimigos) { const f = await fichaDoCampeao(id).catch(() => null); if (f?.contraEle?.length) dicas.set(f.nome, f.contraEle.map((t) => t.length > 140 ? t.slice(0, 137) + '…' : t)); }
+        intelCache = { chave: chaveIntel, intel: intelDoTime({ inimigos: nomesDeles, bans: bansDeles, perfis, contraMim, dicas, minhaRota: rota, meuCampeao }) };
+      }
+      intel = intelCache.intel;
+    } catch (erro) { log(`intel: ${erro.message}`); }
     // Contexto útil: confronto do seu campeão com cada um deles, jungler deles, tipo de dano.
     let confrontos = [], junglerDeles = null, dano = null;
     try {
@@ -1129,9 +1151,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     for (const f of falasDaSelecao({ rota, inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados, meuCampeao, sugestaoBan, runas, confrontos, junglerDeles, dano }, selecaoMem)) {
       selecaoMem.falas.push(prontaFala({ ...f, seq: ++seqFalas }));
     }
+    // Time deles completo: uma linha com o que importa (sem repetir na mesma seleção)
+    if (intel?.completude === 1 && !selecaoMem.ditas.has('intel-time')) {
+      selecaoMem.ditas.add('intel-time');
+      const partes = (intel.avisos ?? []).slice(0, 3).map((x) => x.texto.split(':')[0]);
+      if (partes.length) selecaoMem.falas.push(prontaFala({ seq: ++seqFalas, modulo: 'selecao', prioridade: 2, serio: F`Time deles: ${partes.join(', ')}.`, divertido: F`Time deles: ${partes.join(', ')}.` }));
+    }
     return {
       fase: s.timer?.phase ?? '', rota, meuCampeao,
-      inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados: aliados.map((id) => ({ id, nome: nomeDe(id) })),
+      inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados: aliados.map((id) => ({ id, nome: nomeDe(id) })), intel,
       sugestao: selecaoCache.chave === chave && selecaoCache.sugestao ? { ...selecaoCache.sugestao, fala: selecaoCache.sugestao.fala ? prontaFala(selecaoCache.sugestao.fala) : null } : null,
       sugestaoBan, falas: selecaoMem.falas.slice(-8),
     };
