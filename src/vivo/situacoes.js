@@ -50,9 +50,17 @@ function verVisto(f, v, t) {
   const antes = f.ultimo;
   // Pulo grande em pouco tempo: pode ser TP ou um ícone parecido no lugar errado.
   // Só aceita se a leitura seguinte confirmar o novo lugar.
+  // TP de verdade: o novo lugar tem que se confirmar em 3 leituras seguidas (≥ 1,5 s) e
+  // o campeão não pode ter dado TP nos últimos 300 s (o feitiço tem 6 min de recarga).
+  // Um ícone parecido no lugar errado some em 1–2 leituras; um TP fica.
   if (antes && t - antes.t < 6 && dist(antes, p) > 0.25) {
-    if (f.pendente && t - f.pendente.t < 2.5 && dist(f.pendente, p) < 0.08) { f.tp = t; f.pendente = null; }
-    else { f.pendente = p; return; }
+    if (f.pendente && t - f.pendente.t < 4 && dist(f.pendente, p) < 0.08) {
+      f.pendente.n = (f.pendente.n ?? 1) + 1;
+      if (f.pendente.n >= 3 && t - f.pendente.t >= 1.5) {
+        if (!(f.ultimoTp != null && t - f.ultimoTp < 300)) { f.tp = t; f.ultimoTp = t; }
+        f.pendente = null;
+      } else return;
+    } else { f.pendente = { ...p, n: 1 }; return; }
   } else f.pendente = null;
   f.hist.push(p); if (f.hist.length > 400) f.hist.splice(0, 100);
   f.ultimo = p; if (!f.primeiro) f.primeiro = p;
@@ -230,7 +238,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       const l = f.regiao;
       // TP
       const temTp = (estado.jogadores.find((x) => x.nome === f.nome)?.spells ?? []).some((sp) => /teleport/i.test(sp));
-      if (f.tp === t) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: temTp ? 2 : 0, modulo: 'mapa', serio: F`${f.campeao} deu TP pro ${l.lane === 'jungle' ? 'mapa' : l.lane}.`, cooldown: 60 });
+      if (f.tp === t && temTp && ['top', 'mid', 'bot'].includes(l.lane)) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: l.lane === minhaLane ? 3 : 1, modulo: 'mapa', serio: F`${f.campeao} deu TP pro ${l.lane}.`, cooldown: 60, dados: { lane: l.lane } });
+      else if (f.tp === t) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: 0, modulo: 'mapa', serio: F`${f.campeao} apareceu ${l.texto} de repente.`, cooldown: 60 });
       // roam em andamento: laner fora da lane dele indo pra outra
       const alvo = laneAlvo(f);
       const foraDaLane = f.hist.filter((q) => t - q.t <= 3).every((q) => lugar(q.x, q.y, meuTime).lane !== laneDele);
