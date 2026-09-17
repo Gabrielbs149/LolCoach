@@ -303,13 +303,26 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         const partes = [];
         if (jg) partes.push(visivel(jg, t) ? `jungler deles ${lugarTxt(jg.ultimo)}` : jg.morto ? 'jungler deles morto' : jg.ultimo ? `jungler deles sumido há ${Math.round(vistoHa(jg, t))} segundos` : 'jungler deles não visto');
         const pertoPit = vis.filter((f) => dist(f.ultimo, pit) < 0.2).length;
-        if (pertoPit) partes.push(`${pertoPit} deles perto do pit`);
+        const nossosPit = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.2).length;
+        if (pertoPit) partes.push(`${pertoPit} deles perto do pit${nossosPit ? `, ${nossosPit} nosso${nossosPit > 1 ? 's' : ''}` : ''}`);
+        else if (nossosPit >= 2) partes.push(`${nossosPit} nossos já lá`);
+        // a wave da lane do objetivo: dragão = bot, barão/arauto = top. Empurrada pra eles = dá pra ir; na nossa torre = perde a wave
+        const laneObj = o.nome === 'Dragão' || o.nome === 'Ancião' ? 'bot' : 'top';
+        const wv = mundo.waves?.[laneObj];
+        if (wv && t - wv.t < 60) partes.push(wv.estado === 'deles' ? `wave do ${laneObj} empurrada, dá pra ir` : wv.estado === 'nosso' ? `wave do ${laneObj} na nossa torre, empurra antes` : `wave do ${laneObj} no meio`);
         if (meuJg && visivel(meuJg, t)) partes.push(`seu jungler a ${seg(dist(meuJg.ultimo, pit))} segundos`);
         const semWard = !!mundo.wards && !mundo.wards.nossas.some((w) => dist(w, pit) < 0.14);
         if (semWard) partes.push('sem ward no pit');
         situ(`pre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: partes.length ? F`${o.nome} em um minuto: ${partes.join(', ')}.` : F`${o.nome} em um minuto.`, cooldown: 100, dados: { semWard } });
       }
       const deles = vis.filter((f) => dist(f.ultimo, pit) < 0.12), nossos = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.12);
+      // nasceu: quem está no rio agora (só quando tem gente)
+      mundo.objVivo ??= {};
+      if (o.vivo && !mundo.objVivo[o.nome] && ['Dragão', 'Barão', 'Ancião', 'Arauto'].includes(o.nome)) {
+        const delesRio = vis.filter((f) => dist(f.ultimo, pit) < 0.2).length, nossosRio = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.2).length;
+        if (delesRio >= 1 || nossosRio >= 2) situ(`nasceu-${o.nome}-${Math.floor(t / 60)}`, { tipo: 'objetivo', prioridade: delesRio >= 2 && nossosRio < delesRio ? 3 : 2, modulo: 'timers', serio: F`${o.nome} nasceu: ${delesRio} deles no rio, ${nossosRio} nosso${nossosRio === 1 ? '' : 's'}.${delesRio >= 2 && nossosRio < delesRio ? ' Não entra sozinho.' : ''}`, cooldown: 120, dados: { delesRio, nossosRio } });
+      }
+      mundo.objVivo[o.nome] = !!o.vivo;
       if (!o.vivo && o.em > 0 && o.em <= 60 && deles.length >= 2) situ(`armando-${o.nome}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${deles.length} deles no ${o.nome}, que nasce em ${Math.round(o.em)} segundos.`, cooldown: 60 });
       if (o.vivo && jg && deles.length === 0) {
         if (jg.morto && (estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0) >= 25) situ(`livre-${o.nome}-${Math.floor((t + o.em) / 60)}`, { tipo: 'objetivo', prioridade: 2, modulo: 'timers', serio: F`${o.nome} livre: jungler deles morto por ${Math.round(estado.jogadores.find((j) => j.nome === jg.nome)?.renasceEm ?? 0)} segundos.`, cooldown: 240 });
@@ -323,7 +336,13 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     }
     // agrupados
     const grupo = vis.filter((f) => vis.filter((g) => dist(f.ultimo, g.ultimo) < 0.14).length >= 4);
-    if (grupo.length >= 4 && minhaPos && grupo.every((f) => dist(f.ultimo, minhaPos) > 0.3)) situ('agrupados', { tipo: 'grupo', prioridade: 1, modulo: 'mapa', serio: F`${grupo.length} deles agrupados ${lugarTxt(grupo[0].ultimo)}.`, cooldown: 60 });
+    if (grupo.length >= 4 && minhaPos) {
+      const gc = { x: grupo.reduce((s, f) => s + f.ultimo.x, 0) / grupo.length, y: grupo.reduce((s, f) => s + f.ultimo.y, 0) / grupo.length };
+      const nossosLa = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, gc) < 0.2).length;
+      // pré-fight: eles agrupados perto dos nossos e em maior número → recua; longe de mim → só aviso
+      if (nossosLa >= 1 && nossosLa < grupo.length) situ('agrupados-vantagem', { tipo: 'grupo', prioridade: nossosLa >= 2 ? 3 : 2, modulo: 'mapa', serio: F`${grupo.length} deles juntos ${lugarTxt(gc)}, ${nossosLa} nosso${nossosLa > 1 ? 's' : ''}. ${dist(minhaPos, gc) < 0.2 ? 'Recua' : 'Não vai'}.`, cooldown: 45, dados: { deles: grupo.length, nossos: nossosLa } });
+      else if (grupo.every((f) => dist(f.ultimo, minhaPos) > 0.3)) situ('agrupados', { tipo: 'grupo', prioridade: 1, modulo: 'mapa', serio: F`${grupo.length} deles agrupados ${lugarTxt(grupo[0].ultimo)}.`, cooldown: 60 });
+    }
     // flanco: um deles perto do nosso grupo, no lado oposto ao resto deles
     if (alVis.length >= 3) {
       const cx = alVis.reduce((s, f) => s + f.ultimo.x, 0) / alVis.length, cy = alVis.reduce((s, f) => s + f.ultimo.y, 0) / alVis.length;
@@ -468,5 +487,7 @@ export function instantaneo(mundo, estado) {
     waves: mundo.wavesBruto ?? null,
     wards: mundo.wards ? { nossas: mundo.wards.nossas.map((w) => [w.x, w.y, w.tipo]), deles: mundo.wards.deles.map((w) => [w.x, w.y]) } : null,
     campeoes: [...mundo.campeoes.values()].map((f) => ({ c: f.campeao, time: f.time, role: f.role, morto: !!f.morto, x: f.ultimo?.x ?? null, y: f.ultimo?.y ?? null, ha: f.ultimo ? Math.round((t - f.ultimo.t) * 10) / 10 : null, regiao: f.regiao?.chave ?? null })),
+    // ninguém deles visto a menos de 15 s de mim nos últimos 10 s (pra 'reseta agora'); null = não sei onde estou
+    livrePerto: (() => { const fe = estado.eu ? mundo.campeoes.get(estado.eu.nome) : null; const eu = fe?.ultimo && t - fe.ultimo.t < 5 ? fe.ultimo : null; if (!eu) return null; return ![...mundo.campeoes.values()].some((f) => f.time !== estado.eu.time && f.ultimo && t - f.ultimo.t < 10 && seg(dist(f.ultimo, eu)) <= 15); })(),
   };
 }

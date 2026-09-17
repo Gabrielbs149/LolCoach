@@ -822,6 +822,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         }
       }
     }
+    if (partidaVivo.extras && partidaVivo.mundo) { try { const { instantaneo } = await import('./vivo/situacoes.js'); const inst = instantaneo(partidaVivo.mundo, estado); partidaVivo.extras.livrePerto = inst.livrePerto; const laneMinha = { top: 'top', mid: 'mid', adc: 'bot', sup: 'bot' }[estado.eu.role]; partidaVivo.extras.minhaWave = laneMinha ? partidaVivo.mundo.waves?.[laneMinha]?.estado ?? null : null; } catch { /* sem olho */ } }
     for (const f of [...falasNovas({ estado, rastreio, objetivos: objs, conselhos, extras: partidaVivo.extras, olho: !!partidaVivo.olho?.calib && Date.now() - partidaVivo.olho.recebidoEm < 5000 }, partidaVivo.memFalas), ...falasDeFlash(estado.tempo)]) {
       if (f.id && partidaVivo.silenciadas?.has(baseChave(f.id))) continue;
       if ((f.prioridade ?? 1) <= 0) { prontaFala({ ...f, seq: 0, t: estado.tempo }); continue; }   // prioridade 0 = só registro, não fala

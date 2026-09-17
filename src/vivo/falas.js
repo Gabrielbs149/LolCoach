@@ -156,7 +156,13 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
         }
       }
       const prox = b.ordem.find((x) => !tenho.has(x.id));
-      if (prox?.preco && eu.ouro >= prox.preco && !eu.morto) { jaFalouDoGold = true; dizer(`gold-item-${prox.id}`, 'economia', F`Tem gold pro ${prox.nome}.`, F`Tem gold pro ${prox.nome}.`, 2); }
+      if (prox?.preco && eu.ouro >= prox.preco && !eu.morto) {
+        jaFalouDoGold = true;
+        // olho ligado e ninguém deles perto = a hora de resetar é agora; com alguém perto, só o gold
+        const livre = extras.livrePerto === true, waveOk = extras.minhaWave === 'deles';
+        if (livre) dizer(`gold-item-${prox.id}`, 'economia', F`Tem gold pro ${nomeItem(prox.id, prox.nome)} e ninguém deles perto${waveOk ? ', wave empurrada' : ''}. Reseta.`, F`Gold pro ${nomeItem(prox.id, prox.nome)} e ninguém perto: reseta.`, 2);
+        else dizer(`gold-item-${prox.id}`, 'economia', F`Tem gold pro ${nomeItem(prox.id, prox.nome)}.`, F`Tem gold pro ${nomeItem(prox.id, prox.nome)}.`, 2);
+      }
     }
   }
 
@@ -194,6 +200,19 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   /* ---- jungler deles morto: janela ---- */
   if (jgDeles?.morto && jgDeles.renasceEm > 20) dizer(`jgbase-${Math.floor(tempo / 60)}`, 'jungler', F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, 1);
 
+  /* ---- spikes deles que mudam a jogada ---- */
+  mem.spikes ??= new Set();
+  // (jgDeles já vem de cima)
+  if (jgDeles && jgDeles.nivel >= 6 && !mem.spikes.has('jg6')) { mem.spikes.add('jg6'); if (tempo < 900) dizer('jg-deles-6', 'spikes', F`Jungler deles level 6${jgDeles.nivel > (eu.nivel ?? 0) ? ', na sua frente' : ''}. Gank com ult.`, F`Jungler deles de ult. Cuidado no gank.`, 2); }
+  if (rival && rival.nivel >= 6 && (eu.nivel ?? 0) < 6 && !mem.spikes.has('rival6')) { mem.spikes.add('rival6'); dizer('rival-6-antes', 'spikes', F`${rival.campeao} de ult e você não. Não troca.`, F`${rival.campeao} tem ult e você não. Segura.`, 2); }
+  // itens que viram a lane: quem fechou primeiro
+  const ITENS_CHAVE = { 3153: 'BORK', 6692: 'Eclipse', 6333: 'Cutelo', 3078: 'Trindade', 6632: 'Divino', 3031: 'IE', 6672: 'Kraken', 3124: 'Rageblade', 3089: 'Deathcap', 4645: 'Shadowflame', 3157: 'Ampulheta', 6653: 'Liandry', 3142: 'Youmuu', 6691: 'Dusk', 3068: 'Sunfire', 3065: 'Espírito', 3110: 'Coração Gelado', 3143: 'Randuin' };
+  for (const j of inimigos) for (const it of j.itens ?? []) {
+    const nome = ITENS_CHAVE[it.id]; if (!nome) continue;
+    const k = `${j.nome}-${it.id}`; if (mem.spikes.has(k)) continue; mem.spikes.add(k);
+    const euTenhoGrande = (eu.itens ?? []).some((x) => ITENS_CHAVE[x.id]);
+    if (tempo > 60 && (j.role === minhaRole || j.role === 'jungle') && !euTenhoGrande) dizer(`spike-${k}`, 'spikes', F`${j.campeao} fechou ${nome} antes de você. Respeita.`, F`${j.campeao} com ${nome} e você sem item. Respeita.`, 2);
+  }
   /* ---- spikes vindos do rastreio ---- */
   for (const a of rastreio?.avisos ?? []) {
     if (a.t < mem.ultimoTempo - 1) continue;
