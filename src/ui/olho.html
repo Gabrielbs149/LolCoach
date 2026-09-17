@@ -283,6 +283,7 @@ function retanguloCamera(rgba, s) {
   return null;
 }
 let camTravada = { ok: 0, n: 0 }, ultimaCam = null;
+const posAnterior = new Map();   // último lugar confirmado de cada ícone (pra ver pulo de flash)
 // O que é vermelho/azul sempre no mesmo pixel é torre/inibidor, não minion: máscara temporal.
 let fixoR = null, fixoA = null, fixoS = 0;
 const FIXO_TETO = 30, FIXO_LIMIAR = 12;   // ~12 leituras seguidas (uns 25 s) no mesmo pixel = estrutura
@@ -605,7 +606,19 @@ async function quadro() {
     if (!eu && !vistosAli.length && !limpos.length) { cegoDesde ||= agora; if (agora - cegoDesde > 15000 && agora - cegoAvisado > 60000) { cegoAvisado = agora; log('cego há 15 s: nada reconhecido no minimapa (outra janela na frente do jogo?)'); } }
     else cegoDesde = 0;
     if (rodada % 10 === 5) wardsVistas = wards(rgba, s, [...limpos, ...vistosAli, ...(eu ? [eu] : [])].map((v) => ({ x: v.x, y: v.y, d })));
-    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, wards: wardsVistas, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
+    // Flash automático (experimental): ícone confirmado em dois quadros seguidos (≤ 400 ms) que
+    // pulou 2–5% do mapa de uma vez — andar é 0,7%/s; flash são 400 unidades ≈ 2,7%.
+    const pulos = [];
+    for (const v of [...limpos, ...(eu ? [{ ...eu, campeao: 'eu' }] : [])]) {
+      const antes = posAnterior.get(v.campeao);
+      if (antes && agora - antes.em <= 400 && agora - antes.em >= 60) {
+        const dd = Math.hypot(v.x - antes.x, v.y - antes.y);
+        if (dd >= 0.02 && dd <= 0.05 && (v.score ?? 0) >= 0.8 && antes.score >= 0.8) pulos.push({ campeao: v.campeao, de: { x: antes.x, y: antes.y }, para: { x: v.x, y: v.y }, dt: agora - antes.em, dist: Math.round(dd * 1000) / 1000 });
+      }
+      posAnterior.set(v.campeao, { x: v.x, y: v.y, em: agora, score: v.score ?? 0 });
+    }
+    if (pulos.length) { log(`pulo: ${pulos.map((p) => `${p.campeao} ${p.dist} em ${p.dt}ms`).join(', ')}`); (window.__pulos ??= []).push(...pulos.map((p) => ({ ...p, em: agora }))); }
+    enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, wards: wardsVistas, pulos, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
       log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · eu ${eu ? (eu.fonte === 'camera' ? 'câmera' : 'ícone') : 'não'} (câmera travada ${camTravada.n ? Math.round(100 * camTravada.ok / camTravada.n) + '%' : '?'}) · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
@@ -701,6 +714,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
 }
 function enviar(dados) {
   const agora = Date.now();
+  if (dados.pulos?.length) { ultimoEnvio = null; }   // pulo de flash nunca pode ser engolido pela dedupe
   const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.wards && [dados.wards.nossas.length, dados.wards.deles.length, dados.wards.nossas.map((w) => Math.round(w.x * 50 + w.y * 5000))], dados.waves && Object.values(dados.waves).map((w) => Math.round((w.frente ?? -1) * 20)), dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
   if (chave === ultimoEnvio && agora - ultimoEnvioEm < 1000) return;
   ultimoEnvio = chave; ultimoEnvioEm = agora;
@@ -726,7 +740,9 @@ async function desenharFalsa(t) {
   c.drawImage(mapa, x0, y0, s, s);
   c.fillStyle = 'rgba(0,0,0,.35)'; c.fillRect(x0, y0, s, s * 0.5);   // "fog"
   const d = Math.round(s * 0.085);
-  const pos = (i) => ({ x: 0.5 + 0.35 * Math.cos(t / 4000 + i * 1.3), y: 0.5 + 0.35 * Math.sin(t / 5000 + i * 1.7) });
+  // Zed (i=1) 'dá flash' a cada 12 s: pula 0,03 do mapa de uma vez, por 3 s — pra testar o detector de pulo
+  // devagar, como andar (~0,01 do mapa/s); Zed (i=1) "dá flash" a cada 12 s: pula 0,03 de uma vez por 3 s
+  const pos = (i) => { const p = { x: 0.5 + 0.35 * Math.cos(t / 40000 + i * 1.3), y: 0.5 + 0.35 * Math.sin(t / 50000 + i * 1.7) }; if (i === 1 && (t % 12000) < 3000) { p.x += 0.03; } return p; };
   const icone = async (nome, pt, cor) => {
     const img = await iconeDe(nome); if (!img) return;
     const cx = x0 + pt.x * s, cy = y0 + pt.y * s;

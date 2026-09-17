@@ -858,7 +858,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * janela ao vivo). Flash volta em 5:00 — 4:28 com bota da Ionia.
    */
   const IONIA = 3158;
-  async function marcarFlash({ posicao, nome } = {}) {
+  async function marcarFlash({ posicao, nome, automatico = false } = {}) {
     if (!partidaVivo?.ultimoEstado) await vivo().catch(() => null);
     if (!partidaVivo?.ultimoEstado) throw new Error('sem partida rodando');
     const e = partidaVivo.ultimoEstado;
@@ -880,7 +880,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     partidaVivo.flashes.set(alvo.nome, { campeao: alvo.campeao, nomeJogador: alvo.nome, usadoEm: e.tempo, volta, avisado60: false, avisadoVolta: false });
     compartilharFlash(alvo, e).catch((erro) => log(`flash compartilhado falhou: ${erro.message}`));
     partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: e.tempo, modulo: 'flash', prioridade: 2,
-      serio: F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
+      serio: automatico ? F`Flash do ${alvo.campeao} marcado pelo olho. Volta em ${cdTxt}.` : F`Flash do ${alvo.campeao} marcado. Volta em ${cdTxt}${temInspiracao ? ', se tiver Percepção Cósmica' : ''}.`,
       divertido: F`${alvo.campeao} sem flash por ${cdTxt}.` }));
     log(`flash do ${alvo.campeao} marcado aos ${Math.floor(e.tempo / 60)}:${String(Math.floor(e.tempo % 60)).padStart(2, '0')} (volta em ${cdTxt}: ionia ${temIonia ? 'sim' : 'não'}, inspiração ${temInspiracao ? 'sim' : 'não'})`);
     return { ok: true, campeao: alvo.campeao, volta };
@@ -909,8 +909,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     try { await receberOlhoInterno(dados); }
     catch (erro) { if (Date.now() - erroOlhoEm > 30_000) { erroOlhoEm = Date.now(); log(`olho: erro ao processar: ${erro.stack?.split('\n').slice(0, 2).join(' ← ') ?? erro.message}`); } }
   }
+  // Campeões sem dash/pulo próprio: um pulo instantâneo do ícone deles só pode ser flash.
+  const SEM_DASH = new Set(['Jinx', 'Ashe', "Kog'Maw", 'Miss Fortune', 'Varus', 'Aphelios', 'Twitch', 'Draven', 'Senna', 'Jhin', 'Sivir', 'Smolder', 'Yunara', 'Karthus', 'Annie', 'Veigar', 'Lux', 'Xerath', 'Malzahar', 'Morgana', 'Nami', 'Soraka', 'Janna', 'Sona', 'Lulu', 'Zyra', 'Brand', "Vel'Koz", 'Syndra', 'Cassiopeia', 'Swain', 'Orianna', 'Anivia', 'Zilean', 'Heimerdinger', 'Teemo', 'Viktor', 'Seraphine', 'Milio', 'Renata Glasc', 'Hwei', 'Mel', 'Neeko', 'Garen', 'Darius', 'Nasus', 'Illaoi', 'Mordekaiser', 'Yorick', 'Kayle', 'Sett', 'Olaf', 'Trundle', 'Singed', "Cho'Gath", 'Dr. Mundo', 'Tahm Kench', 'Taric', 'Blitzcrank', 'Rammus', 'Nunu & Willump', 'Taliyah', 'Ryze', 'Rumble', 'Kalista', 'Zaahen']);
+  async function flashAutomatico(pulos, e) {
+    for (const p of pulos ?? []) {
+      if (p.campeao === 'eu') { log(`flash automático: VOCÊ pulou ${p.dist} do mapa em ${p.dt} ms (teste do detector)`); continue; }
+      const alvo = e.jogadores.find((j) => j.time !== e.eu.time && j.campeao === p.campeao);
+      if (!alvo || !SEM_DASH.has(alvo.campeao)) { log(`pulo de ${p.campeao} (${p.dist}) ignorado: tem dash`); continue; }
+      if (!(alvo.spells ?? []).some((sp) => /flash/i.test(sp))) continue;
+      const f = partidaVivo.flashes.get(alvo.nome);
+      if (f && f.volta > e.tempo) { log(`pulo de ${p.campeao} com flash já marcado (volta em ${Math.round(f.volta - e.tempo)} s): ignorado`); continue; }
+      if (alvo.morto) continue;
+      log(`flash automático: ${alvo.campeao} pulou ${p.dist} do mapa em ${p.dt} ms`);
+      await marcarFlash({ nome: alvo.nome, automatico: true }).catch((erro) => log(`flash automático falhou: ${erro.message}`));
+    }
+  }
   async function receberOlhoInterno(dados) {
     if (dados?.erro) { log(`olho: ${dados.erro}`); return; }
+    if (dados?.pulos?.length && partidaVivo?.ultimoEstado) flashAutomatico(dados.pulos, partidaVivo.ultimoEstado).catch(() => {});
     if (!partidaVivo?.ultimoEstado) return;
     if (!partidaVivo.memOlho) {
       const { novaMemoriaOlho } = await import('./vivo/olho.js');
