@@ -37,7 +37,7 @@ export function montarConjunto(build, championId) {
 
   return {
     uid: `lolcoach-${championId}-${build.role}`,
-    title: `${PREFIXO}${build.roleNome}`,
+    title: `${PREFIXO}${build.campeao ?? ''} ${build.roleNome}`.replace(/\s+/g, ' '),
     type: 'custom',
     map: 'any',
     mode: 'any',
@@ -83,9 +83,15 @@ export async function gravarConjuntos(lcu, conjuntos, { limparNossos = false } =
 /** Um campeão numa role (a principal, se `role` for null). */
 export async function aplicarConjunto(lcu, nome, championId, role = null, opcoes = {}) {
   const build = await buildsDoCampeao(nome, role, opcoes);
-  const conjunto = montarConjunto(build, championId);
+  const conjunto = montarConjunto({ ...build, campeao: build.campeao ?? nome }, championId);
   await gravarConjuntos(lcu, [conjunto]);
-  return { campeao: nome, role: build.roleNome, blocos: conjunto.blocks.length };
+  // confere: o client às vezes engole o PUT em silêncio; se o nosso conjunto pra ESTE campeão não está lá, grava de novo
+  await new Promise((r) => setTimeout(r, 2500));
+  const eu = await lcu.get('/lol-summoner/v1/current-summoner');
+  const atual = await lcu.get(`/lol-item-sets/v1/item-sets/${eu.summonerId}/sets`).catch(() => null);
+  const tem = (atual?.itemSets ?? []).some((s) => s.uid === conjunto.uid && (s.associatedChampions ?? []).includes(championId));
+  if (!tem) { await gravarConjuntos(lcu, [conjunto]); }
+  return { campeao: nome, role: build.roleNome, blocos: conjunto.blocks.length, conferido: tem, core: (build.itens?.principais?.[0]?.itens ?? []).join(',') };
 }
 
 /**

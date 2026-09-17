@@ -9,7 +9,7 @@ async function limparNossasPaginas(lcu) {
   const paginas = await lcu.get('/lol-perks/v1/pages').catch(() => []);
   let apagadas = 0;
   for (const pg of paginas) {
-    if (pg.name !== NOME_PAGINA || !pg.isDeletable) continue;
+    if (!String(pg.name ?? '').startsWith(NOME_PAGINA) || !pg.isDeletable) continue;
     await lcu.delete(`/lol-perks/v1/pages/${pg.id}`).catch(() => {});
     apagadas++;
   }
@@ -26,7 +26,7 @@ async function limparNossasPaginas(lcu) {
  */
 export async function aplicarRunas(lcu, build, { paginaAlvo = null } = {}) {
   const corpo = {
-    name: NOME_PAGINA,
+    name: build.campeao ? `${NOME_PAGINA} · ${build.campeao}` : NOME_PAGINA,
     primaryStyleId: build.runas.primaryStyleId,
     subStyleId: build.runas.subStyleId,
     selectedPerkIds: build.runas.selectedPerkIds,
@@ -55,7 +55,7 @@ export async function aplicarRunas(lcu, build, { paginaAlvo = null } = {}) {
   if (paginaAlvo) {
     const atualId = (await lcu.get('/lol-perks/v1/currentpage').catch(() => null))?.id;
     const alvo = paginaAlvo === 'atual' ? editaveis.find((p) => p.id === atualId)
-      : paginas.find((p) => p.name === NOME_PAGINA)
+      : paginas.find((p) => String(p.name ?? '').startsWith(NOME_PAGINA))
         ?? (paginaAlvo === '*' ? editaveis[0] : paginas.find((p) => p.name === paginaAlvo));
 
     if (!alvo) {

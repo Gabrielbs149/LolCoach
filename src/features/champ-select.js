@@ -260,7 +260,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
         // O conjunto de itens da loja pra este campeão nesta role — usa o mesmo
         // cache do op.gg, então quase sempre é instantâneo.
         if (permite('builds')) aplicarConjunto(lcu, nome, meuCampeaoId, role, { regiao: config.runas?.regiao ?? 'br' })
-          .then((r) => log(`itens de ${r.campeao} ${r.role} gravados na loja (${r.blocos} blocos)`))
+          .then((r) => log(`itens de ${r.campeao} ${r.role} gravados na loja (${r.blocos} blocos, core ${r.core})${r.conferido ? '' : ' — regravados: o client tinha engolido'}`))
           .catch((erro) => log(`não consegui gravar os itens de ${nome}: ${erro.message}`));
       } catch (erro) {
         log(`não consegui aplicar runas de ${nome}: ${erro.message}`);
