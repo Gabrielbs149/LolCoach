@@ -88,3 +88,16 @@ if (latest.tag_name !== tag || !nomes.includes('latest.yml')) {
   console.error(`ALGO ERRADO: rode "node scripts/github.js arrumar-release ${tag}"`);
   process.exit(1);
 }
+
+// Ninguém fica em versão velha: a versão mínima do painel de controle passa a ser a que acabou de sair.
+// Quem está abaixo vê o aviso na hora e o app dele procura/instala a atualização imediatamente.
+if (githubToken) {
+  try {
+    const { lerControle, gravarControle } = await import('../src/dados/controle.js');
+    const controle = await lerControle(githubToken);
+    if (controle.versaoMinima !== pkg.version) {
+      await gravarControle(githubToken, { ...controle, versaoMinima: pkg.version });
+      console.log(`versão mínima no controle: ${pkg.version}`);
+    }
+  } catch (e) { console.warn(`não consegui subir a versão mínima no controle: ${e.message}`); }
+}

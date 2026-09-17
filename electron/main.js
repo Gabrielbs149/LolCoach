@@ -102,9 +102,11 @@ function ligarAtualizacao() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.on('checking-for-update', () => estado.log('procurando atualização…'));
+  // procura de 5 em 5 min: só registra quando acha algo (senão o registro vira só isso)
+  let primeiraBusca = true;
+  autoUpdater.on('checking-for-update', () => { if (primeiraBusca) estado.log('procurando atualização…'); });
   autoUpdater.on('update-available', (i) => estado.log(`atualização ${i.version} encontrada — baixando em segundo plano`));
-  autoUpdater.on('update-not-available', () => estado.log(`você está na versão mais recente (${app.getVersion()})`));
+  autoUpdater.on('update-not-available', () => { if (primeiraBusca) estado.log(`você está na versão mais recente (${app.getVersion()})`); primeiraBusca = false; });
   autoUpdater.on('download-progress', (p) => { if (Math.round(p.percent) % 25 === 0) estado.set('atualizacao', { baixando: Math.round(p.percent) }); });
   autoUpdater.on('update-downloaded', (i) => {
     baixada = i.version;
@@ -125,11 +127,12 @@ function ligarAtualizacao() {
       setTimeout(() => autoUpdater.quitAndInstall(true, true), 1500);
     }, 30_000);
   });
-  autoUpdater.on('error', (e) => estado.log(`atualização: ${e?.message ?? e}`));
+  // Erro (GitHub fora, latest.yml ainda subindo logo depois de publicar): tenta de novo em 2 min, sem esperar os 5
+  autoUpdater.on('error', (e) => { const msg = String(e?.message ?? e).split(/\r?\n/)[0].slice(0, 160); estado.log(`atualização: ${msg} — tento de novo em 2 min`); setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 2 * 60 * 1000); });
   autoUpdater.checkForUpdates().catch(() => {});
-  // E de novo a cada 30 min, pra quem deixa o app aberto o dia inteiro — e
-  // sempre que uma partida termina, que é a hora natural de instalar.
-  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 30 * 60 * 1000);
+  // Ninguém fica em versão velha: procura de 5 em 5 min (é um GET pequeno no latest.yml) e sempre que uma
+  // partida termina; o que baixou instala sozinho no primeiro momento tranquilo (None/Lobby/EndOfGame).
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 5 * 60 * 1000);
 }
 let janela = null;
 let bandeja = null;

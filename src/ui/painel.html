@@ -2646,7 +2646,7 @@ function desenharAdmin(){
       return `<tr>
         <td class="${souEu?'eu':''}"><b>${esc(u.conta ?? '—')}</b>${souEu?' (você)':''}<div class="sub">${esc(u.id)}</div></td>
         <td class="sub">${esc(outras.join(', ') || '—')}</td>
-        <td>${esc(u.versao ?? '?')}</td>
+        <td>${(() => { const m = controle?.versaoMinima; const velha = m && u.versao && u.versao.localeCompare(m, undefined, { numeric: true }) < 0; return velha ? `<span class="aviso" title="abaixo da mínima ${esc(m)} — o app dele atualiza sozinho no próximo momento sem partida">${esc(u.versao)} ⚠</span>` : esc(u.versao ?? '?'); })()}</td>
         <td class="sub" title="${esc(u.vistoEm ?? '')}">${u.vistoEm ? haQuanto(u.vistoEm) : '—'}</td>
         <td>${num(u.partidas ?? 0)}</td>
         <td class="sub">${u.uso ? `${u.uso.aceitas ?? 0} · ${u.uso.travadas ?? 0} · ${u.uso.banidas ?? 0}` : '—'}</td>

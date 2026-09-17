@@ -115,6 +115,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (avaliacao.bloqueado && !antes.bloqueado) log('acesso desligado pelo painel de controle');
       if (!avaliacao.bloqueado && antes.bloqueado) log('acesso liberado pelo painel de controle');
       if (avaliacao.desligadas.join() !== antes.desligadas.join()) log(avaliacao.desligadas.length ? `desligado pelo painel: ${avaliacao.desligadas.join(', ')}` : 'painel: tudo ligado de novo');
+      // abaixo da versão mínima: não espera os 5 min do atualizador — procura e instala no primeiro momento tranquilo
+      if (avaliacao.desatualizado && !antes.desatualizado) { log(`versão ${versao} abaixo da mínima (${avaliacao.versaoMinima}) — atualizando`); setTimeout(() => { const f = estado?.instantaneo?.().fase ?? null; if (f == null || ['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(f)) fetch('http://127.0.0.1:8770/api/atualizar', { method: 'POST' }).catch(() => {}); }, 3000); }
     } catch (erro) {
       log(`controle: não consegui ler (${erro.message})`);
     }
@@ -139,6 +141,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
 
   sincronizarControle().then(apresentar);
+  // relê o controle de 10 em 10 min (versão mínima, bloqueios, avisos) — antes só ao abrir e ao conectar
+  setInterval(() => sincronizarControle().catch(() => {}), 10 * 60 * 1000).unref?.();
   setInterval(sincronizarControle, 10 * 60 * 1000);
   setInterval(apresentar, 60 * 60 * 1000);
   // Logou no client: agora sei a conta — reavalia e apresenta de novo.
