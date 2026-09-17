@@ -136,6 +136,24 @@ export async function classesDosCampeoes() {
   return mapa;
 }
 
+/** Perfil de cada campeão pra análise de pick: tags e tipo de dano (attack × magic do ddragon). Map(nome -> { tags, dano }). */
+export async function perfisDosCampeoes() {
+  if (cache.has('perfis')) return cache.get('perfis');
+  const patch = await patchAtual();
+  if (!patch) return new Map();
+  await tabelaDeIds();
+  const bruto = await lerCache(resolve(pasta(), patch, 'lista.json'));
+  const mapa = new Map();
+  for (const c of Object.values(bruto?.data ?? {})) {
+    const a = c.info?.attack ?? 5, m = c.info?.magic ?? 5;
+    const dano = m >= a + 2 ? 'ap' : a >= m + 2 ? 'ad' : 'misto';
+    const p = { tags: c.tags ?? [], dano, id: Number(c.key) };
+    mapa.set(c.name, p); mapa.set(c.id, p);
+  }
+  cache.set('perfis', mapa);
+  return mapa;
+}
+
 const limpar = (t) => String(t ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
 /**

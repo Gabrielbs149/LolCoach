@@ -1067,12 +1067,32 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const cellParceiro = posParceiro ? (s.myTeam ?? []).find((c) => c.assignedPosition === posParceiro && c.cellId !== s.localPlayerCellId) : null;
     let parceiro = cellParceiro ? nomeDe(cellParceiro.championId || cellParceiro.championPickIntent) : null;
     if (!parceiro && posParceiro) { const Sin = await import('./dados/sinergia.js'); const teste = posParceiro === 'utility' ? Sin.ehSup : Sin.ehAdc; parceiro = (s.myTeam ?? []).filter((c) => c.cellId !== s.localPlayerCellId).map((c) => nomeDe(c.championId || c.championPickIntent)).find((n) => n && teste(n)) ?? null; }
-    const chave = `${rota}|${inimigos.join(',')}|${candidatos.join(',')}|${parceiro ?? ''}`;
-    if ((inimigos.length || parceiro) && candidatos.length && tabela && selecaoCache.chave !== chave) {
+    const minhaVez = (s.actions ?? []).flat().some((a) => a.actorCellId === s.localPlayerCellId && a.type === 'pick' && a.isInProgress && !a.completed);
+    const meuCampeaoAgora = nomeDe(meu?.championId || meu?.championPickIntent) ?? null;
+    const chave = `${rota}|${inimigos.join(',')}|${aliados.join(',')}|${candidatos.join(',')}|${parceiro ?? ''}|${minhaVez ? 'vez' : ''}`;
+    if ((inimigos.length || parceiro || aliados.length) && candidatos.length && tabela && selecaoCache.chave !== chave) {
       selecaoCache = { ...selecaoCache, chave, sugestao: null };
       const [{ confrontoContra }, { sugerirPick }, Sin] = await Promise.all([import('./dados/confrontos.js'), import('./vivo/falas.js'), import('./dados/sinergia.js')]);
       const historico = parceiro ? duoHistorico(rota, candidatos, parceiro) : null;
-      selecaoCache.sugestao = await sugerirPick({ candidatos, rota, inimigosIds: inimigos, confrontoContra, tabela, opcoes: { regiao: config.runas?.regiao ?? 'br' }, parceiro, sinergia: parceiro ? Sin.melhoresCom({ candidatos, parceiro, souSup: rota === 'utility' }) : null, historico }).catch(() => null);
+      const [{ analisarPick }, { perfisDosCampeoes }] = await Promise.all([import('./vivo/analise-pick.js'), import('./dados/ddragon.js')]);
+      const perfis = await perfisDosCampeoes().catch(() => new Map());
+      const confrontos = new Map();
+      for (const nome of candidatos) {
+        const linhas = [];
+        for (const id of inimigos) { const c = await confrontoContra(nome, rota, id, { regiao: config.runas?.regiao ?? 'br' }).catch(() => null); if (c) linhas.push({ id, campeao: nomeDe(id), taxa: c.taxa, jogos: c.jogos }); }
+        confrontos.set(nome, linhas);
+      }
+      const sinergiaMap = new Map(parceiro ? Sin.melhoresCom({ candidatos, parceiro, souSup: rota === 'utility' }).map((x) => [x.nome, x]) : []);
+      const meusNumeros = new Map();
+      try { const chaveDb = { top: 'TOP', jungle: 'JUNGLE', middle: 'MID', bottom: 'ADC', utility: 'SUPORTE' }[rota]; const k = (n) => String(n ?? '').toLowerCase().replace(/[^a-z]/g, ''); for (const r of db.prepare('select meuCampeao c, count(*) n, sum(venci) v from partidas where minhaRole = ? group by c').all(chaveDb)) { const nome = candidatos.find((x) => k(x) === k(r.c)); if (nome) meusNumeros.set(nome, { jogos: r.n, vitorias: r.v }); } } catch { /* sem banco */ }
+      const aliadosNomes = aliados.map((id) => nomeDe(id)).filter((n) => n && n !== meuCampeaoAgora);
+      const an = analisarPick({ rota, candidatos, aliados: aliadosNomes, inimigos: inimigos.map((id) => nomeDe(id)).filter(Boolean), parceiro, confrontos, sinergia: sinergiaMap, historico: historico ?? {}, meusNumeros, perfis });
+      const lista = an.lista.map((r) => ({ nome: r.nome, total: r.total, media: r.total, contra: r.contra, fatores: r.fatores, sinergia: sinergiaMap.get(r.nome)?.nota ?? null, motivo: sinergiaMap.get(r.nome)?.motivo ?? null, historico: historico?.[r.nome] ?? null }));
+      // a voz só fala com 3+ deles vistos (ou na sua vez de escolher); antes é análise parcial
+      const fala = an.melhor && (inimigos.length >= 3 || minhaVez)
+        ? { serio: F`Pick: ${an.melhor.nome}${an.porque.length ? ' — ' + an.porque.slice(0, 2).join('; ') : ''}.`, divertido: F`Vai de ${an.melhor.nome}${an.porque.length ? ': ' + an.porque[0] : ''}.` }
+        : null;
+      selecaoCache.sugestao = { lista, fala, parceiro, oponente: an.oponente, completude: an.completude, avisos: an.avisos, porque: an.porque, resumoTime: an.resumoTime, parcial: inimigos.length < 3 && !minhaVez };
     }
     const meuCampeao = nomeDe(meu?.championId || meu?.championPickIntent) ?? null;
     // Seleção nova: zera o que já foi dito.

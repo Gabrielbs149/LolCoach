@@ -75,6 +75,9 @@ header>*{position:relative}
 .selecao .lista span{display:inline-flex;align-items:center;gap:6px;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-s);padding:3px 8px 3px 3px;font-size:12px}
 .selecao .lista img{width:24px;height:24px;border-radius:var(--r-s)}
 .selecao .sug{margin-top:12px;background:var(--f1);border:1px solid var(--ouro-escuro);border-radius:var(--r-m);padding:10px 12px}
+.selecao .anMeta{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px;font-size:11px;color:var(--fraco)} .selecao .anMeta span{background:var(--f2);border:1px solid var(--borda);border-radius:999px;padding:2px 8px} .selecao .anMeta .parcial{color:var(--u2);border-color:#5c4a22} .selecao .anMeta .completa{color:var(--vit)} .selecao .anMeta .aviso{color:var(--u3);border-color:#5c2226}
+.selecao .cand.top{background:#1a1810;border:1px solid var(--ouro-escuro);border-radius:var(--r-s)}
+.selecao .cand .vs i{display:inline-block;font-style:normal;margin:2px 6px 0 0;padding:1px 6px;border-radius:4px;background:var(--f2);color:var(--fraco);font-size:10.5px} .selecao .cand .vs i.v{color:var(--vit)} .selecao .cand .vs i.d{color:var(--der)}
 .selecao .sug .cand{display:grid;grid-template-columns:120px 1fr;gap:6px 10px;align-items:center;margin-top:6px;font-size:12.5px}
 .selecao .sug .cand b{font-variant-numeric:tabular-nums}
 .selecao .sug .cand .vs{display:flex;gap:6px;flex-wrap:wrap;color:var(--fraco);font-size:11px}
@@ -419,10 +422,12 @@ function desenharSelecao(sel){
     </div>
     ${sel.sugestaoBan?.length ? `<div class="sug" style="border-color:#5c2226"><b>Quem mais te ganha de ${esc(ROLE_NOME[sel.rota] ?? sel.rota)} — ban</b>
       <div class="lista" style="margin-top:6px">${sel.sugestaoBan.map(b => `<span>${icone(b.campeao, b.championId)}${esc(b.campeao)} <em style="color:var(--der);font-style:normal;margin-left:4px">${Math.round(b.taxa*100)}% em ${b.jogos}j</em></span>`).join('')}</div></div>` : ''}
-    ${sug?.lista?.length ? `<div class="sug"><b>Seus picks de ${esc(ROLE_NOME[sel.rota] ?? sel.rota)}${sug.parceiro ? ` com ${esc(sug.parceiro)}` : ''}${sel.inimigos.length ? ' contra o que eles travaram' : ''}</b>
-      ${sug.lista.map(r => `<div class="cand"><span>${icone(r.nome, porNome.get(chave(r.nome)))} ${esc(r.nome)} <b class="${(r.total ?? r.media)>=.52?'v':(r.total ?? r.media)<=.48?'d':''}">${(r.total ?? r.media) == null ? '—' : Math.round((r.total ?? r.media)*100) + '%'}</b></span>
-        <span class="vs">${[r.sinergia != null ? `duo ${Math.round(r.sinergia*100)}%${r.motivo ? ' — ' + esc(r.motivo) : ''}` : '', r.historico ? `você: ${r.historico.vitorias}/${r.historico.jogos} com ${esc(sug.parceiro)}` : '', ...r.contra.map(c => `${esc(c.campeao)} ${Math.round(c.taxa*100)}%`)].filter(Boolean).join(' · ') || 'sem amostra'}</span></div>`).join('')}</div>`
-      : (sel.inimigos.length ? '<div class="montando">calculando confrontos…</div>' : '')}
+    ${sug?.lista?.length ? `<div class="sug">
+      <b>Análise de pick · ${esc(ROLE_NOME[sel.rota] ?? sel.rota)}${sug.parceiro ? ` com ${esc(sug.parceiro)}` : ''}${sug.oponente ? ` · contra ${esc(sug.oponente)}` : ''}</b>
+      <div class="anMeta">${sug.parcial ? `<span class="parcial">parcial — ${sel.inimigos.length} de 5 deles</span>` : `<span class="completa">${sel.inimigos.length} de 5 deles</span>`}${sug.resumoTime ? `<span>nosso time: ${esc(sug.resumoTime)}</span>` : ''}${(sug.avisos ?? []).map(x => `<span class="aviso">${esc(x)}</span>`).join('')}</div>
+      ${sug.lista.map((r, i) => `<div class="cand ${i === 0 ? 'top' : ''}"><span>${icone(r.nome, porNome.get(chave(r.nome)))} ${esc(r.nome)} <b class="${r.total>=.55?'v':r.total<=.45?'d':''}">${r.total == null ? '—' : Math.round(r.total*100) + '%'}</b></span>
+        <span class="vs">${(r.fatores ?? []).map(f => `<i class="${f.nota>=.6?'v':f.nota<=.4?'d':''}">${esc(f.texto)}</i>`).join('') || 'sem dado ainda'}</span></div>`).join('')}</div>`
+      : (sel.inimigos.length || sel.aliados.length ? '<div class="montando">analisando…</div>' : '')}
   </div>`;
 }
 
