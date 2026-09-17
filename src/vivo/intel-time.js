@@ -54,6 +54,25 @@ const classeDe = (nome, tags) => {
  * `contraMim`: Map(nome → {jogos, vitorias}) — suas partidas contra esse campeão (banco).
  * `dicas`: Map(nome → [frases]) — "como jogar contra" do ddragon. `minhaRota`: bottom/utility/…
  */
+/**
+ * Runa preferida pelo confronto de lane. Devolve { runaId, motivo } ou null.
+ * Segunda Vento (8242) contra AP de poke na sua lane; Placa de Ossos (8473) contra assassino/all-in.
+ * Só vale pra quem joga lane (top/mid/adc/sup); jungle não tem oponente fixo.
+ */
+export function runaPorConfronto({ meuCampeao, minhaRota, inimigos = [], perfis = new Map() }) {
+  const minha = ROTA_PT[minhaRota] ?? minhaRota;
+  if (!minha || minha === 'jungle') return null;
+  const tags = (n) => perfis.get(n)?.tags ?? [];
+  const tomadas = new Set();
+  let oponente = null;
+  for (const nome of inimigos) { const rota = rotaProvavel(nome, tags(nome), tomadas); if (rota) tomadas.add(rota); if (rota === minha) oponente = nome; }
+  // só quando a rota dele é a natural (não sobrou pra ele por eliminação: Lulu "mid" porque o sup já tinha dono)
+  if (!oponente || rotaProvavel(oponente, tags(oponente), new Set()) !== minha) return null;
+  const dano = perfis.get(oponente)?.dano ?? null, t = tags(oponente);
+  if (ASSASSINOS.has(oponente) || (t.includes('Assassin') && dano === 'ad')) return { runaId: 8473, motivo: `${oponente} é all-in: Placa de Ossos` };
+  if (dano === 'ap' && (t.includes('Mage') || POKE.has(oponente))) return { runaId: 8242, motivo: `${oponente} é AP de poke: Segunda Vento` };
+  return null;
+}
 export function intelDoTime({ inimigos = [], bans = [], perfis = new Map(), contraMim = new Map(), dicas = new Map(), minhaRota = null, meuCampeao = null }) {
   const tags = (n) => perfis.get(n)?.tags ?? [];
   const dano = (n) => perfis.get(n)?.dano ?? null;

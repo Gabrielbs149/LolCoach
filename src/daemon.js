@@ -1252,8 +1252,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const E = await import('./analise/estatisticas.js');
       const chaveDb = { top: 'TOP', jungle: 'JUNGLE', middle: 'MID', bottom: 'ADC', utility: 'SUPORTE' }[rota];
       const logada = estado?.instantaneo?.().conta ?? null;
-      sugestaoBan = (E.piores(db, { minimo: 5, conta: logada ? logada.split('#')[0] : null })[chaveDb] ?? []).filter((x) => x.custo > 0.5).slice(0, 2);
+      sugestaoBan = (E.piores(db, { minimo: 5, conta: logada ? logada.split('#')[0] : null })[chaveDb] ?? []).filter((x) => x.custo > 0.5).slice(0, 2).map((x) => ({ ...x, motivo: 'te ganha no seu histórico' }));
     } catch { /* sem histórico */ }
+    // Sem histórico suficiente (ou além dele): quem mais counteira o SEU pick principal no op.gg (amostra grande)
+    try {
+      const principal = meuCampeao ?? candidatos[0] ?? null;
+      if (principal && sugestaoBan.length < 2 && !inimigos.length) {
+        const chaveB = `${principal}|${rota}`;
+        if (selecaoCache.chaveBan !== chaveB) {
+          const { confrontosDe } = await import('./dados/confrontos.js');
+          const tabelaC = await confrontosDe(principal, rota, { regiao: config.runas?.regiao ?? 'br' });
+          const banidos = new Set([...(s.bans?.myTeamBans ?? []), ...(s.bans?.theirTeamBans ?? [])]);
+          selecaoCache.chaveBan = chaveB;
+          selecaoCache.banMeta = [...tabelaC.values()].filter((c) => c.jogos >= 150 && c.taxa <= 0.47 && !banidos.has(c.id)).sort((a, b) => a.taxa - b.taxa).slice(0, 2)
+            .map((c) => ({ campeao: nomeDe(c.id), championId: c.id, taxa: c.taxa, jogos: c.jogos, motivo: `counter do ${principal} no op.gg` }));
+        }
+        for (const b of selecaoCache.banMeta ?? []) if (sugestaoBan.length < 2 && !sugestaoBan.some((x) => x.campeao === b.campeao)) sugestaoBan.push(b);
+      }
+    } catch { /* sem op.gg */ }
     const { falasDaSelecao } = await import('./vivo/falas.js');
     const runas = ultimasRunas && meuCampeao && ultimasRunas.campeao === meuCampeao ? ultimasRunas : null;
     // Intel do time deles: cada campeão travado (rota provável, classe, dano, CC, seu histórico contra, dica) e o time como um todo

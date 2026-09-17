@@ -431,8 +431,8 @@ function desenharSelecao(sel){
       ${sel.intel.bans?.length ? `<div class="anMeta"><span>eles baniram: ${sel.intel.bans.map(esc).join(', ')}</span></div>` : ''}
       ${sel.intel.lista.map(x => `<div class="cand ${x.ameaca ? 'ameaca' : ''}"><span>${icone(x.nome, porNome.get(chave(x.nome)))} ${esc(x.nome)} <em class="rota">${esc(x.rota ?? '?')}</em></span>
         <span class="vs"><i>${esc(x.classe)}${x.dano ? ' · ' + x.dano.toUpperCase() : ''}</i>${x.ameaca ? '<i class="d">ameaça pra você</i>' : ''}${x.marcas.map(m => `<i>${esc(m)}</i>`).join('')}${x.contraMim ? `<i class="${x.contraMim.vitorias / x.contraMim.jogos >= .55 ? 'v' : x.contraMim.vitorias / x.contraMim.jogos <= .45 ? 'd' : ''}">você contra ele: ${x.contraMim.vitorias}/${x.contraMim.jogos}</i>` : ''}${x.dica ? `<i class="dica">${esc(x.dica)}</i>` : ''}</span></div>`).join('')}</div>` : ''}
-    ${sel.sugestaoBan?.length ? `<div class="sug" style="border-color:#5c2226"><b>Quem mais te ganha de ${esc(ROLE_NOME[sel.rota] ?? sel.rota)} — ban</b>
-      <div class="lista" style="margin-top:6px">${sel.sugestaoBan.map(b => `<span>${icone(b.campeao, b.championId)}${esc(b.campeao)} <em style="color:var(--der);font-style:normal;margin-left:4px">${Math.round(b.taxa*100)}% em ${b.jogos}j</em></span>`).join('')}</div></div>` : ''}
+    ${sel.sugestaoBan?.length ? `<div class="sug" style="border-color:#5c2226"><b>Ban sugerido · ${esc(ROLE_NOME[sel.rota] ?? sel.rota)}</b>
+      <div class="lista" style="margin-top:6px">${sel.sugestaoBan.map(b => `<span>${icone(b.campeao, b.championId)}${esc(b.campeao)} <em style="color:var(--der);font-style:normal;margin-left:4px">${Math.round(b.taxa*100)}% em ${b.jogos}j</em>${b.motivo ? `<small style="opacity:.7;margin-left:6px">${esc(b.motivo)}</small>` : ''}</span>`).join('')}</div></div>` : ''}
     ${sug?.travado ? `<div class="sug"><b>Travado: ${esc(sug.travado)}</b> <small>análise de pick encerrada</small></div>` : ''}
     ${sug?.lista?.length ? `<div class="sug">
       <b>Análise de pick · ${esc(ROLE_NOME[sel.rota] ?? sel.rota)}${sug.parceiro ? ` com ${esc(sug.parceiro)}` : ''}${sug.oponente ? ` · contra ${esc(sug.oponente)}` : ''}</b>

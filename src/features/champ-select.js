@@ -1,4 +1,5 @@
 import { aplicarBuildDoOpgg, aplicarSpells } from './runas.js';
+import { runaPorConfronto } from '../vivo/intel-time.js';
 import { aplicarConjunto } from './item-sets.js';
 import { writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -249,13 +250,25 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
       fase.runasDe = meuCampeaoId;
       const nome = tabela.porId.get(meuCampeaoId);
       try {
+        // Runa por confronto: quem provavelmente é o seu oponente de lane e o que ele faz (AP de poke → Segunda
+        // Vento; all-in/assassino → Placa de Ossos) — só troca pra uma página que os jogadores já usam
+        let preferirRuna = null;
+        try {
+          const delesIds = (sessao.theirTeam ?? []).map((c) => c.championId).filter((id) => id > 0);
+          if (delesIds.length && config.runas?.porConfronto !== false) {
+            const { perfisDosCampeoes } = await import('../dados/ddragon.js');
+            const perfis = await perfisDosCampeoes().catch(() => new Map());
+            preferirRuna = runaPorConfronto({ meuCampeao: nome, minhaRota: role, inimigos: delesIds.map((id) => tabela.porId.get(id)).filter(Boolean), perfis });
+          }
+        } catch { /* sem confronto, página popular */ }
         const build = await aplicarBuildDoOpgg(lcu, nome, role, {
+          preferirRuna,
           regiao: config.runas?.regiao ?? 'br',
           criterio: config.runas?.criterio ?? 'popular',
           aplicarSpells: config.runas?.aplicarSpells === true,
           paginaAlvo: config.runas?.paginaAlvo ?? null,
         });
-        log(`runas de ${nome} ${build.role} aplicadas (${build.runas.estatistica}, ${build.fonte})`);
+        log(`runas de ${nome} ${build.role} aplicadas (${build.runas.estatistica}, ${build.fonte})${build.runas.porConfronto ? ` — por confronto: ${build.runas.porConfronto}` : ''}`);
         aoRunas({ campeao: nome, build });
         // O conjunto de itens da loja pra este campeão nesta role — usa o mesmo
         // cache do op.gg, então quase sempre é instantâneo.

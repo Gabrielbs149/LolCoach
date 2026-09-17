@@ -48,8 +48,15 @@ async function buscarJson(url) {
  *  - 'vitoria': a de maior taxa de vitória entre as que têm amostra decente,
  *    pra não pegar uma build de 12 partidas com 70% de winrate
  */
-function escolherBuild(builds, criterio) {
+function escolherBuild(builds, criterio, preferir = null) {
   if (!builds?.length) return null;
+  // Confronto: entre as páginas que os jogadores usam de verdade (≥ 10% da mais jogada), a que tem a runa
+  // pedida (Segunda Vento contra AP de poke, Placa de Ossos contra all-in). Nunca inventa página.
+  if (preferir?.runaId) {
+    const maior = builds.reduce((a, b) => (b.play > a.play ? b : a));
+    const comRuna = builds.filter((b) => b.play >= maior.play * 0.1 && [...(b.primary_rune_ids ?? []), ...(b.secondary_rune_ids ?? [])].includes(preferir.runaId));
+    if (comRuna.length) return { ...comRuna.reduce((a, b) => (b.play > a.play ? b : a)), porConfronto: preferir.motivo };
+  }
   if (criterio === 'vitoria') {
     const totalJogos = builds.reduce((s, b) => s + b.play, 0);
     const minimo = Math.max(50, totalJogos * 0.03);
@@ -64,7 +71,8 @@ function escolherBuild(builds, criterio) {
  * Busca a build de um campeão numa role.
  * `criterio` aceita 'popular' (padrão) ou 'vitoria'.
  */
-export async function buscarBuild(nomeCampeao, role, { regiao = 'br', criterio = 'popular' } = {}) {
+export async function buscarBuild(nomeCampeao, role, opcoes = {}) {
+  const { regiao = 'br', criterio = 'popular' } = opcoes;
   const slug = slugDoCampeao(nomeCampeao);
   const pos = ROLE_OPGG[role] ?? String(role).toLowerCase();
   const url = `${BASE}/${regiao}/champions/ranked/${slug}/${pos}`;
@@ -72,7 +80,7 @@ export async function buscarBuild(nomeCampeao, role, { regiao = 'br', criterio =
   const j = await buscarJson(url);
   const d = j.data ?? j;
 
-  const runa = escolherBuild(d.runes, criterio);
+  const runa = escolherBuild(d.runes, criterio, opcoes.preferirRuna ?? null);
   if (!runa) throw new Error(`op.gg não tem build de ${nomeCampeao} em ${pos}`);
 
   const spells = escolherBuild(d.summoner_spells, criterio);
@@ -89,6 +97,7 @@ export async function buscarBuild(nomeCampeao, role, { regiao = 'br', criterio =
       // A LCU espera exatamente nesta ordem: 4 da primária, 2 da secundária, 3 fragmentos.
       selectedPerkIds: [...runa.primary_rune_ids, ...runa.secondary_rune_ids, ...runa.stat_mod_ids],
       estatistica: taxa(runa),
+      porConfronto: runa.porConfronto ?? null,
     },
     spells: spells ? { ids: spells.ids, estatistica: taxa(spells) } : null,
     itens: {

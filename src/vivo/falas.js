@@ -304,7 +304,8 @@ export function falasDaSelecao({ rota, inimigos, aliados, meuCampeao, sugestaoBa
   const rotaFala = ROLE_FALA[{ top: 'top', jungle: 'jungle', middle: 'mid', bottom: 'adc', utility: 'sup' }[rota] ?? rota] ?? rota;
   if (sugestaoBan?.length) {
     const [a, b] = sugestaoBan;
-    dizer('ban', F`Ban sugerido: ${a.campeao}.${b ? ` Ou ${b.campeao}.` : ''}`, F`Ban sugerido: ${a.campeao}.${b ? ` Ou ${b.campeao}.` : ''}`, 2);
+    const pq = (x) => x.motivo?.startsWith('counter') ? ` (${Math.round(x.taxa * 100)}% contra ${x.motivo.replace('counter do ', '').replace(' no op.gg', '')})` : '';
+    dizer('ban', F`Ban sugerido: ${a.campeao}${pq(a)}.${b ? ` Ou ${b.campeao}${pq(b)}.` : ''}`, F`Ban sugerido: ${a.campeao}.${b ? ` Ou ${b.campeao}.` : ''}`, 2);
   }
   // Jungler deles: quem é e o que fazer contra (só se for campeão de jungle).
   if (junglerDeles) dizer(`jg-${junglerDeles.nome}`, F`Jungler deles: ${junglerDeles.nome}, ${junglerDeles.dica}.`, F`Jungler deles é ${junglerDeles.nome}: ${junglerDeles.dica}.`, 2);
