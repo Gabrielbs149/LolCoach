@@ -437,14 +437,28 @@ async function quadro() {
     const nomesEscala = [meuCampeao, ...aliados.filter((j) => !j.morto).map((j) => j.campeao)].filter(Boolean);
     if (nomesEscala.length && (!escala || (!escala.confiavel && agora - escala.em > 5000) || (escala.confiavel && agora - escala.em > 60000 && fracoDesde && agora - fracoDesde > 30000))) {
       escala = { ...(escala ?? {}), em: agora };
-      let melhor = { media: -1, d: 0 };
-      for (let d = Math.round(s * 0.05); d <= Math.round(s * 0.11); d += 1) {
+      // Template pequeno demais
+      // pontua alto em qualquer lugar (meia-resolução com 7 px é quase ruído), então
+      // a busca fica na faixa 6,5–10% e a nota é a da confirmação em cor cheia;
+      // o tamanho padrão só perde se outro ganhar dele com folga (0,04).
+      // Medido: o ícone NÃO acompanha o minimapa (26–28 px com minimapa de 321, 24–26 px com 275):
+      // ele acompanha a tela (~2,35% da altura: 25 px em 1080p). A busca fica em ±30% disso.
+      const padrao = Math.round(H * 0.0235);
+      const medias = new Map();
+      for (let d = Math.round(padrao * 0.7); d <= Math.round(padrao * 1.3); d += 1) {
         let soma = 0, n = 0;
-        for (const nome of nomesEscala) { const t = await template(nome, d); if (!t) continue; const [p] = buscar(m, t, null, 1); if (p) { soma += p.score; n++; } }
-        if (n && soma / n > melhor.media) melhor = { media: soma / n, d };
+        for (const nome of nomesEscala) {
+          const t = await template(nome, d); if (!t) continue;
+          const [p] = buscar(m, t, null, 1); if (!p) continue;
+          const c = confirmar(rgba, s, t, p.x * 2, p.y * 2);   // buscar devolve o canto em meia-resolução
+          soma += c.score; n++;
+        }
+        if (n) medias.set(d, soma / n);
       }
+      let melhor = { media: medias.get(padrao) ?? -1, d: padrao };
+      for (const [d, media] of medias) if (media > melhor.media + 0.04 || (Math.abs(d - padrao) < Math.abs(melhor.d - padrao) && media > melhor.media)) melhor = { media, d };
       if (melhor.media >= 0.7 || (melhor.media >= 0.6 && nomesEscala.length >= 3)) { const antes = escala.d; escala = { d: melhor.d, score: Math.round(melhor.media * 100) / 100, confiavel: true, em: agora }; if (antes !== melhor.d) log(`ícone: ${melhor.d}px (média ${escala.score} em ${nomesEscala.length} ícones)`); fracoDesde = 0; }
-      else if (!escala.d) { escala = { d: Math.round(s * 0.081), score: 0, confiavel: false, em: agora }; log(`tamanho do ícone incerto (melhor média ${Math.round(melhor.media * 100) / 100} com ${melhor.d}px); usando ${escala.d}px por enquanto`); }
+      else if (!escala.d) { escala = { d: Math.round(H * 0.0235), score: 0, confiavel: false, em: agora }; log(`tamanho do ícone incerto (melhor média ${Math.round(melhor.media * 100) / 100} com ${melhor.d}px); usando ${escala.d}px por enquanto`); }
     }
     if (!escala?.d) return;
     const d = escala.d;

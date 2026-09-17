@@ -1,4 +1,5 @@
 import { nomeItem as apelido } from './itens-nomes.js';
+import { torreInfo } from './torres.js';
 /**
  * Onde cada inimigo foi visto por último — só pelo que é público.
  *
@@ -95,7 +96,7 @@ export function rastrear(estado, mem) {
     } else if (e.tipo === 'TurretKilled' && e.autor) {
       // O nome da torre diz a lane: Turret_T1_C_05_A → C = mid; L/R são as
       // laterais e variam de lado, então só o mid é afirmado com certeza.
-      const lane = /_C_/.test(e.torre ?? '') ? 'mid' : null;
+      const lane = torreInfo(e.torre)?.lane ?? null;
       marcar(e.autor, e.t, lane, `derrubou torre${lane ? ` no ${lane}` : ''}`);
     }
   }

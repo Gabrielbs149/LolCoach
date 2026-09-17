@@ -10,6 +10,7 @@
 
 import { F } from './texto.js';
 import { nomeItem } from './itens-nomes.js';
+import { torreInfo } from './torres.js';
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const ROLE_FALA = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'ADC', sup: 'suporte' };
@@ -118,13 +119,11 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       if (n === 3) dizer(`horde-${e.id}`, 'timers', F('Vastilarvas nossas.'), F('Vastilarvas nossas.'), 1);
     }
     if (e.tipo === 'TurretKilled' && e.torre) {
-      const m = String(e.torre).match(/Turret_T(\d)_([LRC])_(\d\d)/);
-      const nossa = m ? Number(m[1]) === (eu.time === 100 ? 1 : 2) : !ehAliado(e.autor);
-      // Letras são do ponto de vista de cada base: pro time vermelho (T2) L é o bot e R é o top.
-      const lane = m ? (m[1] === '2' ? { L: 'bot', C: 'mid', R: 'top' } : { L: 'top', C: 'mid', R: 'bot' })[m[2]] : '';
-      const inib = m && ((m[2] === 'C' && m[3] === '03') || (m[2] !== 'C' && m[3] === '01'));
-      const nexus = m && m[2] === 'C' && (m[3] === '01' || m[3] === '02');
-      if (nexus) continue;
+      const ti = torreInfo(e.torre);
+      const nossa = ti ? ti.time === eu.time : !ehAliado(e.autor);
+      const lane = ti?.lane ?? '';
+      const inib = ti?.camada === 'inib';
+      if (ti?.camada === 'nexus') continue;
       if (!lane) dizer(`tk-${e.id}`, 'timers', nossa ? F('Torre nossa caiu.') : F('Torre deles caiu.'), nossa ? F('Torre nossa caiu.') : F('Torre deles caiu.'), nossa ? 1 : 2);
       else if (nossa) dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? 3 : 1);
       else dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, 2);
@@ -187,7 +186,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
 
   /* ---- torres: vantagem ---- */
   const torres = eventos.filter((e) => e.tipo === 'TurretKilled' && e.torre);
-  const minhasT = torres.filter((e) => { const t = String(e.torre).match(/Turret_T(\d)/)?.[1]; return t ? Number(t) !== (eu.time === 100 ? 1 : 2) : ehAliado(e.autor); }).length;
+  const minhasT = torres.filter((e) => { const ti = torreInfo(e.torre); return ti ? ti.time !== eu.time : ehAliado(e.autor); }).length;
   const delasT = torres.length - minhasT;
   if (minhasT - delasT >= 3 && (minhasT - delasT) % 2 === 1) dizer(`torres-${minhasT - delasT}`, 'timers', F`${minhasT - delasT} torres na frente.`, F`${minhasT - delasT} torres na frente.`, 1);
   else if (delasT - minhasT >= 3 && (delasT - minhasT) % 2 === 1) dizer(`torres--${delasT - minhasT}`, 'timers', F`${delasT - minhasT} torres atrás.`, F`${delasT - minhasT} torres atrás.`, 1);

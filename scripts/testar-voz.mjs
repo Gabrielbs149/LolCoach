@@ -86,6 +86,13 @@ console.log('cérebro');
   ok(r7[0].falar, 'lane por dados.para conta como minha lane');
 }
 
+console.log('torres');
+{
+  const { torreInfo } = await import('../src/vivo/torres.js');
+  ok(JSON.stringify(torreInfo('Turret_TOrder_L0_P3_3812066093_0')) === JSON.stringify({ time: 100, lane: 'bot', camada: 'externa' }), 'Order L0 P3 = azul, bot, externa');
+  ok(JSON.stringify(torreInfo('Turret_TChaos_L2_P1_1_0')) === JSON.stringify({ time: 200, lane: 'top', camada: 'inib' }), 'Chaos L2 P1 = vermelho, top, inibidor');
+  ok(torreInfo('Turret_TOrder_L1_P5_1_0').camada === 'nexus' && torreInfo('Turret_T2_L_03_A').lane === 'bot' && torreInfo('nada') === null, 'nexus, formato antigo, desconhecido');
+}
 console.log('pesos');
 {
   const P = await import('../src/vivo/pesos.js');
