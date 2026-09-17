@@ -471,14 +471,13 @@ async function lerPlacar(agora) {
   if (res.length) { const md = res.sort((p, q) => p - q)[Math.floor(res.length / 2)]; if (md <= P / 2) off = md; else { off = P - md; base = yMin - off; } }
   if (off < dm - 2 || off > dm + 6) return null;
   const grade = { P, off, base };
-  // Um lado sem Flash claro (todos gastos, ou ninguém com Flash): a coluna dele fica a ~7,7 passos da outra
-  // (medido no placar); varre ±12 px em volta e fica com o x que mais parece Flash somando as 5 linhas
+  // Um lado sem Flash claro (todos gastos, ou ninguém com Flash): a coluna dele fica a ~7,1 passos da outra
+  // (medido no placar do jogo dele: 540 px pra 76 px de passo); varre ±0,6 passo e fica com o x que mais parece Flash
   if (xEsq == null || xDir == null) {
-    // (a distância escala com o HUD como o passo das linhas: 587 px pra 76 px de passo a 1080p = 7,7 P)
-    const temEsq = xEsq != null, est = Math.round(temEsq ? xEsq + P * 7.72 : xDir - P * 7.72);
+    const temEsq = xEsq != null, est = Math.round(temEsq ? xEsq + P * 7.1 : xDir - P * 7.1), faixa = Math.round(P * 0.6);
     const slots = padraoPlacar?.[temEsq ? 'dir' : 'esq'] ?? [];
     let melhorX = null;
-    for (let cx = est - 12; cx <= est + 12; cx++) {
+    for (let cx = est - faixa; cx <= est + faixa; cx++) {
       let soma = 0;
       for (let k = 0; k < 5; k++) for (const sl of [0, 1]) {
         if (slots[k] != null && slots[k] !== sl) continue;   // só o espaço onde o Flash desse jogador está
@@ -511,7 +510,8 @@ async function lerPlacar(agora) {
     return { x: x0 + px + d / 2, y: y0 + py + d / 2, cinza: Math.round(a.score * 100) / 100, cor: Math.round(cor.score * 100) / 100, brilho: Math.round(lums[Math.floor(lums.length / 2)] / t.brilhoMediana * 100) / 100, brancos: Math.round(brancos / lums.length * 100) / 100 };
   };
   const claro = (s) => s && s.cinza >= 0.55 && s.cor >= 0.55;
-  const escuro = (s) => s && s.cinza >= 0.3 && (s.brilho < 0.6 || s.brancos >= 0.08);
+  // escuro provisório (só pra pontuar a hipótese); o definitivo é relativo ao brilho dos claros da mesma coluna
+  const escuro = (s) => s && !claro(s) && s.cinza >= 0.3 && (s.brilho < 0.6 || s.brancos >= 0.05);
   const ehFlash = (s) => claro(s) || escuro(s);
   let melhorH = null;
   for (const b of [grade.base, grade.base - grade.off]) {
@@ -533,6 +533,15 @@ async function lerPlacar(agora) {
     }
   }
   if (!melhorH || melhorH.pontos < 4) return null;
+  // Escuro DEFINITIVO: no placar do jogo dele a coluna da esquerda vinha com o ícone escurecido (brilho 0,37 do
+  // original) mesmo com o Flash na mão, e a da direita a 0,98 — brilho absoluto não serve. Referência = mediana do
+  // brilho dos CLAROS da mesma coluna; escuro = não é claro, tem algo ali (cinza ≥ 0,3) e ou brilho < 0,6 da
+  // referência ou ≥ 5% de pixels brancos (o número da recarga). Sem claro na coluna: só pelo branco.
+  for (const lado of ['esq', 'dir']) {
+    const claros = melhorH[lado].filter((l) => l && l.claro).map((l) => l.brilho).sort((p, q) => p - q);
+    const ref = claros.length ? claros[Math.floor(claros.length / 2)] : null;
+    for (const l of melhorH[lado]) if (l) l.escuro = !l.claro && l.cinza >= 0.3 && (l.brancos >= 0.05 || (ref != null && l.brilho < 0.6 * ref));
+  }
   // cada linha: só o espaço do Flash daquele jogador (null = sem Flash / não medido), com claro/escuro decidido aqui
   return { d, passo: grade.P * 2, off: grade.off * 2, pontos: melhorH.pontos, esq: melhorH.esq, dir: melhorH.dir };
 }

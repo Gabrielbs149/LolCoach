@@ -1155,10 +1155,18 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const cellParceiro = posParceiro ? (s.myTeam ?? []).find((c) => c.assignedPosition === posParceiro && c.cellId !== s.localPlayerCellId) : null;
     let parceiro = cellParceiro ? nomeDe(cellParceiro.championId || cellParceiro.championPickIntent) : null;
     if (!parceiro && posParceiro) { const Sin = await import('./dados/sinergia.js'); const teste = posParceiro === 'utility' ? Sin.ehSup : Sin.ehAdc; parceiro = (s.myTeam ?? []).filter((c) => c.cellId !== s.localPlayerCellId).map((c) => nomeDe(c.championId || c.championPickIntent)).find((n) => n && teste(n)) ?? null; }
-    const minhaVez = (s.actions ?? []).flat().some((a) => a.actorCellId === s.localPlayerCellId && a.type === 'pick' && a.isInProgress && !a.completed);
+    const minhasAcoes = (s.actions ?? []).flat().filter((a) => a.actorCellId === s.localPlayerCellId && a.type === 'pick');
+    const minhaVez = minhasAcoes.some((a) => a.isInProgress && !a.completed);
+    // Travei = meu pick completou (ou já tenho campeão e a minha vez passou); escolhi = já apontei alguém (hover/intent)
+    const travei = minhasAcoes.some((a) => a.completed) || ((meu?.championId ?? 0) > 0 && !minhaVez && minhasAcoes.length > 0);
+    const escolhi = (meu?.championId ?? 0) > 0 || (meu?.championPickIntent ?? 0) > 0;
     const meuCampeaoAgora = nomeDe(meu?.championId || meu?.championPickIntent) ?? null;
-    const chave = `${rota}|${inimigos.join(',')}|${aliados.join(',')}|${candidatos.join(',')}|${parceiro ?? ''}|${minhaVez ? 'vez' : ''}`;
-    if ((inimigos.length || parceiro || aliados.length) && candidatos.length && tabela && selecaoCache.chave !== chave) {
+    if (selecaoMem.gameId !== (s.gameId ?? null)) selecaoMem = { gameId: s.gameId ?? null, ditas: new Set(), falas: [] };
+    const chave = `${rota}|${inimigos.join(',')}|${aliados.join(',')}|${candidatos.join(',')}|${parceiro ?? ''}|${minhaVez ? 'vez' : ''}|${travei ? 'travei' : escolhi ? 'escolhi' : ''}`;
+    if (travei && selecaoCache.chave !== chave) {
+      // já travou: parou de sugerir — a tela mostra o que travou e a voz não passa mais "buneco"
+      selecaoCache = { ...selecaoCache, chave, sugestao: meuCampeaoAgora ? { lista: [], fala: null, travado: meuCampeaoAgora, parcial: false } : null };
+    } else if ((inimigos.length || parceiro || aliados.length) && candidatos.length && tabela && selecaoCache.chave !== chave) {
       selecaoCache = { ...selecaoCache, chave, sugestao: null };
       const [{ confrontoContra }, { sugerirPick }, Sin] = await Promise.all([import('./dados/confrontos.js'), import('./vivo/falas.js'), import('./dados/sinergia.js')]);
       const historico = parceiro ? duoHistorico(rota, candidatos, parceiro) : null;
@@ -1177,10 +1185,13 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const an = analisarPick({ rota, candidatos, aliados: aliadosNomes, inimigos: inimigos.map((id) => nomeDe(id)).filter(Boolean), parceiro, confrontos, sinergia: sinergiaMap, historico: historico ?? {}, meusNumeros, perfis });
       const lista = an.lista.map((r) => ({ nome: r.nome, total: r.total, media: r.total, contra: r.contra, fatores: r.fatores, sinergia: sinergiaMap.get(r.nome)?.nota ?? null, motivo: sinergiaMap.get(r.nome)?.motivo ?? null, historico: historico?.[r.nome] ?? null }));
       // a voz só fala com 3+ deles vistos (ou na sua vez de escolher); antes é análise parcial
-      const fala = an.melhor && (inimigos.length >= 3 || minhaVez)
+      selecaoMem.sugeridos ??= [];
+      const podeFalar = an.melhor && !escolhi && (inimigos.length >= 3 || minhaVez) && !selecaoMem.sugeridos.includes(an.melhor.nome) && selecaoMem.sugeridos.length < 3;
+      if (podeFalar) selecaoMem.sugeridos.push(an.melhor.nome);
+      const fala = podeFalar
         ? { serio: F`Pick: ${an.melhor.nome}${an.porque.length ? ' — ' + an.porque.slice(0, 2).join('; ') : ''}.`, divertido: F`Vai de ${an.melhor.nome}${an.porque.length ? ': ' + an.porque[0] : ''}.` }
         : null;
-      selecaoCache.sugestao = { lista, fala, parceiro, oponente: an.oponente, completude: an.completude, avisos: an.avisos, porque: an.porque, resumoTime: an.resumoTime, parcial: inimigos.length < 3 && !minhaVez };
+      selecaoCache.sugestao = { lista, fala, parceiro, oponente: an.oponente, completude: an.completude, avisos: an.avisos, porque: an.porque, resumoTime: an.resumoTime, parcial: inimigos.length < 3 && !minhaVez, escolhido: escolhi ? meuCampeaoAgora : null };
     }
     const meuCampeao = nomeDe(meu?.championId || meu?.championPickIntent) ?? null;
     // Seleção nova: zera o que já foi dito.
