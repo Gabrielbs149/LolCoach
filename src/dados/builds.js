@@ -93,6 +93,12 @@ export async function buildsDoCampeao(nome, role, { regiao = 'br' } = {}) {
   let d;
   try { d = await baixar(slug, pos, regiao); }
   catch (erro) { if (cache) return cache; throw erro; }
+  // Role fora do normal (Ahri jungle: 6 jogos): itens de 1–2 partidas não valem nada — usa a role principal
+  if ((d.runes ?? []).reduce((a, r) => a + (r.play ?? 0), 0) < 100) {
+    const principal = (d.summary?.positions ?? []).slice().sort((a, b) => (b.stats?.play ?? 0) - (a.stats?.play ?? 0))[0];
+    const posP = principal ? (ROLE_OPGG[principal.name] ?? String(principal.name).toLowerCase()) : null;
+    if (posP && posP !== pos) { const c2 = await lerCache(arquivo(posP)); if (c2 && Date.now() - c2.em < VALIDADE) return c2; pos = posP; d = await baixar(slug, pos, regiao); }
+  }
 
   const [itens, runas, feiticos] = await Promise.all([tabelaDeItens(), tabelaDeRunas(), tabelaDeFeiticos()]);
 

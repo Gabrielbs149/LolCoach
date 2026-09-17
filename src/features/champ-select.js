@@ -268,7 +268,7 @@ export function autoChampSelect(lcu, config, { log = () => {}, permite = () => t
           aplicarSpells: config.runas?.aplicarSpells === true,
           paginaAlvo: config.runas?.paginaAlvo ?? null,
         });
-        log(`runas de ${nome} ${build.role} aplicadas (${build.runas.estatistica}, ${build.fonte})${build.runas.porConfronto ? ` — por confronto: ${build.runas.porConfronto}` : ''}`);
+        log(`runas de ${nome} ${build.role} aplicadas (${build.runas.estatistica}, ${build.fonte})${build.runas.porConfronto ? ` — por confronto: ${build.runas.porConfronto}` : ''}${build.roleTrocada ? ` — ${build.roleTrocada}` : ''}`);
         aoRunas({ campeao: nome, build });
         // O conjunto de itens da loja pra este campeão nesta role — usa o mesmo
         // cache do op.gg, então quase sempre é instantâneo.

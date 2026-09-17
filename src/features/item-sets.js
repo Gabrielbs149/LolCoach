@@ -91,7 +91,7 @@ export async function aplicarConjunto(lcu, nome, championId, role = null, opcoes
   const atual = await lcu.get(`/lol-item-sets/v1/item-sets/${eu.summonerId}/sets`).catch(() => null);
   const tem = (atual?.itemSets ?? []).some((s) => s.uid === conjunto.uid && (s.associatedChampions ?? []).includes(championId));
   if (!tem) { await gravarConjuntos(lcu, [conjunto]); }
-  return { campeao: nome, role: build.roleNome, blocos: conjunto.blocks.length, conferido: tem, core: (build.itens?.principais?.[0]?.itens ?? []).join(',') };
+  return { campeao: nome, role: build.roleNome, blocos: conjunto.blocks.length, conferido: tem, core: (build.itens?.principais?.[0]?.itens ?? []).map((x) => x?.nome ?? x?.id ?? x).join(',') };
 }
 
 /**

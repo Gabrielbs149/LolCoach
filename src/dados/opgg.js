@@ -77,18 +77,31 @@ export async function buscarBuild(nomeCampeao, role, opcoes = {}) {
   const pos = ROLE_OPGG[role] ?? String(role).toLowerCase();
   const url = `${BASE}/${regiao}/champions/ranked/${slug}/${pos}`;
 
-  const j = await buscarJson(url);
-  const d = j.data ?? j;
+  let j = await buscarJson(url);
+  let d = j.data ?? j;
+  // Role fora do normal (Ahri jungle, Lux top…): o op.gg devolve páginas de 1–2 jogos, que não valem nada.
+  // Com menos de 100 jogos na role, pega a role principal do campeão (a mais jogada no summary).
+  let posUsada = pos, roleTrocada = null;
+  const totalRole = (d.runes ?? []).reduce((a, r) => a + (r.play ?? 0), 0);
+  if (totalRole < 100) {
+    const principal = (d.summary?.positions ?? []).slice().sort((a, b) => (b.stats?.play ?? 0) - (a.stats?.play ?? 0))[0];
+    const posP = principal ? (ROLE_OPGG[principal.name] ?? String(principal.name).toLowerCase()) : null;
+    if (posP && posP !== pos) {
+      j = await buscarJson(`${BASE}/${regiao}/champions/ranked/${slug}/${posP}`); d = j.data ?? j;
+      posUsada = posP; roleTrocada = `${pos} tem só ${totalRole} jogos, usei ${posP}`;
+    }
+  }
 
   const runa = escolherBuild(d.runes, criterio, opcoes.preferirRuna ?? null);
-  if (!runa) throw new Error(`op.gg não tem build de ${nomeCampeao} em ${pos}`);
+  if (!runa) throw new Error(`op.gg não tem build de ${nomeCampeao} em ${posUsada}`);
 
   const spells = escolherBuild(d.summoner_spells, criterio);
   const taxa = (b) => (b?.play ? `${Math.round((b.win / b.play) * 100)}% em ${b.play.toLocaleString('pt-BR')} jogos` : '');
 
   return {
     campeao: nomeCampeao,
-    role: pos,
+    role: posUsada,
+    roleTrocada,
     fonte: `op.gg/${regiao}`,
     criterio,
     runas: {
