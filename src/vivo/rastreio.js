@@ -135,7 +135,7 @@ export function rastrear(estado, mem) {
     mem.niveis.set(j.nome, j.nivel);
 
     // Morto agora: a "última posição" é a base, com hora exata de volta.
-    if (j.morto) marcar(j.nome, tempo, 'base', `morto, volta em ${Math.round(j.renasceEm)}s`);
+    if (j.morto) marcar(j.nome, tempo, 'base', j.renasceEm > 0 ? `morto, volta em ${Math.round(j.renasceEm)}s` : 'morreu agora');
   }
 
   /* ---- 3. vantagem de nível de quem divide a lane com você ---- */

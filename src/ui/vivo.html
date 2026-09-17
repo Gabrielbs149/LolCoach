@@ -470,7 +470,7 @@ function desenhar(d){
 
   const vistos = (d.vistos ?? []).map(v => {
     const cls = v.morto ? 'morto' : v.ha == null ? 'velho' : v.ha <= 20 ? 'fresco' : v.ha > 90 ? 'velho' : '';
-    const ha = v.morto ? `volta em ${Math.round(v.renasceEm)}s` : (v.ha == null ? 'sem sinal' : `há ${mmss(v.ha)}`);
+    const ha = v.morto ? (v.renasceEm > 0 ? `volta em ${Math.round(v.renasceEm)}s` : 'morto') : (v.ha == null ? 'sem sinal' : `há ${mmss(v.ha)}`);
     const onde = v.morto ? 'na base' : (v.onde ? `no ${v.onde}` : '');
     return `<div class="visto ${v.role==='jungle'?'jungle':''}">${icone(v.campeao)}
       <div class="q"><b>${esc(v.campeao)}</b><span>${esc(ROLE_NOME[v.role] ?? v.role ?? '')} · nv ${v.nivel}</span>

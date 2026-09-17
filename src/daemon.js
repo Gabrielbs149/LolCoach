@@ -1048,6 +1048,19 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     const antes = partidaVivo.olho;
     partidaVivo.olho = { ...dados, recebidoEm: Date.now() };
+    // Último lugar de cada um deles (pra tela ao vivo, o overlay e o radar): as falas do olho viraram situações,
+    // mas a memória de 'onde foi visto' tinha parado de ser preenchida — ficava 'visto: null' pra todo mundo
+    try {
+      const { lugar } = await import('./vivo/olho.js');
+      const eAg = partidaVivo.ultimoEstado, meuTime = eAg.eu.time;
+      for (const v of dados.vistos ?? []) {
+        const j = eAg.jogadores.find((p) => p.time !== meuTime && String(p.campeao).toLowerCase() === String(v.campeao).toLowerCase());
+        if (!j) continue;
+        const l = lugar(v.x, v.y, meuTime);
+        const r = partidaVivo.memOlho.porCampeao.get(j.nome) ?? partidaVivo.memOlho.porCampeao.set(j.nome, { vistoEm: 0, faladoEm: 0, sumiuEm: 0 }).get(j.nome);
+        r.x = v.x; r.y = v.y; r.chave = l.chave; r.lane = l.lane; r.lado = l.lado; r.texto = l.texto; r.vistoEm = Date.now();
+      }
+    } catch { /* sem lugar */ }
     if (dados.calib && (!antes?.calib || antes.calib.s !== dados.calib.s)) log(`olho: minimapa ${dados.calib.s}px (score ${dados.calib.score})${dados.escala ? `, ícone ${dados.escala.d}px` : ''}`);
     if (!dados.calib && antes?.calib !== null && Date.now() - partidaVivo.olhoLog > 30000) { partidaVivo.olhoLog = Date.now(); log('olho: não achei o minimapa (jogo em tela cheia exclusiva? overlay por cima?)'); }
     // Cego (nada reconhecido há 15 s+ com o minimapa achado, depois de 1:00 de jogo): avisa uma vez por episódio
