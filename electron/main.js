@@ -337,6 +337,27 @@ function abrirOlho() {
   estado.log('olho: janela aberta');
   janelaOlho.on('closed', () => { janelaOlho = null; });
 }
+/**
+ * A voz: janela escondida que toca as falas da seleção até o fim da partida.
+ * Nunca aparece; sem "hidden" por estar coberta (backgroundThrottling off) e
+ * sem exigir clique pra tocar áudio (autoplayPolicy).
+ */
+let janelaVoz = null;
+function abrirVoz() {
+  if (!endereco) return;
+  if (janelaVoz && !janelaVoz.isDestroyed()) return;
+  janelaVoz = new BrowserWindow({
+    width: 300, height: 200, show: false, skipTaskbar: true, focusable: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' },
+  });
+  janelaVoz.loadURL(`${endereco}/voz`);
+  janelaVoz.webContents.on('console-message', (ev) => { const msg = String(ev?.message ?? ''); if (msg.includes('[voz]')) estado.log(msg.replace('[voz] ', 'voz: ')); });
+  janelaVoz.on('closed', () => { janelaVoz = null; });
+}
+function fecharVoz() {
+  if (janelaVoz && !janelaVoz.isDestroyed()) janelaVoz.close();
+  janelaVoz = null;
+}
 function fecharOlho() {
   if (janelaOlho && !janelaOlho.isDestroyed()) janelaOlho.close();
   janelaOlho = null;
@@ -452,7 +473,7 @@ app.whenReady().then(async () => {
   try {
     daemon = await iniciarDaemon({
       estado,
-      aoSelecionar: () => abrirVivo({ focar: false }),
+      aoSelecionar: () => { abrirVoz(); abrirVivo({ focar: false }); },
       aoConfig: (cfg) => registrarAtalhos(cfg),
       aoFase: (fase) => {
         const antes = faseAtual;
@@ -460,6 +481,8 @@ app.whenReady().then(async () => {
         // Saiu da partida: se o painel estava esperando pra aparecer, agora pode.
         if (fase !== 'InProgress') mostrarPainelSeSeguro();
         // Overlay: nasce quando o jogo carrega e some quando acaba.
+        if (fase === 'InProgress' || fase === 'GameStart' || fase === 'ChampSelect') abrirVoz();
+        else if (['None', 'Lobby', 'Matchmaking', 'EndOfGame'].includes(fase)) fecharVoz();
         if (fase === 'InProgress' || fase === 'GameStart') { abrirOverlay(); abrirOlho(); }
         else if (antes === 'InProgress' || antes === 'GameStart') { fecharOverlay(); fecharOlho(); }
         // Acabou uma partida: boa hora pra procurar (e instalar) atualização.
@@ -483,7 +506,7 @@ app.whenReady().then(async () => {
   ligarAtualizacao();
   registrarAtalhos(daemon.config);
   prepararCaptura();
-  if (faseAtual === 'InProgress') { abrirOverlay(); abrirOlho(); }
+  if (faseAtual === 'InProgress') { abrirOverlay(); abrirOlho(); abrirVoz(); }
 
   setTimeout(() => {
     if (!painelPendente) return;

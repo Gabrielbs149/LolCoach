@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pt-BR"><head><meta charset="utf-8"><title>LolCoach — voz</title></head>
+<body>
+<!--
+  A VOZ mora aqui: uma janela escondida que existe da seleção de campeão até
+  o fim da partida e só faz uma coisa — ouvir /api/vivo e tocar as falas.
+  Antes a janela ao vivo é que falava, e ela cala quando fica escondida atrás
+  do jogo (o Chromium marca a página como "hidden" quando outra janela cobre
+  tudo) ou quando a pessoa fecha ela: partida inteira em silêncio.
+  As opções (ligada, modo, volume, módulos) são as mesmas da janela ao vivo,
+  lidas do localStorage (mesma origem) a cada instante.
+-->
+<script>
+const MODULOS = ['timers', 'flash', 'kills', 'jungler', 'spikes', 'economia', 'lane', 'mapa', 'selecao'];
+const lerVoz = () => { let v = { ligada: true, modo: 'serio', volume: 0.9, modulos: Object.fromEntries(MODULOS.map((k) => [k, true])) }; try { v = { ...v, ...JSON.parse(localStorage.getItem('voz') ?? '{}') }; } catch {} return v; };
+let voz = lerVoz();
+let motorVoz = 'edge', errosSeguidos = 0;
+const lerMotor = () => fetch('/api/config').then((r) => r.json()).then((c) => { const m = c?.voz?.motor === 'windows' ? 'windows' : 'edge'; if (m === 'edge' && errosSeguidos >= 4) return; motorVoz = m; }).catch(() => {});
+lerMotor(); setInterval(lerMotor, 60000);
+
+let vozPt = null;
+function acharVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find((v) => /pt[-_]BR/i.test(v.lang) && /natural|neural|online/i.test(v.name)) ?? vs.find((v) => /pt[-_]BR/i.test(v.lang)) ?? vs.find((v) => /^pt/i.test(v.lang)) ?? null; }
+if ('speechSynthesis' in window) { acharVoz(); speechSynthesis.onvoiceschanged = acharVoz; }
+const filaFalas = [], filaMp3 = []; let tocando = null;
+function tocarProxima() {
+  if (tocando || !filaMp3.length) return;
+  const { texto, em } = filaMp3.shift();
+  if (em && Date.now() - em > 8000) { tocarProxima(); return; }   // fala velha demais: não vale mais
+  const a = new Audio('/api/voz/falar?texto=' + encodeURIComponent(texto));
+  a.volume = voz.volume; tocando = a;
+  const fim = () => { tocando = null; tocarProxima(); };
+  const falhou = () => { console.log('[voz] falhou: ' + texto.slice(0, 40)); fim(); if (++errosSeguidos >= 4 && motorVoz === 'edge') { motorVoz = 'windows'; falarWindows(texto); } };
+  a.onended = () => { errosSeguidos = 0; fim(); };
+  a.onerror = falhou;
+  a.play().catch(falhou);
+}
+function falar(texto, prioridade = 1) {
+  if (!voz.ligada || !texto) return;
+  if (motorVoz === 'edge') {
+    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto, em: Date.now() }); if (tocando) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
+    if (filaMp3.length >= 3) filaMp3.shift();
+    filaMp3.push({ texto, em: Date.now() }); tocarProxima();
+    return;
+  }
+  if (prioridade >= 3 && 'speechSynthesis' in window) { speechSynthesis.cancel(); filaFalas.length = 0; }
+  falarWindows(texto);
+}
+function falarWindows(texto) {
+  if (!('speechSynthesis' in window) || !texto) return;
+  const u = new SpeechSynthesisUtterance(texto);
+  if (vozPt) u.voice = vozPt;
+  u.lang = 'pt-BR'; u.rate = 1.05; u.volume = voz.volume;
+  if (speechSynthesis.pending && filaFalas.length >= 3) { speechSynthesis.cancel(); filaFalas.length = 0; }
+  filaFalas.push(u); u.onend = () => { const i = filaFalas.indexOf(u); if (i >= 0) filaFalas.splice(i, 1); };
+  speechSynthesis.speak(u);
+}
+
+let ultimaSeq = 0, ultimaSugestao = '', primeiroTick = true, faladas = 0;
+function falarNovas(falas) {
+  for (const f of falas ?? []) {
+    if (f.seq <= ultimaSeq) continue;
+    ultimaSeq = f.seq;
+    if (primeiroTick) continue;                 // o que já tinha sido dito antes de eu abrir não é repetido
+    if (!voz.modulos[f.modulo]) continue;
+    faladas++;
+    falar(voz.modo === 'divertido' ? f.divertido : f.serio, f.prioridade ?? 1);
+  }
+}
+async function tick() {
+  try {
+    voz = lerVoz();
+    const d = await fetch('/api/vivo').then((r) => r.json());
+    if (d.emJogo) falarNovas(d.falas);
+    else if (d.selecao) {
+      falarNovas(d.selecao.falas);
+      const sug = d.selecao.sugestao;
+      if (sug?.fala && voz.modulos.selecao && ultimaSugestao !== sug.fala.serio && !primeiroTick) { ultimaSugestao = sug.fala.serio; falar(voz.modo === 'divertido' ? sug.fala.divertido : sug.fala.serio); }
+    }
+    primeiroTick = false;
+  } catch { /* painel ocupado */ }
+}
+tick(); setInterval(tick, 700);
+setInterval(() => console.log(`[voz] viva · ${faladas} falas tocadas · motor ${motorVoz} · ${voz.ligada ? 'ligada' : 'DESLIGADA'} · volume ${voz.volume}`), 120000);
+console.log('[voz] janela aberta');
+</script>
+</body></html>

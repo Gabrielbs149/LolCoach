@@ -446,6 +446,9 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       if (url.pathname === '/overlay') {
         return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'overlay.html'), 'utf8'));
       }
+      if (url.pathname === '/voz') {
+        return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'voz.html'), 'utf8'));
+      }
       if (url.pathname === '/vivo') {
         return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'vivo.html'), 'utf8'));
       }

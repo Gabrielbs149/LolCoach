@@ -378,7 +378,7 @@ function fichaContra(f, eu){
 function desenharSelecao(sel){
   const chip = (c) => `<span>${icone(c.nome, c.id)}${esc(c.nome ?? '?')}</span>`;
   const sug = sel.sugestao;
-  if (sug?.fala && voz.modulos.selecao && ultimaSugestaoFalada !== sug.fala.serio) { ultimaSugestaoFalada = sug.fala.serio; falar(voz.modo === 'divertido' ? sug.fala.divertido : sug.fala.serio); }
+
   $('#tudo').innerHTML = `<div class="selecao">
     <h1>Seleção de campeão · ${esc(ROLE_NOME[sel.rota] ?? sel.rota)}${sel.meuCampeao ? ' · ' + esc(sel.meuCampeao) : ''}</h1>
     <div class="times">
@@ -395,7 +395,7 @@ function desenharSelecao(sel){
 }
 
 function desenhar(d){
-  if (!d.emJogo && d.selecao) { desenharSelecao(d.selecao); falarNovas(d.selecao.falas); return; }
+  if (!d.emJogo && d.selecao) { desenharSelecao(d.selecao); return; }
   if (!d.emJogo) {
     const u = d.ultimaPartida;
     const resumo = u ? `<div class="resumoFim">
@@ -484,7 +484,7 @@ async function tick(){
     if (json === ultimoJson) return;
     ultimoJson = json;
     desenhar(d);
-    if (d.emJogo) { falarNovas(d.falas); pastaSituAtual = d.pastaSitu ?? pastaSituAtual; } ultimoDado = d;
+    if (d.emJogo) { pastaSituAtual = d.pastaSitu ?? pastaSituAtual; } ultimoDado = d;
     ajustarRitmo(!!d.emJogo);
   } catch { /* painel caiu; a próxima tentativa resolve */ }
 }
