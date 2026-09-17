@@ -408,15 +408,32 @@ function confirmar(rgba, s, tpl, x, y) {
     const score = ncc(vals, { z, norma });
     if (score > melhor.score) melhor = { score, x: px, y: py };
   }
-  // borda do ícone: inimigo tem anel vermelho — um reforço contra "sósias" no terreno
-  const cx = melhor.x + tw / 2, cy = melhor.y + tw / 2, raio = tw / 2 - 1.5;
-  let r = 0, g = 0, b = 0, n = 0;
-  for (let a = 0; a < 360; a += 12) {
-    const px = Math.round(cx + Math.cos(a / 57.3) * raio), py = Math.round(cy + Math.sin(a / 57.3) * raio);
-    if (px < 0 || py < 0 || px >= s || py >= s) continue;
-    const q = (py * s + px) * 4; r += rgba[q]; g += rgba[q + 1]; b += rgba[q + 2]; n++;
-  }
-  // cor da BORDA (raio d/2): é onde o anel de cada time fica; é isso que se aprende por instalação
+  // Anel do ícone (medido): inimigo vermelho, aliado azul, o meu teal — todos na BORDA (raio d/2).
+  // O que conta é a FRAÇÃO de pixels da cor no círculo (não a média: dois pontinhos de minion
+  // já mudam a média), o NCC pode parar 1–2 px deslocado (testa 9 centros) e tem que ser ANEL:
+  // a raio d/2+4 a cor some — a água da fonte, o rio e uma borda de terreno não passam.
+  const cx = melhor.x + tw / 2, cy = melhor.y + tw / 2;
+  const vermelho = (r, g, b) => (r > 100 && r > g * 1.5 && r > b * 1.2) || (corPronta('inimigo') && distCor(r, g, b, cores.inimigo) < 40);
+  const azul = (r, g, b) => (b > 100 && b > r * 1.5 && b >= g * 1.1) || (corPronta('aliado') && distCor(r, g, b, cores.aliado) < 40);
+  const teal = (r, g, b) => (b > 150 && g > 130 && r > 95 && r < 150 && b > r * 1.25) || (corPronta('eu') && distCor(r, g, b, cores.eu) < 35);
+  const frac = (ccx, ccy, raio, cor) => {
+    let k = 0, nn = 0;
+    for (let a = 0; a < 360; a += 8) {
+      const px = Math.round(ccx + Math.cos(a / 57.3) * raio), py = Math.round(ccy + Math.sin(a / 57.3) * raio);
+      if (px < 0 || py < 0 || px >= s || py >= s) continue;
+      const q = (py * s + px) * 4; nn++; if (cor(rgba[q], rgba[q + 1], rgba[q + 2])) k++;
+    }
+    return nn ? k / nn : 0;
+  };
+  const anel = (cor) => {
+    let melhorF = 0;
+    for (const dx of [-2, 0, 2]) for (const dy of [-2, 0, 2]) {
+      let f = 0; for (const raio of [tw / 2 - 1.5, tw / 2, tw / 2 + 1.5]) f = Math.max(f, frac(cx + dx, cy + dy, raio, cor));
+      if (f > melhorF && frac(cx + dx, cy + dy, tw / 2 + 4, cor) <= 0.3) melhorF = f;
+    }
+    return melhorF;
+  };
+  // cor média da borda, pra aprender a cor desta instalação
   let r2 = 0, g2 = 0, b2 = 0, n2 = 0;
   for (let a = 0; a < 360; a += 12) {
     const px = Math.round(cx + Math.cos(a / 57.3) * (tw / 2)), py = Math.round(cy + Math.sin(a / 57.3) * (tw / 2));
@@ -424,30 +441,9 @@ function confirmar(rgba, s, tpl, x, y) {
     const q = (py * s + px) * 4; r2 += rgba[q]; g2 += rgba[q + 1]; b2 += rgba[q + 2]; n2++;
   }
   melhor.anelCor = n2 > 0 ? [r2 / n2, g2 / n2, b2 / n2] : null;
-  melhor.anelVermelho = n > 0 && ((r / n > 90 && r / n > (g / n) * 1.6 && r / n > (b / n) * 1.4) || (corPronta('inimigo') && n2 > 0 && distCor(r2 / n2, g2 / n2, b2 / n2, cores.inimigo) < 35));
-  // O MEU ícone tem um anel teal (~116,152,175) logo na borda (medido: 70% dos pixels a raio d/2; 0% nos outros)
-  const teal = (r, g, b) => b > 150 && g > 130 && r > 95 && r < 150 && b > r * 1.25;
-  let melhorTeal = 0;
-  for (const raio of [tw / 2 - 1, tw / 2, tw / 2 + 1]) {
-    let k = 0, nn = 0;
-    for (let a = 0; a < 360; a += 8) {
-      const px = Math.round(cx + Math.cos(a / 57.3) * raio), py = Math.round(cy + Math.sin(a / 57.3) * raio);
-      if (px < 0 || py < 0 || px >= s || py >= s) continue;
-      const q = (py * s + px) * 4; nn++; if (teal(rgba[q], rgba[q + 1], rgba[q + 2])) k++;
-    }
-    if (nn) melhorTeal = Math.max(melhorTeal, k / nn);
-  }
-  // aprendida: a borda a raio d/2 perto da cor média do meu anel conta como teal
-  if (corPronta('eu')) {
-    let k2 = 0, nn2 = 0;
-    for (let a = 0; a < 360; a += 8) {
-      const px = Math.round(cx + Math.cos(a / 57.3) * (tw / 2)), py = Math.round(cy + Math.sin(a / 57.3) * (tw / 2));
-      if (px < 0 || py < 0 || px >= s || py >= s) continue;
-      const q = (py * s + px) * 4; nn2++; if (distCor(rgba[q], rgba[q + 1], rgba[q + 2], cores.eu) < 45) k2++;
-    }
-    if (nn2) melhorTeal = Math.max(melhorTeal, k2 / nn2);
-  }
-  melhor.anelTeal = melhorTeal;
+  melhor.fracVermelho = anel(vermelho); melhor.fracAzul = anel(azul); melhor.anelTeal = anel(teal);
+  melhor.anelVermelho = melhor.fracVermelho >= 0.35;
+  melhor.anelAzul = melhor.fracAzul >= 0.35;
   return melhor;
 }
 
@@ -570,6 +566,7 @@ async function quadro() {
         const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
         if (!cand.length || cand[0].score < 0.3) continue;
         const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
+        if (!ok.anelVermelho && ok.score < 0.80) continue;   // mancha vermelha já é indício; sem anel nítido (ícones colados) pede 0,80
         notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, cor: ok.anelCor });
       }
       notas.sort((a, b) => b.score - a.score);
@@ -583,8 +580,9 @@ async function quadro() {
       const [a, b] = livres;
       melhoresDoQuadro.set(a.nome, Math.max(melhoresDoQuadro.get(a.nome) ?? -1, Math.round(a.score * 100) / 100));
       if (a.score < LIMIAR_MANCHA || (b && b.score > a.score - MARGEM && a.score < 0.85)) continue;
-      tomados.add(a.nome);
       const t = tpls.get(a.nome);
+      if (naFonte((a.x + t.d / 2) / s, (a.y + t.d / 2) / s, meuTime === 100 ? 200 : 100) && a.score < 0.85) continue;
+      tomados.add(a.nome);
       rastros.set(a.nome, { x: a.x, y: a.y, em: agora });
       vistos.push({ campeao: a.nome, x: (a.x + t.d / 2) / s, y: (a.y + t.d / 2) / s, score: Math.round(a.score * 100) / 100 });
       if (a.score >= 0.85) aprenderCor('inimigo', a.cor);
@@ -632,6 +630,7 @@ function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora, classe = nu
       const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
       if (!cand.length || cand[0].score < 0.3) continue;
       const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
+      if (classe === 'aliado' && !ok.anelAzul && ok.score < 0.80) continue;
       notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, d: t.d, cor: ok.anelCor });
     }
     notas.sort((a, b) => b.score - a.score);
@@ -643,12 +642,14 @@ function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora, classe = nu
     if (!livres.length) continue;
     const [a, b] = livres;
     if (a.score < LIMIAR_MANCHA || (b && b.score > a.score - MARGEM && a.score < 0.85)) continue;
+    if (classe === 'aliado' && naFonte((a.x + a.d / 2) / s, (a.y + a.d / 2) / s, meuTime) && a.score < 0.85) continue;
     tomados.add(a.nome);
     saida.push({ campeao: a.nome, x: (a.x + a.d / 2) / s, y: (a.y + a.d / 2) / s, score: Math.round(a.score * 100) / 100 });
     if (classe && a.score >= 0.85) aprenderCor(classe, a.cor);
   }
   return saida;
 }
+const naFonte = (x, y, time) => Math.hypot(x - (time === 100 ? 0.105 : 0.897), y - (time === 100 ? 0.90 : 0.106)) < 0.075;
 function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   const rastro = rastros.get(chave);
   const seguindo = rastro && agora - rastro.em < 2000;
@@ -675,7 +676,14 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
     if (!melhor || ok.score > melhor.score) melhor = ok;
   }
   if (melhor) melhoresDoQuadro.set(chave, Math.round(melhor.score * 100) / 100);
+  // Ícone de campeão sempre tem anel (vermelho deles, azul nosso, teal o meu). Dragão, Barão, camps e a
+  // loja não têm — e eram lidos como Pantheon/Diana/Pyke (centenas de vezes por partida). Sem anel: 0,88+.
+  const anelCerto = !melhor ? false : chave === 'eu' ? melhor.anelTeal >= 0.4 : chave.startsWith('ali-') ? melhor.anelAzul : melhor.anelVermelho;
   const perto = melhor && seguindo && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 40;
+  // quem já estava sendo seguido pode perder o anel por um instante (ícones se sobrepondo): só o novo exige anel
+  if (melhor && !perto && !anelCerto && melhor.crua < 0.88) melhor = null;
+  // dentro da fonte a água é azul e a loja parece ícone: ali só entra com 0,85+ (Pantheon 'na fonte' 270 vezes numa partida)
+  if (melhor && naFonte((melhor.x + tw) / s, (melhor.y + tw) / s, chave === 'eu' || chave.startsWith('ali-') ? meuTime : (meuTime === 100 ? 200 : 100)) && melhor.crua < 0.85) melhor = null;
   if (melhor && melhor.score >= (perto ? LIMIAR_SEGUIDO : LIMIAR_NOVO)) {
     rastros.set(chave, { x: melhor.x, y: melhor.y, em: agora });
     return { x: (melhor.x + t.d / 2) / s, y: (melhor.y + t.d / 2) / s, score: Math.round(melhor.score * 100) / 100, crua: melhor.crua, cor: melhor.anelCor, teal: melhor.anelTeal };
