@@ -2262,12 +2262,13 @@ function desenharAmigos(){
   $('#amDetalhe').innerHTML = aberto ? detalheDeAmigo(aberto) : '';
 
   /* ---- ranking da semana ---- */
-  const comSemana = todos.filter(p => p.semana != null).sort((a, b) => b.semana - a.semana);
+  // sem histórico de PDL ainda (conta nova na lista): entra com 0 e a forma da semana
+  const comSemana = todos.filter(p => p.semana != null || p.forma?.jogos).map(p => ({ ...p, semana: p.semana ?? 0 })).sort((a, b) => b.semana - a.semana || (b.forma?.vitorias ?? 0) - (a.forma?.vitorias ?? 0));
   $('#amSemana').innerHTML = comSemana.length ? `<h2>Ranking da semana</h2><div class="mini">${comSemana.map((p, i) => `
     <div class="miniLinha"><b style="text-align:center;color:var(--apagado)">${i+1}º</b>
       <span class="n">${esc(p.perfil?.conta?.nome ?? p.nome)}${p === eu ? ' (você)' : ''}</span>
       <span class="wr ${p.semana>0?'v':p.semana<0?'d':''}">${p.semana>0?'+':''}${p.semana} PDL</span>
-      <span class="kda">${esc(eloSolo(p.perfil)?.nome ?? 'sem elo')}</span></div>`).join('')}</div>` : '';
+      <span class="kda">${esc(eloSolo(p.perfil)?.nome ?? 'sem elo')}${p.forma?.jogos ? ` · ${p.forma.vitorias}V ${p.forma.jogos - p.forma.vitorias}D na semana` : ''}${Math.abs(p.forma?.sequencia ?? 0) >= 3 ? ` · ${p.forma.sequencia > 0 ? '🔥 ' + p.forma.sequencia + ' seguidas' : '❄ ' + (-p.forma.sequencia) + ' derrotas seguidas'}` : ''}</span></div>`).join('')}</div>` : '';
 
   /* ---- comparativo ---- */
   const cols = todos.filter(p => p.perfil);

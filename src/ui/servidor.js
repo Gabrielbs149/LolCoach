@@ -330,7 +330,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       }
       if (url.pathname === '/api/voz/falar' && acoes.vozFalar) {
         try {
-          const { corpo, tipo } = await acoes.vozFalar({ texto: url.searchParams.get('texto') ?? '', voz: url.searchParams.get('voz') || null, ritmo: url.searchParams.get('ritmo') || null });
+          const { corpo, tipo } = await acoes.vozFalar({ texto: url.searchParams.get('texto') ?? '', voz: url.searchParams.get('voz') || null, ritmo: url.searchParams.get('ritmo') || null, perigo: url.searchParams.get('perigo') === '1' });
           res.writeHead(200, { 'Content-Type': tipo, 'Cache-Control': 'no-store' });
           return res.end(corpo);
         } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }

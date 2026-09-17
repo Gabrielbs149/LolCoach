@@ -1262,7 +1262,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const fala = podeFalar
         ? { serio: F`Pick: ${an.melhor.nome}${an.porque.length ? ' — ' + an.porque.slice(0, 2).join('; ') : ''}.`, divertido: F`Vai de ${an.melhor.nome}${an.porque.length ? ': ' + an.porque[0] : ''}.` }
         : null;
-      selecaoCache.sugestao = { lista, fala, parceiro, oponente: an.oponente, completude: an.completude, avisos: an.avisos, porque: an.porque, resumoTime: an.resumoTime, parcial: inimigos.length < 3 && !minhaVez, escolhido: escolhi ? meuCampeaoAgora : null };
+      // Modo duo: sem parceiro declarado ainda, o que pedir pro sup/adc pra combinar com o seu melhor pick
+      let paraParceiro = null;
+      if (posParceiro && !parceiro && an.melhor) {
+        const pool = posParceiro === 'utility' ? Sin.todosSups() : Sin.todosAdcs();
+        const ban = new Set([...(s.bans?.myTeamBans ?? []), ...(s.bans?.theirTeamBans ?? [])].map((id) => nomeDe(id)));
+        paraParceiro = Sin.melhoresCom({ candidatos: pool.filter((n) => !ban.has(n)), parceiro: an.melhor.nome, souSup: posParceiro === 'utility' }).filter((x) => x.nota != null && x.nota >= 0.6).slice(0, 3).map((x) => ({ nome: x.nome, motivo: x.motivo }));
+      }
+      selecaoCache.sugestao = { lista, fala, parceiro, oponente: an.oponente, completude: an.completude, avisos: an.avisos, porque: an.porque, resumoTime: an.resumoTime, parcial: inimigos.length < 3 && !minhaVez, escolhido: escolhi ? meuCampeaoAgora : null, paraParceiro, posParceiro };
     }
     const meuCampeao = nomeDe(meu?.championId || meu?.championPickIntent) ?? null;
     // Seleção nova: zera o que já foi dito.
@@ -1769,7 +1776,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
   const vozEmAndamento = new Map();
   /** `voz`/`ritmo` opcionais servem pra ouvir uma voz antes de escolher. */
-  async function vozFalar({ texto, voz, ritmo } = {}) {
+  const DEGRAUS_RITMO = ['-10%', '0%', '+5%', '+10%', '+15%', '+20%'];
+  async function vozFalar({ texto, voz, ritmo, perigo = false } = {}) {
+    // perigo (p3): um degrau mais rápido que o ritmo configurado
+    if (perigo && !ritmo) { const base = vozCfg().ritmo; ritmo = DEGRAUS_RITMO[Math.min(DEGRAUS_RITMO.length - 1, Math.max(0, DEGRAUS_RITMO.indexOf(base)) + 1)]; }
     const [{ falarEdge }, { pronunciar }] = await Promise.all([import('./vivo/voz.js'), import('./vivo/pronuncia.js')]);
     texto = pronunciar(texto, config.voz?.pronuncia ?? null);   // "Kha'Zix" vira "Cazícs" só no áudio
     const v = { ...vozCfg(), ...(voz ? { vozId: voz } : {}), ...(ritmo ? { ritmo } : {}) };
@@ -1898,6 +1908,13 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       return pontos(hist.at(-1)) - pontos(antes);
     };
     for (const a of [...lista, eu]) if (a) a.semana = deltaSemana(a.perfil?.conta?.nome ?? a.nome);
+    // forma da semana: jogos/vitórias dos últimos 7 dias (das últimas partidas baixadas) e a sequência atual
+    for (const a of [...lista, eu]) {
+      if (!a) continue;
+      const ult = (a.perfil?.recente?.ultimas ?? []).filter((u) => u.quando && Date.parse(u.quando) >= Date.parse(semana));
+      let seq = 0; for (const u of a.perfil?.recente?.ultimas ?? []) { if (seq === 0) seq = u.venci ? 1 : -1; else if ((seq > 0) === !!u.venci) seq += seq > 0 ? 1 : -1; else break; }
+      a.forma = { jogos: ult.length, vitorias: ult.filter((u) => u.venci).length, sequencia: seq };
+    }
     return { amigos: lista, eu, semChave: !config.riot?.apiKey };
   }
 

@@ -24,10 +24,11 @@ if ('speechSynthesis' in window) { acharVoz(); speechSynthesis.onvoiceschanged =
 const filaFalas = [], filaMp3 = []; let tocando = null;
 function tocarProxima() {
   if (tocando || !filaMp3.length) return;
-  const { texto, em } = filaMp3.shift();
+  const { texto, em, prioridade = 1 } = filaMp3.shift();
   if (em && Date.now() - em > 8000) { tocarProxima(); return; }   // fala velha demais: não vale mais
-  const a = new Audio('/api/voz/falar?texto=' + encodeURIComponent(texto));
-  a.volume = voz.volume; tocando = a;
+  // Perfil por situação: perigo (p3) sai mais rápido (o servidor sobe um degrau do ritmo configurado) e mais alto; dica (p1) um pouco mais baixa.
+  const a = new Audio('/api/voz/falar?texto=' + encodeURIComponent(texto) + (prioridade >= 3 ? '&perigo=1' : ''));
+  a.volume = Math.min(1, voz.volume * (prioridade >= 3 ? 1.15 : prioridade <= 1 ? 0.9 : 1)); tocando = a;
   const fim = () => { tocando = null; tocarProxima(); };
   // Edge falha de vez em quando (3 em 100): a frase NÃO pode sumir — sai na voz do Windows na hora; 4 falhas seguidas trocam o motor de vez
   let jaFalhou = false;
@@ -39,19 +40,19 @@ function tocarProxima() {
 function falar(texto, prioridade = 1) {
   if (!voz.ligada || !texto) return;
   if (motorVoz === 'edge') {
-    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto, em: Date.now() }); if (tocando) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
+    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto, em: Date.now(), prioridade }); if (tocando) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
     if (filaMp3.length >= 3) filaMp3.shift();
-    filaMp3.push({ texto, em: Date.now() }); tocarProxima();
+    filaMp3.push({ texto, em: Date.now(), prioridade }); tocarProxima();
     return;
   }
   if (prioridade >= 3 && 'speechSynthesis' in window) { speechSynthesis.cancel(); filaFalas.length = 0; }
-  falarWindows(texto);
+  falarWindows(texto, prioridade);
 }
-function falarWindows(texto) {
+function falarWindows(texto, prioridade = 1) {
   if (!('speechSynthesis' in window) || !texto) return;
   const u = new SpeechSynthesisUtterance(texto);
   if (vozPt) u.voice = vozPt;
-  u.lang = 'pt-BR'; u.rate = 1.05; u.volume = voz.volume;
+  u.lang = 'pt-BR'; u.rate = prioridade >= 3 ? 1.2 : 1.05; u.volume = Math.min(1, voz.volume * (prioridade >= 3 ? 1.15 : prioridade <= 1 ? 0.9 : 1));
   if (speechSynthesis.pending && filaFalas.length >= 3) { speechSynthesis.cancel(); filaFalas.length = 0; }
   filaFalas.push(u); u.onend = () => { const i = filaFalas.indexOf(u); if (i >= 0) filaFalas.splice(i, 1); };
   speechSynthesis.speak(u);

@@ -81,5 +81,8 @@ export function melhoresCom({ candidatos, parceiro, souSup = false }) {
 }
 
 /** Sem posição atribuída (normal sem fila por rota): chuta o parceiro pelo campeão que o time declarou. */
+/** Todos os sups / adcs que a tabela conhece (pra sugerir o pick do PARCEIRO). */
+export const todosSups = () => Object.values(SUP).flat();
+export const todosAdcs = () => Object.values(ADC).flat();
 export const ehSup = (nome) => Object.values(SUP).some((l) => l.includes(nome));
 export const ehAdc = (nome) => Object.values(ADC).some((l) => l.includes(nome));
