@@ -64,7 +64,7 @@ function falarNovas(falas) {
     if (f.seq <= ultimaSeq) continue;
     ultimaSeq = f.seq;
     if (primeiroTick) continue;                 // o que já tinha sido dito antes de eu abrir não é repetido
-    if (!voz.modulos[f.modulo]) continue;
+    if (f.modulo !== 'sistema' && !voz.modulos[f.modulo]) continue;   // 'sistema' (avalie as falas, olho cego) não tem filtro
     faladas++;
     falar(voz.modo === 'divertido' ? f.divertido : f.serio, f.prioridade ?? 1);
   }

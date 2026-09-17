@@ -285,7 +285,7 @@ function retanguloCamera(rgba, s) {
   if (a.n >= s * 0.24) return { x: (a.x1 + a.x2) / 2 / s, y: Math.min(1, Math.max(0, (a.y + (a.y < s / 2 ? s * 0.078 : -s * 0.078)) / s)), w: a.n / s, h: 0.156, cortado: true };
   return null;
 }
-let camTravada = { ok: 0, n: 0 }, ultimaCam = null, placarAvisado = false;
+let camTravada = { ok: 0, n: 0 }, ultimaCam = null, placarAvisado = false, meuUltimo = null;
 const posAnterior = new Map();   // último lugar confirmado de cada ícone (pra ver pulo de flash)
 // O que é vermelho/azul sempre no mesmo pixel é torre/inibidor, não minion: máscara temporal.
 let fixoR = null, fixoA = null, fixoS = 0;
@@ -831,6 +831,10 @@ async function quadro() {
       if (cam && !eu && camTravada.n >= 10 && camTravada.ok / camTravada.n >= 0.7) eu = { x: cam.x, y: cam.y, score: 0, fonte: 'camera' };
       ultimaCam = cam;
     } else if (!eu && ultimaCam && camTravada.n >= 10 && camTravada.ok / camTravada.n >= 0.7) eu = { x: ultimaCam.x, y: ultimaCam.y, score: 0, fonte: 'camera' };
+    // Câmera SOLTA: quando o ícone some (seta/linha por cima) mas o retângulo está perto de onde eu estava há
+    // pouco (≤ 10 s, ≤ 12% do mapa), a câmera é a melhor pista — você quase sempre olha pra onde está
+    if (eu) meuUltimo = { x: eu.x, y: eu.y, em: agora };
+    else if (ultimaCam && meuUltimo && agora - meuUltimo.em <= 10000 && Math.hypot(ultimaCam.x - meuUltimo.x, ultimaCam.y - meuUltimo.y) <= 0.12) eu = { x: ultimaCam.x, y: ultimaCam.y, score: 0, fonte: 'camera-solta' };
     // inimigos vivos: quem está sendo seguido é procurado em volta de onde
     // estava; quem não, nas manchas vermelhas e — um por quadro, em rodízio —
     // no minimapa inteiro (garantia pra quem joga sem anel vermelho).
@@ -920,7 +924,7 @@ async function quadro() {
     enviar({ calib: { x, y, s, score: calib.score }, escala: { d, score: escala.score, confiavel: escala.confiavel }, vistos: limpos, aliados: vistosAli, eu, waves, wards: wardsVistas, pulos, placar, cego: cegoDesde ? Math.round((agora - cegoDesde) / 1000) : 0 });
     if (agora - ultimoDiag > 20000) {
       ultimoDiag = agora;
-      log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · eu ${eu ? (eu.fonte === 'camera' ? 'câmera' : 'ícone') : 'não'} (câmera travada ${camTravada.n ? Math.round(100 * camTravada.ok / camTravada.n) + '%' : '?'}) · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
+      log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · eu ${eu ? (eu.fonte === 'camera' ? 'câmera' : eu.fonte === 'camera-solta' ? 'câmera solta' : 'ícone') : 'não'} (câmera travada ${camTravada.n ? Math.round(100 * camTravada.ok / camTravada.n) + '%' : '?'}) · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
       melhoresDoQuadro.clear();
     }
     if (!TESTE && !AMOSTRA && agora - ultimaFoto > 30000 && fotos < 40) {

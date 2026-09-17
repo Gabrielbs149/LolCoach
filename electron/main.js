@@ -485,7 +485,8 @@ app.whenReady().then(async () => {
         if (fase !== 'InProgress') mostrarPainelSeSeguro();
         // Overlay: nasce quando o jogo carrega e some quando acaba.
         if (fase === 'InProgress' || fase === 'GameStart' || fase === 'ChampSelect') abrirVoz();
-        else if (['None', 'Lobby', 'Matchmaking', 'EndOfGame'].includes(fase)) fecharVoz();
+        else if (['None', 'Lobby', 'Matchmaking'].includes(fase)) fecharVoz();
+        else if (fase === 'EndOfGame') setTimeout(() => { if (faseAtual === 'EndOfGame' || faseAtual === 'None' || faseAtual === 'Lobby') fecharVoz(); }, 25_000);   // dá tempo do "avalia as falas"
         if (fase === 'InProgress' || fase === 'GameStart') { abrirOverlay(); abrirOlho(); }
         else if (antes === 'InProgress' || antes === 'GameStart') { fecharOverlay(); fecharOlho(); }
         // Acabou uma partida: boa hora pra procurar (e instalar) atualização.

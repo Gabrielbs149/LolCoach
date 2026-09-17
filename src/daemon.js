@@ -355,7 +355,16 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     return { ok: true };
   }
   /** Tecla no jogo: tamanho do overlay em ciclo 100% → 80% → 65% → 50% → 100%. */
-  async function overlayTamanho({ escala } = {}) {
+  async function overlayTamanho({ escala, radar } = {}) {
+    if (radar) {   // radar: p / m / g / off (cicla se vier 'ciclo')
+      const ordem = ['p', 'm', 'g', 'off'];
+      const atualR = config.overlay?.radar ?? 'm';
+      const novoR = ordem.includes(radar) ? radar : ordem[(ordem.indexOf(atualR) + 1) % ordem.length];
+      config.overlay = { ...(config.overlay ?? {}), radar: novoR };
+      await salvarConfig({ overlay: config.overlay }).catch(() => {});
+      log(`overlay: radar ${novoR}`);
+      return { radar: novoR };
+    }
     const passos = [1, 0.8, 0.65, 0.5];
     const atual = Number(config.overlay?.escala) || 1;
     const i = passos.findIndex((p) => Math.abs(p - atual) < 0.01);
@@ -459,6 +468,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const c = pv.contSitu;
     const top = [...c.porTipo.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, n]) => `${k} ${n}`).join(', ');
     log(`olho: partida gravada — ${c.total} situações, ${c.faladas} faladas, ${c.leituras} leituras (${top})`);
+    // pede a avaliação em voz alta (a janela da voz fica aberta mais 25 s no fim) — é o que ensina o cérebro
+    if (c.faladas >= 3) pv.falas.push(prontaFala({ seq: ++seqFalas, t: pv.ultimoEstado?.tempo ?? 0, modulo: 'sistema', prioridade: 2, id: 'avalie', serio: F`Acabou. Avalia as falas na janela ao vivo: joinha ou não.`, divertido: F`Acabou! Me dá nota na janela ao vivo.` }));
     if (!pv.pastaSitu) return;
     const base = pv.pastaSitu;
     conferirPrevisoes(base).catch((erro) => { log(`previsões: ${erro.message}`); return null; }).then(() => montarResumoDe(base)).then((r) => { ultimoResumo = r; }).catch(() => {});
@@ -791,9 +802,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (!partidaVivo.intelJogadores && !partidaVivo.montandoIntel && config.riot?.apiKey) {
       partidaVivo.intelJogadores = new Map();
       const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time);
+      const t0Intel = Date.now();
       partidaVivo.montandoIntel = import('./vivo/intel-jogadores.js')
-        .then(({ intelDosJogadores }) => intelDosJogadores(config.riot, deles, { aoAtualizar: (nome, f) => { partidaVivo?.intelJogadores?.set(nome, f); } }))
-        .then((m) => { if (partidaVivo) { partidaVivo.intelJogadores = m; const prontos = [...m.values()].filter((f) => f && !f.erro).length; log(`intel deles: ${prontos}/${deles.length} perfis`); } })
+        .then(({ intelDosJogadores }) => intelDosJogadores(config.riot, deles, { quantas: 6, aoAtualizar: (nome, f) => { partidaVivo?.intelJogadores?.set(nome, f); } }))
+        .then((m) => { if (partidaVivo) { partidaVivo.intelJogadores = m; const prontos = [...m.values()].filter((f) => f && !f.erro).length; log(`intel deles: ${prontos}/${deles.length} perfis em ${Math.round((Date.now() - t0Intel) / 1000)} s`); } })
         .catch((erro) => log(`intel deles falhou: ${erro.message}`));
     }
     if (!partidaVivo.fichas && !partidaVivo.montandoFichas) {
@@ -833,9 +845,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time);
       const alvos = [deles.find((j) => j.role === estado.eu.role && estado.eu.role !== 'jungle'), deles.find((j) => j.role === 'jungle')].filter(Boolean);
       const prontas = alvos.map((j) => [j, partidaVivo.intelJogadores.get(j.nome)]).filter(([, f]) => f && !f.erro);
-      if (prontas.length === alvos.length && alvos.length) {
-        partidaVivo.intelFalada = true;
+      // fala quando os dois estão prontos; ou, a partir de 1:45, o que já estiver (a Riot demora ~5 s por perfil)
+      partidaVivo.intelDitas ??= new Set();
+      if ((prontas.length === alvos.length || estado.tempo >= 105) && prontas.length) {
+        if (prontas.length === alvos.length) partidaVivo.intelFalada = true;
         for (const [j, f] of prontas) {
+          if (partidaVivo.intelDitas.has(j.nome)) continue; partidaVivo.intelDitas.add(j.nome);
           const quem = j.role === 'jungle' ? 'Jungler deles' : `${j.campeao} deles`;
           const partes = [];
           if (f.elo) partes.push(f.elo); else partes.push('sem ranqueada');
@@ -862,9 +877,13 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       objetivos: objs,
       falas: partidaVivo.falas.slice(-12),
       flashes: [...partidaVivo.flashes.values()].map((f) => ({ campeao: f.campeao, volta: f.volta, em: Math.max(0, Math.round(f.volta - estado.tempo)) })),
+      flashesAliados: [...(partidaVivo.flashesAliados?.values() ?? [])].filter((f) => f.volta > estado.tempo).map((f) => ({ campeao: f.campeao, em: Math.round(f.volta - estado.tempo), aproximado: !!f.aproximado })),
       // O olho: minimapa achado? onde cada um foi visto pela última vez.
       olho: resumoDoOlho(estado, objs),
       overlayEscala: Number(config.overlay?.escala) || 1,
+      overlayRadar: config.overlay?.radar ?? 'm',
+      // pro radar: aliados vistos agora pelo olho e eu
+      radarNossos: (() => { const o = partidaVivo.olho; if (!o || Date.now() - o.recebidoEm > 5000) return []; const l = (o.aliados ?? []).map((a) => ({ campeao: a.campeao, x: a.x, y: a.y })); if (o.eu) l.push({ campeao: estado.eu.campeao, x: o.eu.x, y: o.eu.y, eu: true }); return l; })(),
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       intelDeles: partidaVivo.intelJogadores ? Object.fromEntries([...partidaVivo.intelJogadores].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
@@ -960,7 +979,48 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * o flash foi usado entre as duas leituras — marca com a hora do meio. Claro com marca ativa = marca errada, apaga.
    */
   const ORDEM_PLACAR = ['top', 'jungle', 'mid', 'adc', 'sup'];
+  /**
+   * A NOSSA coluna do placar: flash dos aliados (o meu não — a API já diz). Só guarda e avisa quando o parceiro
+   * de lane (sup se sou adc, adc se sou sup) ou o jungler ficou sem flash — "Sup sem flash, não engaja".
+   */
+  function lerPlacarNossos(placar, e) {
+    const nossos = e.jogadores.filter((j) => j.time === e.eu.time);
+    const porRole = ORDEM_PLACAR.map((r) => nossos.find((j) => j.role === r)).filter(Boolean);
+    const linhas = e.eu.time === 100 ? placar.esq : placar.dir;
+    if (porRole.length !== 5 || (linhas ?? []).length !== 5) return;
+    partidaVivo.placarNossos ??= new Map();
+    partidaVivo.flashesAliados ??= new Map();
+    const agora = e.tempo;
+    const parceiroRole = e.eu.role === 'adc' ? 'sup' : e.eu.role === 'sup' ? 'adc' : null;
+    for (let i = 0; i < 5; i++) {
+      const j = porRole[i], l = linhas[i];
+      if (!j || j.nome === e.eu.nome || !l || (!l.claro && !l.escuro)) continue;
+      const antes = partidaVivo.placarNossos.get(j.nome) ?? { escuro: null, claroEm: null, seguidos: 0, ultimaLeitura: null };
+      const leitura = l.escuro ? 'E' : 'C';
+      antes.seguidos = antes.ultimaLeitura === leitura ? antes.seguidos + 1 : 1; antes.ultimaLeitura = leitura;
+      if (antes.seguidos < 2) { partidaVivo.placarNossos.set(j.nome, antes); continue; }
+      if (l.claro) antes.claroEm = agora;
+      const f = partidaVivo.flashesAliados.get(j.nome);
+      if (l.escuro && !(f && f.volta > agora)) {
+        const numero = Number.isFinite(l.numero) && l.numero >= 1 && l.numero <= 300 ? l.numero : null;
+        const maisCedo = Math.max(antes.claroEm ?? agora - 285, agora - 285);
+        const usadoEm = numero != null ? agora + numero - 300 : maisCedo, volta = usadoEm + 300;
+        partidaVivo.flashesAliados.set(j.nome, { campeao: j.campeao, usadoEm, volta, aproximado: numero == null });
+        const resta = Math.max(0, Math.round(volta - agora)), rTxt = `${Math.floor(resta / 60)}:${String(resta % 60).padStart(2, '0')}`;
+        log(`placar: flash do nosso ${j.campeao} gasto${numero != null ? ` (número ${numero})` : ''}`);
+        if (j.role === parceiroRole || j.role === 'jungle') {
+          const quem = j.role === 'sup' ? 'Sup' : j.role === 'adc' ? 'Adc' : 'Seu jungler';
+          partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: agora, modulo: 'flash', prioridade: 2, id: `flash-nosso-${j.nome}`,
+            serio: F`${quem} sem flash${numero != null ? ` por ${rTxt}` : ''}. ${j.role === 'sup' ? 'Não engaja' : j.role === 'adc' ? 'Não força a troca' : 'Gank sem flash: só com a lane na frente'}.`,
+            divertido: F`${quem} sem flash. ${j.role === 'jungle' ? 'Segura o gank' : 'Não vai'}.` }));
+        }
+      } else if (l.claro && f && f.volta > agora + 20 && agora - f.usadoEm > 30) partidaVivo.flashesAliados.delete(j.nome);
+      antes.escuro = !!l.escuro;
+      partidaVivo.placarNossos.set(j.nome, antes);
+    }
+  }
   async function lerPlacarDeles(placar, e) {
+    try { lerPlacarNossos(placar, e); } catch { /* coluna nossa é extra */ }
     const deles = e.jogadores.filter((j) => j.time !== e.eu.time);
     const porRole = ORDEM_PLACAR.map((r) => deles.find((j) => j.role === r)).filter(Boolean);
     // lado do placar é pelo time: azul (100) à esquerda, vermelho (200) à direita

@@ -224,7 +224,7 @@ export function atividade(db, { desde = null, conta = null } = {}) {
  */
 export function tendencias(db, { conta = null } = {}) {
   const agora = Date.now(), semana = new Date(agora - 7 * 86400_000).toISOString(), mes = new Date(agora - 35 * 86400_000).toISOString();
-  const jogos = (desde, ate) => db.prepare(`SELECT p.gameId, p.venci, p.duracaoS, meu.deaths, meu.participantId, meu.cs ${BASE}${recorte(desde, null, conta)} AND p.quando < '${ate}'`).all();
+  const jogos = (desde, ate) => db.prepare(`SELECT p.gameId, p.venci, p.duracaoS, meu.deaths, meu.kills, meu.assists, meu.visao, meu.time, meu.participantId, meu.cs ${BASE}${recorte(desde, null, conta)} AND p.quando < '${ate}'`).all();
   const atual = jogos(semana, new Date(agora + 86400_000).toISOString()), antes = jogos(mes, semana);
   if (atual.length < 5) return { jogosAgora: atual.length, jogosAntes: antes.length, itens: [] };
   const cs10 = (lista) => { const v = []; for (const j of lista) { const f = db.prepare('SELECT cs FROM frames WHERE gameId = ? AND participantId = ? AND minuto = 10').get(j.gameId, j.participantId); if (f) v.push(f.cs); } return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
@@ -241,6 +241,13 @@ export function tendencias(db, { conta = null } = {}) {
   if (mB != null && antes.length >= 5) itens.push({ chave: 'mortes', rotulo: 'Mortes por jogo', agora: mA.toFixed(1), antes: mB.toFixed(1), delta: Math.round((mA - mB) * 10) / 10, bom: mA <= mB });
   const cA = cs10(atual), cB = cs10(antes);
   if (cA != null && cB != null) itens.push({ chave: 'cs10', rotulo: 'CS aos 10 min', agora: Math.round(cA), antes: Math.round(cB), delta: Math.round(cA - cB), bom: cA >= cB });
+  // visão por minuto e participação em abates (kills+assists / abates do time)
+  const vpm = (l) => media(l.filter((j) => j.duracaoS > 0), (j) => (j.visao ?? 0) / (j.duracaoS / 60));
+  const vA = vpm(atual), vB = vpm(antes);
+  if (vA != null && vB != null && antes.length >= 5) itens.push({ chave: 'visao', rotulo: 'Visão por minuto', agora: vA.toFixed(2), antes: vB.toFixed(2), delta: Math.round((vA - vB) * 100) / 100, bom: vA >= vB, dica: vA < 0.8 ? 'menos de 0,8/min: uma ward a cada volta na base' : null });
+  const part = (l) => { const v = []; for (const j of l) { const t = db.prepare('SELECT SUM(kills) k FROM jogadores WHERE gameId = ? AND time = ?').get(j.gameId, j.time); if (t?.k > 0) v.push(((j.kills ?? 0) + (j.assists ?? 0)) / t.k); } return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const pA = part(atual), pB = part(antes);
+  if (pA != null && pB != null && antes.length >= 5) itens.push({ chave: 'participacao', rotulo: 'Participação em abates', agora: Math.round(pA * 100) + '%', antes: Math.round(pB * 100) + '%', delta: Math.round((pA - pB) * 100), bom: pA >= pB, unidade: 'pp', dica: pA < 0.45 ? 'abaixo de 45%: você está longe das lutas que decidem' : null });
   const fA = mortesPorFaixa(atual), fB = mortesPorFaixa(antes);
   const NOMES = ['0–10', '10–20', '20–30', '30+'];
   if (fA.n >= 10 && fB.n >= 10) {

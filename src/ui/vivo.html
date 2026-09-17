@@ -455,7 +455,7 @@ function desenhar(d){
         ${u.mortes?.padrao ? `<div style="color:var(--der)"><b style="display:inline">Padrão:</b> ${esc(u.mortes.padrao)}</div>` : ''}
         ${u.mortes?.lista?.length ? `<details><summary>Suas mortes (${u.mortes.lista.length})</summary><div class="situs">${u.mortes.lista.map(m => `<div class="situ"><span>${mmss(m.t)}</span>${m.por ? esc(m.por) + ' te matou' : 'morreu'}${m.onde ? ' ' + esc(m.onde) : ''}${m.licao ? ' — <i>' + esc(m.licao) + '</i>' : ''}</div>`).join('')}</div></details>` : ''}
         <div class="dica">detalhe em Partidas → a partida → Suas mortes</div>
-        ${u.ditas?.length ? `<details><summary>Avaliar o que a voz falou (${u.ditas.length})</summary><div class="situs">${u.ditas.map(s => `<div class="situ"><span>${mmss(s.t)}</span>${esc(s.texto)}<b class="aval ${(avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === 1 ? 'bom' : (avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === -1 ? 'ruim' : ''}" data-k="${esc(`${s.t}|${s.chave}`)}"><i data-n="1" title="boa">👍</i><i data-n="-1" title="lixo">👎</i></b></div>`).join('')}</div></details>` : ''}
+        ${u.ditas?.length ? `<details ${u.ditas.filter(s => s.aval == null).length ? 'open' : ''}><summary><b style="display:inline;color:var(--vit,#9c6)">Vale 10 segundos:</b> avalie o que a voz falou (${u.ditas.length}) — é o que ensina o cérebro</summary><div class="situs">${u.ditas.map(s => `<div class="situ"><span>${mmss(s.t)}</span>${esc(s.texto)}<b class="aval ${(avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === 1 ? 'bom' : (avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === -1 ? 'ruim' : ''}" data-k="${esc(`${s.t}|${s.chave}`)}"><i data-n="1" title="boa">👍</i><i data-n="-1" title="lixo">👎</i></b></div>`).join('')}</div></details>` : ''}
       </div>` : '';
     if (u?.pasta) pastaSituAtual = u.pasta;
     $('#tudo').innerHTML = `<div class="vazio"><div class="anel"></div><b>Esperando a partida</b>
@@ -516,7 +516,7 @@ function desenhar(d){
       <div class="col">
       <h2 class="sec">Placar</h2>
       <div class="placar">
-        <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador(j, j.souEu)).join('')}</div>
+        <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador({ ...j, feiticoEm: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao) ? { nome: 'sem flash', em: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao).em, aproximado: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao).aproximado } : null }, j.souEu)).join('')}</div>
         <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${jgLinhaVivo(d)}${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null, feiticoEm: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.feiticoEm ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null, d.intelDeles?.[j.nome] ?? null)).join('')}</div>
       </div>
 

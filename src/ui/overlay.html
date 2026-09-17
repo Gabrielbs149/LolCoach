@@ -54,7 +54,7 @@ body.ajuste .hud{outline:2px dashed var(--ouro-claro);outline-offset:2px}
 .fala::before{content:"🔊";font-size:12px;opacity:.8}
 .fala.u3{color:var(--der)} .fala.u2{color:var(--g2)}
 .f .fx{display:block;font-size:.72em;opacity:.8;margin-top:1px}
-.radar{position:relative;width:118px;height:118px;margin:4px 10px 2px auto;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.15)}.radar img{width:100%;height:100%;display:block;opacity:.75}.radar .pt{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;line-height:1}.radar .pt i{font-style:normal;font-size:8px;font-weight:700;color:#fff;background:rgba(190,40,40,.85);border-radius:8px;padding:1px 3px;border:1px solid rgba(255,255,255,.5)}.radar .pt.agora i{background:rgba(230,50,50,1);box-shadow:0 0 6px rgba(255,80,80,.9)}.radar .pt.velho i{opacity:.45}.radar .pt.morto i{background:rgba(90,90,90,.8)}.radar .pt b{font-size:8px;color:#ffd166;text-shadow:0 0 2px #000;margin-top:1px}
+.radar{position:relative;width:118px;height:118px;}.radar.p{width:90px;height:90px}.radar.g{width:170px;height:170px}.radar{margin:4px 10px 2px auto;border-radius:6px;overflow:hidden;border:1px solid rgba(255,255,255,.15)}.radar img{width:100%;height:100%;display:block;opacity:.75}.radar .pt{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;line-height:1}.radar .pt i{font-style:normal;font-size:8px;font-weight:700;color:#fff;background:rgba(190,40,40,.85);border-radius:8px;padding:1px 3px;border:1px solid rgba(255,255,255,.5)}.radar .pt.agora i{background:rgba(230,50,50,1);box-shadow:0 0 6px rgba(255,80,80,.9)}.radar .pt.velho i{opacity:.45}.radar .pt.morto i{background:rgba(90,90,90,.8)}.radar .pt b{font-size:8px;color:#ffd166;text-shadow:0 0 2px #000;margin-top:1px}.radar .pt.nosso i{background:rgba(40,110,200,.8)}.radar .pt.eu i{background:rgba(30,170,170,.95)}
 </style>
 </head>
 <body>
@@ -72,9 +72,12 @@ const visto = (v) => !v || v.ha >= 90 ? '' : v.ha <= 3 ? `<em class="v agora">${
 
 /* Radar: o minimapa em miniatura com o último lugar de cada um deles (some depois de 90 s) e o flash em cima do ponto. */
 function radar(d){
+  const tam = d.overlayRadar ?? 'm';
+  if (tam === 'off') return '';
   const pontos = (d.inimigos ?? []).filter(j => j.visto && j.visto.x != null && j.visto.ha < 90);
-  if (!pontos.length) return '';
-  return `<div class="radar"><img src="/minimapa.png" alt="">${pontos.map(j => {
+  const nossos = d.radarNossos ?? [];
+  if (!pontos.length && !nossos.length) return '';
+  return `<div class="radar ${tam}"><img src="/minimapa.png" alt="">${nossos.map(a => `<span class="pt nosso ${a.eu ? 'eu' : ''}" style="left:${(a.x * 100).toFixed(1)}%;top:${(a.y * 100).toFixed(1)}%"><i>${a.eu ? 'EU' : esc(String(a.campeao).slice(0, 3))}</i></span>`).join('')}${pontos.map(j => {
     const f = j.flashMarcado && j.flashEm > 0 ? mmss(j.flashEm) : '';
     return `<span class="pt ${j.morto ? 'morto' : j.visto.ha <= 5 ? 'agora' : j.visto.ha > 30 ? 'velho' : ''}" style="left:${(j.visto.x * 100).toFixed(1)}%;top:${(j.visto.y * 100).toFixed(1)}%"><i>${esc(j.campeao.slice(0, 3))}</i>${f ? `<b>${f}</b>` : ''}</span>`;
   }).join('')}</div>`;
@@ -114,13 +117,16 @@ window.addEventListener('mousemove', (ev) => {
   fetch('/api/overlay/mover?' + q).catch(() => {});
 });
 window.addEventListener('mouseup', () => { arr = null; });
+let radarAtual = 'm';
+async function radarCiclo(){ await fetch('/api/overlay/tamanho?radar=ciclo', { method: 'POST' }).catch(() => {}); }
 async function escalar(delta){ const nova = Math.round((escalaAtual + delta) * 100) / 100; await fetch('/api/overlay/tamanho?escala=' + nova, { method: 'POST' }).catch(() => {}); }
 async function pronto(){ await fetch('/api/overlay/ajustar?ligar=0', { method: 'POST' }).catch(() => {}); ajuste = false; document.body.classList.remove('ajuste'); }
 function barraAjuste(){
-  return `<div class="ajusteBarra"><span class="pega" onmousedown="comecarArrasto(event,'mover')">⠿ arrasta pra mover</span><button onclick="escalar(-0.1)">−</button><b>${Math.round(escalaAtual * 100)}%</b><button onclick="escalar(0.1)">+</button><button class="ok" onclick="pronto()">Pronto</button></div><div class="canto" onmousedown="comecarArrasto(event,'tamanho')" title="arrasta pra redimensionar">◢</div>`;
+  return `<div class="ajusteBarra"><span class="pega" onmousedown="comecarArrasto(event,'mover')">⠿ arrasta pra mover</span><button onclick="escalar(-0.1)">−</button><b>${Math.round(escalaAtual * 100)}%</b><button onclick="escalar(0.1)">+</button><button onclick="radarCiclo()" title="tamanho do radar: pequeno, médio, grande, desligado">radar ${esc(radarAtual)}</button><button class="ok" onclick="pronto()">Pronto</button></div><div class="canto" onmousedown="comecarArrasto(event,'tamanho')" title="arrasta pra redimensionar">◢</div>`;
 }
 function desenhar(d){
   const esc0 = Number(d.overlayEscala) || 1;
+  radarAtual = d.overlayRadar ?? 'm';
   if (esc0 !== escalaAtual) { escalaAtual = esc0; document.body.style.zoom = String(esc0); }
   const hud = document.getElementById('hud');
   if(!d.emJogo && !ajuste){ hud.classList.add('oculto'); return; }
@@ -154,7 +160,7 @@ async function tick(){
     await lerAjuste();
     const d = await fetch('/api/vivo').then(r => r.json());
     if (ajuste) { desenhar(d); return; }
-    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos?.map((j) => [j.morto, j.flashEm, j.feiticoEm?.em, j.visto?.lane, j.visto?.ha]), d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
+    const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos?.map((j) => [j.morto, j.flashEm, j.feiticoEm?.em, j.visto?.lane, j.visto?.ha, Math.round((j.visto?.x ?? 0) * 40), Math.round((j.visto?.y ?? 0) * 40)]), d.overlayRadar, (d.radarNossos ?? []).map((a) => [Math.round(a.x * 40), Math.round(a.y * 40)]), d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
     if (json === ultimoJson && Date.now() - ultimaFalaEm > 13000) return;
     ultimoJson = json;
     desenhar(d);
