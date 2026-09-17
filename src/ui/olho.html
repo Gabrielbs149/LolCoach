@@ -47,8 +47,11 @@ let cegoDesde = 0, cegoAvisado = 0, fracoDesde = 0;
  * da janela do olho, de uma partida pra outra.
  */
 const cores = (() => { try { return JSON.parse(localStorage.getItem('olho.cores') || 'null') ?? {}; } catch { return {}; } })();
-for (const k of ['inimigo', 'aliado', 'eu']) cores[k] ??= { r: 0, g: 0, b: 0, n: 0 };
-const corPronta = (k) => cores[k].n >= 25;
+// cor de anel é SATURADA (vermelho 169,61,56 · azul ~90,170,240); uma média sem graça (73,103,130 = rio) é
+// aprendizado ruim — casar pixels a 40 dela enche o minimapa de 'manchas' de rio/terreno e engole os ícones
+const croma = (c) => Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b);
+for (const k of ['inimigo', 'aliado', 'eu']) { cores[k] ??= { r: 0, g: 0, b: 0, n: 0 }; if (cores[k].n >= 25 && croma(cores[k]) < 80) cores[k] = { r: 0, g: 0, b: 0, n: 0 }; }
+const corPronta = (k) => cores[k].n >= 25 && croma(cores[k]) >= 80;
 const distCor = (r, g, b, c) => Math.hypot(r - c.r, g - c.g, b - c.b);
 let coresAvisadas = false;
 function aprenderCor(k, cor) {
@@ -598,14 +601,17 @@ function confirmar(rgba, s, tpl, x, y) {
     }
     return melhorF;
   };
-  // cor média da borda, pra aprender a cor desta instalação
-  let r2 = 0, g2 = 0, b2 = 0, n2 = 0;
+  // cor da borda pra aprender a cor desta instalação: só o terço mais saturado do anel (o resto é
+  // fundo/ícone vazando e dava uma média sem graça igual ao rio)
+  const pixAnel = [];
   for (let a = 0; a < 360; a += 12) {
     const px = Math.round(cx + Math.cos(a / 57.3) * (tw / 2)), py = Math.round(cy + Math.sin(a / 57.3) * (tw / 2));
     if (px < 0 || py < 0 || px >= s || py >= s) continue;
-    const q = (py * s + px) * 4; r2 += rgba[q]; g2 += rgba[q + 1]; b2 += rgba[q + 2]; n2++;
+    const q = (py * s + px) * 4; pixAnel.push([rgba[q], rgba[q + 1], rgba[q + 2]]);
   }
-  melhor.anelCor = n2 > 0 ? [r2 / n2, g2 / n2, b2 / n2] : null;
+  pixAnel.sort((p, q) => (Math.max(...q) - Math.min(...q)) - (Math.max(...p) - Math.min(...p)));
+  const topo = pixAnel.slice(0, Math.max(1, Math.floor(pixAnel.length / 3)));
+  melhor.anelCor = topo.length ? [0, 1, 2].map((i) => topo.reduce((acc, p) => acc + p[i], 0) / topo.length) : null;
   melhor.fracVermelho = anel(vermelho); melhor.fracAzul = anel(azul); melhor.anelTeal = anel(teal);
   melhor.anelVermelho = melhor.fracVermelho >= 0.35;
   melhor.anelAzul = melhor.fracAzul >= 0.35;
@@ -719,7 +725,7 @@ async function quadro() {
     const vistosAli = reconhecerEmManchas(azuis, tplsAli, m, rgba, s, null, 'aliado');
     {
       const faltam = [...tplsAli.keys()].filter((n) => !vistosAli.some((v) => v.campeao === n));
-      for (const nome of faltam.slice(rodada % Math.max(1, faltam.length)).slice(0, 1)) {   // um aliado por quadro no mapa todo
+      for (const nome of faltam) {   // todo aliado que faltou procura o mapa todo (5 ms cada em meia resolução)
         const p = procurar(m, rgba, s, tplsAli.get(nome), 'ali-' + nome, agora, true, []);
         if (p) { vistosAli.push({ campeao: nome, x: p.x, y: p.y, score: p.score }); if (p.crua >= 0.85) aprenderCor('aliado', p.cor); }
       }
@@ -735,7 +741,9 @@ async function quadro() {
         const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
         if (!cand.length || cand[0].score < 0.3) continue;
         const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
-        if (!ok.anelVermelho && ok.score < 0.80) continue;   // mancha vermelha já é indício; sem anel nítido (ícones colados) pede 0,80
+        // mesma régua da busca no mapa: sem anel só com 0,88+; anel pela metade (ícones colados) com 0,82+
+        // (um losango amarelo em cima de vermelho virava Pantheon 0,81 sem anel nenhum)
+        if (!ok.anelVermelho && ok.score < (ok.fracVermelho >= 0.25 ? 0.82 : 0.88)) continue;
         notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, cor: ok.anelCor });
       }
       notas.sort((a, b) => b.score - a.score);
@@ -756,11 +764,12 @@ async function quadro() {
       vistos.push({ campeao: a.nome, x: (a.x + t.d / 2) / s, y: (a.y + t.d / 2) / s, score: Math.round(a.score * 100) / 100 });
       if (a.score >= 0.85) aprenderCor('inimigo', a.cor);
     }
-    // (b) quem não caiu em mancha nenhuma: segue de onde estava; um por quadro procura o mapa todo
+    // (b) quem não caiu em mancha nenhuma: segue de onde estava, ou procura o mapa todo
     const soltos = vivos.filter((j) => !tomados.has(j.campeao));
     const semRastro = soltos.filter((j) => !rastros.has(j.campeao));
-    const ini = semRastro.length ? rodada % semRastro.length : 0;
-    const daVez = new Set(semRastro.slice(ini, ini + 2).concat(semRastro.slice(0, Math.max(0, ini + 2 - semRastro.length))).map((j) => j.campeao));
+    // todo mundo sem rastro procura o mapa todo a cada quadro (5 ms cada): a mancha vermelha é só atalho —
+    // com 100+ blocos vermelhos/azuis (torres, minions, rio) o corte de 14 manchas deixava metade de fora
+    const daVez = new Set(semRastro.map((j) => j.campeao));
     for (const j of soltos) {
       const t = tpls.get(j.campeao); if (!t) continue;
       const p = procurar(m, rgba, s, t, j.campeao, agora, daVez.has(j.campeao), []);
@@ -821,7 +830,7 @@ function reconhecerEmManchas(manchas, tpls, m, rgba, s, tomadosFora, classe = nu
       const cand = buscar(m, t, { x0: cx - 4, y0: cy - 4, x1: cx + 4, y1: cy + 4 }, 1);
       if (!cand.length || cand[0].score < 0.3) continue;
       const ok = confirmar(rgba, s, t, cand[0].x * 2, cand[0].y * 2);
-      if (classe === 'aliado' && !ok.anelAzul && ok.score < 0.80) continue;
+      if (classe === 'aliado' && !ok.anelAzul && ok.score < (ok.fracAzul >= 0.25 ? 0.82 : 0.88)) continue;
       notas.push({ nome, score: ok.score, x: ok.x, y: ok.y, d: t.d, cor: ok.anelCor });
     }
     notas.sort((a, b) => b.score - a.score);
@@ -872,7 +881,9 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   const anelCerto = !melhor ? false : chave === 'eu' ? melhor.anelTeal >= 0.4 : chave.startsWith('ali-') ? melhor.anelAzul : melhor.anelVermelho;
   const perto = melhor && seguindo && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 40;
   // quem já estava sendo seguido pode perder o anel por um instante (ícones se sobrepondo): só o novo exige anel
-  if (melhor && !perto && !anelCerto && melhor.crua < 0.88) melhor = null;
+  // anel pela metade (ícone colado em outro: Milio grudado em mim, Kai'Sa na Nami) com 0,82+ passa
+  const anelParcial = !!melhor && (chave === 'eu' ? melhor.anelTeal : chave.startsWith('ali-') ? melhor.fracAzul : melhor.fracVermelho) >= 0.25;
+  if (melhor && !perto && !anelCerto && melhor.crua < (anelParcial ? 0.82 : 0.88)) melhor = null;
   // dentro da fonte a água é azul e a loja parece ícone: ali só entra com 0,85+ (Pantheon 'na fonte' 270 vezes numa partida)
   if (melhor && naFonte((melhor.x + tw) / s, (melhor.y + tw) / s, chave === 'eu' || chave.startsWith('ali-') ? meuTime : (meuTime === 100 ? 200 : 100)) && melhor.crua < 0.85) melhor = null;
   if (melhor && melhor.score >= (perto ? LIMIAR_SEGUIDO : LIMIAR_NOVO)) {
