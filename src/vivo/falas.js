@@ -206,7 +206,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   if (jgDeles && jgDeles.nivel >= 6 && !mem.spikes.has('jg6')) { mem.spikes.add('jg6'); if (tempo < 900) dizer('jg-deles-6', 'spikes', F`Jungler deles level 6${jgDeles.nivel > (eu.nivel ?? 0) ? ', na sua frente' : ''}. Gank com ult.`, F`Jungler deles de ult. Cuidado no gank.`, 2); }
   if (rival && rival.nivel >= 6 && (eu.nivel ?? 0) < 6 && !mem.spikes.has('rival6')) { mem.spikes.add('rival6'); dizer('rival-6-antes', 'spikes', F`${rival.campeao} de ult e você não. Não troca.`, F`${rival.campeao} tem ult e você não. Segura.`, 2); }
   // itens que viram a lane: quem fechou primeiro
-  const ITENS_CHAVE = { 3153: 'BORK', 6692: 'Eclipse', 6333: 'Cutelo', 3078: 'Trindade', 6632: 'Divino', 3031: 'IE', 6672: 'Kraken', 3124: 'Rageblade', 3089: 'Deathcap', 4645: 'Shadowflame', 3157: 'Ampulheta', 6653: 'Liandry', 3142: 'Youmuu', 6691: 'Dusk', 3068: 'Sunfire', 3065: 'Espírito', 3110: 'Coração Gelado', 3143: 'Randuin' };
+  const ITENS_CHAVE = { 3153: 'BORK', 6692: 'Eclipse', 3071: 'Cleaver', 6333: 'Death Dance', 3078: 'Trindade', 6631: 'Sundered Sky', 3074: 'Hidra', 6698: 'Profane', 3161: 'Shojin', 3031: 'IE', 6672: 'Kraken', 6675: 'Navori', 3072: 'Sede de Sangue', 6676: 'Coletor', 3124: 'Rageblade', 3115: 'Nashor', 3089: 'Deathcap', 4645: 'Shadowflame', 6655: 'Luden', 3157: 'Ampulheta', 6653: 'Liandry', 3142: 'Youmuu', 3068: 'Sunfire', 3065: 'Espírito', 3110: 'Coração Gelado', 3143: 'Randuin' };
   for (const j of inimigos) for (const it of j.itens ?? []) {
     const nome = ITENS_CHAVE[it.id]; if (!nome) continue;
     const k = `${j.nome}-${it.id}`; if (mem.spikes.has(k)) continue; mem.spikes.add(k);

@@ -6,7 +6,7 @@
 const APELIDOS = new Map([
   [3153, 'BORK'], [3031, 'Gume'], [6672, 'Kraken'], [3157, 'Zhonya'], [3140, 'QSS'], [3139, 'Mercurial'],
   [3026, 'GA'], [6653, 'Liandry'], [3089, 'Rabadon'], [6692, 'Eclipse'], [3142, 'Youmuu'], [6695, 'Serpente'],
-  [3074, 'Hidra'], [6631, 'Sundered Sky'], [3078, 'Trindade'], [3071, 'Cleaver'], [3065, 'Banshee'],
+  [3074, 'Hidra'], [6631, 'Sundered Sky'], [3078, 'Trindade'], [3071, 'Cleaver'], [3065, 'Espírito'],
   [3143, 'Randuin'], [3110, 'Frozen'], [3075, 'Thornmail'], [3742, 'Dead Man'], [3068, 'Sunfire'], [3084, 'Heartsteel'],
   [2065, 'Shurelya'], [3011, 'Putrifier'], [3124, 'Guinsoo'], [3036, 'LDR'], [3033, 'Mortal'], [3135, 'Void Staff'],
   [3102, 'Banshee'], [3072, 'Sede de Sangue'], [3508, 'Colhedor'], [6675, 'Navori'], [3085, 'Furacão'], [3094, 'Rapid Fire'],
