@@ -131,6 +131,10 @@ body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:
 .campoAdm{width:360px;max-width:50%;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);padding:6px 10px;border-radius:var(--r-s);font:inherit;font-size:12.5px}
 .campoAdm.curto{width:120px}
 .campoAdm:focus{outline:none;border-color:var(--ouro)}
+.skBarra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}.skLigar{display:flex;align-items:center;gap:6px;font-size:13px}
+.skZona{border:1.5px dashed var(--borda);border-radius:var(--r-m);padding:14px 16px;background:var(--f1);display:flex;align-items:center;gap:14px;flex-wrap:wrap;transition:border-color .15s,background .15s}.skZona.sobre{border-color:var(--vit,#9c6);background:rgba(120,200,100,.08)}.skZonaTexto{flex:1;min-width:220px;font-size:13px}.skZonaBotoes{display:flex;gap:8px}.skZona .dica{width:100%}
+.skGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:12px}.skCamp{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:8px 10px}.skCamp.ativa{border-color:rgba(120,200,100,.5)}.skCampCab{display:flex;align-items:center;gap:8px;margin-bottom:6px}.skCampCab img{width:28px;height:28px;border-radius:50%}.skCampCab small{color:var(--apagado);margin-left:auto}
+.skItem{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px}.skItem:hover{background:rgba(255,255,255,.04)}.skItem.escolhida{background:rgba(120,200,100,.1)}.skNome{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skNome small{color:var(--apagado)}.skAcoes{display:flex;gap:4px}.skAcoes .mini{background:transparent;border:1px solid var(--borda);color:var(--texto);border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px}.skAcoes .mini:hover{border-color:var(--texto)}
 .admTabela{width:100%;border-collapse:collapse;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden;font-size:12.5px}
 .admTabela th,.admTabela td{padding:8px 10px;border-bottom:1px solid var(--borda);text-align:left;white-space:nowrap;vertical-align:middle}
 .admTabela th{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700;background:var(--f2)}
@@ -3181,6 +3185,7 @@ async function carregarSkins(){
   skDados = await pegar('/api/skins');
   desenharSkins();
 }
+function skIconeDe(c){ const k = String(c).toLowerCase().replace(/[^a-z]/g, ''); const cc = listaCampeoes.find(x => String(x.nome).toLowerCase().replace(/[^a-z]/g, '') === k); return cc ? icone(cc.id) : ''; }
 function desenharSkins(){
   const d = skDados; if(!d) return;
   if(d.erro){ $('#skTopo').innerHTML = `<div class="vazio">${esc(d.erro)}</div>`; return; }
@@ -3188,30 +3193,73 @@ function desenharSkins(){
     ${cartao('cslol-tools', d.instalado ? `<span class="v">instalado</span>` : `<span class="d">não instalado</span>`, d.versao ? 'versão ' + esc(d.versao) : (d.instalando ? 'baixando…' : 'necessário pra aplicar'))}
     ${cartao('Pasta do jogo', d.jogo ? '<span class="v">achada</span>' : '<span class="d">não achei</span>', d.jogo ? esc(d.jogo) : 'abre o League uma vez')}
     ${cartao('Patcher', d.patcher ? `<span class="v">ligado</span>` : 'parado', d.patcher ? esc(d.patcher.mod) : 'sobe sozinho quando você trava o campeão')}
+    ${cartao('Skins', String(d.mods.length), `${Object.keys(d.porCampeao ?? {}).length} campeões com skin escolhida`)}
   </div>
-  <div style="margin-top:8px"><label style="margin-right:12px"><input type="checkbox" ${d.ativo ? 'checked' : ''} onchange="skLigar(this.checked)"> aplicar skin ao travar o campeão</label>${d.instalado ? `<button class="acao" onclick="skAcao('/api/skins/instalar')">Atualizar cslol-tools</button>` : `<button class="acao" onclick="skAcao('/api/skins/instalar')" ${d.instalando ? 'disabled' : ''}>Instalar cslol-tools (≈37 MB)</button>`}
-  ${d.patcher ? ` <button class="acao" onclick="skAcao('/api/skins/parar')">Parar patcher</button>` : ''}</div>`;
-  $('#skImport').innerHTML = `<button class="acao" onclick="document.getElementById('skArq').click()">Importar skin (.fantome / .zip)</button><input id="skArq" type="file" accept=".fantome,.zip" multiple hidden onchange="skImportar(this.files); this.value=''">
-    <span class="dica" style="margin-left:8px">baixe a skin em sites de custom skins (formato fantome) e importe aqui; o campeão é reconhecido sozinho</span>`;
+  <div class="skBarra">
+    <label class="skLigar"><input type="checkbox" ${d.ativo ? 'checked' : ''} onchange="skLigar(this.checked)"> aplicar skin ao travar o campeão</label>
+    ${d.instalado ? `<button class="acao" onclick="skAcao('/api/skins/instalar')">Atualizar cslol-tools</button>` : `<button class="acao" onclick="skAcao('/api/skins/instalar')" ${d.instalando ? 'disabled' : ''}>Instalar cslol-tools (≈37 MB)</button>`}
+    ${d.patcher ? `<button class="acao" onclick="skAcao('/api/skins/parar')">Parar patcher</button>` : ''}
+  </div>`;
+  $('#skImport').innerHTML = `<div class="skZona" id="skZona" ondragover="event.preventDefault(); this.classList.add('sobre')" ondragleave="this.classList.remove('sobre')" ondrop="skSoltar(event)">
+    <div class="skZonaTexto"><b>Arrasta aqui</b> os arquivos ou a pasta inteira de skins (.fantome / .zip)</div>
+    <div class="skZonaBotoes">
+      <button class="acao" onclick="document.getElementById('skArq').click()">Escolher arquivos</button>
+      <button class="acao" onclick="document.getElementById('skPasta').click()">Escolher pasta inteira</button>
+      <input id="skArq" type="file" accept=".fantome,.zip" multiple hidden onchange="skImportar(this.files); this.value=''">
+      <input id="skPasta" type="file" webkitdirectory directory multiple hidden onchange="skImportar(this.files); this.value=''">
+    </div>
+    <div class="dica" id="skProgresso"></div>
+  </div>`;
   const por = d.porCampeao ?? {};
-  $('#skLista').innerHTML = d.mods.length ? `<table class="admTabela"><thead><tr><th>Skin</th><th>Campeão</th><th>Autor</th><th>Usar</th><th></th></tr></thead><tbody>${d.mods.map(m => `<tr>
-      <td><b>${esc(m.titulo)}</b>${m.descricao ? `<div class="sub">${esc(String(m.descricao).slice(0, 90))}</div>` : ''}</td>
-      <td>${m.campeoes.map(c => `<span>${(() => { const k = String(c).toLowerCase().replace(/[^a-z]/g, ""); const cc = listaCampeoes.find(x => String(x.nome).toLowerCase().replace(/[^a-z]/g, "") === k); return cc ? icone(cc.id) : ""; })()} ${esc(c)}</span>`).join(', ') || '<span class="sub">?</span>'}</td>
-      <td class="sub">${esc(m.autor ?? '—')}</td>
-      <td>${m.campeoes.map(c => `<label style="display:block"><input type="checkbox" ${por[c] === m.nome ? 'checked' : ''} onchange="skAcao('/api/skins/escolher?campeao=${encodeURIComponent(c)}&mod=' + (this.checked ? encodeURIComponent('${esc(m.nome)}') : ''))"> ${esc(c)}</label>`).join('') || '—'}</td>
-      <td><button class="acao" onclick="skAcao('/api/skins/testar?campeao=${encodeURIComponent(m.campeoes[0] ?? '')}')" title="monta o overlay e sobe o patcher agora (pra testar no treino)">Testar</button> <button class="acao" onclick="if(confirm('Apagar ${esc(m.titulo)}?')) skAcao('/api/skins/remover?mod=${encodeURIComponent(m.nome)}')">Apagar</button></td>
-    </tr>`).join('')}</tbody></table>` : '<div class="vazio">nenhuma skin importada ainda</div>';
+  // agrupado por campeão; uma skin escolhida por campeão (ou nenhuma)
+  const porCamp = new Map();
+  for (const m of d.mods) for (const c of (m.campeoes.length ? m.campeoes : ['?'])) { if (!porCamp.has(c)) porCamp.set(c, []); porCamp.get(c).push(m); }
+  const grupos = [...porCamp.entries()].sort((a, b) => a[0].localeCompare(b[0]));
+  $('#skLista').innerHTML = grupos.length ? `<div class="skGrade">${grupos.map(([c, mods]) => `<div class="skCamp ${por[c] ? 'ativa' : ''}">
+      <div class="skCampCab">${skIconeDe(c)}<b>${esc(c)}</b><small>${mods.length} skin${mods.length > 1 ? 's' : ''}${por[c] ? ' · em uso' : ''}</small></div>
+      ${mods.map(m => `<label class="skItem ${por[c] === m.nome ? 'escolhida' : ''}">
+        <input type="radio" name="sk-${esc(c)}" ${por[c] === m.nome ? 'checked' : ''} onclick="skEscolher('${esc(c)}', '${esc(m.nome)}', this)">
+        <span class="skNome" title="${esc(m.descricao ?? '')}">${esc(m.titulo)}${m.autor ? `<small> · ${esc(m.autor)}</small>` : ''}</span>
+        <span class="skAcoes"><button class="mini" title="testa agora: monta e liga o patcher" onclick="event.preventDefault(); skAcao('/api/skins/testar?campeao=${encodeURIComponent(c)}')">▶</button><button class="mini" title="apagar" onclick="event.preventDefault(); if(confirm('Apagar ${esc(m.titulo)}?')) skAcao('/api/skins/remover?mod=${encodeURIComponent(m.nome)}')">✕</button></span>
+      </label>`).join('')}
+      <label class="skItem ${!por[c] ? 'escolhida' : ''}"><input type="radio" name="sk-${esc(c)}" ${!por[c] ? 'checked' : ''} onclick="skEscolher('${esc(c)}', '', this)"><span class="skNome sub">nenhuma (skin normal)</span></label>
+    </div>`).join('')}</div>` : '<div class="vazio">nenhuma skin importada ainda — arrasta a pasta aqui em cima</div>';
 }
-async function skLigar(ativo){ try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skins: { ...(skDados ?? {}), ativo, mods: undefined, patcher: undefined, instalado: undefined, versao: undefined, instalando: undefined } }) }); } catch(e){ alert(e.message); } skDados = await pegar('/api/skins'); desenharSkins(); }
+async function skEscolher(campeao, mod, el){ await skAcao('/api/skins/escolher?campeao=' + encodeURIComponent(campeao) + '&mod=' + encodeURIComponent(mod)); }
+async function skLigar(ativo){ try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skins: { ativo, porCampeao: skDados?.porCampeao ?? {} } }) }); } catch(e){ alert(e.message); } skDados = await pegar('/api/skins'); desenharSkins(); }
 async function skAcao(url){
   try { const r = await fetch(url, { method: 'POST' }).then(r => r.json()); if(r?.erro) alert(r.erro); } catch(e){ alert(e.message); }
   skDados = await pegar('/api/skins'); desenharSkins();
 }
+/* pasta inteira: lê recursivamente as entradas do drop (webkitGetAsEntry) ou a lista do input webkitdirectory */
+function skLerEntrada(entry){
+  return new Promise((ok) => {
+    if (entry.isFile) entry.file((f) => ok([f]), () => ok([]));
+    else if (entry.isDirectory) { const r = entry.createReader(); const todos = []; const lote = () => r.readEntries(async (es) => { if (!es.length) { ok(todos); return; } for (const e of es) todos.push(...await skLerEntrada(e)); lote(); }, () => ok(todos)); lote(); }
+    else ok([]);
+  });
+}
+async function skSoltar(ev){
+  ev.preventDefault(); document.getElementById('skZona')?.classList.remove('sobre');
+  const itens = [...(ev.dataTransfer?.items ?? [])];
+  let files = [];
+  if (itens.length && itens[0].webkitGetAsEntry) { for (const it of itens) { const e = it.webkitGetAsEntry(); if (e) files.push(...await skLerEntrada(e)); } }
+  else files = [...(ev.dataTransfer?.files ?? [])];
+  await skImportar(files);
+}
 async function skImportar(files){
-  for (const f of files) {
-    try { const r = await fetch('/api/skins/importar?nome=' + encodeURIComponent(f.name), { method: 'POST', body: await f.arrayBuffer() }).then(r => r.json()); if(r?.erro) alert(f.name + ': ' + r.erro); } catch(e){ alert(e.message); }
+  const lista = [...files].filter(f => /\.(fantome|zip)$/i.test(f.name));
+  const prog = document.getElementById('skProgresso');
+  if (!lista.length) { if (prog) prog.textContent = 'nenhum .fantome/.zip aí dentro'; return; }
+  let ok = 0; const erros = [];
+  for (let i = 0; i < lista.length; i++) {
+    const f = lista[i];
+    if (prog) prog.textContent = `importando ${i + 1}/${lista.length}: ${f.name}`;
+    try { const r = await fetch('/api/skins/importar?nome=' + encodeURIComponent(f.name), { method: 'POST', body: await f.arrayBuffer() }).then(r => r.json()); if (r?.erro) erros.push(f.name + ': ' + r.erro); else ok++; } catch(e){ erros.push(f.name + ': ' + e.message); }
+    if (i % 5 === 4) { skDados = await pegar('/api/skins'); desenharSkins(); const p2 = document.getElementById('skProgresso'); if (p2) p2.textContent = `importando ${i + 1}/${lista.length}…`; }
   }
   skDados = await pegar('/api/skins'); desenharSkins();
+  const p3 = document.getElementById('skProgresso'); if (p3) p3.textContent = `${ok} importada${ok === 1 ? '' : 's'}${erros.length ? ` · ${erros.length} com erro: ${erros.slice(0, 3).join(' | ')}` : ''}`;
 }
 const jaCarregou = new Set();
 
