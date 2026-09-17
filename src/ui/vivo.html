@@ -451,7 +451,9 @@ function desenhar(d){
         <b>Última partida${u.campeao ? ' de ' + esc(u.campeao) : ''}</b>
         <div>${u.faladas} falas de ${u.situacoes} situações vistas</div>
         ${u.previsoes ? `<div>previsões certas: ${u.previsoes.certas}/${u.previsoes.total}</div>` : ''}
-        ${u.mortes ? `<div>mortes: ${u.mortes.total} · com aviso antes: ${u.mortes.avisadas} · jungler sumido: ${u.mortes.semJg} · avançado: ${u.mortes.avancado}</div>` : ''}
+        ${u.mortes ? `<div>mortes: ${u.mortes.total} · com aviso antes: ${u.mortes.avisadas} · jungler sumido: ${u.mortes.semJg} · avançado: ${u.mortes.avancado}${u.mortes.semWard ? ` · sem ward: ${u.mortes.semWard}` : ''}</div>` : ''}
+        ${u.mortes?.padrao ? `<div style="color:var(--der)"><b style="display:inline">Padrão:</b> ${esc(u.mortes.padrao)}</div>` : ''}
+        ${u.mortes?.lista?.length ? `<details><summary>Suas mortes (${u.mortes.lista.length})</summary><div class="situs">${u.mortes.lista.map(m => `<div class="situ"><span>${mmss(m.t)}</span>${m.por ? esc(m.por) + ' te matou' : 'morreu'}${m.onde ? ' ' + esc(m.onde) : ''}${m.licao ? ' — <i>' + esc(m.licao) + '</i>' : ''}</div>`).join('')}</div></details>` : ''}
         <div class="dica">detalhe em Partidas → a partida → Suas mortes</div>
         ${u.ditas?.length ? `<details><summary>Avaliar o que a voz falou (${u.ditas.length})</summary><div class="situs">${u.ditas.map(s => `<div class="situ"><span>${mmss(s.t)}</span>${esc(s.texto)}<b class="aval ${(avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === 1 ? 'bom' : (avaliadas.get(`${s.t}|${s.chave}`) ?? s.aval) === -1 ? 'ruim' : ''}" data-k="${esc(`${s.t}|${s.chave}`)}"><i data-n="1" title="boa">👍</i><i data-n="-1" title="lixo">👎</i></b></div>`).join('')}</div></details>` : ''}
       </div>` : '';

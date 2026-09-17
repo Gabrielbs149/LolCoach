@@ -215,6 +215,42 @@ export function atividade(db, { desde = null, conta = null } = {}) {
   };
 }
 
+/* ---------------------------------------------------------- tendências */
+
+/**
+ * O que mudou nos últimos 7 dias contra as 4 semanas anteriores: winrate, mortes por jogo,
+ * CS aos 10, e EM QUE MINUTO você morre (0–10, 10–20, 20–30, 30+) — a curva de mortes vem
+ * dos eventos gravados (ChampionKill com você de vítima). Só fala do que tem amostra (≥ 5 jogos agora).
+ */
+export function tendencias(db, { conta = null } = {}) {
+  const agora = Date.now(), semana = new Date(agora - 7 * 86400_000).toISOString(), mes = new Date(agora - 35 * 86400_000).toISOString();
+  const jogos = (desde, ate) => db.prepare(`SELECT p.gameId, p.venci, p.duracaoS, meu.deaths, meu.participantId, meu.cs ${BASE}${recorte(desde, null, conta)} AND p.quando < '${ate}'`).all();
+  const atual = jogos(semana, new Date(agora + 86400_000).toISOString()), antes = jogos(mes, semana);
+  if (atual.length < 5) return { jogosAgora: atual.length, jogosAntes: antes.length, itens: [] };
+  const cs10 = (lista) => { const v = []; for (const j of lista) { const f = db.prepare('SELECT cs FROM frames WHERE gameId = ? AND participantId = ? AND minuto = 10').get(j.gameId, j.participantId); if (f) v.push(f.cs); } return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null; };
+  const mortesPorFaixa = (lista) => {
+    const faixas = [0, 0, 0, 0]; let n = 0;
+    for (const j of lista) { for (const e of db.prepare("SELECT t FROM eventos WHERE gameId = ? AND tipo = 'CHAMPION_KILL' AND vitimaId = ?").all(j.gameId, j.participantId)) { { const seg = e.t > 7200 ? e.t / 1000 : e.t; faixas[Math.min(3, Math.floor(seg / 600))]++; n++; } } }
+    return { faixas, n };
+  };
+  const media = (l, f) => (l.length ? l.reduce((a, j) => a + f(j), 0) / l.length : null);
+  const itens = [];
+  const wrA = media(atual, (j) => j.venci), wrB = media(antes, (j) => j.venci);
+  if (wrB != null && antes.length >= 5) itens.push({ chave: 'winrate', rotulo: 'Taxa de vitória', agora: Math.round(wrA * 100) + '%', antes: Math.round(wrB * 100) + '%', delta: Math.round((wrA - wrB) * 100), bom: wrA >= wrB, unidade: 'pp' });
+  const mA = media(atual, (j) => j.deaths), mB = media(antes, (j) => j.deaths);
+  if (mB != null && antes.length >= 5) itens.push({ chave: 'mortes', rotulo: 'Mortes por jogo', agora: mA.toFixed(1), antes: mB.toFixed(1), delta: Math.round((mA - mB) * 10) / 10, bom: mA <= mB });
+  const cA = cs10(atual), cB = cs10(antes);
+  if (cA != null && cB != null) itens.push({ chave: 'cs10', rotulo: 'CS aos 10 min', agora: Math.round(cA), antes: Math.round(cB), delta: Math.round(cA - cB), bom: cA >= cB });
+  const fA = mortesPorFaixa(atual), fB = mortesPorFaixa(antes);
+  const NOMES = ['0–10', '10–20', '20–30', '30+'];
+  if (fA.n >= 10 && fB.n >= 10) {
+    const pa = fA.faixas.map((x) => x / fA.n), pb = fB.faixas.map((x) => x / fB.n);
+    let pior = 0; for (let i = 1; i < 4; i++) if (pa[i] - pb[i] > pa[pior] - pb[pior]) pior = i;
+    if (pa[pior] - pb[pior] >= 0.08) itens.push({ chave: 'faixa', rotulo: `Mortes entre ${NOMES[pior]} min`, agora: Math.round(pa[pior] * 100) + '%', antes: Math.round(pb[pior] * 100) + '%', delta: Math.round((pa[pior] - pb[pior]) * 100), bom: false, unidade: 'pp', dica: pior === 0 ? 'morrendo cedo: respeita o level 2–3 e o primeiro gank' : pior === 1 ? 'morrendo no meio do jogo: rotação depois do primeiro item, não força' : 'morrendo tarde: uma morte aos 30 min decide o jogo; anda com o time' });
+  }
+  return { jogosAgora: atual.length, jogosAntes: antes.length, itens, curvaMortes: fA.n ? fA.faixas.map((x, i) => ({ rotulo: NOMES[i], fatia: x / fA.n })) : null };
+}
+
 /* ----------------------------------------------------------- classes */
 
 /**

@@ -993,6 +993,7 @@ h2{letter-spacing:1px}
            <h2>Tipo de campeão</h2><div id="eClasses"></div></div>
       <div><h2>Radar</h2><div id="eRadar"></div></div>
     </div>
+    <h2>Tendências · últimos 7 dias contra as 4 semanas anteriores</h2><div id="eTend"></div>
     <h2>Por dia da semana</h2><div id="eDias"></div>
     <h2>Por horário</h2><div id="eHoras"></div>
     <h2>Campeão por campeão</h2><div id="eCampeoes"></div>
@@ -1819,6 +1820,14 @@ async function carregarEstat(){
 
   $('#eRadar').innerHTML = desenharRadar(e.radar);
   const legendaColunas = '';
+  {
+    const t = e.tendencias;
+    const sinal = (x) => (x.delta > 0 ? '+' : '') + x.delta + (x.unidade === 'pp' ? ' pp' : '');
+    $('#eTend').innerHTML = !t || t.jogosAgora < 5 ? `<div class="vazio">precisa de 5 jogos na semana (tem ${t?.jogosAgora ?? 0})</div>`
+      : !t.itens.length ? '<div class="vazio">sem mudança que valha comentar</div>'
+      : `<div class="cartoes">${t.itens.map(x => cartao(x.rotulo, `<span class="${x.bom ? 'v' : 'd'}">${esc(String(x.agora))}</span>`, `antes ${esc(String(x.antes))} · ${sinal(x)}${x.dica ? ' · ' + esc(x.dica) : ''}`)).join('')}</div>
+         <div class="dica" style="margin-top:6px">${t.jogosAgora} jogos na semana · ${t.jogosAntes} nas 4 semanas anteriores</div>`;
+  }
   $('#eDias').innerHTML = colunas(e.atividade.dias, {minimo:5}) + legendaColunas;
   $('#eHoras').innerHTML = colunas(e.atividade.horas, {minimo:8}) + legendaColunas;
 

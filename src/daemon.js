@@ -210,17 +210,38 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const jg = jgDeles ? l.campeoes.find((c) => c.c === jgDeles) : null;
         const perto = minhaPos ? l.campeoes.filter((c) => c.time !== meuTime && c.x != null && c.ha != null && c.ha <= 5 && dist(c, minhaPos) < 0.16).map((c) => c.c) : [];
         const onde = minhaPos ? lugar(minhaPos.x, minhaPos.y, meuTime) : null;
-        mortes.push({ n: eu.m, t: e.t, por: e.por ?? null, avisos: avisosAntes(e.t),
+        // tinha ward nossa perto de onde você morreu? (leituras guardam as wards vistas no minimapa)
+        const wardPerto = minhaPos && l.wards?.nossas ? l.wards.nossas.some((w) => dist({ x: w[0], y: w[1] }, minhaPos) < 0.15) : null;
+        const jgSumido = jg && !jg.morto && (jg.ha == null || jg.ha >= 30);
+        const m = { n: eu.m, t: e.t, por: e.por ?? null, avisos: avisosAntes(e.t),
           onde: onde?.texto ?? null, avancado: onde?.lado === 'deles' && onde.lane !== 'base',
           jg: jg ? { campeao: jg.c, morto: jg.morto, ha: jg.ha, regiao: jg.regiao } : null,
-          perto });
+          perto, wardPerto };
+        // a lição, curta: o que faltou naquela morte
+        const licoes = [];
+        if (m.avancado && jgSumido) licoes.push(`avançado com o jungler deles sumido há ${Math.round(jg.ha ?? 99)} s`);
+        else if (jgSumido) licoes.push('jungler deles sumido');
+        if (wardPerto === false && (m.avancado || jgSumido)) licoes.push('sem ward por perto');
+        if (perto.length >= 2) licoes.push(`${perto.length} deles em cima (${perto.join(', ')})`);
+        if (m.avisos?.length) licoes.push(`a voz avisou ${Math.round(e.t - m.avisos[0].t)} s antes`);
+        m.licao = licoes.join(' · ') || null;
+        mortes.push(m);
       }
     }
     const semJg = mortes.filter((m) => m.jg && !m.jg.morto && (m.jg.ha == null || m.jg.ha >= 30)).length;
     const avancado = mortes.filter((m) => m.avancado).length;
     const emNumero = mortes.filter((m) => m.perto.length >= 2).length;
     const avisadas = mortes.filter((m) => m.avisos?.length).length;
-    return { lista: mortes, total: mortes.length, semJg, avancado, emNumero, avisadas };
+    const semWard = mortes.filter((m) => m.wardPerto === false).length;
+    // o padrão da partida numa frase (só quando repete)
+    let padrao = null;
+    if (mortes.length >= 3) {
+      if (semJg >= Math.ceil(mortes.length / 2) && semWard >= 2) padrao = `${semJg} de ${mortes.length} mortes com o jungler deles sumido e sem ward: warda antes de avançar.`;
+      else if (avancado >= Math.ceil(mortes.length / 2)) padrao = `${avancado} de ${mortes.length} mortes no lado deles: recua sem visão.`;
+      else if (emNumero >= Math.ceil(mortes.length / 2)) padrao = `${emNumero} de ${mortes.length} mortes em desvantagem numérica: olha o minimapa antes de trocar.`;
+      else if (avisadas >= Math.ceil(mortes.length / 2)) padrao = `${avisadas} de ${mortes.length} mortes vieram com aviso antes: dá ouvido à voz.`;
+    }
+    return { lista: mortes, total: mortes.length, semJg, avancado, emNumero, avisadas, semWard, padrao };
   }
 /**
    * Auto-avaliação: situação que PREVÊ algo ("jungler indo pro bot", "Ahri
@@ -447,7 +468,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       .sort((a, b) => a.t - b.t).map((d) => ({ ...d, aval: notas.get(`${d.t}|${d.chave}`) ?? null }));
     return { ditas, em: Date.parse(partida?.inicio ?? '') || Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
       situacoes: sits.length, faladas: sits.filter((s) => s.falada).length, previsoes: acs.length ? { total: acs.length, certas: acs.filter((a) => a.acertou).length } : null,
-      mortes: mortes ? { total: mortes.total, avisadas: mortes.avisadas, semJg: mortes.semJg, avancado: mortes.avancado } : null };
+      mortes: mortes ? { total: mortes.total, avisadas: mortes.avisadas, semJg: mortes.semJg, avancado: mortes.avancado, semWard: mortes.semWard, padrao: mortes.padrao, lista: mortes.lista.map((m) => ({ n: m.n, t: m.t, por: m.por, onde: m.onde, licao: m.licao })) } : null };
   }
   // ao abrir: se a última partida gravada é de menos de 3 h, o cartão volta
   setTimeout(async () => {
@@ -1546,6 +1567,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       classes: E.porClasse(db, tags, o),
       atividade: E.atividade(db, o),
       radar: E.radar(db, o),
+      tendencias: E.tendencias(db, o),
     };
   }
 
