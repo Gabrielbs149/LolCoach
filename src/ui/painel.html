@@ -3191,7 +3191,7 @@ function desenharSkins(){
   </div>
   <div style="margin-top:8px"><label style="margin-right:12px"><input type="checkbox" ${d.ativo ? 'checked' : ''} onchange="skLigar(this.checked)"> aplicar skin ao travar o campeão</label>${d.instalado ? `<button class="acao" onclick="skAcao('/api/skins/instalar')">Atualizar cslol-tools</button>` : `<button class="acao" onclick="skAcao('/api/skins/instalar')" ${d.instalando ? 'disabled' : ''}>Instalar cslol-tools (≈37 MB)</button>`}
   ${d.patcher ? ` <button class="acao" onclick="skAcao('/api/skins/parar')">Parar patcher</button>` : ''}</div>`;
-  $('#skImport').innerHTML = `<label class="acao" style="cursor:pointer">Importar skin (.fantome / .zip)<input type="file" accept=".fantome,.zip" multiple hidden onchange="skImportar(this.files)"></label>
+  $('#skImport').innerHTML = `<button class="acao" onclick="document.getElementById('skArq').click()">Importar skin (.fantome / .zip)</button><input id="skArq" type="file" accept=".fantome,.zip" multiple hidden onchange="skImportar(this.files); this.value=''">
     <span class="dica" style="margin-left:8px">baixe a skin em sites de custom skins (formato fantome) e importe aqui; o campeão é reconhecido sozinho</span>`;
   const por = d.porCampeao ?? {};
   $('#skLista').innerHTML = d.mods.length ? `<table class="admTabela"><thead><tr><th>Skin</th><th>Campeão</th><th>Autor</th><th>Usar</th><th></th></tr></thead><tbody>${d.mods.map(m => `<tr>
