@@ -269,7 +269,12 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       if (t >= 90 && t < 480 && ((f.role === 'adc' && l.lane === 'top' && trocado('top', 'bot')) || (f.role === 'top' && l.lane === 'bot' && trocado('adc', 'top')))) situ('lane-swap', { tipo: 'lane', prioridade: 2, modulo: 'lane', serio: F`Lane swap: ${f.campeao} no ${l.lane}.`, cooldown: 300 });
     } else if (!f.morto) {
       const ha = vistoHa(f, t);
-      if (ha >= 30 && ha < 32 && laneDele && laneDele !== 'jungle' && f.regiao?.lane === laneDele && laneDele !== minhaLane) situ(`sumiu-${f.nome}`, { tipo: 'roam', prioridade: laneDele === 'mid' || f.role === 'sup' ? 2 : 1, modulo: 'mapa', serio: F`${f.campeao} sumiu do ${laneDele}. Cuidado com roam.`, cooldown: 90 });
+      if (ha >= 30 && ha < 32 && laneDele && laneDele !== 'jungle' && f.regiao?.lane === laneDele && laneDele !== minhaLane) {
+        // Roam de verdade precisa de wave: se a wave dele está empurrada pra torre dele ('deles'), ele foi
+        // farmar/base, não roamar — vira só registro. Wave no nosso lado ou no meio = ele tem tempo: avisa.
+        const wv = mundo.waves?.[laneDele]; const semTempo = wv && t - wv.t < 45 && wv.estado === 'deles';
+        situ(`sumiu-${f.nome}`, { tipo: 'roam', prioridade: semTempo ? 0 : (laneDele === 'mid' || f.role === 'sup' ? 2 : 1), modulo: 'mapa', serio: semTempo ? F`${f.campeao} sumiu do ${laneDele}, wave na torre dele: base ou farm.` : F`${f.campeao} sumiu do ${laneDele}${wv?.estado === 'nosso' ? ', com a wave empurrada' : ''}. Cuidado com roam.`, cooldown: 90 });
+      }
     }
   }
   // seus oponentes de lane sumiram (estavam na lane, some há 12 s+) e o jungler deles também: armadilha
