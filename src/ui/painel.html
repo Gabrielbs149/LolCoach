@@ -1500,7 +1500,7 @@ function cartaoDePartida(p){
   <div class="cartaoP ${p.venci?'venceu':'perdeu'}" onclick="abrirPartida(${p.gameId})">
     <div class="ctx">${esc(FILA_NOME[p.fila] ?? 'Partida')}
       <span class="res">${p.venci?'Vitória':'Derrota'}</span>
-      ${haQuanto(p.quando)} · ${mmssCurto(p.duracaoS)}</div>
+      ${haQuanto(p.quando)} · ${mmssCurto(p.duracaoS)}${coachIds?.[p.gameId] ? ` · <span title="o coach ao vivo gravou esta partida: mortes cruzadas, previsões e o que a voz falou no detalhe" style="color:var(--vit,#9c6)">🎧${coachIds[p.gameId].previsoes ? ' ' + Math.round(coachIds[p.gameId].previsoes.certas / coachIds[p.gameId].previsoes.total * 100) + '%' : ''}</span>` : ''}</div>
     <div class="arte" style="background-image:url(/arte/${p.championId ?? 0})"></div>
     <div><div class="nomeCamp">${esc(p.meuCampeao)}</div>
       <div class="sub">${role(p.minhaRole)}${p.rival ? ` · contra <b>${esc(p.rival)}</b>` : ''}</div></div>
@@ -1510,7 +1510,6 @@ function cartaoDePartida(p){
       ${csMin ? `<span>CS</span> ${p.cs} (${csMin})<br>` : ''}
       ${p.participacao != null ? `<span>Part.</span> ${p.participacao}%` : ''}</div>
     <div class="gr"><span class="selo ${p.graves?'tem':'zero'}">${p.graves}</span><span class="rotp">graves</span></div>
-    ${coachIds?.[p.gameId] ? `<div class="gr" title="o coach ao vivo gravou esta partida: mortes cruzadas, previsões e o que a voz falou no detalhe"><span class="selo tem" style="background:rgba(120,200,100,.25);color:var(--vit,#9c6)">🎧</span><span class="rotp">${coachIds[p.gameId].previsoes ? Math.round(coachIds[p.gameId].previsoes.certas / coachIds[p.gameId].previsoes.total * 100) + '% prev.' : 'coach'}</span></div>` : ''}
     <button class="marca ${marcadasIds.has(p.gameId)?'on':''}" title="marcar pra estudar depois" onclick="marcarPartida(event, ${p.gameId})">${marcadasIds.has(p.gameId)?'★':'☆'}</button>
   </div>`;
 }
