@@ -1361,6 +1361,7 @@ async function carregarVisao(){
         <div class="fila">${esc(e.fila)}</div>
         <div class="nome">${esc(e.nome)}</div>
         <div class="pdl">${num(e.pdl)} PDL${e.sequencia ? ' · em sequência' : ''}</div>
+        ${metaElo(e)}
       </div>
       <div class="placar"><b class="${e.taxa>=0.52?'v':e.taxa<=0.48?'d':''}">${Math.round(e.taxa*100)}%</b>
         ${e.vitorias}V ${e.derrotas}D</div>
@@ -1462,6 +1463,18 @@ function curvaPdl(curva){
     </svg></div>`;
 }
 
+
+/* Quanto falta pra subir (divisão/tier), com o ritmo dele: ganho ~+22, perda ~−20 (o cliente não expõe o seu). */
+function metaElo(e){
+  if (e.pdl == null || !e.tier || ['MASTER','GRANDMASTER','CHALLENGER'].includes(e.tier)) return '';
+  const jogos = (e.vitorias ?? 0) + (e.derrotas ?? 0); if (jogos < 5) return '';
+  const falta = Math.max(1, 100 - e.pdl);
+  const seguidas = Math.ceil(falta / 22);
+  const w = e.taxa ?? 0.5, liquido = w * 22 - (1 - w) * 20;
+  const noRitmo = liquido > 0.5 ? Math.ceil(falta / liquido) : null;
+  const alvo = e.rank === 'I' || / 1$/.test(String(e.nome ?? '')) ? 'o próximo tier' : 'a próxima divisão';
+  return `<div class="pdl" style="color:var(--apagado)">Faltam ${falta} PDL pra ${alvo}: ${seguidas} vitória${seguidas > 1 ? 's' : ''} seguida${seguidas > 1 ? 's' : ''}${noRitmo ? ` ou ~${noRitmo} jogos no seu ritmo (${Math.round(w * 100)}%)` : ` — no ritmo atual (${Math.round(w * 100)}%) não sobe`}.</div>`;
+}
 /** Ignora o cache de 10 minutos e pergunta o elo à Riot de novo. */
 async function atualizarPerfil(botao){
   botao.disabled = true;
