@@ -177,7 +177,9 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       if (minhaPos) {
         const s = seg(dist(jg.ultimo, minhaPos));
         const v = velocidade(jg, t), aproximando = v ? (dist({ x: jg.ultimo.x + v.vx * 3, y: jg.ultimo.y + v.vy * 3 }, minhaPos) < dist(jg.ultimo, minhaPos)) : false;
-        if (s <= 6) situ('jg-em-cima', { tipo: 'jungler', prioridade: 3, modulo: 'jungler', serio: F`Jungler deles em cima de você, ${l.texto}. Recua!`, divertido: F`Jungler deles em cima de você! Corre, ${l.texto}.`, cooldown: 12, dados: { s } });
+        // você na base deles e ele nasceu ali: é o respawn, não um gank
+        if (s <= 6 && l.lane === 'base' && l.lado === 'deles') situ('jg-em-cima', { tipo: 'jungler', prioridade: 3, modulo: 'jungler', serio: F('Jungler deles nasceu, em cima de você. Sai da base.'), cooldown: 12, dados: { s } });
+        else if (s <= 6) situ('jg-em-cima', { tipo: 'jungler', prioridade: 3, modulo: 'jungler', serio: F`Jungler deles em cima de você, ${l.texto}. Recua!`, divertido: F`Jungler deles em cima de você! Corre, ${l.texto}.`, cooldown: 12, dados: { s } });
         else if (s <= 12 && aproximando) situ('jg-vindo', { tipo: 'jungler', prioridade: 3, modulo: 'jungler', serio: F`Jungler deles a ${s} segundos de você, vindo ${l.texto}.`, divertido: F`Jungler deles chega em ${s} segundos. Não fica de enfeite.`, cooldown: 15, dados: { s } });
       }
       // indo pra uma lane
@@ -202,7 +204,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       // dive: jungler + laner deles perto de você no nosso lado
       if (minhaPos && ladoNosso(minhaPos)) {
         const juntos = fIni.filter((f) => f !== jg && visivel(f, t) && dist(f.ultimo, minhaPos) < 0.1);
-        if (juntos.length && dist(jg.ultimo, minhaPos) < 0.12) situ('dive', { tipo: 'perigo', prioridade: 3, modulo: 'jungler', serio: F`Dive vindo: jungler e ${juntos[0].campeao} em cima de você.`, divertido: F`Dive! Jungler e ${juntos[0].campeao} querem te visitar. Sai da torre.`, cooldown: 30 });
+        // antes dos 2:30 não é dive, é invade/cheese de nível 1 (saiu "Dive vindo" a 1:40 com o jungler no leash)
+        if (juntos.length && dist(jg.ultimo, minhaPos) < 0.12) situ(t < 150 ? 'invade-cedo' : 'dive', { tipo: 'perigo', prioridade: 3, modulo: 'jungler', serio: t < 150 ? F`Jungler deles e ${juntos[0].campeao} em cima de você, cedo. Recua pra torre.` : F`Dive vindo: jungler e ${juntos[0].campeao} em cima de você.`, divertido: t < 150 ? F`Jungler deles e ${juntos[0].campeao} em cima de você, cedo. Recua pra torre.` : F`Dive! Jungler e ${juntos[0].campeao} querem te visitar. Sai da torre.`, cooldown: t < 150 ? 60 : 30 });
       }
       jg.sumidoDito = 0;
     } else if (jg.ultimo && !jg.morto) {
