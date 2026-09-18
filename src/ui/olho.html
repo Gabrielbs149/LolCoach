@@ -674,7 +674,9 @@ async function lerPlacar(agora) {
     const claros = melhorH[lado].filter((l) => l && l.claro).map((l) => l.brilho).sort((p, q) => p - q);
     const ref = claros.length ? claros[Math.floor(claros.length / 2)] : null;
     // o número branco é obrigatório: só 'escuro e parecido' pegava Ghost/Ignite (cinza 0,31, escuros) do espaço errado
-    for (const l of melhorH[lado]) if (l) { const rec = recarga(l); l.ocr = l.numero; l.escuro = !!rec; if (rec) l.claro = false; l.angulo = rec?.angulo ?? null; l.numero = rec ? faltaDaLinha(rec, 300, ref != null ? l.brilho / ref : null) : null; }
+    // linha inteira apagada (inimigo sumido do mapa, com retrato '?'): a linha da varredura some junto — não dá pra
+    // dizer nem claro nem escuro; sem isso o 'claro' falso apagava uma marca de flash certa
+    for (const l of melhorH[lado]) if (l) { const rec = recarga(l); l.ocr = l.numero; l.escuro = !!rec; if (rec) l.claro = false; l.angulo = rec?.angulo ?? null; l.numero = rec ? faltaDaLinha(rec, 300, ref != null ? l.brilho / ref : null) : null; if (!rec && ref != null && l.brilho < 0.6 * ref) { l.claro = false; l.apagado = true; } }
   }
   // Recorte de cada ícone escuro (pra calibrar o leitor de dígitos com a fonte de verdade do jogo): 3× o ícone,
   // até 20 por partida, 1 a cada 20 s
@@ -703,7 +705,8 @@ async function lerPlacar(agora) {
     const RECARGA = { 12: 360, 14: 180, 3: 210, 7: 240, 6: 210, 21: 180, 1: 210 };
     const recO = recarga(mo), escuroO = !!recO;
     const refO = melhorH[lado].filter((q) => q && q.claro).map((q) => q.brilho).sort((p, q) => p - q); const refCol = refO.length ? refO[Math.floor(refO.length / 2)] : null;
-    l.outro = { nome: pad.outro.nome, id: pad.outro.id, cinza: mo.cinza, cor: mo.cor, brilho: mo.brilho, brancos: mo.brancos, angulo: recO?.angulo ?? null, numero: escuroO ? faltaDaLinha(recO, RECARGA[pad.outro.id] ?? 210, refCol != null ? mo.brilho / refCol : null) : null, claro: claroO && !escuroO, escuro: escuroO };
+    const apagadoO = !escuroO && refCol != null && mo.brilho < 0.6 * refCol;
+    l.outro = { nome: pad.outro.nome, id: pad.outro.id, cinza: mo.cinza, cor: mo.cor, brilho: mo.brilho, brancos: mo.brancos, angulo: recO?.angulo ?? null, numero: escuroO ? faltaDaLinha(recO, RECARGA[pad.outro.id] ?? 210, refCol != null ? mo.brilho / refCol : null) : null, claro: claroO && !escuroO && !apagadoO, escuro: escuroO, apagado: apagadoO };
     delete l.cyLinha;
   }
   for (const lado of ['esq', 'dir']) for (const l of melhorH[lado]) if (l) { delete l.cyLinha; delete l.px; delete l.py; delete l.tpl; }
