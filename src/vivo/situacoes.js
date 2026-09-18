@@ -419,7 +419,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
     if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) mundo.perigoEm = t;
     mundo.perigoN = perto.length;
-    if (vidaPct < 0.35 && perto.length) situ('vida-baixa-vindo', { tipo: 'perigo', prioridade: 3, modulo: 'kills', serio: F`Vida baixa e ${perto[0].campeao} vindo. Sai.`, cooldown: 20 });
+    // mesmo campeão: 60 s (saía 3x em 40 s enquanto a vida seguia baixa); outro campeão: 30 s
+    if (vidaPct < 0.35 && perto.length && situ('vida-baixa-vindo', { tipo: 'perigo', prioridade: 3, modulo: 'kills', serio: F`Vida baixa e ${perto[0].campeao} vindo. Sai.`, cooldown: mundo.vidaBaixaQuem === perto[0].campeao ? 60 : 30 })) mundo.vidaBaixaQuem = perto[0].campeao;
     if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 180) situ('na-frente-sem-jg', { grupo: 'exposto', tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 150 });
     const pertoLane = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 20);
     if (!pertoLane.length && minhaLane && minhaLane !== 'jungle' && ['top', 'mid', 'bot'].includes(lugar(minhaPos.x, minhaPos.y, meuTime).lane)) {

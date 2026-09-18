@@ -144,3 +144,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.147 — "Xerath te matou 2 vezes." agora diz o porquê quando dá pra saber: "Gank." (jungler deles na kill), "Tinha aviso." (você morreu até 12 s depois de um perigo falado) ou "Respeita." (da 3ª em diante).
 - v2.28.148 — "2 deles a menos de 8 segundos de você" agora diz quem ("Malphite e Xerath a menos de 8 segundos de você") — é quem está vindo que decide se dá pra lutar. Com 3 ou mais continua só o número. (Novo replay-situ.mjs pra reprocessar partidas gravadas com o código atual.)
 - v2.28.149 — Voz nunca mais fala "a 1 segundos" / "1 vezes": singular automático em toda frase. "Jungler deles com ult, a N segundos" só até os 15 min (depois todo mundo tem ult; virava lembrete a cada 2 min) e a 3 s ou menos vira "em cima de você".
+- v2.28.150 — "Vida baixa e Leona vindo. Sai." saía 3x em 40 s enquanto a vida seguia baixa. Mesmo campeão só repete em 60 s; outro campeão chegando, em 30 s.
