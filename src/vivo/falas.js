@@ -35,7 +35,7 @@ export function novaMemoriaFalas() {
  * `objetivos`: de objetivos.js; `conselhos`: de conselhos.js.
  * Devolve só as falas NOVAS desde a última chamada.
  */
-export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olho = false }, mem) {
+export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olho = false, ultimoPerigoT = null }, mem) {
   const { tempo, eu, jogadores, eventos } = estado;
   const novas = [];
   const dizer = (id, modulo, serio, divertido, prioridade = 1) => {
@@ -83,7 +83,11 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       if (souVitima) {
         const quem = autorJ?.campeao ?? 'eles';
         const n = (mem.mortesPor.get(e.autor) ?? 0) + 1; mem.mortesPor.set(e.autor, n);
-        if (n >= 2) dizer(`morte-${e.id}`, 'kills', F`${quem} te matou ${n} vezes.`, F`${quem} de novo. ${n} vezes.`, 3);
+        // o porquê, quando dá pra saber: gank (jungler deles na kill), aviso de perigo nos 12 s antes, ou só "respeita" a partir da 3ª
+        const comJg = !!jgDeles && (e.autor === jgDeles.nome || e.assistentes?.includes(jgDeles.nome));
+        const avisada = ultimoPerigoT != null && tempo - ultimoPerigoT <= 12 && tempo - ultimoPerigoT >= 0;
+        const porque = comJg && autorJ !== jgDeles ? ' Gank.' : avisada ? ' Tinha aviso.' : n >= 3 ? ' Respeita.' : '';
+        if (n >= 2) dizer(`morte-${e.id}`, 'kills', F`${quem} te matou ${n} vezes.${porque}`, F`${quem} de novo. ${n} vezes.${porque}`, 3);
       } else if (souAutor) {
         mem.meusKills++;
         const k = mem.meusKills;
