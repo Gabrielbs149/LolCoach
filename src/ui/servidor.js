@@ -1,5 +1,6 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, appendFile, mkdir, stat, rename } from 'node:fs/promises';
+import { pastaBase } from '../caminhos.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { temporadaDe, resumoPorTemporada } from '../dados/temporadas.js';
@@ -493,13 +494,22 @@ export function criarEstado({ aoAvisar } = {}) {
   const linhas = [];
   const dados = { conectado: false, conta: null, fase: null, config: null };
 
+  const fila = []; let gravando = false;
   return {
     set(chave, valor) { dados[chave] = valor; },
     // Notificação do Windows — quem decide se pode (fora de partida) é o main.
     avisar(titulo, texto) { try { aoAvisar?.(titulo, texto, dados.fase); } catch { /* sem notificação */ } },
     log(texto) {
-      linhas.unshift({ em: new Date().toISOString(), texto });
+      const em = new Date().toISOString();
+      linhas.unshift({ em, texto });
       if (linhas.length > 200) linhas.pop();
+      // Também em disco (dados/registro.log, vira registro.1.log com 2 MB): o registro na memória some quando o app
+      // reinicia, e é ele que explica o que aconteceu numa partida de ontem
+      try {
+        const arq = join(pastaBase(), 'dados', 'registro.log');
+        fila.push(`${em} ${texto}\n`);
+        if (!gravando) { gravando = true; setTimeout(async () => { const bloco = fila.join(''); fila.length = 0; try { await mkdir(dirname(arq), { recursive: true }); const st = await stat(arq).catch(() => null); if (st && st.size > 2 * 1024 * 1024) await rename(arq, arq.replace(/.log$/, '.1.log')).catch(() => {}); await appendFile(arq, bloco); } catch { /* disco */ } gravando = false; }, 1500); }
+      } catch { /* sem disco */ }
     },
     instantaneo: () => ({ ...dados, log: linhas.slice(0, 60) }),
   };

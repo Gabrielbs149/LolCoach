@@ -1,6 +1,6 @@
 import os from 'node:os';
 import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut, screen, session, desktopCapturer } from 'electron';
-import { cp, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { cp, mkdir, readdir, writeFile, readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -81,7 +81,10 @@ async function diagnostico() {
   linhas.push('', '== config (sem chaves) ==', JSON.stringify(semChaves(daemon?.config), null, 1));
   const inst = estado?.instantaneo?.() ?? {};
   linhas.push('', '== estado ==', JSON.stringify({ fase: inst.fase, conta: inst.conta, versao: inst.versao, controle: inst.controle, atualizacao: inst.atualizacao }, null, 1));
-  linhas.push('', '== registro (últimas 300 linhas) ==', ...(inst.log ?? []).slice(0, 300).reverse().map((l) => `${l.em} ${l.texto}`));
+  let reg = (inst.log ?? []).slice(0, 60).reverse().map((l) => `${l.em} ${l.texto}`);
+  try { const txt = await readFile(join(pastaDados(), 'dados', 'registro.log'), 'utf8'); reg = txt.trim().split(/?
+/).slice(-400); } catch { /* sem registro em disco ainda */ }
+  linhas.push('', '== registro (últimas 400 linhas) ==', ...reg);
   try {
     const base = join(pastaDados(), 'dados', 'situacoes');
     const pastas = (await readdir(base)).sort().slice(-3);
