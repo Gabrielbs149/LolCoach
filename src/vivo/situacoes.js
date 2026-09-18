@@ -197,7 +197,8 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         if (sAlvo >= 22 && (!minhaPos || seg(dist(minhaPos, alvo)) <= sAlvo - 8)) situ(`invade-${emCima ? 'baixo' : 'cima'}`, { tipo: 'oportunidade', prioridade: 1, modulo: 'jungler', serio: F`Jungle de ${emCima ? 'baixo' : 'cima'} dele livre: ele está a ${sAlvo} segundos de lá.`, cooldown: 90, dados: { lado: emCima ? 'baixo' : 'cima', s: sAlvo } });
       }
       // nível 6 perto de você
-      if (jg.nivel >= 6 && minhaPos && seg(dist(jg.ultimo, minhaPos)) <= 15) situ('jg-6-perto', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles com ult, a ${seg(dist(jg.ultimo, minhaPos))} segundos.`, cooldown: 120 });
+      // só até 15 min (depois todo mundo tem ult, virava lembrete a cada 2 min); a 3 s ou menos já está em cima
+      if (jg.nivel >= 6 && t < 900 && minhaPos && seg(dist(jg.ultimo, minhaPos)) <= 15) { const s6 = seg(dist(jg.ultimo, minhaPos)); situ('jg-6-perto', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: s6 <= 3 ? F('Jungler deles com ult, em cima de você.') : F`Jungler deles com ult, a ${s6} segundos.`, cooldown: 120 }); }
       // dive: jungler + laner deles perto de você no nosso lado
       if (minhaPos && ladoNosso(minhaPos)) {
         const juntos = fIni.filter((f) => f !== jg && visivel(f, t) && dist(f.ultimo, minhaPos) < 0.1);

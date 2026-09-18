@@ -25,7 +25,8 @@ export function render(f) {
   if (f == null) return f;
   if (typeof f === 'string') return f;
   const modelo = Object.hasOwn(personalizadas, f.modelo) && String(personalizadas[f.modelo]).trim() ? String(personalizadas[f.modelo]) : f.modelo;
-  return modelo.replace(/\{(\d+)\}/g, (m, n) => { const v = f.valores[Number(n) - 1]; return v == null ? '' : String(v); });
+  // singular quando o número cai em 1 ("a 1 segundos" saía da voz)
+  return modelo.replace(/\{(\d+)\}/g, (m, n) => { const v = f.valores[Number(n) - 1]; return v == null ? '' : String(v); }).replace(/\b1 (segundo|minuto|kill|jogo|vitória|derrota|morte)s\b/g, '1 $1').replace(/\b1 vezes\b/g, '1 vez');
 }
 
 /* --------------------------------------------------------- catálogo */
