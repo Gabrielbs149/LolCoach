@@ -195,6 +195,13 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.skinsImportar({ nome: url.searchParams.get('nome') ?? 'mod', corpo: Buffer.concat(pedacos) }))); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
+      if (req.method === 'POST' && url.pathname === '/api/skins/escolher-pastas' && acoes.skinsEscolherPastas) {
+        try {
+          const pastas = await acoes.skinsEscolherPastas();
+          if (!pastas?.length) return enviar(200, 'application/json', JSON.stringify({ cancelado: true }));
+          return enviar(200, 'application/json', JSON.stringify(await acoes.skinsImportarPastas({ pastas })));
+        } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       for (const [caminho, nome] of [['/api/skins/instalar', 'skinsInstalar'], ['/api/skins/remover', 'skinsRemover'], ['/api/skins/escolher', 'skinsEscolher'], ['/api/skins/testar', 'skinsTestar'], ['/api/skins/parar', 'skinsParar']]) {
         if (req.method === 'POST' && url.pathname === caminho && acoes[nome]) {
           try { return enviar(200, 'application/json', JSON.stringify(await acoes[nome](Object.fromEntries(url.searchParams)) ?? { ok: true })); }

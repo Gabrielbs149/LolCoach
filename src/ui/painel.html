@@ -3204,7 +3204,8 @@ function desenharSkins(){
     <div class="skZonaTexto"><b>Arrasta aqui</b> os arquivos ou a pasta inteira de skins (.fantome / .zip)</div>
     <div class="skZonaBotoes">
       <button class="acao" onclick="document.getElementById('skArq').click()">Escolher arquivos</button>
-      <button class="acao" onclick="document.getElementById('skPasta').click()">Escolher pasta inteira</button>
+      <button class="acao" onclick="skPastas()">Escolher pastas (várias)</button>
+      <button class="acao" onclick="document.getElementById('skPasta').click()" title="pelo navegador: uma pasta por vez, com as subpastas">Uma pasta</button>
       <input id="skArq" type="file" accept=".fantome,.zip" multiple hidden onchange="skImportar(this.files); this.value=''">
       <input id="skPasta" type="file" webkitdirectory directory multiple hidden onchange="skImportar(this.files); this.value=''">
     </div>
@@ -3224,6 +3225,27 @@ function desenharSkins(){
       </label>`).join('')}
       <label class="skItem ${!por[c] ? 'escolhida' : ''}"><input type="radio" name="sk-${esc(c)}" ${!por[c] ? 'checked' : ''} onclick="skEscolher('${esc(c)}', '', this)"><span class="skNome sub">nenhuma (skin normal)</span></label>
     </div>`).join('')}</div>` : '<div class="vazio">nenhuma skin importada ainda — arrasta a pasta aqui em cima</div>';
+}
+async function skPastas(){
+  const prog = document.getElementById('skProgresso');
+  try {
+    const r = await fetch('/api/skins/escolher-pastas', { method: 'POST' }).then(r => r.json());
+    if (r?.erro) { alert(r.erro); return; }
+    if (r?.cancelado) return;
+    if (!r?.total) { if (prog) prog.textContent = 'nenhum .fantome/.zip nessas pastas'; return; }
+    // acompanha o progresso pelo estado
+    for (let i = 0; i < 3600; i++) {
+      await new Promise(res => setTimeout(res, 700));
+      skDados = await pegar('/api/skins');
+      const im = skDados.importando;
+      const p2 = document.getElementById('skProgresso');
+      if (im) { if (p2) p2.textContent = `importando ${im.feitos}/${im.total}: ${im.atual ?? ''}`; if (i % 6 === 5) { const t = p2?.textContent; desenharSkins(); const p3 = document.getElementById('skProgresso'); if (p3) p3.textContent = t; } continue; }
+      desenharSkins();
+      const u = skDados.ultimaImportacao; const p3 = document.getElementById('skProgresso');
+      if (p3 && u) p3.textContent = `${u.ok} de ${u.total} importadas${u.erros?.length ? ` · ${u.erros.length} com erro: ${u.erros.slice(0, 3).join(' | ')}` : ''}`;
+      break;
+    }
+  } catch(e){ alert(e.message); }
 }
 async function skEscolher(campeao, mod, el){ await skAcao('/api/skins/escolher?campeao=' + encodeURIComponent(campeao) + '&mod=' + encodeURIComponent(mod)); }
 async function skLigar(ativo){ try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skins: { ativo, porCampeao: skDados?.porCampeao ?? {} } }) }); } catch(e){ alert(e.message); } skDados = await pegar('/api/skins'); desenharSkins(); }

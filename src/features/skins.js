@@ -115,6 +115,37 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
     return m;
   }
 
+  /** Varre pastas do disco (recursivo) e importa todo .fantome/.zip — progresso fica em estado().importando */
+  let importando = null;
+  async function importarPastas({ pastas = [] } = {}) {
+    if (importando) return { erro: 'já tem uma importação rodando' };
+    const arquivos = [];
+    const varrer = async (dir, prof = 0) => {
+      if (prof > 6) return;
+      for (const n of await readdir(dir).catch(() => [])) {
+        const c = join(dir, n);
+        let st; try { st = await stat(c); } catch { continue; }
+        if (st.isDirectory()) await varrer(c, prof + 1);
+        else if (/\.(fantome|zip)$/i.test(n)) arquivos.push(c);
+      }
+    };
+    for (const p of pastas) await varrer(p);
+    if (!arquivos.length) return { total: 0, ok: 0, erros: [] };
+    importando = { total: arquivos.length, feitos: 0, atual: null, ok: 0, erros: [] };
+    (async () => {
+      for (const arq of arquivos) {
+        importando.atual = basename(arq);
+        try { await importar({ nome: basename(arq), corpo: await readFile(arq) }); importando.ok++; }
+        catch (e) { importando.erros.push(`${basename(arq)}: ${e.message}`); }
+        importando.feitos++;
+      }
+      log(`skins: ${importando.ok} de ${importando.total} skins importadas das pastas${importando.erros.length ? ` (${importando.erros.length} com erro)` : ''}`);
+      const fim = importando; importando = null; ultimaImportacao = fim;
+    })();
+    return { total: arquivos.length, iniciado: true };
+  }
+  let ultimaImportacao = null;
+
   async function remover({ mod }) {
     const nome = basename(String(mod ?? '')); if (!nome) throw new Error('mod?');
     await rm(join(pastaMods(), nome), { recursive: true, force: true });
@@ -173,8 +204,9 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
       jogo: pastaDoJogo(), ativo: config.skins?.ativo !== false,
       mods: await listarMods(), porCampeao: config.skins?.porCampeao ?? {},
       patcher: patcher ? { mod: patcherMod, desde: patcherDesde } : null,
+      importando, ultimaImportacao,
     };
   }
 
-  return { instalar, importar, remover, escolher, aplicar, parar, estado, instalado };
+  return { instalar, importar, importarPastas, remover, escolher, aplicar, parar, estado, instalado };
 }

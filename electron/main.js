@@ -98,6 +98,12 @@ async function restaurar() {
   return { ok: true, arquivos: n };
 }
 
+/** Escolher VÁRIAS pastas de skins de uma vez (diálogo nativo; o do navegador só pega uma). */
+async function skinsEscolherPastas() {
+  if (faseAtual === 'InProgress') return [];   // nunca abre diálogo com o jogo rodando
+  const r = await dialog.showOpenDialog(janela ?? undefined, { title: 'Pastas com skins (.fantome / .zip) — pode marcar várias', properties: ['openDirectory', 'multiSelections'] });
+  return r.canceled ? [] : r.filePaths;
+}
 function ligarAtualizacao() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
@@ -507,7 +513,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado, skinsEscolherPastas },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.
