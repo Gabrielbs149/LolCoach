@@ -817,6 +817,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .amCartao .quem span{font-size:11px;color:var(--apagado)}
 .amCartao .tagEu{position:absolute;top:8px;right:9px;font-size:9px;text-transform:uppercase;letter-spacing:.8px;
   color:var(--ouro);font-weight:800}
+.tagApp{font-size:10px;color:var(--apagado);border:1px solid var(--borda);border-radius:10px;padding:0 6px;white-space:nowrap}
 .amCartao .tagEu.chat{color:var(--vit)} .amCartao .tagEu.dnd{color:var(--g2)} .amCartao .tagEu.away{color:var(--apagado)}
 .amCartao .eloL{display:flex;align-items:center;gap:8px;margin-top:10px}
 .amCartao .eloL .emblema{width:34px;height:34px;flex:0 0 34px;object-fit:contain;display:block;margin:-3px 0}
@@ -2268,7 +2269,7 @@ function cartaoDeAmigo(p, { eu = false } = {}){
     <div class="topo">
       <img class="retrato" src="${perfil?.icone != null ? '/iconeperfil/'+perfil.icone : ''}" alt="">
       <div class="quem"><b>${esc(perfil?.conta?.nome ?? p.nome)}</b>
-        <span>#${esc(perfil?.conta?.tag ?? p.tag)}${perfil?.nivel ? ' · nível ' + num(perfil.nivel) : ''}</span></div>
+        <span>#${esc(perfil?.conta?.tag ?? p.tag)}${perfil?.nivel ? ' · nível ' + num(perfil.nivel) : ''}${p.doApp ? ' <span class="tagApp" title="usa o LolCoach — aparece pra todo mundo que tem o app">🎧 usa o app</span>' : ''}</span></div>
     </div>
     <div class="eloL">${solo ? `
       ${emblema(solo.tier)}
@@ -2284,7 +2285,7 @@ function cartaoDeAmigo(p, { eu = false } = {}){
       : perfil ? `<div class="estadoA">atualizado ${haQuanto(new Date(perfil.em).toISOString())}${perfil.desatualizado ? ' · a Riot não respondeu agora' : ''}</div>` : ''}
     <div class="acoesA">
       <button onclick="atualizarAmigo(event,'${esc(chave)}')" ${p.carregando?'disabled':''}>Atualizar</button>
-      ${eu ? '' : `<button class="tirar" onclick="removerAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">Tirar</button>`}
+      ${eu ? '' : `<button class="tirar" onclick="removerAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">${p.doApp ? 'Esconder' : 'Tirar'}</button>`}
       ${!eu && p.online && p.online !== 'offline' ? `<button class="convidar" title="convida pro lobby de solo/duo pelo client" onclick="convidarAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">Convidar</button>` : ''}
     </div>
   </div>`;

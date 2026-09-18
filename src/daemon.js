@@ -1876,7 +1876,37 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 
   /* ------------------------------------------------------------- amigos */
 
-  const listaDeAmigos = () => (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
+  // Galera do LolCoach: quem instalou o app aparece na aba Amigos de todo mundo (conta principal do check-in).
+  // Lida do repositório de controle a cada 30 min; "Tirar" num desses só esconde (config.amigosOcultos).
+  let galera = [];   // [{ nome, tag }]
+  async function atualizarGalera() {
+    const token = tokenControle();
+    if (!token) return;
+    try {
+      const usuarios = await Controle.listarUsuarios(token);
+      const vistos = new Set(); const lista = [];
+      for (const u of usuarios) {
+        if (u.id === config.instalacaoId) continue;
+        const conta = u.conta ?? (u.contas ?? [])[0];
+        if (!conta || !conta.includes('#')) continue;
+        const [nome, tag] = conta.split('#');
+        const k = conta.toLowerCase();
+        if (!nome || !tag || vistos.has(k)) continue;
+        vistos.add(k); lista.push({ nome, tag });
+      }
+      galera = lista;
+    } catch (erro) { log(`galera do app: não consegui ler (${erro.message})`); }
+  }
+  setTimeout(() => atualizarGalera().catch(() => {}), 40_000);
+  setInterval(() => atualizarGalera().catch(() => {}), 30 * 60_000).unref?.();
+  const listaDeAmigos = () => {
+    const meus = (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
+    const chave = (a) => `${a.nome}#${a.tag}`.toLowerCase();
+    const tem = new Set(meus.map(chave)), ocultos = new Set((config.amigosOcultos ?? []).map((s) => String(s).toLowerCase()));
+    const minha = String(estado?.instantaneo?.().conta ?? '').toLowerCase();
+    const extras = galera.filter((g) => { const k = chave(g); return !tem.has(k) && !ocultos.has(k) && k !== minha; }).map((g) => ({ ...g, doApp: true }));
+    return [...meus, ...extras];
+  };
   // Amigo (da lista do app) que entrou no LoL: notificação do Windows, fora de partida. Desliga com amigosAvisarOnline: false.
   const amigosOnline = new Map();   // nome#tag -> availability da última olhada
   let amigosOnlinePrimeira = true;
@@ -2029,7 +2059,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const { perfilDeAmigo } = await import('./dados/amigos.js');
     const soDisco = { ...config.riot, apiKey: null };
     const lista = await Promise.all(listaDeAmigos().map(async (a) => ({
-      nome: a.nome, tag: a.tag,
+      nome: a.nome, tag: a.tag, doApp: !!a.doApp,
       perfil: await perfilDeAmigo(soDisco, a, {}).catch(() => null),
     })));
 
@@ -2100,7 +2130,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
 
   async function removerAmigo({ nome, tag } = {}) {
-    await salvarConfig({ amigos: listaDeAmigos().filter((a) => !(a.nome === nome && a.tag === tag)) });
+    const k = `${nome}#${tag}`.toLowerCase();
+    const meus = (config.amigos ?? []).filter((a) => a?.nome && a?.tag && `${a.nome}#${a.tag}`.toLowerCase() !== k);
+    const ocultos = [...new Set([...(config.amigosOcultos ?? []).map((s) => String(s).toLowerCase()), ...(galera.some((g) => `${g.nome}#${g.tag}`.toLowerCase() === k) ? [k] : [])])];
+    await salvarConfig({ amigos: meus, amigosOcultos: ocultos });
     return { ok: true };
   }
 
