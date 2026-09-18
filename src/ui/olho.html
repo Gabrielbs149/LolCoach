@@ -618,9 +618,10 @@ async function lerPlacar(agora) {
     const branco = (jj, ii) => L[jj * d + ii] >= lim && S[jj * d + ii] <= 70;
     const c0 = Math.floor(d / 2) - 1;
     // linha fixa: coluna central (2 px de largura), das 12h até perto do centro
-    let fixos = 0, n = 0;
-    for (let jj = 1; jj < Math.floor(d / 2) - 2; jj++) { n++; if (branco(jj, c0) || branco(jj, c0 + 1)) fixos++; }
+    let fixos = 0, n = 0, largos = 0;
+    for (let jj = 1; jj < Math.floor(d / 2) - 2; jj++) { n++; if (branco(jj, c0) || branco(jj, c0 + 1)) fixos++; if (branco(jj, c0 - 3) || branco(jj, c0 + 4)) largos++; }
     if (n < 4 || fixos < 0.6 * n) return null;                       // sem recarga rodando
+    if (largos >= 0.5 * n) return null;                              // mancha branca larga (retrato '?', ping), não uma linha
     // linha móvel: brancos fora da coluna fixa e fora do miolo; ângulo horário a partir das 12h
     const angs = [];
     for (let jj = 1; jj < d - 1; jj++) for (let ii = 1; ii < d - 1; ii++) {
@@ -630,6 +631,7 @@ async function lerPlacar(agora) {
       if (dx * dx + dy * dy < 12) continue;                           // miolo
       angs.push(((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360);
     }
+    if (angs.length > 26) return null;                                // uma linha tem 8–14 px; mais que isso é outra coisa
     if (angs.length < 3) return { angulo: null };                     // começo (tudo escuro) ou fim (tudo claro)
     angs.sort((a, b) => a - b);
     return { angulo: Math.round(angs[Math.floor(angs.length / 2)]) };
