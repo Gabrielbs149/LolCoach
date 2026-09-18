@@ -548,13 +548,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     try {
       const pastas = (await readdir(pastaSituacoes()).catch(() => [])).sort().slice(-10);
       const cont = new Map();
-      for (const p of pastas) for (const f of await lerJsonl(resolve(pastaSituacoes(), p, 'falas.jsonl'))) if (f.serio) cont.set(f.serio, (cont.get(f.serio) ?? 0) + 1);
+      const perigosas = new Set();
+      for (const p of pastas) for (const f of await lerJsonl(resolve(pastaSituacoes(), p, 'falas.jsonl'))) if (f.serio) { cont.set(f.serio, (cont.get(f.serio) ?? 0) + 1); if ((f.prioridade ?? 1) >= 3) perigosas.add(f.serio); }
       const textos = [...cont].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([t]) => t);
       let feitas = 0;
       for (const texto of textos) {
         const fase = estado?.instantaneo?.().fase;
         if (fase === 'InProgress' || fase === 'GameStart') break;
-        try { await vozFalar({ texto }); feitas++; } catch { break; }   // sem rede: para
+        // p3 toca um degrau mais rápido (chave de cache diferente): aquece do jeito que vai tocar
+        try { await vozFalar({ texto, perigo: perigosas.has(texto) }); feitas++; } catch { break; }   // sem rede: para
         await new Promise((r) => setTimeout(r, 1200));
       }
       if (feitas) log(`voz aquecida: ${feitas} frase(s) em cache`);
