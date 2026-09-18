@@ -1722,10 +1722,11 @@ async function abrirPartida(gameId){
         if (m.jg) partes.push(m.jg.morto ? 'jungler deles morto' : m.jg.ha == null ? 'jungler deles nunca visto' : m.jg.ha >= 30 ? `jungler deles sumido há ${Math.round(m.jg.ha)} s (última vez ${regiao(m.jg.regiao)})` : `jungler deles visto há ${Math.round(m.jg.ha)} s ${regiao(m.jg.regiao)}`);
         if (m.perto?.length) partes.push(`${m.perto.length} deles perto: ${m.perto.join(', ')}`);
         const aviso = m.avisos?.length ? `<div style="color:var(--apagado);font-size:11px;margin-left:52px">${m.avisos.map(a => `${Math.round(m.t - a.t)} s antes: “${esc(a.texto)}”`).join(' · ')}</div>` : '';
-        return aviso + `<div class="situ"><span class="t">${mm(m.t)}</span><span class="txt">Morte ${m.n}: ${esc(partes.join(' · ') || 'sem leitura do olho')}</span><span></span><span></span></div>`;
+        const licao = m.licao ? `<div style="color:var(--der);font-size:11px;margin-left:52px">lição: ${esc(m.licao)}</div>` : '';
+        return aviso + `<div class="situ"><span class="t">${mm(m.t)}</span><span class="txt">Morte ${m.n}: ${esc(partes.join(' · ') || 'sem leitura do olho')}</span><span></span><span></span></div>` + licao;
       };
       const resumo = [M.avisadas != null ? `${M.avisadas} de ${M.total} com aviso da voz antes` : '', M.semJg ? `${M.semJg} de ${M.total} com o jungler deles sumido há 30 s+` : '', M.avancado ? `${M.avancado} avançado no lado deles` : '', M.emNumero ? `${M.emNumero} com 2+ deles perto` : ''].filter(Boolean).join(' · ');
-      $('#det').insertAdjacentHTML('beforeend', `<h2>Suas mortes <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${esc(resumo)}</small></h2><div class="cartao" style="padding:6px 0">${M.lista.map(linha).join('')}</div>`);
+      $('#det').insertAdjacentHTML('beforeend', `<h2>Suas mortes <small style="text-transform:none;letter-spacing:0;color:var(--apagado)">${esc(resumo)}</small></h2>${M.padrao ? `<div class="aviso" style="margin-bottom:8px"><b>Padrão da partida:</b> ${esc(M.padrao)}</div>` : ''}<div class="cartao" style="padding:6px 0">${M.lista.map(linha).join('')}</div>`);
     }
     const conf = s.situacoes.filter(x => x.acertou != null), certas = conf.filter(x => x.acertou).length;
     const marca = (x) => x.acertou == null ? '' : x.acertou ? '<span style="color:var(--vit)" title="aconteceu">✓</span>' : '<span style="color:var(--der)" title="não aconteceu">✗</span>';
@@ -1776,6 +1777,18 @@ function desenharRadar(eixos){
   </div>`;
 }
 
+
+/* Melhor e pior faixa de horário pra jogar (blocos de 2 h com 12+ jogos), a partir do histórico inteiro. */
+function horarioInsight(atividade){
+  const horas = atividade?.horas ?? []; if (horas.length !== 24) return '';
+  const blocos = [];
+  for (let h = 0; h < 24; h += 2) { const a = horas[h], b = horas[(h + 1) % 24]; const jogos = a.jogos + b.jogos, vit = a.vitorias + b.vitorias; if (jogos >= 12) blocos.push({ h, jogos, taxa: vit / jogos }); }
+  if (blocos.length < 2) return '';
+  const melhor = blocos.reduce((x, y) => (y.taxa > x.taxa ? y : x)), pior = blocos.reduce((x, y) => (y.taxa < x.taxa ? y : x));
+  if (melhor.taxa - pior.taxa < 0.08) return '';
+  const faixa = (h) => `${String(h).padStart(2, '0')}h–${String((h + 2) % 24).padStart(2, '0')}h`;
+  return `<div class="dica" style="margin-top:4px">Horário: você ganha mais entre <b>${faixa(melhor.h)}</b> (${Math.round(melhor.taxa * 100)}% em ${melhor.jogos}) e menos entre <b>${faixa(pior.h)}</b> (${Math.round(pior.taxa * 100)}% em ${pior.jogos}).${pior.h >= 0 && pior.h < 6 ? ' Madrugada cobra.' : ''}</div>`;
+}
 /** Colunas de barras para dia da semana e horário. */
 function colunas(itens, {minimo = 1} = {}){
   const vis = itens.filter(x => x.jogos >= minimo);
@@ -1836,7 +1849,7 @@ async function carregarEstat(){
     $('#eTend').innerHTML = !t || t.jogosAgora < 5 ? `<div class="vazio">precisa de 5 jogos na semana (tem ${t?.jogosAgora ?? 0})</div>`
       : !t.itens.length ? '<div class="vazio">sem mudança que valha comentar</div>'
       : `<div class="cartoes">${t.itens.map(x => cartao(x.rotulo, `<span class="${x.bom ? 'v' : 'd'}">${esc(String(x.agora))}</span>`, `antes ${esc(String(x.antes))} · ${sinal(x)}${x.dica ? ' · ' + esc(x.dica) : ''}`)).join('')}</div>
-         <div class="dica" style="margin-top:6px">${t.jogosAgora} jogos na semana · ${t.jogosAntes} nas 4 semanas anteriores</div>`;
+         <div class="dica" style="margin-top:6px">${t.jogosAgora} jogos na semana · ${t.jogosAntes} nas 4 semanas anteriores</div>${horarioInsight(e.atividade)}`;
   }
   $('#eDias').innerHTML = colunas(e.atividade.dias, {minimo:5}) + legendaColunas;
   $('#eHoras').innerHTML = colunas(e.atividade.horas, {minimo:8}) + legendaColunas;
