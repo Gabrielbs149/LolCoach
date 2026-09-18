@@ -867,7 +867,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
           const quem = j.role === 'jungle' ? 'Jungler deles' : `${j.campeao} deles`;
           const partes = [];
           if (f.elo) partes.push(f.elo); else partes.push('sem ranqueada');
-          if (f.jogosRecentes) partes.push(`${Math.round(f.taxaRecente * 100)}% nas últimas ${f.jogosRecentes}`);
+          // "100% nas últimas 6" + "6 vitórias seguidas" é a mesma coisa duas vezes: fica só a sequência
+          if (f.jogosRecentes && Math.abs(f.sequencia ?? 0) !== f.jogosRecentes) partes.push(`${Math.round(f.taxaRecente * 100)}% nas últimas ${f.jogosRecentes}`);
           if (f.noCampeao) partes.push(`${f.noCampeao.jogos} de ${j.campeao} recente${f.noCampeao.jogos > 1 ? 's' : ''}`); else if (f.jogosRecentes) partes.push(`nenhum jogo recente de ${j.campeao}`);
           if (f.foraDaRota) partes.push(`fora da rota dele, joga ${f.rotaPrincipal}`);
           if (Math.abs(f.sequencia) >= 3) partes.push(f.sequencia > 0 ? `${f.sequencia} vitórias seguidas` : `${-f.sequencia} derrotas seguidas`);
