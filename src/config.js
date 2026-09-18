@@ -24,7 +24,8 @@ function chavesEmbutidas() {
 
 const PADRAO = {
   autoAceitar: { ativo: true, atrasoMs: 0 },
-  olho: { ligado: true, leve: false },   // leve: PC fraco — 2 leituras/s, captura a 5 fps, sem placar
+  olho: { ligado: true, leve: false },
+  amigosAvisarOnline: true,   // notificação do Windows quando um amigo da lista entra no LoL   // leve: PC fraco — 2 leituras/s, captura a 5 fps, sem placar
   voz: { motor: 'edge', vozId: 'pt-BR-AntonioNeural', ritmo: '+5%' },
   atalhos: { flashes: ['Control+Alt+1', 'Control+Alt+2', 'Control+Alt+3', 'Control+Alt+4', 'Control+Alt+5'], overlay: 'Control+Shift+O', painel: 'Control+Shift+L' },
   champSelect: { ativo: true, escolher: true, banir: true, travarPick: true, travarBan: true, picks: {}, bans: {} },

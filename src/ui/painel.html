@@ -1135,6 +1135,10 @@ h2{letter-spacing:1px}
         <label class="chave"><input type="checkbox" id="cOlho"><span class="pino"></span></label>
       </div>
       <div class="linhaCfg">
+        <div class="txt"><b>Avisar quando amigo entrar no LoL</b><small>notificação do Windows, só fora de partida, só pros amigos da sua lista</small></div>
+        <label class="chave"><input type="checkbox" id="cAmigoOnline"><span class="pino"></span></label>
+      </div>
+      <div class="linhaCfg">
         <div class="txt"><b>Modo leve</b><small>PC fraco: o olho lê 2× por segundo em vez de 4, captura a 5 fps e não lê o placar (Tab). Vale a partir da próxima partida.</small></div>
         <label class="chave"><input type="checkbox" id="cOlhoLeve"><span class="pino"></span></label>
       </div>
@@ -2737,6 +2741,7 @@ function gravar(){
         atalhos: cfg.atalhos ?? {},
         overlay: cfg.overlay ?? {},
         olho: { ligado: cfg.olho?.ligado !== false, leve: cfg.olho?.leve === true },
+        amigosAvisarOnline: cfg.amigosAvisarOnline !== false,
         champSelect: {
           ativo: cfg.champSelect.escolher !== false || cfg.champSelect.banir !== false,
           escolher: cfg.champSelect.escolher !== false,
@@ -2961,6 +2966,8 @@ async function carregarConfig(){
   $('#cBanir').onchange = e => { cfg.champSelect.banir = e.target.checked; gravar(); };
   $('#cOlho').checked = cfg.olho?.ligado !== false;
   $('#cOlhoLeve').checked = cfg.olho?.leve === true;
+  $('#cAmigoOnline').checked = cfg.amigosAvisarOnline !== false;
+  $('#cAmigoOnline').onchange = e => { cfg.amigosAvisarOnline = e.target.checked; gravar(); };
   desenharVozCfg();
   $('#cOlho').onchange = e => { cfg.olho = { ...(cfg.olho ?? {}), ligado: e.target.checked }; gravar(); };
   $('#cOlhoLeve').onchange = e => { cfg.olho = { ...(cfg.olho ?? {}), leve: e.target.checked }; gravar(); };

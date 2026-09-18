@@ -326,6 +326,7 @@ function fecharOverlay() {
 let overlayAjuste = false;
 function overlayAjustar({ ligar } = {}) {
   overlayAjuste = ligar !== false && ligar !== 'false' && ligar !== '0';
+  estado.set('overlayAjuste', overlayAjuste);
   if (overlayAjuste) {
     if (!janelaOverlay || janelaOverlay.isDestroyed()) { const antes = overlayLigado; overlayLigado = true; abrirOverlay(); overlayLigado = antes; }
     else janelaOverlay.setIgnoreMouseEvents(false);

@@ -157,8 +157,8 @@ function desenhar(d){
 }
 async function tick(){
   try {
-    await lerAjuste();
     const d = await fetch('/api/vivo').then(r => r.json());
+    if (typeof d.overlayAjuste === 'boolean' && d.overlayAjuste !== ajuste) { ajuste = d.overlayAjuste; document.body.classList.toggle('ajuste', ajuste); }
     if (ajuste) { desenhar(d); return; }
     const json = JSON.stringify([d.emJogo, d.estado?.tempo, d.objetivos, d.inimigos?.map((j) => [j.morto, j.flashEm, j.feiticoEm?.em, j.visto?.lane, j.visto?.ha, Math.round((j.visto?.x ?? 0) * 40), Math.round((j.visto?.y ?? 0) * 40)]), d.overlayRadar, (d.radarNossos ?? []).map((a) => [Math.round(a.x * 40), Math.round(a.y * 40)]), d.falas?.at(-1)?.seq, d.estado?.eu?.kills, d.estado?.eu?.mortes, d.estado?.eu?.cs]);
     if (json === ultimoJson && Date.now() - ultimaFalaEm > 13000) return;

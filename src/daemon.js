@@ -881,6 +881,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       // O olho: minimapa achado? onde cada um foi visto pela última vez.
       olho: resumoDoOlho(estado, objs),
       overlayEscala: Number(config.overlay?.escala) || 1,
+      overlayAjuste: !!estado?.instantaneo?.().overlayAjuste,
       numlock: estado?.instantaneo?.().numlock ?? null,
       overlayRadar: config.overlay?.radar ?? 'm',
       // pro radar: aliados vistos agora pelo olho e eu
@@ -1176,6 +1177,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const cs = (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() });
       cs.total++; if (sit.falar) cs.faladas++; cs.porTipo.set(sit.tipo, (cs.porTipo.get(sit.tipo) ?? 0) + 1);
       (partidaVivo.situacoesRecentes ??= []).push({ t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, texto: pronta.serio, falada: sit.falar });
+      if (partidaVivo.situacoesRecentes.length > 300) partidaVivo.situacoesRecentes.splice(0, partidaVivo.situacoesRecentes.length - 300);
       if (partidaVivo.situacoesRecentes.length > 20) partidaVivo.situacoesRecentes.splice(0, partidaVivo.situacoesRecentes.length - 20);
     }
     // foto do mundo 1x por segundo
@@ -1834,6 +1836,25 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   /* ------------------------------------------------------------- amigos */
 
   const listaDeAmigos = () => (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
+  // Amigo (da lista do app) que entrou no LoL: notificação do Windows, fora de partida. Desliga com amigosAvisarOnline: false.
+  const amigosOnline = new Map();   // nome#tag -> availability da última olhada
+  let amigosOnlinePrimeira = true;
+  async function vigiarAmigosOnline() {
+    if (!lcu.conectado || config.amigosAvisarOnline === false) return;
+    const meus = new Set(listaDeAmigos().map((a) => `${a.nome}#${a.tag}`.toLowerCase()));
+    if (!meus.size) return;
+    const lista = await lcu.get('/lol-chat/v1/friends').catch(() => null);
+    if (!Array.isArray(lista)) return;
+    const agora = new Map(lista.map((f) => [`${f.gameName}#${f.gameTag}`.toLowerCase(), { disp: f.availability ?? 'offline', nome: f.gameName }]));
+    for (const chave of meus) {
+      const d = agora.get(chave)?.disp ?? 'offline', antes = amigosOnline.get(chave) ?? 'offline';
+      const ligado = (x) => x && x !== 'offline' && x !== 'mobile';
+      if (!amigosOnlinePrimeira && ligado(d) && !ligado(antes)) estado?.avisar?.('Amigo online', `${agora.get(chave)?.nome ?? chave} entrou no LoL`);
+      amigosOnline.set(chave, d);
+    }
+    amigosOnlinePrimeira = false;
+  }
+  setInterval(() => vigiarAmigosOnline().catch(() => {}), 60_000).unref?.();
 
   /* ------------------------------------------------------------- voz */
   // Vozes neurais do Edge (grátis). Texto entra, mp3 sai; cache em dados/voz.
