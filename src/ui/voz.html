@@ -21,14 +21,14 @@ lerMotor(); setInterval(lerMotor, 60000);
 let vozPt = null;
 function acharVoz() { const vs = speechSynthesis.getVoices(); vozPt = vs.find((v) => /pt[-_]BR/i.test(v.lang) && /natural|neural|online/i.test(v.name)) ?? vs.find((v) => /pt[-_]BR/i.test(v.lang)) ?? vs.find((v) => /^pt/i.test(v.lang)) ?? null; }
 if ('speechSynthesis' in window) { acharVoz(); speechSynthesis.onvoiceschanged = acharVoz; }
-const filaFalas = [], filaMp3 = []; let tocando = null;
+const filaFalas = [], filaMp3 = []; let tocando = null, tocandoPrioridade = 0;
 function tocarProxima() {
   if (tocando || !filaMp3.length) return;
   const { texto, em, prioridade = 1 } = filaMp3.shift();
   if (em && Date.now() - em > 8000) { tocarProxima(); return; }   // fala velha demais: não vale mais
   // Perfil por situação: perigo (p3) sai mais rápido (o servidor sobe um degrau do ritmo configurado) e mais alto; dica (p1) um pouco mais baixa.
   const a = new Audio('/api/voz/falar?texto=' + encodeURIComponent(texto) + (prioridade >= 3 ? '&perigo=1' : ''));
-  a.volume = Math.min(1, voz.volume * (prioridade >= 3 ? 1.15 : prioridade <= 1 ? 0.9 : 1)); tocando = a;
+  a.volume = Math.min(1, voz.volume * (prioridade >= 3 ? 1.15 : prioridade <= 1 ? 0.9 : 1)); tocando = a; tocandoPrioridade = prioridade;
   const fim = () => { tocando = null; tocarProxima(); };
   // Edge falha de vez em quando (3 em 100): a frase NÃO pode sumir — sai na voz do Windows na hora; 4 falhas seguidas trocam o motor de vez
   let jaFalhou = false;
@@ -40,7 +40,8 @@ function tocarProxima() {
 function falar(texto, prioridade = 1) {
   if (!voz.ligada || !texto) return;
   if (motorVoz === 'edge') {
-    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto, em: Date.now(), prioridade }); if (tocando) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
+    // p3 corta dica/aviso no meio, mas não corta outro p3 (ficava "Dois deles a— Jungler deles em cima…"): entra na frente e toca logo depois
+    if (prioridade >= 3) { filaMp3.length = 0; filaMp3.push({ texto, em: Date.now(), prioridade }); if (tocando && tocandoPrioridade < 3) { try { tocando.pause(); } catch {} tocando = null; } tocarProxima(); return; }
     if (filaMp3.length >= 3) filaMp3.shift();
     filaMp3.push({ texto, em: Date.now(), prioridade }); tocarProxima();
     return;
