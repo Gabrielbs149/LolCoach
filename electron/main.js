@@ -499,6 +499,7 @@ function criarBandeja() {
   bandeja.setContextMenu(Menu.buildFromTemplate([
     { label: 'Abrir painel', click: () => (janela ? janela.show() : criarJanela()) },
     { label: 'Abrir tela ao vivo', click: () => abrirVivo() },
+    { label: 'Ver registro (log)', click: () => { const arq = join(pastaDados(), 'dados', 'registro.log'); shell.openPath(arq).then((erro) => { if (erro) estado.log('registro: ' + erro); }); } },
     { label: 'Ajustar overlay (posição e tamanho)', click: () => overlayAjustar({ ligar: true }) },
     { label: 'Abrir com o Windows', type: 'checkbox', checked: daemon?.config?.iniciarComWindows !== false, click: (item) => { ligarInicioComWindows(item.checked); daemon?.acoes?.salvarConfig?.({ iniciarComWindows: item.checked }).catch(() => {}); estado.log(item.checked ? 'abre com o Windows: ligado' : 'abre com o Windows: desligado'); } },
     { label: 'Overlay no jogo (Ctrl+Shift+O)', type: 'checkbox', checked: true, click: (item) => { overlayLigado = item.checked; if (!overlayLigado) fecharOverlay(); else if (faseAtual === 'InProgress') abrirOverlay(); } },
