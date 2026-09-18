@@ -1019,7 +1019,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (l.claro) antes.claroEm = agora;
       const f = partidaVivo.flashesAliados.get(j.nome);
       if (l.escuro && !(f && f.volta > agora)) {
-        const numero = Number.isFinite(l.numero) && l.numero >= 1 && l.numero <= 300 ? l.numero : null;
+        // número do OCR só vale se for plausível: ≥ 10 (saiu "sem flash por 0:01" com um "1" lido errado) e não anterior à última vez que estava claro
+        let numero = Number.isFinite(l.numero) && l.numero >= 10 && l.numero <= 300 ? l.numero : null;
+        if (numero != null && antes.claroEm != null && agora + numero - 300 < antes.claroEm - 10) numero = null;
         const maisCedo = Math.max(antes.claroEm ?? agora - 285, agora - 285);
         const usadoEm = numero != null ? agora + numero - 300 : maisCedo, volta = usadoEm + 300;
         partidaVivo.flashesAliados.set(j.nome, { campeao: j.campeao, usadoEm, volta, aproximado: numero == null });
@@ -1064,7 +1066,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const maisCedo = Math.max(antes.claroEm, agora - 300 + 15), incerteza = Math.round((agora - maisCedo) / 2);
         // com o número da recarga lido no ícone, a hora é exata: volta em `numero` s
         // número lido: confere com a leitura anterior (tem que cair junto com o relógio, ±6 s); 5↔6 e 9↔6 se confundem
-        let numero = Number.isFinite(l.numero) && l.numero >= 1 && l.numero <= 300 ? l.numero : null;
+        let numero = Number.isFinite(l.numero) && l.numero >= 10 && l.numero <= 300 ? l.numero : null;   // < 10 não existe num ícone recém-escuro: é dígito lido errado
+        if (numero != null && agora + numero - 300 < antes.claroEm - 10) numero = null;                  // não pode ter sido usado antes de estar claro
         if (numero != null && numeroAntes != null && numeroAntesEm != null && Math.abs((numeroAntes - numero) - (agora - numeroAntesEm)) > 6) numero = null;
         const aproximado = numero == null && incerteza > 45;
         const usadoEm = numero != null ? agora + numero - 300 : aproximado ? maisCedo : agora - (agora - maisCedo) / 2;
