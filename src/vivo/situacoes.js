@@ -376,7 +376,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     }
     // base sendo empurrada
     const naBase = vis.filter((f) => dist(f.ultimo, minhaBase) < 0.16);
-    if (naBase.length && t > 900) situ('base-empurrada', { tipo: 'perigo', prioridade: 3, modulo: 'timers', serio: F`${naBase.length} deles na nossa base.`, cooldown: 45 });
+    if (naBase.length && t > 900) situ('base-empurrada', { tipo: 'perigo', prioridade: 3, modulo: 'timers', serio: naBase.length === 1 ? F`${naBase[0].campeao} na nossa base.` : F`${naBase.length} deles na nossa base.`, cooldown: 45 });   // 1 = backdoor: diz quem
     // base deles vazia (backdoor) / reset
     if (t > 1200 && vis.length >= 4 && vis.every((f) => dist(f.ultimo, baseDeles) > 0.35)) situ('base-vazia', { tipo: 'oportunidade', prioridade: 1, modulo: 'timers', serio: F`Base deles vazia: ${vis.length} vistos longe.`, cooldown: 90 });
     const recuando = vis.filter((f) => dist(f.ultimo, baseDeles) < 0.16);
