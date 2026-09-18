@@ -121,9 +121,11 @@ export function processar(mundo, leitura, estado, objetivos = []) {
 
   const novas = [];
   /** Registra a situação; `cooldown` em segundos por chave; prioridade 3 fura a fila. */
-  const situ = (chave, { tipo, prioridade = 1, modulo = 'mapa', serio, divertido, cooldown = 30, dados = {} }) => {
+  const situ = (chave, { tipo, prioridade = 1, modulo = 'mapa', serio, divertido, cooldown = 30, dados = {}, grupo = null, cooldownGrupo = 180 }) => {
     const ultima = mundo.ditas.get(chave) ?? -Infinity;
     if (t - ultima < cooldown) return null;
+    // família (ex.: 'exposto' = sumidos / sem saber do jungler / isolado): uma fala da família cala as outras por 180 s
+    if (grupo) { const ug = mundo.ditas.get('grupo:' + grupo) ?? -Infinity; if (t - ug < cooldownGrupo) return null; mundo.ditas.set('grupo:' + grupo, t); }
     mundo.ditas.set(chave, t);
     const s = { chave, tipo, prioridade, modulo, serio, divertido: divertido ?? serio, t, dados, falar: true };
     novas.push(s);
@@ -285,7 +287,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   }
   // contagem de sumidos, quando você está avançado
   const sumidos = fIni.filter((f) => !f.morto && vistoHa(f, t) > 15);
-  if (t > 180 && sumidos.length >= 3 && minhaPos && !ladoNosso(minhaPos)) situ('sumidos', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${sumidos.length} deles sumidos e você no lado deles.`, cooldown: 120, dados: { sumidos: sumidos.map((f) => f.campeao) } });
+  if (t > 180 && sumidos.length >= 3 && minhaPos && !ladoNosso(minhaPos)) situ('sumidos', { grupo: 'exposto', tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`${sumidos.length} deles sumidos e você no lado deles.`, cooldown: 120, dados: { sumidos: sumidos.map((f) => f.campeao) } });
   // split push: um deles sozinho numa lane lateral, 3+ juntos em outro lugar
   {
     const vis = fIni.filter((f) => visivel(f, t));
@@ -417,7 +419,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) mundo.perigoEm = t;
     mundo.perigoN = perto.length;
     if (vidaPct < 0.35 && perto.length) situ('vida-baixa-vindo', { tipo: 'perigo', prioridade: 3, modulo: 'kills', serio: F`Vida baixa e ${perto[0].campeao} vindo. Sai.`, cooldown: 20 });
-    if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 180) situ('na-frente-sem-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 150 });
+    if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 180) situ('na-frente-sem-jg', { grupo: 'exposto', tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 150 });
     const pertoLane = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 20);
     if (!pertoLane.length && minhaLane && minhaLane !== 'jungle' && ['top', 'mid', 'bot'].includes(lugar(minhaPos.x, minhaPos.y, meuTime).lane)) {
       const desde = mundo.lanesLivres.get('eu') ?? t; mundo.lanesLivres.set('eu', desde);
@@ -425,7 +427,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       if (t - desde >= 10 && eu.ouro >= 1300) situ('hora-de-voltar', { tipo: 'oportunidade', prioridade: 1, modulo: 'economia', serio: F`Ninguém perto e ${eu.ouro} de gold. Hora de voltar.`, cooldown: 120 });
     } else mundo.lanesLivres.delete('eu');
     const aliadoMaisPerto = fAli.filter((f) => visivel(f, t)).map((f) => dist(f.ultimo, minhaPos)).sort((a, b) => a - b)[0];
-    if (t > 1200 && aliadoMaisPerto != null && aliadoMaisPerto > 0.3 && sumidos.length >= 2) situ('isolado', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`Você isolado: aliado mais perto a ${seg(aliadoMaisPerto)} segundos, ${sumidos.length} deles sumidos.`, cooldown: 60 });
+    if (t > 1200 && aliadoMaisPerto != null && aliadoMaisPerto > 0.3 && sumidos.length >= 2) situ('isolado', { grupo: 'exposto', tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F`Você isolado: aliado mais perto a ${seg(aliadoMaisPerto)} segundos, ${sumidos.length} deles sumidos.`, cooldown: 60 });
   }
 
   /* ============================================ 4b. zona onde você morre muito (banco) */
