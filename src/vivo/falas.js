@@ -99,7 +99,9 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       } else if (jgDeles && e.assistentes?.includes(jgDeles.nome) && vitimaJ && vitimaJ.time === eu.time && vitimaJ.role !== 'jungle') {
         dizer(`jg-${e.id}`, 'jungler', F`${jgDeles.campeao} gankou o ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}.`, F`${jgDeles.campeao} gankou o ${LANE_DE_ROLE[vitimaJ.role] ?? vitimaJ.role}.`, 1);
       } else if (vitimaJ && vitimaJ.time !== eu.time && vitimaJ.role === 'jungle') {
-        dizer(`jgmorreu-${e.id}`, 'jungler', F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, 2);
+        // menos de 15 s de morte não abre janela nenhuma; e o 'jgbase' (por minuto) cala 40 s pra não repetir a mesma coisa
+        mem.jgMorreuT = tempo;
+        if ((vitimaJ.renasceEm || 30) >= 15) dizer(`jgmorreu-${e.id}`, 'jungler', F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, F`Jungler deles morreu. ${Math.round(vitimaJ.renasceEm || 30)} segundos livres.`, 2);
       }
     }
     if (e.tipo === 'Ace') {
@@ -202,7 +204,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   else if (delasT - minhasT >= 3 && (delasT - minhasT) % 2 === 1) dizer(`torres--${delasT - minhasT}`, 'timers', F`${delasT - minhasT} torres atrás.`, F`${delasT - minhasT} torres atrás.`, 1);
 
   /* ---- jungler deles morto: janela ---- */
-  if (jgDeles?.morto && jgDeles.renasceEm > 20) dizer(`jgbase-${Math.floor(tempo / 60)}`, 'jungler', F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, 1);
+  if (jgDeles?.morto && jgDeles.renasceEm > 20 && tempo - (mem.jgMorreuT ?? -999) > 40) dizer(`jgbase-${Math.floor(tempo / 60)}`, 'jungler', F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, F`${jgDeles.campeao} morto por ${Math.round(jgDeles.renasceEm)} segundos.`, 1);
 
   /* ---- spikes deles que mudam a jogada ---- */
   mem.spikes ??= new Set();
