@@ -237,7 +237,14 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   const nossosKills = aliados.reduce((s, j) => s + j.kills, 0), delesKills = inimigos.reduce((s, j) => s + j.kills, 0);
   if (tempo >= 900 && tempo < 908 && nossosKills !== delesKills) dizer('jogo-15', 'lane', F`Quinze minutos: ${nossosKills} a ${delesKills} em kills.`, F`Quinze minutos: ${nossosKills} a ${delesKills}.`, 1);
   const mortosDeles = inimigos.filter((j) => j.morto).length;
-  if (mortosDeles >= 3 && !(mem.nMortosAntes >= 3)) dizer(`3mortos-${Math.floor(tempo)}`, 'timers', F`${mortosDeles} deles mortos. Torre ou objetivo agora.`, F`${mortosDeles} deles mortos. Pega alguma coisa.`, 3);
+  // 3+ deles mortos: fala o alvo (objetivo vivo > torre), só se a troca foi boa (nós com 2+ vivos a mais)
+  // e se você pode ir (vivo ou voltando em até 12 s). Morto de vez, não tem o que fazer com a informação.
+  const nossosMortos = aliados.filter((j) => j.morto).length;
+  if (mortosDeles >= 3 && !(mem.nMortosAntes >= 3) && mortosDeles - nossosMortos >= 2 && (!eu.morto || (eu.renasceEm ?? 99) <= 12)) {
+    const alvo = (objetivos ?? []).find((o) => o.vivo && ['Barão', 'Ancião', 'Dragão', 'Arauto', 'Vastilarvas'].includes(o.nome))?.nome ?? 'Torre';
+    const ida = eu.morto ? 'Volta e vai. ' : '';
+    dizer(`3mortos-${Math.floor(tempo)}`, 'timers', F`${mortosDeles} deles mortos. ${ida}${alvo} agora.`, F`${mortosDeles} deles mortos. ${ida}${alvo} agora.`, 3);
+  }
   mem.nMortosAntes = mortosDeles;
   if (tempo >= 1800 && tempo < 1808 && nossosKills > delesKills + 5) dizer('fecha', 'lane', F`Trinta minutos, ${nossosKills - delesKills} kills na frente. Fecha o jogo.`, F`Trinta minutos, ${nossosKills - delesKills} kills na frente. Fecha.`, 2);
 
