@@ -169,6 +169,17 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     return saida;
   }
+  /** gameId → resumo curto de cada partida gravada pelo coach (pra marcar os cards de Partidas). Sem admin. */
+  async function situacoesIds() {
+    const saida = {};
+    for (const p of (await readdir(pastaSituacoes()).catch(() => []))) {
+      const info = (await lerJsonl(resolve(pastaSituacoes(), p, 'partida.json')))[0];
+      if (!info?.gameId) continue;
+      const acs = await lerJsonl(resolve(pastaSituacoes(), p, 'acertos.jsonl'));
+      saida[info.gameId] = { pasta: p, previsoes: acs.length ? { total: acs.length, certas: acs.filter((a) => a.acertou).length } : null };
+    }
+    return saida;
+  }
   async function situacoesDe({ pasta, gameId } = {}) {
     if (gameId && !pasta) {
       for (const p of (await readdir(pastaSituacoes()).catch(() => []))) { const info = (await lerJsonl(resolve(pastaSituacoes(), p, 'partida.json')))[0]; if (info?.gameId === Number(gameId)) { pasta = p; break; } }
@@ -2075,7 +2086,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo, convidarAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
-    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, avaliarUltima, overlayTamanho, situacoesResumo,
+    adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesIds, situacoesDe, avaliarSituacao, avaliarUltima, overlayTamanho, situacoesResumo,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
@@ -2122,5 +2133,5 @@ const ACOES_DO_PAINEL = [
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
-  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
+  'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
 ];

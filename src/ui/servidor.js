@@ -180,6 +180,9 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.situacoesResumo())); }
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
+      if (url.pathname === '/api/situacoes/ids' && acoes.situacoesIds) {
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.situacoesIds())); } catch (erro) { return enviar(500, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       if (url.pathname === '/api/situacoes' && acoes.situacoesPartidas) {
         try { const pasta = url.searchParams.get('pasta'), gameId = url.searchParams.get('gameId'); return enviar(200, 'application/json', JSON.stringify(pasta || gameId ? await acoes.situacoesDe({ pasta, gameId }) : await acoes.situacoesPartidas())); }
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }

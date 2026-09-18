@@ -1510,6 +1510,7 @@ function cartaoDePartida(p){
       ${csMin ? `<span>CS</span> ${p.cs} (${csMin})<br>` : ''}
       ${p.participacao != null ? `<span>Part.</span> ${p.participacao}%` : ''}</div>
     <div class="gr"><span class="selo ${p.graves?'tem':'zero'}">${p.graves}</span><span class="rotp">graves</span></div>
+    ${coachIds?.[p.gameId] ? `<div class="gr" title="o coach ao vivo gravou esta partida: mortes cruzadas, previsões e o que a voz falou no detalhe"><span class="selo tem" style="background:rgba(120,200,100,.25);color:var(--vit,#9c6)">🎧</span><span class="rotp">${coachIds[p.gameId].previsoes ? Math.round(coachIds[p.gameId].previsoes.certas / coachIds[p.gameId].previsoes.total * 100) + '% prev.' : 'coach'}</span></div>` : ''}
     <button class="marca ${marcadasIds.has(p.gameId)?'on':''}" title="marcar pra estudar depois" onclick="marcarPartida(event, ${p.gameId})">${marcadasIds.has(p.gameId)?'★':'☆'}</button>
   </div>`;
 }
@@ -1570,6 +1571,8 @@ function desenharTemporadas(){
   </table></div>`;
 }
 
+let coachIds = null;
+async function carregarCoachIds(){ try { coachIds = await pegar('/api/situacoes/ids'); } catch { coachIds = null; } }
 function desenharPartidas(){
   desenharTemporadas();
   $('#filtros').innerHTML = FILTROS.map(([k,rot]) =>
@@ -1592,6 +1595,7 @@ function desenharPartidas(){
 function maisPartidas(){ mostrando += POR_PAGINA; desenharPartidas(); }
 
 async function carregarPartidas(){
+  carregarCoachIds().then(() => { if (Array.isArray(todasPartidas) && todasPartidas.length) desenharPartidas(); });   // marca 🎧 nos cards gravados pelo coach (chega depois, sem travar)
   const [ps, m, ts] = await Promise.all([pegar(comConta('/api/partidas')), pegar('/api/marcadas').catch(() => []), pegar(comConta('/api/temporadas')).catch(() => [])]);
   todasPartidas = ps; marcadasIds = new Set(m); temporadas = ts;
   if(temporada && !ts.some(t => t.chave === temporada)) temporada = '';
