@@ -73,6 +73,8 @@ if (existente.status === 404) {
   console.log(`release ${tag} já existe — os arquivos vão pra ela`);
 }
 
+// trava: nenhum arquivo com erro de sintaxe sobe (scripts/conferir-sintaxe.mjs)
+{ const c = spawnSync(process.execPath, ['scripts/conferir-sintaxe.mjs'], { stdio: 'inherit' }); if (c.status) process.exit(c.status); }
 console.log(`publicando LolCoach v${pkg.version} em ${owner}/${repo}…`);
 const r = spawnSync('npx', ['electron-builder', '--win', 'nsis', '--publish', 'always'], {
   stdio: 'inherit', shell: true,
