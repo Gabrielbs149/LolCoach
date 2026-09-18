@@ -182,6 +182,8 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
     if (!nomeMod) return null;
     if (!existsSync(join(pastaMods(), nomeMod))) { log(`skins: mod "${nomeMod}" sumiu`); return null; }
     const jogo = pastaDoJogo(); if (!jogo) { log('skins: não achei a pasta do jogo'); return null; }
+    // Rose aberto: ele já injeta a skin dele (e congela o jogo até enganchar); dois patchers no mesmo processo dá modelo branco/crash
+    try { const { stdout } = await execFileP('tasklist', ['/FI', 'IMAGENAME eq Rose.exe', '/FO', 'CSV', '/NH'], { windowsHide: true, timeout: 8000 }); if (/Rose.exe/i.test(stdout)) { log('skins: o Rose está aberto — deixo a skin com ele (não subo o meu patcher)'); return null; } } catch { /* sem tasklist */ }
     await parar();
     await rm(pastaOverlay(), { recursive: true, force: true }).catch(() => {});
     await mkdir(pastaOverlay(), { recursive: true });
