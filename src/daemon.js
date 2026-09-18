@@ -1345,7 +1345,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       try { const chaveDb = { top: 'TOP', jungle: 'JUNGLE', middle: 'MID', bottom: 'ADC', utility: 'SUPORTE' }[rota]; const k = (n) => String(n ?? '').toLowerCase().replace(/[^a-z]/g, ''); for (const r of db.prepare('select meuCampeao c, count(*) n, sum(venci) v from partidas where minhaRole = ? group by c').all(chaveDb)) { const nome = candidatos.find((x) => k(x) === k(r.c)); if (nome) meusNumeros.set(nome, { jogos: r.n, vitorias: r.v }); } } catch { /* sem banco */ }
       const aliadosNomes = aliados.map((id) => nomeDe(id)).filter((n) => n && n !== meuCampeaoAgora);
       const an = analisarPick({ rota, candidatos, aliados: aliadosNomes, inimigos: inimigos.map((id) => nomeDe(id)).filter(Boolean), parceiro, confrontos, sinergia: sinergiaMap, historico: historico ?? {}, meusNumeros, perfis });
-      const lista = an.lista.map((r) => ({ nome: r.nome, total: r.total, media: r.total, contra: r.contra, fatores: r.fatores, sinergia: sinergiaMap.get(r.nome)?.nota ?? null, motivo: sinergiaMap.get(r.nome)?.motivo ?? null, historico: historico?.[r.nome] ?? null }));
+      const lista = an.lista.map((r) => ({ nome: r.nome, mudouNoPatch: mudouNoPatch(r.nome), total: r.total, media: r.total, contra: r.contra, fatores: r.fatores, sinergia: sinergiaMap.get(r.nome)?.nota ?? null, motivo: sinergiaMap.get(r.nome)?.motivo ?? null, historico: historico?.[r.nome] ?? null }));
       // a voz só fala com 3+ deles vistos (ou na sua vez de escolher); antes é análise parcial
       selecaoMem.sugeridos ??= [];
       const podeFalar = an.melhor && !escolhi && (inimigos.length >= 3 || minhaVez) && !selecaoMem.sugeridos.includes(an.melhor.nome) && selecaoMem.sugeridos.length < 3;
@@ -1410,7 +1410,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         for (const id of inimigos) { const f = await fichaDoCampeao(id).catch(() => null); if (f?.contraEle?.length) dicas.set(f.nome, f.contraEle.map((t) => t.length > 140 ? t.slice(0, 137) + '…' : t)); }
         intelCache = { chave: chaveIntel, intel: intelDoTime({ inimigos: nomesDeles, bans: bansDeles, perfis, contraMim, dicas, minhaRota: rota, meuCampeao }) };
       }
-      intel = intelCache.intel;
+      intel = intelCache.intel ? { ...intelCache.intel, lista: (intelCache.intel.lista ?? []).map((x) => ({ ...x, mudouNoPatch: mudouNoPatch(x.nome) })), patchTitulo: patchMudou?.titulo ?? null } : intelCache.intel;
     } catch (erro) { log(`intel: ${erro.message}`); }
     // Contexto útil: confronto do seu campeão com cada um deles, jungler deles, tipo de dano.
     let confrontos = [], junglerDeles = null, dano = null;
@@ -1717,9 +1717,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const nota = await patchNota(ultimo.slug);
       const meus = nota?.meus?.length ?? 0, contra = nota?.contra?.length ?? 0;
       estado?.set('patchNovo', { slug: ultimo.slug, titulo: ultimo.titulo, meus, contra });
+      patchMudou = { titulo: ultimo.titulo, nomes: new Set((nota?.blocos ?? []).flatMap((b) => [b.chave, b.chaveTexto].filter(Boolean))) };
       if (meus || contra) estado?.avisar?.('Patch novo', `${ultimo.titulo}: ${meus} campeão(ões) seu(s), ${contra} que te ganham`);
     } catch { /* sem internet: fica pra próxima */ }
   }
+  let patchMudou = null;   // { titulo, nomes: Set(chaves dos campeões que mudaram no último patch) }
+  const mudouNoPatch = (nome) => !!patchMudou && (patchMudou.nomes.has(String(nome ?? '').toLowerCase().replace(/[^a-z]/g, '')) || patchMudou.nomes.has(String(nome ?? '')));
   setTimeout(vigiarPatch, 20_000);
   setInterval(vigiarPatch, 6 * 60 * 60 * 1000);
 
