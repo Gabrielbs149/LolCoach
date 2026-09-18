@@ -98,17 +98,6 @@ async function restaurar() {
   return { ok: true, arquivos: n };
 }
 
-/** Escolher VÁRIAS pastas de skins de uma vez (diálogo nativo; o do navegador só pega uma). */
-async function skinsEscolherPastas() {
-  if (faseAtual === 'InProgress') return [];   // nunca abre diálogo com o jogo rodando
-  const r = await dialog.showOpenDialog(janela ?? undefined, { title: 'Pastas com skins (.fantome / .zip) — pode marcar várias', properties: ['openDirectory', 'multiSelections'] });
-  return r.canceled ? [] : r.filePaths;
-}
-async function skinsEscolherFerramenta() {
-  if (faseAtual === 'InProgress') return null;
-  const r = await dialog.showOpenDialog(janela ?? undefined, { title: 'Pasta que tem mod-tools.exe e cslol-dll.dll (ex.: a instalação do Rose)', properties: ['openDirectory'] });
-  return r.canceled ? null : r.filePaths[0];
-}
 function ligarAtualizacao() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
@@ -344,7 +333,7 @@ function abrirOlho() {
     width: 400, height: 300, show: false, skipTaskbar: true, focusable: false,
     webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
   });
-  janelaOlho.loadURL(`${endereco}/olho`);
+  janelaOlho.loadURL(`${endereco}/olho${daemon?.config?.olho?.leve ? '?leve=1' : ''}`);
   // O que a janela escondida diz vai pro registro do app: é a única forma de ver por que não achou o minimapa.
   janelaOlho.webContents.on('console-message', (ev) => { const msg = String(ev?.message ?? ''); if (msg.includes('[olho]')) estado.log(msg.replace('[olho] ', 'olho: ')); });
   janelaOlho.webContents.on('did-fail-load', (_e, code, desc) => estado.log(`olho: não carregou (${code} ${desc})`));
@@ -518,7 +507,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado, skinsEscolherPastas, skinsEscolherFerramenta },
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.

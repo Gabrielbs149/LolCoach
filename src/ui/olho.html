@@ -33,7 +33,10 @@ const TESTE = Q.get('teste') === '1';
 const SO_TELA = Q.get('tela') === '1';
 const FINGIR = Q.get('fingir') === '1';   // captura de verdade, inimigos de mentira (teste com ?tela=1 aberto)
 const AMOSTRA = Q.get('amostra');         // ?amostra=/caminho/0425.png — roda a leitura numa foto gravada (e o .json do lado dá quem está na partida)
-const INTERVALO = 100;                 // ms entre leituras (10 por segundo)
+// Ritmo: 4 leituras por segundo dão conta (o ícone anda 0,7%/s; flash é pego no par de quadros seguidos).
+// ?leve=1 (modo leve, pra PC fraco): 2 por segundo, captura a 5 fps, sem placar, um ícone por quadro no mapa todo.
+const LEVE = Q.get('leve') === '1';
+const INTERVALO = LEVE ? 500 : 250;    // ms entre leituras
 const N = 48;                          // grade da calibração do minimapa
 const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.76, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.74, MARGEM = 0.04;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
@@ -113,7 +116,7 @@ async function abrirCaptura() {
     x.drawImage(img, 1920 - img.width - 16, 1080 - img.height - 16);
     fonte = c; W = 1920; H = 1080; return;
   }
-  const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: 15, max: 20 } }, audio: false });
+  const stream = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: { ideal: LEVE ? 5 : 8, max: LEVE ? 6 : 10 } }, audio: false });
   video.srcObject = stream;
   await new Promise((ok) => { video.onloadedmetadata = ok; });
   await video.play().catch(() => {});
@@ -285,7 +288,7 @@ function retanguloCamera(rgba, s) {
   if (a.n >= s * 0.24) return { x: (a.x1 + a.x2) / 2 / s, y: Math.min(1, Math.max(0, (a.y + (a.y < s / 2 ? s * 0.078 : -s * 0.078)) / s)), w: a.n / s, h: 0.156, cortado: true };
   return null;
 }
-let camTravada = { ok: 0, n: 0 }, ultimaCam = null, placarAvisado = false, meuUltimo = null;
+let camTravada = { ok: 0, n: 0 }, ultimaCam = null, placarAvisado = false, meuUltimo = null, ultimoPlacarEm = 0;
 const posAnterior = new Map();   // último lugar confirmado de cada ícone (pra ver pulo de flash)
 // O que é vermelho/azul sempre no mesmo pixel é torre/inibidor, não minion: máscara temporal.
 let fixoR = null, fixoA = null, fixoS = 0;
@@ -849,7 +852,7 @@ async function quadro() {
     const vistosAli = reconhecerEmManchas(azuis, tplsAli, m, rgba, s, null, 'aliado');
     {
       const faltam = [...tplsAli.keys()].filter((n) => !vistosAli.some((v) => v.campeao === n));
-      for (const nome of faltam) {   // todo aliado que faltou procura o mapa todo (5 ms cada em meia resolução)
+      for (const nome of (LEVE ? faltam.slice(rodada % Math.max(1, faltam.length)).slice(0, 1) : faltam)) {   // todo aliado que faltou procura o mapa todo (5 ms cada); leve: um por quadro
         const p = procurar(m, rgba, s, tplsAli.get(nome), 'ali-' + nome, agora, true, []);
         if (p) { vistosAli.push({ campeao: nome, x: p.x, y: p.y, score: p.score }); if (p.crua >= 0.85) aprenderCor('aliado', p.cor); }
       }
@@ -893,7 +896,7 @@ async function quadro() {
     const semRastro = soltos.filter((j) => !rastros.has(j.campeao));
     // todo mundo sem rastro procura o mapa todo a cada quadro (5 ms cada): a mancha vermelha é só atalho —
     // com 100+ blocos vermelhos/azuis (torres, minions, rio) o corte de 14 manchas deixava metade de fora
-    const daVez = new Set(semRastro.map((j) => j.campeao));
+    const daVez = new Set((LEVE ? semRastro.slice(rodada % Math.max(1, semRastro.length)).slice(0, 2) : semRastro).map((j) => j.campeao));
     for (const j of soltos) {
       const t = tpls.get(j.campeao); if (!t) continue;
       const p = procurar(m, rgba, s, t, j.campeao, agora, daVez.has(j.campeao), []);
@@ -908,7 +911,7 @@ async function quadro() {
     else cegoDesde = 0;
     if (rodada % 10 === 5) wardsVistas = wards(rgba, s, [...limpos, ...vistosAli, ...(eu ? [eu] : [])].map((v) => ({ x: v.x, y: v.y, d })));
     let placar = null;
-    if (rodada % 5 === 2 && !TESTE && !AMOSTRA) { placar = await lerPlacar(agora).catch(() => null); if (placar && !placarAvisado) { placarAvisado = true; log(`placar lido: ícone ${placar.d}px, linha a cada ${placar.passo}px, F a +${placar.off}px`); } }
+    if (!LEVE && agora - ultimoPlacarEm >= 3000 && !TESTE && !AMOSTRA) { ultimoPlacarEm = agora; placar = await lerPlacar(agora).catch(() => null); if (placar && !placarAvisado) { placarAvisado = true; log(`placar lido: ícone ${placar.d}px, linha a cada ${placar.passo}px, F a +${placar.off}px`); } }
     // Flash automático (experimental): ícone confirmado em dois quadros seguidos (≤ 400 ms) que
     // pulou 2–5% do mapa de uma vez — andar é 0,7%/s; flash são 400 unidades ≈ 2,7%.
     const pulos = [];
@@ -1089,7 +1092,7 @@ async function desenharFalsa(t) {
     const t0 = performance.now();
     await quadro();
     const gasto = performance.now() - t0;
-    intervalo = gasto > 80 ? Math.min(250, intervalo + 20) : gasto < 35 ? Math.max(INTERVALO, intervalo - 10) : intervalo;
+    intervalo = gasto > 80 ? Math.min(LEVE ? 900 : 500, intervalo + 40) : gasto < 35 ? Math.max(INTERVALO, intervalo - 10) : intervalo;
     setTimeout(laco, Math.max(20, intervalo - gasto));
   };
   laco();

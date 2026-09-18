@@ -186,35 +186,6 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       if (url.pathname === '/api/overlay/ajustar' && acoes.overlayAjustar) return enviar(200, 'application/json', JSON.stringify(acoes.overlayAjustar({ ligar: url.searchParams.get('ligar') })));
       if (url.pathname === '/api/overlay/mover' && acoes.overlayMover) return enviar(200, 'application/json', JSON.stringify(acoes.overlayMover(Object.fromEntries(url.searchParams))));
       if (url.pathname === '/api/overlay/estado' && acoes.overlayEstado) return enviar(200, 'application/json', JSON.stringify(acoes.overlayEstado()));
-      if (url.pathname === '/api/skins' && acoes.skinsEstado) {
-        try { return enviar(200, 'application/json', JSON.stringify(await acoes.skinsEstado())); }
-        catch (erro) { return enviar(500, 'application/json', JSON.stringify({ erro: erro.message })); }
-      }
-      if (req.method === 'POST' && url.pathname === '/api/skins/importar' && acoes.skinsImportar) {
-        const pedacos = []; for await (const p of req) pedacos.push(p);
-        try { return enviar(200, 'application/json', JSON.stringify(await acoes.skinsImportar({ nome: url.searchParams.get('nome') ?? 'mod', corpo: Buffer.concat(pedacos) }))); }
-        catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
-      }
-      if (req.method === 'POST' && url.pathname === '/api/skins/escolher-ferramenta' && acoes.skinsEscolherFerramenta) {
-        try {
-          const pasta = await acoes.skinsEscolherFerramenta();
-          if (!pasta) return enviar(200, 'application/json', JSON.stringify({ cancelado: true }));
-          return enviar(200, 'application/json', JSON.stringify(await acoes.skinsUsarFerramenta({ pasta })));
-        } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
-      }
-      if (req.method === 'POST' && url.pathname === '/api/skins/escolher-pastas' && acoes.skinsEscolherPastas) {
-        try {
-          const pastas = await acoes.skinsEscolherPastas();
-          if (!pastas?.length) return enviar(200, 'application/json', JSON.stringify({ cancelado: true }));
-          return enviar(200, 'application/json', JSON.stringify(await acoes.skinsImportarPastas({ pastas })));
-        } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
-      }
-      for (const [caminho, nome] of [['/api/skins/instalar', 'skinsInstalar'], ['/api/skins/remover', 'skinsRemover'], ['/api/skins/escolher', 'skinsEscolher'], ['/api/skins/testar', 'skinsTestar'], ['/api/skins/parar', 'skinsParar']]) {
-        if (req.method === 'POST' && url.pathname === caminho && acoes[nome]) {
-          try { return enviar(200, 'application/json', JSON.stringify(await acoes[nome](Object.fromEntries(url.searchParams)) ?? { ok: true })); }
-          catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
-        }
-      }
       if (req.method === 'POST' && url.pathname === '/api/overlay/tamanho' && acoes.overlayTamanho) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.overlayTamanho(Object.fromEntries(url.searchParams)))); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
@@ -324,11 +295,6 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
-      const sk = url.pathname.match(/^\/skin\/([A-Za-z]+)_(\d+)$/);
-      if (sk && acoes.imagemSkin) {
-        try { const { corpo, tipo } = await acoes.imagemSkin({ chave: sk[1], num: Number(sk[2]) }); res.writeHead(200, { 'Content-Type': tipo, 'Cache-Control': 'max-age=604800' }); return res.end(corpo); }
-        catch { return enviar(404, 'text/plain', 'sem imagem'); }
-      }
       // Imagens de item, runa e feitiço (Data Dragon, guardadas em disco).
       const im = url.pathname.match(/^\/(item|runa|feitico)\/(\d+)$/);
       if (im) {

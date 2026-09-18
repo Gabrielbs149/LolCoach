@@ -82,7 +82,7 @@ async function tick() {
     primeiroTick = false;
   } catch { /* painel ocupado */ }
 }
-tick(); setInterval(tick, 700);
+tick(); setInterval(tick, 1000);
 setInterval(() => console.log(`[voz] viva · ${faladas} falas tocadas · motor ${motorVoz} · ${voz.ligada ? 'ligada' : 'DESLIGADA'} · volume ${voz.volume}`), 120000);
 console.log('[voz] janela aberta');
 </script>

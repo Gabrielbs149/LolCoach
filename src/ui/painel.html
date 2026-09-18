@@ -131,14 +131,6 @@ body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:
 .campoAdm{width:360px;max-width:50%;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);padding:6px 10px;border-radius:var(--r-s);font:inherit;font-size:12.5px}
 .campoAdm.curto{width:120px}
 .campoAdm:focus{outline:none;border-color:var(--ouro)}
-.skBarra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}.skLigar{display:flex;align-items:center;gap:6px;font-size:13px}
-.skZona{border:1.5px dashed var(--borda);border-radius:var(--r-m);padding:14px 16px;background:var(--f1);display:flex;align-items:center;gap:14px;flex-wrap:wrap;transition:border-color .15s,background .15s}.skZona.sobre{border-color:var(--vit,#9c6);background:rgba(120,200,100,.08)}.skZonaTexto{flex:1;min-width:220px;font-size:13px}.skZonaBotoes{display:flex;gap:8px}.skZona .dica{width:100%}
-.skDuas{display:grid;grid-template-columns:230px 1fr;gap:12px;margin-top:12px}.skEsq .busca{max-width:none}.skQtd{margin-left:auto;font-size:11px;color:var(--apagado)}.skQtd.emUso{color:var(--vit,#9c6)}.skSemIcone{display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--f2,#222)}
-.skCab{display:flex;align-items:center;gap:10px;margin-bottom:10px}.skCab img{width:40px;height:40px;border-radius:50%}.skCab .acao{margin-left:auto}
-.skTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}.skTile{cursor:pointer;border-radius:8px;border:2px solid transparent;padding:4px;transition:border-color .12s,transform .12s}.skTile:hover{border-color:var(--borda);transform:translateY(-1px)}.skTile.escolhida{border-color:var(--vit,#9c6)}.skArte{position:relative;aspect-ratio:308/560;border-radius:6px;overflow:hidden;background:var(--f1)}.skArte img{width:100%;height:100%;object-fit:cover;display:block}.skSemArte{width:100%;height:100%;display:flex;align-items:center;justify-content:center;opacity:.6}.skSemArte img{width:56px;height:56px;border-radius:50%}
-.skTileAcoes{position:absolute;top:4px;right:4px;display:none;gap:3px}.skTile:hover .skTileAcoes{display:flex}.skTileAcoes .mini{background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px}.skMarca{position:absolute;left:0;right:0;bottom:0;background:rgba(120,200,100,.85);color:#08140a;font-weight:700;font-size:10px;text-align:center;padding:2px}
-.skTitulo{font-size:12px;margin-top:5px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.skAutor{font-size:10.5px;color:var(--apagado)}
-.skGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:12px}.skCamp{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:8px 10px}.skCamp.ativa{border-color:rgba(120,200,100,.5)}.skCampCab{display:flex;align-items:center;gap:8px;margin-bottom:6px}.skCampCab img{width:28px;height:28px;border-radius:50%}.skCampCab small{color:var(--apagado);margin-left:auto}
 .skItem{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px}.skItem:hover{background:rgba(255,255,255,.04)}.skItem.escolhida{background:rgba(120,200,100,.1)}.skNome{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skNome small{color:var(--apagado)}.skAcoes{display:flex;gap:4px}.skAcoes .mini{background:transparent;border:1px solid var(--borda);color:var(--texto);border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px}.skAcoes .mini:hover{border-color:var(--texto)}
 .admTabela{width:100%;border-collapse:collapse;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden;font-size:12.5px}
 .admTabela th,.admTabela td{padding:8px 10px;border-bottom:1px solid var(--borda);text-align:left;white-space:nowrap;vertical-align:middle}
@@ -921,8 +913,6 @@ h2{letter-spacing:1px}
     <div class="grupo">Jogo</div>
     <button data-aba="builds" title="Builds">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
-    <button data-aba="skins" title="Skins">
-      <svg viewBox="0 0 24 24"><path d="M12 3l2.5 4.5L20 9l-4 4 1 5.5-5-2.6-5 2.6 1-5.5-4-4 5.5-1.5z"/></svg><span class="nome">Skins</span></button>
     <button data-aba="patch" title="Patch">
       <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
     <div class="grupo">App</div>
@@ -1046,20 +1036,6 @@ h2{letter-spacing:1px}
     </div>
   </section>
 
-  <section id="skins">
-    <div class="titulo">Skins só pra você</div>
-    <div class="aviso" style="margin-bottom:10px">Skin customizada: só você vê, ninguém mais. Quem aplica é o <b>cslol-manager</b> (código aberto), baixado do GitHub dele — o LolCoach só organiza e liga na hora que você trava o campeão. A Riot diz que não pune skin customizada, mas é modificação do cliente do jogo: use por sua conta.</div>
-    <div id="skTopo"></div>
-    <div id="skImport" style="margin:10px 0"></div>
-    <div class="skDuas">
-      <div class="skEsq">
-        <input class="busca" id="skBusca" placeholder="Buscar campeão…" autocomplete="off" oninput="skDesenharCamp()">
-        <div class="listaCamp" id="skCampeoes"></div>
-      </div>
-      <div class="skDir" id="skLista"><div class="vazio">escolha um campeão</div></div>
-    </div>
-  </section>
-
   <section id="patch">
     <div class="titulo">Patch</div>
     <div id="patchTopo"></div>
@@ -1156,6 +1132,10 @@ h2{letter-spacing:1px}
       <div class="linhaCfg">
         <div class="txt"><b>Olho no minimapa</b></div>
         <label class="chave"><input type="checkbox" id="cOlho"><span class="pino"></span></label>
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Modo leve</b><small>PC fraco: o olho lê 2× por segundo em vez de 4, captura a 5 fps e não lê o placar (Tab). Vale a partir da próxima partida.</small></div>
+        <label class="chave"><input type="checkbox" id="cOlhoLeve"><span class="pino"></span></label>
       </div>
     </div>
 
@@ -2587,7 +2567,7 @@ async function estilosZerar(){ aplicarEstilos({}); await salvarControle({ estilo
  * vale pra todos. Só aparece pra quem tem admin: true no config.
  */
 let admDados = null;
-const FUNCOES_ADM = [['aceitar','Aceitar fila'],['escolher','Travar campeão'],['banir','Banir'],['runas','Runas'],['builds','Builds'],['amigos','Amigos'],['skins','Skins (cslol)']];
+const FUNCOES_ADM = [['aceitar','Aceitar fila'],['escolher','Travar campeão'],['banir','Banir'],['runas','Runas'],['builds','Builds'],['amigos','Amigos']];
 
 async function carregarAdmin(forcar = false){
   if(!admDados || forcar) $('#admUsuarios').innerHTML = carregando('lendo o repositório de controle…');
@@ -2735,7 +2715,7 @@ function gravar(){
         autoAceitar: { ativo: cfg.autoAceitar.ativo, atrasoMs: 0 },
         atalhos: cfg.atalhos ?? {},
         overlay: cfg.overlay ?? {},
-        olho: { ligado: cfg.olho?.ligado !== false },
+        olho: { ligado: cfg.olho?.ligado !== false, leve: cfg.olho?.leve === true },
         champSelect: {
           ativo: cfg.champSelect.escolher !== false || cfg.champSelect.banir !== false,
           escolher: cfg.champSelect.escolher !== false,
@@ -2959,8 +2939,10 @@ async function carregarConfig(){
   $('#cChamp').onchange = e => { cfg.champSelect.escolher = e.target.checked; gravar(); };
   $('#cBanir').onchange = e => { cfg.champSelect.banir = e.target.checked; gravar(); };
   $('#cOlho').checked = cfg.olho?.ligado !== false;
+  $('#cOlhoLeve').checked = cfg.olho?.leve === true;
   desenharVozCfg();
   $('#cOlho').onchange = e => { cfg.olho = { ...(cfg.olho ?? {}), ligado: e.target.checked }; gravar(); };
+  $('#cOlhoLeve').onchange = e => { cfg.olho = { ...(cfg.olho ?? {}), leve: e.target.checked }; gravar(); };
   desenharRotas(); desenharTeclas();
   if(!listaCampeoes.length) document.querySelectorAll('.rotas input').forEach(i => i.placeholder = 'abra o League uma vez');
 }
@@ -3187,110 +3169,8 @@ async function tick(){
  * abertura do app atrasaria a única tela que a maioria quer ver.
  */
 const CARREGADORES = {
-  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, skins: carregarSkins,
+  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin,
 };
-/* =================================================================== skins */
-let skDados = null;
-async function carregarSkins(){
-  $('#skTopo').innerHTML = carregando();
-  skDados = await pegar('/api/skins');
-  desenharSkins();
-}
-function skIconeDe(c){ const k = String(c).toLowerCase().replace(/[^a-z]/g, ''); const cc = listaCampeoes.find(x => String(x.nome).toLowerCase().replace(/[^a-z]/g, '') === k); return cc ? icone(cc.id) : ''; }
-function desenharSkins(){
-  const d = skDados; if(!d) return;
-  if(d.erro){ $('#skTopo').innerHTML = `<div class="vazio">${esc(d.erro)}</div>`; return; }
-  $('#skTopo').innerHTML = `<div class="cartoes">
-    ${cartao('cslol-tools', d.instalado ? `<span class="v">instalado</span>` : `<span class="d">não instalado</span>`, d.versao ? 'versão ' + esc(d.versao) : (d.instalando ? 'baixando…' : 'necessário pra aplicar'))}
-    ${cartao('Pasta do jogo', d.jogo ? '<span class="v">achada</span>' : '<span class="d">não achei</span>', d.jogo ? esc(d.jogo) : 'abre o League uma vez')}
-    ${cartao('Patcher', d.patcher ? `<span class="v">ligado</span>` : 'parado', d.patcher ? esc(d.patcher.mod) : 'sobe sozinho quando você trava o campeão')}
-    ${cartao('Skins', String(d.mods.length), `${Object.keys(d.porCampeao ?? {}).length} campeões com skin escolhida`)}
-  </div>
-  ${d.ultimoErroPatcher ? `<div class="aviso" style="margin-top:10px"><b>A skin não está aplicando:</b> a ferramenta (cslol-dll) não engancha nesta versão do jogo — a última versão oficial do cslol-manager é de abril e o LoL mudou. O próprio Rose não distribui essa DLL (DMCA); quem tem o Rose funcionando pode apontar a pasta dele em "Usar ferramenta de outra pasta".<div class="sub">${esc(d.ultimoErroPatcher.linha)}</div></div>` : ''}
-  <div class="skBarra">
-    <label class="skLigar"><input type="checkbox" ${d.ativo ? 'checked' : ''} onchange="skLigar(this.checked)"> aplicar skin ao travar o campeão</label>
-    ${d.instalado ? `<button class="acao" onclick="skAcao('/api/skins/instalar')">Atualizar cslol-tools</button>` : `<button class="acao" onclick="skAcao('/api/skins/instalar')" ${d.instalando ? 'disabled' : ''}>Instalar cslol-tools (≈37 MB)</button>`}
-    ${d.patcher ? `<button class="acao" onclick="skAcao('/api/skins/parar')">Parar patcher</button>` : ''}
-    <button class="acao" onclick="skAcao('/api/skins/escolher-ferramenta')" title="copia mod-tools.exe e cslol-dll.dll de uma pasta sua (ex.: a instalação do Rose)">Usar ferramenta de outra pasta</button>
-  </div>`;
-  $('#skImport').innerHTML = `<div class="skZona" id="skZona" ondragover="event.preventDefault(); this.classList.add('sobre')" ondragleave="this.classList.remove('sobre')" ondrop="skSoltar(event)">
-    <div class="skZonaTexto"><b>Arrasta aqui</b> os arquivos ou a pasta inteira de skins (.fantome / .zip)</div>
-    <div class="skZonaBotoes">
-      <button class="acao" onclick="document.getElementById('skArq').click()">Escolher arquivos</button>
-      <button class="acao" onclick="skPastas()">Escolher pastas (várias)</button>
-      <button class="acao" onclick="document.getElementById('skPasta').click()" title="pelo navegador: uma pasta por vez, com as subpastas">Uma pasta</button>
-      <input id="skArq" type="file" accept=".fantome,.zip" multiple hidden onchange="skImportar(this.files); this.value=''">
-      <input id="skPasta" type="file" webkitdirectory directory multiple hidden onchange="skImportar(this.files); this.value=''">
-    </div>
-    <div class="dica" id="skProgresso"></div>
-  </div>`;
-  skDesenharCamp();
-  skDesenharSkins();
-}
-let skCampAtual = null;
-function skIconeChave(chave){ const k = String(chave).toLowerCase().replace(/[^a-z]/g, ''); const cc = listaCampeoes.find(x => String(x.nome).toLowerCase().replace(/[^a-z]/g, '') === k || String(x.chave ?? '').toLowerCase() === k); return cc ? icone(cc.id) : '<span class="skSemIcone"></span>'; }
-function skDesenharCamp(){
-  const d = skDados; if(!d) return;
-  const busca = ($('#skBusca')?.value ?? '').trim().toLowerCase();
-  const por = d.porCampeao ?? {};
-  const lista = (d.catalogo ?? []).filter(c => !busca || c.nome.toLowerCase().includes(busca) || c.chave.toLowerCase().includes(busca));
-  if (!skCampAtual && lista.length) skCampAtual = lista[0].chave;
-  $('#skCampeoes').innerHTML = lista.length ? lista.map(c => `<div class="itemCamp ${c.chave === skCampAtual ? 'on' : ''}" onclick="skCampAtual='${esc(c.chave)}'; skDesenharCamp(); skDesenharSkins()">
-      ${skIconeChave(c.chave)}<span class="n">${esc(c.nome)}</span><span class="skQtd ${por[c.chave] ? 'emUso' : ''}">${por[c.chave] ? '●' : ''} ${c.skins.length}</span></div>`).join('')
-    : '<div class="vazio">nenhuma skin importada — arrasta a pasta em cima</div>';
-}
-function skDesenharSkins(){
-  const d = skDados; if(!d) return;
-  const c = (d.catalogo ?? []).find(x => x.chave === skCampAtual);
-  if (!c) { $('#skLista').innerHTML = '<div class="vazio">escolha um campeão</div>'; return; }
-  const escolhida = (d.porCampeao ?? {})[c.chave] ?? null;
-  const tile = (sk) => `<div class="skTile ${escolhida === sk.nome ? 'escolhida' : ''}" onclick="skEscolher('${esc(c.chave)}', '${esc(sk.nome)}')" title="${esc(sk.descricao ?? sk.titulo)}">
-      <div class="skArte">${sk.previa ? `<img src="${sk.previa}" loading="lazy" alt="">` : `<div class="skSemArte">${skIconeChave(c.chave)}</div>`}
-        <div class="skTileAcoes"><button class="mini" title="testa agora: monta e liga o patcher" onclick="event.stopPropagation(); skAcao('/api/skins/testar?campeao=${encodeURIComponent(c.chave)}')">▶</button><button class="mini" title="apagar" onclick="event.stopPropagation(); if(confirm('Apagar ${esc(sk.titulo)}?')) skAcao('/api/skins/remover?mod=${encodeURIComponent(sk.nome)}')">✕</button></div>
-        ${escolhida === sk.nome ? '<div class="skMarca">EM USO</div>' : ''}
-      </div>
-      <div class="skTitulo">${esc(sk.titulo)}</div>${sk.autor ? `<div class="skAutor">${esc(sk.autor)}</div>` : ''}
-    </div>`;
-  $('#skLista').innerHTML = `<div class="skCab">${skIconeChave(c.chave)}<div><b>${esc(c.nome)}</b><div class="sub">${c.skins.length} skin${c.skins.length > 1 ? 's' : ''} · ${escolhida ? 'em uso: ' + esc(c.skins.find(x => x.nome === escolhida)?.titulo ?? escolhida) : 'nenhuma em uso (skin normal)'}</div></div>
-      <button class="acao" onclick="skEscolher('${esc(c.chave)}', '')" ${escolhida ? '' : 'disabled'}>Usar skin normal</button></div>
-    <div class="skTiles">${c.skins.map(tile).join('')}</div>`;
-}
-async function skEscolher(campeao, mod, el){ await skAcao('/api/skins/escolher?campeao=' + encodeURIComponent(campeao) + '&mod=' + encodeURIComponent(mod)); }
-async function skLigar(ativo){ try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skins: { ativo, porCampeao: skDados?.porCampeao ?? {} } }) }); } catch(e){ alert(e.message); } skDados = await pegar('/api/skins'); desenharSkins(); }
-async function skAcao(url){
-  try { const r = await fetch(url, { method: 'POST' }).then(r => r.json()); if(r?.erro) alert(r.erro); } catch(e){ alert(e.message); }
-  skDados = await pegar('/api/skins'); desenharSkins();
-}
-/* pasta inteira: lê recursivamente as entradas do drop (webkitGetAsEntry) ou a lista do input webkitdirectory */
-function skLerEntrada(entry){
-  return new Promise((ok) => {
-    if (entry.isFile) entry.file((f) => ok([f]), () => ok([]));
-    else if (entry.isDirectory) { const r = entry.createReader(); const todos = []; const lote = () => r.readEntries(async (es) => { if (!es.length) { ok(todos); return; } for (const e of es) todos.push(...await skLerEntrada(e)); lote(); }, () => ok(todos)); lote(); }
-    else ok([]);
-  });
-}
-async function skSoltar(ev){
-  ev.preventDefault(); document.getElementById('skZona')?.classList.remove('sobre');
-  const itens = [...(ev.dataTransfer?.items ?? [])];
-  let files = [];
-  if (itens.length && itens[0].webkitGetAsEntry) { for (const it of itens) { const e = it.webkitGetAsEntry(); if (e) files.push(...await skLerEntrada(e)); } }
-  else files = [...(ev.dataTransfer?.files ?? [])];
-  await skImportar(files);
-}
-async function skImportar(files){
-  const lista = [...files].filter(f => /\.(fantome|zip)$/i.test(f.name));
-  const prog = document.getElementById('skProgresso');
-  if (!lista.length) { if (prog) prog.textContent = 'nenhum .fantome/.zip aí dentro'; return; }
-  let ok = 0; const erros = [];
-  for (let i = 0; i < lista.length; i++) {
-    const f = lista[i];
-    if (prog) prog.textContent = `importando ${i + 1}/${lista.length}: ${f.name}`;
-    try { const r = await fetch('/api/skins/importar?nome=' + encodeURIComponent(f.name), { method: 'POST', body: await f.arrayBuffer() }).then(r => r.json()); if (r?.erro) erros.push(f.name + ': ' + r.erro); else ok++; } catch(e){ erros.push(f.name + ': ' + e.message); }
-    if (i % 5 === 4) { skDados = await pegar('/api/skins'); desenharSkins(); const p2 = document.getElementById('skProgresso'); if (p2) p2.textContent = `importando ${i + 1}/${lista.length}…`; }
-  }
-  skDados = await pegar('/api/skins'); desenharSkins();
-  const p3 = document.getElementById('skProgresso'); if (p3) p3.textContent = `${ok} importada${ok === 1 ? '' : 's'}${erros.length ? ` · ${erros.length} com erro: ${erros.slice(0, 3).join(' | ')}` : ''}`;
-}
 const jaCarregou = new Set();
 
 const abrirAbaOriginal = abrirAba;
