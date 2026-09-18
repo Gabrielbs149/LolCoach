@@ -82,8 +82,7 @@ async function diagnostico() {
   const inst = estado?.instantaneo?.() ?? {};
   linhas.push('', '== estado ==', JSON.stringify({ fase: inst.fase, conta: inst.conta, versao: inst.versao, controle: inst.controle, atualizacao: inst.atualizacao }, null, 1));
   let reg = (inst.log ?? []).slice(0, 60).reverse().map((l) => `${l.em} ${l.texto}`);
-  try { const txt = await readFile(join(pastaDados(), 'dados', 'registro.log'), 'utf8'); reg = txt.trim().split(/?
-/).slice(-400); } catch { /* sem registro em disco ainda */ }
+  try { const txt = await readFile(join(pastaDados(), 'dados', 'registro.log'), 'utf8'); reg = txt.trim().split(/\r?\n/).slice(-400); } catch { /* sem registro em disco ainda */ }
   linhas.push('', '== registro (últimas 400 linhas) ==', ...reg);
   try {
     const base = join(pastaDados(), 'dados', 'situacoes');
