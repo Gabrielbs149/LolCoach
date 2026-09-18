@@ -21,10 +21,10 @@ histórico/inferência) · 🔴 difícil (reconhecer ícone novo, OCR, muita heu
 - 🟢 Perto de dragão/arauto/barão/vastilarvas com o objetivo vivo → "jungler deles no dragão".
 - 🟢 Na NOSSA jungle (counter-jungle) → "jungler deles na nossa jungle de cima, camps em risco" (+ "seu jungler está longe").
 - 🟢 Dive: jungler + laner deles perto da sua torre → "dive vindo".
-- 🟡 Previsão de rota: visto no red aos 1:45 → ordem padrão de clear → hora provável em cada lane ("gank no bot entre 3:10 e 3:30").
-- 🟡 Timer dos buffs deles: viu no buff em T → buff renasce T+5:00 → "red deles nasce em 30 s, dá pra roubar".
-- 🟡 Padrão da partida: contagem de ganks por lane → "ele já gankou bot 3 vezes".
-- 🟡 Nível 6 dele + perto da sua lane → "jungler com ult perto de você".
+- ✅ Previsão de rota: visto no red aos 1:45 → ordem padrão de clear → hora provável em cada lane ("gank no bot entre 3:10 e 3:30").
+- ✅ Timer dos buffs deles: viu no buff em T → buff renasce T+5:00 → "red deles nasce em 30 s, dá pra roubar".
+- ✅ Padrão da partida: contagem de ganks por lane → "ele já gankou bot 3 vezes".
+- ✅ Nível 6 dele + perto da sua lane → "jungler com ult perto de você".
 - 🟢 Jungler morto → invade/objetivo (já existe pela API) + onde a alma dele foi vista.
 
 ## 2. Laners inimigos (roam, missing, recall)
@@ -39,7 +39,7 @@ histórico/inferência) · 🔴 difícil (reconhecer ícone novo, OCR, muita heu
 - 🟢 Lane swap / troca de rota: duo deles no top → "lane swap: adc e sup deles no top".
 - 🟢 TP inimigo: laner some de um lado e aparece do outro em < 5 s → "Garen deu TP pro bot".
 - 🟢 Split push: 1 deles sozinho numa lane lateral e 4 juntos em outro lugar → "Tryndamere sozinho no top, os outros 4 no mid".
-- 🟡 Wave/estado da lane pelos pontos de minion no minimapa → "wave do top vindo pra você" (minion = pontinho, dá pra contar por lane).
+- ✅ Wave/estado da lane pelos pontos de minion no minimapa → "wave do top vindo pra você" (minion = pontinho, dá pra contar por lane).
 
 ## 3. Grupo inimigo e objetivos
 
@@ -61,8 +61,8 @@ histórico/inferência) · 🔴 difícil (reconhecer ícone novo, OCR, muita heu
 - 🟢 Farm livre: nenhum inimigo a menos de 20 s da sua lane → "lane livre, empurra".
 - 🟢 Volta segura: ninguém perto + gold pra item → "hora de voltar".
 - 🟢 Você sozinho longe do time em 20+ min → "você está isolado".
-- 🟡 Zonas onde você morre (banco de partidas) + sua posição → "você já morreu 3 vezes nesse arbusto".
-- 🟡 Recall inimigo × sua lane: laner deles na base e você com wave grande → "roam agora".
+- ✅ Zonas onde você morre (banco de partidas) + sua posição → "você já morreu 3 vezes nesse arbusto".
+- ✅ Recall inimigo × sua lane: laner deles na base e você com wave grande → "roam agora".
 
 ## 5. Aliados (ícones azuis, sempre visíveis)
 

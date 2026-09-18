@@ -267,7 +267,11 @@ export function processar(mundo, leitura, estado, objetivos = []) {
         if (s <= 8 && chegando) situ(`perto-${f.nome}`, { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`${f.campeao} a ${s} segundos de você, ${l.texto}.`, cooldown: 30, dados: { s } });
       }
       // na base → lane dele livre
-      if (l.lane === 'base' && l.lado === 'deles' && laneDele && laneDele !== 'jungle') situ(`base-${f.nome}`, { tipo: 'lane', prioridade: laneDele === minhaLane ? 2 : 0, modulo: 'lane', serio: F`${f.campeao} na base. ${laneDele === minhaLane ? 'Sua lane livre por uns 30 segundos.' : `${laneDele} deles vazio.`}`, cooldown: 60 });
+      // seu oponente na base: com a sua wave já na torre dele é a hora do roam/ward (não tem o que empurrar); senão, empurra
+      if (l.lane === 'base' && l.lado === 'deles' && laneDele && laneDele !== 'jungle') {
+        const minhaWave = laneDele === minhaLane ? mundo.waves?.[minhaLane]?.estado ?? null : null;
+        situ(`base-${f.nome}`, { tipo: 'lane', prioridade: laneDele === minhaLane ? 2 : 0, modulo: 'lane', serio: F`${f.campeao} na base. ${laneDele === minhaLane ? (minhaWave === 'deles' ? 'Sua wave já está na torre dele: 30 segundos pra roam ou ward.' : minhaWave === 'nosso' ? 'Empurra a wave, 30 segundos livres.' : 'Sua lane livre por uns 30 segundos.') : `${laneDele} deles vazio.`}`, cooldown: 60, dados: { wave: minhaWave } });
+      }
       // avançado demais no nosso lado
       if (l.lado === 'nosso' && ['top', 'mid', 'bot'].includes(l.lane) && dist(f.ultimo, minhaBase) < 0.42 && (!jg || !visivel(jg, t) || dist(jg.ultimo, f.ultimo) > 0.25)) situ(`avancado-${f.nome}`, { tipo: 'oportunidade', prioridade: 0, modulo: 'mapa', serio: F`${f.campeao} avançado demais no ${l.lane}. Chama o jungler.`, cooldown: 60 });
       // lane swap (duo deles no top, ou top deles no bot) nos primeiros 8 min
