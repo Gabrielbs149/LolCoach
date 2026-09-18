@@ -403,7 +403,7 @@ async function templateDeImagem(img, d, nome) {
   for (let j = 0; j < m.h; j++) for (let i = 0; i < m.w; i++) { idxM.push([i, j]); valM.push(m.g[j * m.w + i]); }
   const miolo = []; for (let j = 3; j < d - 3; j++) for (let i = 3; i < d - 3; i++) miolo.push(g[j * d + i]);
   miolo.sort((p, q) => p - q);
-  return { nome, d, brilhoMediana: miolo[Math.floor(miolo.length / 2)], cheia: { w: d, idx: idxC, ...zeroMedia(Float32Array.from(valC)) }, meiaRes: { w: m.w, idx: idxM, ...zeroMedia(Float32Array.from(valM)) } };
+  return { nome, d, lum: g, brilhoMediana: miolo[Math.floor(miolo.length / 2)], cheia: { w: d, idx: idxC, ...zeroMedia(Float32Array.from(valC)) }, meiaRes: { w: m.w, idx: idxM, ...zeroMedia(Float32Array.from(valM)) } };
 }
 /** NCC em cor (resolução cheia) do template quadrado em volta de (x, y) num pedaço w×h. */
 function nccCor(rgba, w, h, tpl, x, y) {
@@ -513,6 +513,7 @@ async function lerPlacar(agora) {
     const cand = buscar(m, t, null, 14, 2).filter((c) => c.score >= 0.55).map((c) => ({ ...c, cor: nccCor(rgba, w, h, t, c.x * 2, c.y * 2).score })).filter((c) => c.cor >= 0.55);
     if (!melhor || cand.length > melhor.cand.length) melhor = { t, cand };
   }
+  if (window.__dbg) window.__dbg.push({ passo: 'claros', cand: melhor?.cand.map((c) => [c.x * 2, c.y * 2, Math.round(c.score * 100) / 100, Math.round(c.cor * 100) / 100]) });
   if (!melhor || melhor.cand.length < 3) return null;
   const { t, cand } = melhor;
   const d = t.d, dm = t.meiaRes.w;
@@ -598,7 +599,46 @@ async function lerPlacar(agora) {
     }
     lums.sort((p, q) => p - q);
     const numero = brancos >= 3 ? lerNumero(rgba, w, px, py, d) : null;
-    return { x: x0 + px + d / 2, y: y0 + py + d / 2, cinza: Math.round(a.score * 100) / 100, cor: Math.round(cor.score * 100) / 100, brilho: Math.round(lums[Math.floor(lums.length / 2)] / tpl.brilhoMediana * 100) / 100, brancos: Math.round(brancos / lums.length * 100) / 100, numero };
+    return { x: x0 + px + d / 2, y: y0 + py + d / 2, px, py, tpl, cinza: Math.round(a.score * 100) / 100, cor: Math.round(cor.score * 100) / 100, brilho: Math.round(lums[Math.floor(lums.length / 2)] / tpl.brilhoMediana * 100) / 100, brancos: Math.round(brancos / lums.length * 100) / 100, numero };
+  };
+  // Recarga no placar é uma VARREDURA de relógio, não um número (o "1" que o OCR lia era a linha branca dela):
+  // uma linha branca fixa das 12h até o centro enquanto o feitiço recarrega, e outra, móvel, do centro pra borda —
+  // a parte clara cresce em sentido horário a partir das 12h. Validado nas fotos do jogo dele (Sett usou o Flash
+  // aos ~2:00: linha a 3° aos 2:03, 165° aos 4:12, 322° aos 6:36). Ângulo da linha móvel = fração já recarregada.
+  // Não depende do template nem do brilho da linha (a linha de quem está sumido vem apagada junto com a linha toda).
+  const recarga = (s) => {
+    if (!s || s.px == null) return null;
+    const { px, py } = s;
+    const L = new Float32Array(d * d), S = new Float32Array(d * d); let maxL = 0;
+    for (let jj = 0; jj < d; jj++) for (let ii = 0; ii < d; ii++) {
+      const q = ((py + jj) * w + px + ii) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
+      const lum = 0.3 * r + 0.59 * g + 0.11 * b; L[jj * d + ii] = lum; S[jj * d + ii] = Math.max(r, g, b) - Math.min(r, g, b); if (lum > maxL) maxL = lum;
+    }
+    const lim = Math.max(110, 0.8 * maxL);
+    const branco = (jj, ii) => L[jj * d + ii] >= lim && S[jj * d + ii] <= 70;
+    const c0 = Math.floor(d / 2) - 1;
+    // linha fixa: coluna central (2 px de largura), das 12h até perto do centro
+    let fixos = 0, n = 0;
+    for (let jj = 1; jj < Math.floor(d / 2) - 2; jj++) { n++; if (branco(jj, c0) || branco(jj, c0 + 1)) fixos++; }
+    if (n < 4 || fixos < 0.6 * n) return null;                       // sem recarga rodando
+    // linha móvel: brancos fora da coluna fixa e fora do miolo; ângulo horário a partir das 12h
+    const angs = [];
+    for (let jj = 1; jj < d - 1; jj++) for (let ii = 1; ii < d - 1; ii++) {
+      if (!branco(jj, ii)) continue;
+      const dx = ii + 0.5 - d / 2, dy = jj + 0.5 - d / 2;
+      if (Math.abs(dx) <= 1.5 && dy < 0) continue;                    // a fixa
+      if (dx * dx + dy * dy < 12) continue;                           // miolo
+      angs.push(((Math.atan2(dx, -dy) * 180 / Math.PI) + 360) % 360);
+    }
+    if (angs.length < 3) return { angulo: null };                     // começo (tudo escuro) ou fim (tudo claro)
+    angs.sort((a, b) => a - b);
+    return { angulo: Math.round(angs[Math.floor(angs.length / 2)]) };
+  };
+  /** Segundos que faltam, dado o ângulo da linha móvel e a recarga total do feitiço. */
+  const faltaDaLinha = (rec, cd, brilhoRel) => {
+    if (!rec) return null;
+    if (rec.angulo == null) return brilhoRel != null && brilhoRel < 0.6 ? cd - 2 : 4;   // sem linha móvel: ou acabou de usar, ou está quase voltando
+    return Math.max(1, Math.round((1 - rec.angulo / 360) * cd));
   };
   const claro = (s) => s && s.cinza >= 0.55 && s.cor >= 0.55;
   // escuro provisório (só pra pontuar a hipótese); o definitivo é relativo ao brilho dos claros da mesma coluna
@@ -624,6 +664,7 @@ async function lerPlacar(agora) {
     }
   }
   // 6+ pontos: um placar de verdade tem 7–10 Flashes; com 4 o olho "achava" placar em terreno escuro e guardava recortes de mato
+  if (window.__dbg) window.__dbg.push({ passo: 'hipotese', pontos: melhorH?.pontos, grade, xEsq, xDir, esq: melhorH?.esq.map((l) => l && [Math.round(l.x), Math.round(l.y), l.claro ? 'C' : l.escuro ? 'E' : '-', l.cinza, l.brilho, l.brancos, l.numero]), dir: melhorH?.dir.map((l) => l && [Math.round(l.x), Math.round(l.y), l.claro ? 'C' : l.escuro ? 'E' : '-', l.cinza, l.brilho, l.brancos, l.numero]) });
   if (!melhorH || melhorH.pontos < 6) return null;
   // Escuro DEFINITIVO: no placar do jogo dele a coluna da esquerda vinha com o ícone escurecido (brilho 0,37 do
   // original) mesmo com o Flash na mão, e a da direita a 0,98 — brilho absoluto não serve. Referência = mediana do
@@ -633,7 +674,7 @@ async function lerPlacar(agora) {
     const claros = melhorH[lado].filter((l) => l && l.claro).map((l) => l.brilho).sort((p, q) => p - q);
     const ref = claros.length ? claros[Math.floor(claros.length / 2)] : null;
     // o número branco é obrigatório: só 'escuro e parecido' pegava Ghost/Ignite (cinza 0,31, escuros) do espaço errado
-    for (const l of melhorH[lado]) if (l) l.escuro = !l.claro && l.cinza >= 0.3 && l.brancos >= 0.04 && (ref != null ? l.brilho < 0.75 * ref : l.brilho < 0.5);
+    for (const l of melhorH[lado]) if (l) { const rec = recarga(l); l.ocr = l.numero; l.escuro = !!rec; if (rec) l.claro = false; l.angulo = rec?.angulo ?? null; l.numero = rec ? faltaDaLinha(rec, 300, ref != null ? l.brilho / ref : null) : null; }
   }
   // Recorte de cada ícone escuro (pra calibrar o leitor de dígitos com a fonte de verdade do jogo): 3× o ícone,
   // até 20 por partida, 1 a cada 20 s
@@ -659,10 +700,13 @@ async function lerPlacar(agora) {
     const mo = medir(lado === 'esq' ? xEsq : xDir, l.cyLinha + pad.outro.slot * grade.off, tplO);
     if (!mo) continue;
     const claroO = mo.cinza >= 0.5 && mo.cor >= 0.45;
-    l.outro = { nome: pad.outro.nome, id: pad.outro.id, cinza: mo.cinza, cor: mo.cor, brilho: mo.brilho, brancos: mo.brancos, numero: mo.numero, claro: claroO, escuro: !claroO && mo.brancos >= 0.04 && mo.cinza >= 0.2 };
+    const RECARGA = { 12: 360, 14: 180, 3: 210, 7: 240, 6: 210, 21: 180, 1: 210 };
+    const recO = recarga(mo), escuroO = !!recO;
+    const refO = melhorH[lado].filter((q) => q && q.claro).map((q) => q.brilho).sort((p, q) => p - q); const refCol = refO.length ? refO[Math.floor(refO.length / 2)] : null;
+    l.outro = { nome: pad.outro.nome, id: pad.outro.id, cinza: mo.cinza, cor: mo.cor, brilho: mo.brilho, brancos: mo.brancos, angulo: recO?.angulo ?? null, numero: escuroO ? faltaDaLinha(recO, RECARGA[pad.outro.id] ?? 210, refCol != null ? mo.brilho / refCol : null) : null, claro: claroO && !escuroO, escuro: escuroO };
     delete l.cyLinha;
   }
-  for (const lado of ['esq', 'dir']) for (const l of melhorH[lado]) if (l) delete l.cyLinha;
+  for (const lado of ['esq', 'dir']) for (const l of melhorH[lado]) if (l) { delete l.cyLinha; delete l.px; delete l.py; delete l.tpl; }
   gradePlacar = { xEsq, xDir, base: melhorH.linha0, P: grade.P, off: grade.off, d, buscaCheiaEm: agora };
   // cada linha: o espaço do Flash daquele jogador (null = sem Flash / não medido) + o outro feitiço em .outro
   return { d, passo: grade.P * 2, off: grade.off * 2, pontos: melhorH.pontos, esq: melhorH.esq, dir: melhorH.dir };
