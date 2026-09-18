@@ -132,3 +132,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.134 — Partidas: os cards das partidas que o coach ao vivo gravou ganham o selo 🎧 com a taxa de previsões certas ("45% prev."); o detalhe dessas partidas já traz as mortes cruzadas com o olho, a lição e o padrão.
 - v2.28.136 — Seleção: candidato ou campeão deles que mudou na última atualização ganha a etiqueta "patch" na análise e na intel do time deles (o app já sabia quem mudou pela aba Patch; agora aparece na hora de escolher).
 - v2.28.137 — Perfil: embaixo do elo, quanto falta pra subir — "Faltam 84 PDL pra o próximo tier: 4 vitórias seguidas ou ~20 jogos no seu ritmo (39%)" (ou "no ritmo atual não sobe", quando o winrate não paga).
+- v2.28.138 — Na primeira abertura do dia, notificação "Ontem no LoL: 3V 6D em 9 jogos · mais jogado: Caitlyn (3) — detalhes em Estatísticas → Tendências" (só com 3+ jogos no dia anterior, uma vez por dia).

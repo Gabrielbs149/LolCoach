@@ -1723,6 +1723,22 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
   let patchMudou = null;   // { titulo, nomes: Set(chaves dos campeões que mudaram no último patch) }
   const mudouNoPatch = (nome) => !!patchMudou && (patchMudou.nomes.has(String(nome ?? '').toLowerCase().replace(/[^a-z]/g, '')) || patchMudou.nomes.has(String(nome ?? '')));
+  // Resumo de ontem na primeira abertura do dia (notificação do Windows): jogos, saldo, o que mais pesou
+  setTimeout(async () => {
+    try {
+      const hojeK = new Date().toISOString().slice(0, 10);
+      if (config.ultimoResumoDia === hojeK) return;
+      const ontem = new Date(Date.now() - 86400_000); ontem.setHours(0, 0, 0, 0);
+      const ini = ontem.toISOString(), fim = new Date(ontem.getTime() + 86400_000).toISOString();
+      const jogos = db.prepare('SELECT venci, meuCampeao c FROM partidas WHERE duracaoS >= 300 AND quando >= ? AND quando < ?').all(ini, fim);
+      await salvarConfig({ ultimoResumoDia: hojeK }).catch(() => {});
+      if (jogos.length < 3) return;
+      const v = jogos.filter((j) => j.venci).length, d = jogos.length - v;
+      const porC = new Map(); for (const j of jogos) porC.set(j.c, (porC.get(j.c) ?? 0) + 1);
+      const mais = [...porC.entries()].sort((a, b) => b[1] - a[1])[0];
+      estado?.avisar?.('Ontem no LoL', `${v}V ${d}D em ${jogos.length} jogos${mais ? ` · mais jogado: ${mais[0]} (${mais[1]})` : ''} — detalhes em Estatísticas → Tendências`);
+    } catch { /* sem banco */ }
+  }, 45_000);
   setTimeout(vigiarPatch, 20_000);
   setInterval(vigiarPatch, 6 * 60 * 60 * 1000);
 
