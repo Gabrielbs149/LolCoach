@@ -317,6 +317,11 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      const sk = url.pathname.match(/^\/skin\/([A-Za-z]+)_(\d+)$/);
+      if (sk && acoes.imagemSkin) {
+        try { const { corpo, tipo } = await acoes.imagemSkin({ chave: sk[1], num: Number(sk[2]) }); res.writeHead(200, { 'Content-Type': tipo, 'Cache-Control': 'max-age=604800' }); return res.end(corpo); }
+        catch { return enviar(404, 'text/plain', 'sem imagem'); }
+      }
       // Imagens de item, runa e feitiço (Data Dragon, guardadas em disco).
       const im = url.pathname.match(/^\/(item|runa|feitico)\/(\d+)$/);
       if (im) {

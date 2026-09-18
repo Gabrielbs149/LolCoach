@@ -133,6 +133,11 @@ body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:
 .campoAdm:focus{outline:none;border-color:var(--ouro)}
 .skBarra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px}.skLigar{display:flex;align-items:center;gap:6px;font-size:13px}
 .skZona{border:1.5px dashed var(--borda);border-radius:var(--r-m);padding:14px 16px;background:var(--f1);display:flex;align-items:center;gap:14px;flex-wrap:wrap;transition:border-color .15s,background .15s}.skZona.sobre{border-color:var(--vit,#9c6);background:rgba(120,200,100,.08)}.skZonaTexto{flex:1;min-width:220px;font-size:13px}.skZonaBotoes{display:flex;gap:8px}.skZona .dica{width:100%}
+.skDuas{display:grid;grid-template-columns:230px 1fr;gap:12px;margin-top:12px}.skEsq .busca{max-width:none}.skQtd{margin-left:auto;font-size:11px;color:var(--apagado)}.skQtd.emUso{color:var(--vit,#9c6)}.skSemIcone{display:inline-block;width:26px;height:26px;border-radius:50%;background:var(--f2,#222)}
+.skCab{display:flex;align-items:center;gap:10px;margin-bottom:10px}.skCab img{width:40px;height:40px;border-radius:50%}.skCab .acao{margin-left:auto}
+.skTiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}.skTile{cursor:pointer;border-radius:8px;border:2px solid transparent;padding:4px;transition:border-color .12s,transform .12s}.skTile:hover{border-color:var(--borda);transform:translateY(-1px)}.skTile.escolhida{border-color:var(--vit,#9c6)}.skArte{position:relative;aspect-ratio:308/560;border-radius:6px;overflow:hidden;background:var(--f1)}.skArte img{width:100%;height:100%;object-fit:cover;display:block}.skSemArte{width:100%;height:100%;display:flex;align-items:center;justify-content:center;opacity:.6}.skSemArte img{width:56px;height:56px;border-radius:50%}
+.skTileAcoes{position:absolute;top:4px;right:4px;display:none;gap:3px}.skTile:hover .skTileAcoes{display:flex}.skTileAcoes .mini{background:rgba(0,0,0,.7);border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px}.skMarca{position:absolute;left:0;right:0;bottom:0;background:rgba(120,200,100,.85);color:#08140a;font-weight:700;font-size:10px;text-align:center;padding:2px}
+.skTitulo{font-size:12px;margin-top:5px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}.skAutor{font-size:10.5px;color:var(--apagado)}
 .skGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:10px;margin-top:12px}.skCamp{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);padding:8px 10px}.skCamp.ativa{border-color:rgba(120,200,100,.5)}.skCampCab{display:flex;align-items:center;gap:8px;margin-bottom:6px}.skCampCab img{width:28px;height:28px;border-radius:50%}.skCampCab small{color:var(--apagado);margin-left:auto}
 .skItem{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px}.skItem:hover{background:rgba(255,255,255,.04)}.skItem.escolhida{background:rgba(120,200,100,.1)}.skNome{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skNome small{color:var(--apagado)}.skAcoes{display:flex;gap:4px}.skAcoes .mini{background:transparent;border:1px solid var(--borda);color:var(--texto);border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px}.skAcoes .mini:hover{border-color:var(--texto)}
 .admTabela{width:100%;border-collapse:collapse;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden;font-size:12.5px}
@@ -1046,7 +1051,13 @@ h2{letter-spacing:1px}
     <div class="aviso" style="margin-bottom:10px">Skin customizada: só você vê, ninguém mais. Quem aplica é o <b>cslol-manager</b> (código aberto), baixado do GitHub dele — o LolCoach só organiza e liga na hora que você trava o campeão. A Riot diz que não pune skin customizada, mas é modificação do cliente do jogo: use por sua conta.</div>
     <div id="skTopo"></div>
     <div id="skImport" style="margin:10px 0"></div>
-    <div id="skLista"></div>
+    <div class="skDuas">
+      <div class="skEsq">
+        <input class="busca" id="skBusca" placeholder="Buscar campeão…" autocomplete="off" oninput="skDesenharCamp()">
+        <div class="listaCamp" id="skCampeoes"></div>
+      </div>
+      <div class="skDir" id="skLista"><div class="vazio">escolha um campeão</div></div>
+    </div>
   </section>
 
   <section id="patch">
@@ -3211,41 +3222,36 @@ function desenharSkins(){
     </div>
     <div class="dica" id="skProgresso"></div>
   </div>`;
-  const por = d.porCampeao ?? {};
-  // agrupado por campeão; uma skin escolhida por campeão (ou nenhuma)
-  const porCamp = new Map();
-  for (const m of d.mods) for (const c of (m.campeoes.length ? m.campeoes : ['?'])) { if (!porCamp.has(c)) porCamp.set(c, []); porCamp.get(c).push(m); }
-  const grupos = [...porCamp.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  $('#skLista').innerHTML = grupos.length ? `<div class="skGrade">${grupos.map(([c, mods]) => `<div class="skCamp ${por[c] ? 'ativa' : ''}">
-      <div class="skCampCab">${skIconeDe(c)}<b>${esc(c)}</b><small>${mods.length} skin${mods.length > 1 ? 's' : ''}${por[c] ? ' · em uso' : ''}</small></div>
-      ${mods.map(m => `<label class="skItem ${por[c] === m.nome ? 'escolhida' : ''}">
-        <input type="radio" name="sk-${esc(c)}" ${por[c] === m.nome ? 'checked' : ''} onclick="skEscolher('${esc(c)}', '${esc(m.nome)}', this)">
-        <span class="skNome" title="${esc(m.descricao ?? '')}">${esc(m.titulo)}${m.autor ? `<small> · ${esc(m.autor)}</small>` : ''}</span>
-        <span class="skAcoes"><button class="mini" title="testa agora: monta e liga o patcher" onclick="event.preventDefault(); skAcao('/api/skins/testar?campeao=${encodeURIComponent(c)}')">▶</button><button class="mini" title="apagar" onclick="event.preventDefault(); if(confirm('Apagar ${esc(m.titulo)}?')) skAcao('/api/skins/remover?mod=${encodeURIComponent(m.nome)}')">✕</button></span>
-      </label>`).join('')}
-      <label class="skItem ${!por[c] ? 'escolhida' : ''}"><input type="radio" name="sk-${esc(c)}" ${!por[c] ? 'checked' : ''} onclick="skEscolher('${esc(c)}', '', this)"><span class="skNome sub">nenhuma (skin normal)</span></label>
-    </div>`).join('')}</div>` : '<div class="vazio">nenhuma skin importada ainda — arrasta a pasta aqui em cima</div>';
+  skDesenharCamp();
+  skDesenharSkins();
 }
-async function skPastas(){
-  const prog = document.getElementById('skProgresso');
-  try {
-    const r = await fetch('/api/skins/escolher-pastas', { method: 'POST' }).then(r => r.json());
-    if (r?.erro) { alert(r.erro); return; }
-    if (r?.cancelado) return;
-    if (!r?.total) { if (prog) prog.textContent = 'nenhum .fantome/.zip nessas pastas'; return; }
-    // acompanha o progresso pelo estado
-    for (let i = 0; i < 3600; i++) {
-      await new Promise(res => setTimeout(res, 700));
-      skDados = await pegar('/api/skins');
-      const im = skDados.importando;
-      const p2 = document.getElementById('skProgresso');
-      if (im) { if (p2) p2.textContent = `importando ${im.feitos}/${im.total}: ${im.atual ?? ''}`; if (i % 6 === 5) { const t = p2?.textContent; desenharSkins(); const p3 = document.getElementById('skProgresso'); if (p3) p3.textContent = t; } continue; }
-      desenharSkins();
-      const u = skDados.ultimaImportacao; const p3 = document.getElementById('skProgresso');
-      if (p3 && u) p3.textContent = `${u.ok} de ${u.total} importadas${u.erros?.length ? ` · ${u.erros.length} com erro: ${u.erros.slice(0, 3).join(' | ')}` : ''}`;
-      break;
-    }
-  } catch(e){ alert(e.message); }
+let skCampAtual = null;
+function skIconeChave(chave){ const k = String(chave).toLowerCase().replace(/[^a-z]/g, ''); const cc = listaCampeoes.find(x => String(x.nome).toLowerCase().replace(/[^a-z]/g, '') === k || String(x.chave ?? '').toLowerCase() === k); return cc ? icone(cc.id) : '<span class="skSemIcone"></span>'; }
+function skDesenharCamp(){
+  const d = skDados; if(!d) return;
+  const busca = ($('#skBusca')?.value ?? '').trim().toLowerCase();
+  const por = d.porCampeao ?? {};
+  const lista = (d.catalogo ?? []).filter(c => !busca || c.nome.toLowerCase().includes(busca) || c.chave.toLowerCase().includes(busca));
+  if (!skCampAtual && lista.length) skCampAtual = lista[0].chave;
+  $('#skCampeoes').innerHTML = lista.length ? lista.map(c => `<div class="itemCamp ${c.chave === skCampAtual ? 'on' : ''}" onclick="skCampAtual='${esc(c.chave)}'; skDesenharCamp(); skDesenharSkins()">
+      ${skIconeChave(c.chave)}<span class="n">${esc(c.nome)}</span><span class="skQtd ${por[c.chave] ? 'emUso' : ''}">${por[c.chave] ? '●' : ''} ${c.skins.length}</span></div>`).join('')
+    : '<div class="vazio">nenhuma skin importada — arrasta a pasta em cima</div>';
+}
+function skDesenharSkins(){
+  const d = skDados; if(!d) return;
+  const c = (d.catalogo ?? []).find(x => x.chave === skCampAtual);
+  if (!c) { $('#skLista').innerHTML = '<div class="vazio">escolha um campeão</div>'; return; }
+  const escolhida = (d.porCampeao ?? {})[c.chave] ?? null;
+  const tile = (sk) => `<div class="skTile ${escolhida === sk.nome ? 'escolhida' : ''}" onclick="skEscolher('${esc(c.chave)}', '${esc(sk.nome)}')" title="${esc(sk.descricao ?? sk.titulo)}">
+      <div class="skArte">${sk.previa ? `<img src="${sk.previa}" loading="lazy" alt="">` : `<div class="skSemArte">${skIconeChave(c.chave)}</div>`}
+        <div class="skTileAcoes"><button class="mini" title="testa agora: monta e liga o patcher" onclick="event.stopPropagation(); skAcao('/api/skins/testar?campeao=${encodeURIComponent(c.chave)}')">▶</button><button class="mini" title="apagar" onclick="event.stopPropagation(); if(confirm('Apagar ${esc(sk.titulo)}?')) skAcao('/api/skins/remover?mod=${encodeURIComponent(sk.nome)}')">✕</button></div>
+        ${escolhida === sk.nome ? '<div class="skMarca">EM USO</div>' : ''}
+      </div>
+      <div class="skTitulo">${esc(sk.titulo)}</div>${sk.autor ? `<div class="skAutor">${esc(sk.autor)}</div>` : ''}
+    </div>`;
+  $('#skLista').innerHTML = `<div class="skCab">${skIconeChave(c.chave)}<div><b>${esc(c.nome)}</b><div class="sub">${c.skins.length} skin${c.skins.length > 1 ? 's' : ''} · ${escolhida ? 'em uso: ' + esc(c.skins.find(x => x.nome === escolhida)?.titulo ?? escolhida) : 'nenhuma em uso (skin normal)'}</div></div>
+      <button class="acao" onclick="skEscolher('${esc(c.chave)}', '')" ${escolhida ? '' : 'disabled'}>Usar skin normal</button></div>
+    <div class="skTiles">${c.skins.map(tile).join('')}</div>`;
 }
 async function skEscolher(campeao, mod, el){ await skAcao('/api/skins/escolher?campeao=' + encodeURIComponent(campeao) + '&mod=' + encodeURIComponent(mod)); }
 async function skLigar(ativo){ try { await fetch('/api/config', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ skins: { ativo, porCampeao: skDados?.porCampeao ?? {} } }) }); } catch(e){ alert(e.message); } skDados = await pegar('/api/skins'); desenharSkins(); }

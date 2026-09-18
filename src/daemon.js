@@ -2042,6 +2042,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),
     imagemFeitico: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeFeitico, 'image/png')(id),
+    imagemSkin: async ({ chave, num }) => { const { imagemDeSkin } = await import('./dados/ddragon.js'); const corpo = await imagemDeSkin(chave, num); if (!corpo) throw new Error('sem imagem'); return { corpo, tipo: 'image/jpeg' }; },
     iconePerfil: async (id) => {
       const { iconeDePerfil } = await import('./dados/ddragon.js');
       const corpo = await iconeDePerfil(id);
@@ -2083,7 +2084,7 @@ const ACOES_DO_PAINEL = [
   'coletar', 'reprocessar', 'historico', 'detalhe', 'icone', 'iconePerfil',
   'vivo', 'arte', 'campeoes', 'lerConfig', 'salvarConfig',
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
-  'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
+  'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico', 'imagemSkin',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'skinsEstado', 'skinsInstalar', 'skinsImportar', 'skinsRemover', 'skinsEscolher', 'skinsTestar', 'skinsParar', 'skinsImportarPastas', 'skinsEscolherPastas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',

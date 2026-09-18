@@ -21,6 +21,7 @@ import { existsSync } from 'node:fs';
 import { resolve, join, dirname, basename } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pastaBase } from '../caminhos.js';
+import { skinsPorChave } from '../dados/ddragon.js';
 
 const execFileP = promisify(execFile);
 const REPO = 'LeagueToolkit/cslol-manager';
@@ -81,7 +82,10 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
   }
 
   /** Lê os mods importados: nome, campeão (pelo WAD), info do META. */
+  let modsCache = null, catalogoCache = null;
+  const esquecerCache = () => { modsCache = null; catalogoCache = null; };
   async function listarMods() {
+    if (modsCache) return modsCache;
     const saida = [];
     for (const nome of await readdir(pastaMods()).catch(() => [])) {
       const dir = join(pastaMods(), nome);
@@ -91,7 +95,8 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
       const campeoes = [...new Set(wads.map((w) => w.replace(/\.wad\.client$/i, '')).filter((w) => /^[A-Za-z]+$/.test(w) && !/^(Global|UI|Map\d+|Shared|Common)/i.test(w)))];
       saida.push({ nome, titulo: info.Name ?? nome, autor: info.Author ?? null, versao: info.Version ?? null, descricao: info.Description ?? null, campeoes });
     }
-    return saida.sort((a, b) => a.titulo.localeCompare(b.titulo));
+    modsCache = saida.sort((a, b) => a.titulo.localeCompare(b.titulo));
+    return modsCache;
   }
 
   /** Importa um .fantome/.zip (o corpo do upload) como mod. */
@@ -108,6 +113,7 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
       const { stderr } = await execFileP(modTools(), ['import', tmp, destino, `--game:${jogo}`], { windowsHide: true, timeout: 180_000 });
       if (stderr?.trim()) log(`skins: import ${limpo}: ${stderr.trim().slice(0, 200)}`);
     } finally { await rm(tmp, { force: true }).catch(() => {}); }
+    esquecerCache();
     const m = (await listarMods()).find((x) => x.nome === limpo);
     log(`skins: mod "${m?.titulo ?? limpo}" importado (${(m?.campeoes ?? []).join(', ') || 'campeão não identificado'})`);
     // sem escolha pra esse campeão ainda: já deixa escolhido
@@ -149,6 +155,7 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
   async function remover({ mod }) {
     const nome = basename(String(mod ?? '')); if (!nome) throw new Error('mod?');
     await rm(join(pastaMods(), nome), { recursive: true, force: true });
+    esquecerCache();
     const por = { ...(config.skins?.porCampeao ?? {}) };
     for (const [c, m] of Object.entries(por)) if (m === nome) delete por[c];
     config.skins = { ...(config.skins ?? {}), porCampeao: por };
@@ -198,11 +205,34 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
     patcher = null; patcherMod = null;
   }
 
+  const normal = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cacheSkins = new Map();
+  async function skinsDe(chave) { if (!cacheSkins.has(chave)) cacheSkins.set(chave, skinsPorChave(chave).catch(() => null)); return cacheSkins.get(chave); }
+  /** Pra tela: campeões com as skins de cada um, prévia da skin oficial de mesmo nome (quando existe) */
+  async function catalogo(mods) {
+    if (catalogoCache && catalogoCache.mods === mods) return catalogoCache.saida;
+    const porCamp = new Map();
+    for (const m of mods) for (const c of (m.campeoes.length ? m.campeoes : ['?'])) { if (!porCamp.has(c)) porCamp.set(c, []); porCamp.get(c).push(m); }
+    const saida = [];
+    for (const [chave, lista] of porCamp) {
+      const dd = chave === '?' ? null : await skinsDe(chave);
+      const oficiais = (dd?.skins ?? []).map((s) => ({ ...s, n: normal(s.nome) }));
+      saida.push({ chave, nome: dd?.nome ?? chave, skins: lista.map((m) => {
+        const t = normal(m.titulo);
+        const of = oficiais.find((s) => s.n === t) ?? oficiais.find((s) => s.n.length > 4 && (t.includes(s.n) || s.n.includes(t)));
+        return { nome: m.nome, titulo: m.titulo, autor: m.autor, descricao: m.descricao, previa: of && of.num > 0 ? `/skin/${chave}_${of.num}` : null };
+      }) });
+    }
+    catalogoCache = { mods, saida: saida.sort((a, b) => a.nome.localeCompare(b.nome)) };
+    return catalogoCache.saida;
+  }
   async function estado() {
+    const mods = await listarMods();
     return {
+      catalogo: await catalogo(mods),
       instalado: instalado(), versao: await versaoInstalada(), instalando: !!instalando,
       jogo: pastaDoJogo(), ativo: config.skins?.ativo !== false,
-      mods: await listarMods(), porCampeao: config.skins?.porCampeao ?? {},
+      mods, porCampeao: config.skins?.porCampeao ?? {},
       patcher: patcher ? { mod: patcherMod, desde: patcherDesde } : null,
       importando, ultimaImportacao,
     };

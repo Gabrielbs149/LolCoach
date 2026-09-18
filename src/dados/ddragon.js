@@ -359,6 +359,31 @@ async function imagemDoCdn(subpasta, url, nomeArquivo) {
   } catch { return null; }
 }
 
+/**
+ * Skins oficiais de um campeão pela CHAVE do Data Dragon ("LeeSin", "MissFortune" — é o mesmo nome do WAD
+ * dos mods), com o nome em inglês (os mods vêm com nome em inglês) e o número da skin (pra imagem).
+ */
+export async function skinsPorChave(chave) {
+  const patch = await patchAtual();
+  if (!patch || !chave) return null;
+  const arquivo = resolve(pasta(), patch, `${chave}.en.json`);
+  let bruto = await lerCache(arquivo);
+  if (!bruto) {
+    try {
+      bruto = await (await fetch(`${CDN}/cdn/${patch}/data/en_US/champion/${chave}.json`, { signal: AbortSignal.timeout(15000) })).json();
+      await gravarCache(arquivo, bruto);
+    } catch { return null; }
+  }
+  const c = bruto?.data?.[chave];
+  if (!c) return null;
+  return { chave, nome: c.name, skins: (c.skins ?? []).map((s) => ({ num: s.num, nome: s.name })) };
+}
+/** Arte de loading de uma skin (308×560), guardada em disco. */
+export async function imagemDeSkin(chave, num) {
+  if (!/^[A-Za-z]+$/.test(String(chave)) || !Number.isInteger(Number(num))) return null;
+  return imagemDoCdn('skin', `${CDN}/cdn/img/champion/loading/${chave}_${num}.jpg`, `${chave}_${num}.jpg`);
+}
+
 export async function imagemDeItem(itemId) {
   const patch = await patchAtual();
   const it = (await tabelaDeItens()).get(Number(itemId));
