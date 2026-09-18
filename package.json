@@ -36,7 +36,8 @@
       "electron/**",
       "src/**",
       "package.json",
-      "!**/*.map"
+      "!**/*.map",
+      "docs/melhorias.md"
     ],
     "extraMetadata": {
       "main": "electron/main.js"

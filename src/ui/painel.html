@@ -1220,6 +1220,7 @@ h2{letter-spacing:1px}
 
     <details class="avancado">
       <summary>Avançado</summary>
+      <div id="novidades" class="dica" style="margin:6px 0 10px"></div>
       <div class="acoes">
         <button class="acao" data-acao="coletar">Coletar agora</button>
         <button class="acao" data-acao="historico?quantas=250&fila=420">Puxar 250 solo</button>
@@ -3212,8 +3213,9 @@ async function tick(){
  * no banco e as notas de atualização são um download de 300 KB — pagar isso na
  * abertura do app atrasaria a única tela que a maioria quer ver.
  */
+async function carregarNovidades(){ try { const n = await pegar('/api/novidades'); const el = $('#novidades'); if (!el) return; el.innerHTML = n.itens?.length ? `<b>O que mudou</b> (últimas versões)<div style="max-height:220px;overflow:auto;margin-top:4px">${n.itens.map(i => `<div style="margin:3px 0"><b>${esc(i.versao)}</b> — ${esc(i.texto).slice(0, 400)}${i.texto.length > 400 ? '…' : ''}</div>`).join('')}</div>` : ''; } catch {} }
 const CARREGADORES = {
-  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin,
+  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
 };
 const jaCarregou = new Set();
 

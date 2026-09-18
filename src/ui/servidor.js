@@ -180,6 +180,13 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.situacoesResumo())); }
         catch (erro) { return enviar(403, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
+      if (url.pathname === '/api/novidades') {
+        try {
+          const txt = await readFile(join(AQUI, '..', '..', 'docs', 'melhorias.md'), 'utf8');
+          const itens = txt.split(/\r?\n/).filter((l) => /^- v\d/.test(l)).slice(-15).reverse().map((l) => { const m = l.match(/^- (v[\d.]+)\s*[—-]\s*(.*)$/); return m ? { versao: m[1], texto: m[2] } : { versao: '', texto: l.slice(2) }; });
+          return enviar(200, 'application/json', JSON.stringify({ itens }));
+        } catch { return enviar(200, 'application/json', JSON.stringify({ itens: [] })); }
+      }
       if (url.pathname === '/api/situacoes/ids' && acoes.situacoesIds) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.situacoesIds())); } catch (erro) { return enviar(500, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
