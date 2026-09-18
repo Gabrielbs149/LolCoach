@@ -562,6 +562,7 @@ async function lerPlacar(agora) {
   const grade = { P, off, base };
   // Um lado sem Flash claro (todos gastos, ou ninguém com Flash): a coluna dele fica a ~7,1 passos da outra
   // (medido no placar do jogo dele: 540 px pra 76 px de passo); varre ±0,6 passo e fica com o x que mais parece Flash
+  if ((xEsq == null || xDir == null) && naColuna.length < 4) return null;   // coluna estimada só com 4+ claros na outra
   if (xEsq == null || xDir == null) {
     const temEsq = xEsq != null, est = Math.round(temEsq ? xEsq + P * 7.1 : xDir - P * 7.1), faixa = Math.round(P * 0.6);
     const slots = padraoPlacar?.[temEsq ? 'dir' : 'esq'] ?? [];
@@ -622,7 +623,8 @@ async function lerPlacar(agora) {
       if (!melhorH || pontos > melhorH.pontos) melhorH = { pontos, base: b, linha0: b + (i0 - 2) * grade.P, ...saida };
     }
   }
-  if (!melhorH || melhorH.pontos < 4) return null;
+  // 6+ pontos: um placar de verdade tem 7–10 Flashes; com 4 o olho "achava" placar em terreno escuro e guardava recortes de mato
+  if (!melhorH || melhorH.pontos < 6) return null;
   // Escuro DEFINITIVO: no placar do jogo dele a coluna da esquerda vinha com o ícone escurecido (brilho 0,37 do
   // original) mesmo com o Flash na mão, e a da direita a 0,98 — brilho absoluto não serve. Referência = mediana do
   // brilho dos CLAROS da mesma coluna; escuro = não é claro, tem algo ali (cinza ≥ 0,3) e ou brilho < 0,6 da
