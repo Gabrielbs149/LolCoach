@@ -251,6 +251,40 @@ export async function iconeDoCampeao(championId) {
   } catch { return null; }
 }
 
+/**
+ * Ícone REDONDO do minimapa, que é o da skin (cada skin tem o seu: udyr_circle_4.png, kayn_ass_circle_8.png…).
+ * O Data Dragon só tem o quadrado do campeão base; isso vem do CommunityDragon (os arquivos do próprio jogo).
+ * `forma`: só Kayn ('ass' = Assassino Sombrio, 'slay' = Rhaast). Cai pro círculo base, e por fim pro quadrado.
+ */
+const semCirculo = new Set();   // URLs que deram 404 nesta sessão
+export async function circuloDoCampeao(championId, skin = 0, forma = '') {
+  const ids = await tabelaDeIds();
+  const nome = ids.get(Number(championId));
+  if (!nome) return null;
+  const n = nome.toLowerCase();
+  const sufixo = (k) => (k ? `_${k}` : '');
+  const tentativas = [];
+  if (forma) { tentativas.push(`${n}_${forma}_circle${sufixo(skin)}.png`); if (skin) tentativas.push(`${n}_${forma}_circle.png`); }
+  if (skin) tentativas.push(`${n}_circle_${skin}.png`);
+  tentativas.push(`${n}_circle.png`, `${n}_circle_0.png`);
+  if (n === 'shaco') tentativas.push('jester_circle.png');   // o Shaco base tem nome interno antigo
+  for (const arq of tentativas) {
+    const local = resolve(pasta(), 'circulo', arq);
+    try { return await readFile(local); } catch { /* ainda não baixado */ }
+    const url = `https://raw.communitydragon.org/latest/game/assets/characters/${n}/hud/${arq}`;
+    if (semCirculo.has(url)) continue;
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (!r.ok) { semCirculo.add(url); continue; }
+      const buf = Buffer.from(await r.arrayBuffer());
+      await mkdir(dirname(local), { recursive: true }).catch(() => {});
+      await writeFile(local, buf).catch(() => {});
+      return buf;
+    } catch { semCirculo.add(url); }
+  }
+  return iconeDoCampeao(championId);
+}
+
 /** Ícone de invocador (o retrato do perfil), guardado em disco como os demais. */
 export async function iconeDePerfil(iconeId) {
   const patch = await patchAtual();

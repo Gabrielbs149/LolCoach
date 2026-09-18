@@ -968,7 +968,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     await mkdir(pasta, { recursive: true });
     const n = (meta?.placar ? 'placar-' : meta?.escuro ? `escuro-${meta.numero ?? 'x'}-` : '') + String(Math.floor((partidaVivo?.ultimoEstado?.tempo ?? 0))).padStart(4, '0');
     await writeFile(resolve(pasta, `${n}.png`), png);
-    await writeFile(resolve(pasta, `${n}.json`), JSON.stringify({ ...meta, tempo: partidaVivo?.ultimoEstado?.tempo ?? null, jogadores: partidaVivo?.ultimoEstado?.jogadores?.map((j) => ({ campeao: j.campeao, time: j.time, role: j.role, morto: j.morto })) ?? [] }));
+    await writeFile(resolve(pasta, `${n}.json`), JSON.stringify({ ...meta, tempo: partidaVivo?.ultimoEstado?.tempo ?? null, jogadores: partidaVivo?.ultimoEstado?.jogadores?.map((j) => ({ campeao: j.campeao, time: j.time, role: j.role, skin: j.skin ?? 0, morto: j.morto })) ?? [] }));
     // limpa partidas velhas
     const pastas = (await readdir(resolve(pastaBase(), 'dados', 'olho')).catch(() => [])).sort();
     for (const velha of pastas.slice(0, -6)) await rm(resolve(pastaBase(), 'dados', 'olho', velha), { recursive: true, force: true }).catch(() => {});
@@ -2167,6 +2167,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     },
     // Client primeiro (melhor qualidade e instantâneo); com o League fechado,
     // cai no Data Dragon pra nenhuma tela ficar com quadrado vazio.
+    circulo: async (championId, skin, forma) => { const { circuloDoCampeao } = await import('./dados/ddragon.js'); return circuloDoCampeao(championId, skin, forma); },
     icone: async (championId) => {
       try {
         return await lcu.getBinario(`/lol-game-data/assets/v1/champion-icons/${championId}.png`);

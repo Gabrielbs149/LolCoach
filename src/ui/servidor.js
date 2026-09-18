@@ -298,6 +298,16 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         return enviar(202, 'application/json', JSON.stringify({ iniciado: nome }));
       }
 
+      // Ícone redondo do minimapa da skin (o olho usa esse; o quadrado do campeão base não bate com skin)
+      const cc = url.pathname.match(/^\/circulo\/(\d+)\/(\d+)(?:\/(ass|slay))?$/);
+      if (cc && acoes.circulo) {
+        try {
+          const corpo = await acoes.circulo(Number(cc[1]), Number(cc[2]), cc[3] ?? '');
+          if (!corpo) return enviar(404, 'text/plain', 'sem ícone');
+          res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'max-age=86400' });
+          return res.end(corpo);
+        } catch { return enviar(404, 'text/plain', 'sem ícone'); }
+      }
       // Ícone de campeão, servido pelo próprio client — nada vem da internet.
       const ic = url.pathname.match(/^\/icone\/(\d+)$/);
       if (ic && acoes.icone) {

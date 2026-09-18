@@ -53,12 +53,19 @@ const cores = (() => { try { return JSON.parse(localStorage.getItem('olho.cores'
 // cor de anel é SATURADA (vermelho 169,61,56 · azul ~90,170,240); uma média sem graça (73,103,130 = rio) é
 // aprendizado ruim — casar pixels a 40 dela enche o minimapa de 'manchas' de rio/terreno e engole os ícones
 const croma = (c) => Math.max(c.r, c.g, c.b) - Math.min(c.r, c.g, c.b);
-for (const k of ['inimigo', 'aliado', 'eu']) { cores[k] ??= { r: 0, g: 0, b: 0, n: 0 }; if (cores[k].n >= 25 && croma(cores[k]) < 80) cores[k] = { r: 0, g: 0, b: 0, n: 0 }; }
-const corPronta = (k) => cores[k].n >= 25 && croma(cores[k]) >= 80;
+// regra fixa de cada anel; a cor aprendida só vale se for da mesma família (senão era cabelo da Annie, torre, rio)
+const FIXA = {
+  inimigo: (r, g, b) => r > 90 && r > g * 1.35 && r > b * 1.15,
+  aliado: (r, g, b) => b > 90 && b > r * 1.35 && b >= g * 1.05,
+  eu: (r, g, b) => b > 150 && g > 130 && r > 95 && r < 150 && b > r * 1.25,
+};
+const daFamilia = (k, c) => FIXA[k](c.r ?? c[0], c.g ?? c[1], c.b ?? c[2]);
+for (const k of ['inimigo', 'aliado', 'eu']) { cores[k] ??= { r: 0, g: 0, b: 0, n: 0 }; if (cores[k].n >= 25 && (croma(cores[k]) < 80 || !daFamilia(k, cores[k]))) { cores[k] = { r: 0, g: 0, b: 0, n: 0 }; try { localStorage.setItem('olho.cores', JSON.stringify(cores)); } catch { /* sem espaço */ } } }
+const corPronta = (k) => cores[k].n >= 25 && croma(cores[k]) >= 80 && daFamilia(k, cores[k]);
 const distCor = (r, g, b, c) => Math.hypot(r - c.r, g - c.g, b - c.b);
 let coresAvisadas = false;
 function aprenderCor(k, cor) {
-  if (!cor) return;
+  if (!cor || !daFamilia(k, cor)) return;   // amostra fora da família = pegou o ícone/fundo, não o anel
   const c = cores[k], w = Math.min(c.n, 60);   // média corrida (as últimas ~60 pesam mais)
   c.r = (c.r * w + cor[0]) / (w + 1); c.g = (c.g * w + cor[1]) / (w + 1); c.b = (c.b * w + cor[2]) / (w + 1); c.n++;
   if (c.n % 10 === 0) { try { localStorage.setItem('olho.cores', JSON.stringify(cores)); } catch { /* sem espaço */ } }
@@ -189,7 +196,7 @@ function manchasVermelhas(rgba, s, d, cor = 'vermelho') {
   const cel = Math.max(4, Math.round(d / 2)), nc = Math.ceil(s / cel), cont = new Uint16Array(nc * nc);
   const k = cor === 'azul' ? 'aliado' : 'inimigo';
   // a regra fixa continua valendo; a cor aprendida só ACRESCENTA (nunca tira) — assim o modo daltônico/tema não zera a leitura
-  const fixa = cor === 'azul' ? (r, g, b) => b > 100 && b > r * 1.5 && b >= g * 1.1 : (r, g, b) => r > 100 && r > g * 1.5 && r > b * 1.2;
+  const fixa = cor === 'azul' ? (r, g, b) => b > 90 && b > r * 1.35 && b >= g * 1.05 : (r, g, b) => r > 90 && r > g * 1.35 && r > b * 1.15;
   const bate = corPronta(k) ? (r, g, b) => fixa(r, g, b) || distCor(r, g, b, cores[k]) < 40 : fixa;
   for (let y = 0; y < s; y += 2) for (let x = 0; x < s; x += 2) {
     const q = (y * s + x) * 4, r = rgba[q], g = rgba[q + 1], b = rgba[q + 2];
@@ -342,16 +349,21 @@ function wavesPorLane(rgba, s, d) {
 /* ------------------------------------------------- 2. ícones e escala */
 let porNome = new Map();                 // nome normalizado -> id
 const icones = new Map();                // id -> Image
-const templates = new Map();             // `${nome}@${d}` -> template
+const templates = new Map();             // `${nome}@${skin}@${forma}@${d}` -> template
+const skinDe = new Map();                // campeão -> skin (do Live Client); o ícone do minimapa é o da skin
+let kaynForma = '';                      // '', 'ass' (Assassino Sombrio) ou 'slay' (Rhaast): o Kayn muda de ícone quando transforma
+const formaDe = (nome) => (semAcento(nome) === 'kayn' ? kaynForma : '');
 async function iconeDe(nome) {
   const id = porNome.get(semAcento(nome));
   if (!id) return null;
-  if (!icones.has(id)) icones.set(id, carregar(`/icone/${id}`).catch(() => null));
-  return icones.get(id);
+  const skin = skinDe.get(semAcento(nome)) ?? 0, forma = formaDe(nome);
+  const k = `${id}@${skin}@${forma}`;
+  if (!icones.has(k)) icones.set(k, carregar(`/circulo/${id}/${skin}${forma ? '/' + forma : ''}`).catch(() => carregar(`/icone/${id}`).catch(() => null)));
+  return icones.get(k);
 }
 /** Template do ícone com diâmetro d: meia resolução em cinza (busca) e cheia em cor (confirmação). */
 async function template(nome, d) {
-  const chave = `${nome}@${d}`;
+  const chave = `${nome}@${skinDe.get(semAcento(nome)) ?? 0}@${formaDe(nome)}@${d}`;
   if (templates.has(chave)) return templates.get(chave);
   const img = await iconeDe(nome);
   if (!img) return null;
@@ -761,8 +773,8 @@ function confirmar(rgba, s, tpl, x, y) {
   // já mudam a média), o NCC pode parar 1–2 px deslocado (testa 9 centros) e tem que ser ANEL:
   // a raio d/2+4 a cor some — a água da fonte, o rio e uma borda de terreno não passam.
   const cx = melhor.x + tw / 2, cy = melhor.y + tw / 2;
-  const vermelho = (r, g, b) => (r > 100 && r > g * 1.5 && r > b * 1.2) || (corPronta('inimigo') && distCor(r, g, b, cores.inimigo) < 40);
-  const azul = (r, g, b) => (b > 100 && b > r * 1.5 && b >= g * 1.1) || (corPronta('aliado') && distCor(r, g, b, cores.aliado) < 40);
+  const vermelho = (r, g, b) => (r > 90 && r > g * 1.35 && r > b * 1.15) || (corPronta('inimigo') && distCor(r, g, b, cores.inimigo) < 40);
+  const azul = (r, g, b) => (b > 90 && b > r * 1.35 && b >= g * 1.05) || (corPronta('aliado') && distCor(r, g, b, cores.aliado) < 40);
   const teal = (r, g, b) => (b > 150 && g > 130 && r > 95 && r < 150 && b > r * 1.25) || (corPronta('eu') && distCor(r, g, b, cores.eu) < 35);
   const frac = (ccx, ccy, raio, cor) => {
     let k = 0, nn = 0;
@@ -773,11 +785,11 @@ function confirmar(rgba, s, tpl, x, y) {
     }
     return nn ? k / nn : 0;
   };
-  const anel = (cor) => {
+  const anel = (cor, fixa = cor) => {
     let melhorF = 0;
     for (const dx of [-2, 0, 2]) for (const dy of [-2, 0, 2]) {
       let f = 0; for (const raio of [tw / 2 - 1.5, tw / 2, tw / 2 + 1.5]) f = Math.max(f, frac(cx + dx, cy + dy, raio, cor));
-      if (f > melhorF && frac(cx + dx, cy + dy, tw / 2 + 4, cor) <= 0.3) melhorF = f;
+      if (f > melhorF && frac(cx + dx, cy + dy, tw / 2 + 4, fixa) <= 0.3) melhorF = f;
     }
     return melhorF;
   };
@@ -792,7 +804,7 @@ function confirmar(rgba, s, tpl, x, y) {
   pixAnel.sort((p, q) => (Math.max(...q) - Math.min(...q)) - (Math.max(...p) - Math.min(...p)));
   const topo = pixAnel.slice(0, Math.max(1, Math.floor(pixAnel.length / 3)));
   melhor.anelCor = topo.length ? [0, 1, 2].map((i) => topo.reduce((acc, p) => acc + p[i], 0) / topo.length) : null;
-  melhor.fracVermelho = anel(vermelho); melhor.fracAzul = anel(azul); melhor.anelTeal = anel(teal);
+  melhor.fracVermelho = anel(vermelho, FIXA.inimigo); melhor.fracAzul = anel(azul, FIXA.aliado); melhor.anelTeal = anel(teal, FIXA.eu);
   melhor.anelVermelho = melhor.fracVermelho >= 0.35;
   melhor.anelAzul = melhor.fracAzul >= 0.35;
   return melhor;
@@ -810,6 +822,12 @@ async function lerPartida() {
     if (!d.emJogo) { inimigos = []; meuCampeao = null; return; }
     inimigos = (d.inimigos ?? []).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     meuCampeao = d.estado?.eu?.campeao ?? null; meuTime = d.estado?.eu?.time ?? 100;
+    for (const j of d.estado?.jogadores ?? []) if (j.campeao) skinDe.set(semAcento(j.campeao), Number(j.skin) || 0);
+    const kayn = (d.estado?.jogadores ?? []).find((j) => semAcento(j.campeao) === 'kayn');
+    if (kayn && (d.estado?.tempo ?? 0) >= 360) {
+      const visto = Math.max(ultimaVez.get('Kayn') ?? 0, ultimaVez.get('ali-Kayn') ?? 0);
+      if (performance.now() - visto > 20000) { const ORDEM = ['', 'ass', 'slay']; kaynForma = ORDEM[(ORDEM.indexOf(kaynForma) + 1) % ORDEM.length]; }
+    }
     // Placar: cada lado são 5 linhas na ordem top/jungle/mid/adc/sup; em cada linha o Flash está no D (0) ou no F (1)
     // Flash em qual espaço (D=0/F=1) e qual é o OUTRO feitiço (pra ler a recarga dele também: TP, Ignite, Exaust…)
     const FEITICO_ID = [['flash', 4], ['teleport', 12], ['ignite', 14], ['exhaust', 3], ['heal', 7], ['ghost', 6], ['barrier', 21], ['cleanse', 1], ['smite', 11]];
@@ -1152,6 +1170,7 @@ async function desenharFalsa(t) {
   } else if (AMOSTRA) {
     const meta = await fetch(AMOSTRA.replace(/\.png$/, '.json')).then((r) => r.json());
     meuCampeao = meta.eu; meuTime = (meta.jogadores ?? []).find((j) => j.campeao === meta.eu)?.time ?? 100;
+    for (const j of meta.jogadores ?? []) if (j.campeao) skinDe.set(semAcento(j.campeao), Number(j.skin) || 0);
     inimigos = (meta.jogadores ?? []).filter((j) => j.time !== meuTime).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     aliados = (meta.jogadores ?? []).filter((j) => j.time === meuTime && j.campeao !== meuCampeao).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     log(`amostra: eu ${meuCampeao}, ${inimigos.length} inimigos, ${aliados.length} aliados`);

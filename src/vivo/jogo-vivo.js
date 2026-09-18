@@ -58,6 +58,7 @@ export async function lerEstado() {
     time: TIME[p.team] ?? 100,
     role: ROLE[p.position] ?? (p.position || '').toLowerCase(),
     nivel: p.level,
+    skin: Number(p.skinID ?? 0) || 0,   // o ícone do minimapa é o da SKIN, não o do campeão
     morto: !!p.isDead,
     renasceEm: Math.round(p.respawnTimer ?? 0),
     kills: p.scores?.kills ?? 0,
