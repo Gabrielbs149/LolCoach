@@ -289,6 +289,8 @@ function retanguloCamera(rgba, s) {
   return null;
 }
 let camTravada = { ok: 0, n: 0 }, ultimaCam = null, placarAvisado = false, meuUltimo = null, ultimoPlacarEm = 0;
+const ultimaVez = new Map();             // nome -> quando foi visto pela última vez (pra procurar o mapa todo menos)
+let gradePlacar = null;                  // grade lembrada do placar: {xEsq, xDir, base, P, off, d} em meia-res — leitura rápida
 const posAnterior = new Map();   // último lugar confirmado de cada ícone (pra ver pulo de flash)
 // O que é vermelho/azul sempre no mesmo pixel é torre/inibidor, não minion: máscara temporal.
 let fixoR = null, fixoA = null, fixoS = 0;
@@ -492,6 +494,19 @@ async function lerPlacar(agora) {
   const pc = ctxDe(placarCanvas); pc.drawImage(fonte, x0, y0, w, h, 0, 0, w, h);
   const rgba = pc.getImageData(0, 0, w, h).data;
   const g = cinzaDe(rgba, w, h); const m = meia(g, w, h);
+  // 0. Atalho: já leu o placar antes → o Tab está aberto se aparecer Flash nas posições lembradas (10 buscas minúsculas,
+  // ~2 ms). Sem nada lá, a busca cheia (~150 ms) só roda de 10 em 10 s.
+  if (gradePlacar) {
+    const g = gradePlacar, tg = flashTpls.find((t) => t.d === g.d) ?? flashTpls[0];
+    let achou = 0;
+    for (const cx of [g.xEsq, g.xDir]) for (let k = 0; k < 5 && achou < 2; k++) for (const oy of [0, g.off]) {
+      const cy = g.base + k * g.P + oy; if (cy < 0 || cy + tg.meiaRes.w > m.h) continue;
+      const a = buscar(m, tg, { x0: cx - 1, y0: cy - 1, x1: cx + 1, y1: cy + 1 }, 1, 1)[0];
+      if (a && a.score >= 0.55) achou++;
+    }
+    if (achou < 2 && agora - (gradePlacar.buscaCheiaEm ?? 0) < 10000) return null;
+    gradePlacar.buscaCheiaEm = agora;
+  }
   // 1. Flashes CLAROS (cinza ≥ 0,55 e cor ≥ 0,55): são as âncoras da grade
   let melhor = null;
   for (const t of flashTpls) {
@@ -604,7 +619,7 @@ async function lerPlacar(agora) {
         if (ehFlash(meu)) pontos++; if (claro(outro)) pontos--;
         saida[lado].push(meu ? { slot, ...meu, claro: claro(meu), escuro: escuro(meu), cyLinha: b + (i0 - 2 + k) * grade.P } : null);
       }
-      if (!melhorH || pontos > melhorH.pontos) melhorH = { pontos, base: b, ...saida };
+      if (!melhorH || pontos > melhorH.pontos) melhorH = { pontos, base: b, linha0: b + (i0 - 2) * grade.P, ...saida };
     }
   }
   if (!melhorH || melhorH.pontos < 4) return null;
@@ -646,6 +661,7 @@ async function lerPlacar(agora) {
     delete l.cyLinha;
   }
   for (const lado of ['esq', 'dir']) for (const l of melhorH[lado]) if (l) delete l.cyLinha;
+  gradePlacar = { xEsq, xDir, base: melhorH.linha0, P: grade.P, off: grade.off, d, buscaCheiaEm: agora };
   // cada linha: o espaço do Flash daquele jogador (null = sem Flash / não medido) + o outro feitiço em .outro
   return { d, passo: grade.P * 2, off: grade.off * 2, pontos: melhorH.pontos, esq: melhorH.esq, dir: melhorH.dir };
 }
@@ -852,9 +868,10 @@ async function quadro() {
     const vistosAli = reconhecerEmManchas(azuis, tplsAli, m, rgba, s, null, 'aliado');
     {
       const faltam = [...tplsAli.keys()].filter((n) => !vistosAli.some((v) => v.campeao === n));
-      for (const nome of (LEVE ? faltam.slice(rodada % Math.max(1, faltam.length)).slice(0, 1) : faltam)) {   // todo aliado que faltou procura o mapa todo (5 ms cada); leve: um por quadro
+      const faltamAgora = faltam.filter((n) => agora - (ultimaVez.get('ali-' + n) ?? 0) < 4000 || (rodada + n.length) % 4 === 0);   // sumido há 4 s+: 1×/s
+      for (const nome of (LEVE ? faltamAgora.slice(rodada % Math.max(1, faltamAgora.length)).slice(0, 1) : faltamAgora)) {   // aliado que faltou procura o mapa todo (5 ms cada); leve: um por quadro
         const p = procurar(m, rgba, s, tplsAli.get(nome), 'ali-' + nome, agora, true, []);
-        if (p) { vistosAli.push({ campeao: nome, x: p.x, y: p.y, score: p.score }); if (p.crua >= 0.85) aprenderCor('aliado', p.cor); }
+        if (p) { vistosAli.push({ campeao: nome, x: p.x, y: p.y, score: p.score }); ultimaVez.set('ali-' + nome, agora); if (p.crua >= 0.85) aprenderCor('aliado', p.cor); }
       }
       for (const nome of tplsAli.keys()) if (!faltam.includes(nome)) { const v = vistosAli.find((x) => x.campeao === nome); const t = tplsAli.get(nome); rastros.set('ali-' + nome, { x: v.x * s - t.d / 2, y: v.y * s - t.d / 2, em: agora }); }
     }
@@ -886,7 +903,7 @@ async function quadro() {
       if (a.score < LIMIAR_MANCHA || (b && b.score > a.score - MARGEM && a.score < 0.85)) continue;
       const t = tpls.get(a.nome);
       if (naFonte((a.x + t.d / 2) / s, (a.y + t.d / 2) / s, meuTime === 100 ? 200 : 100) && a.score < 0.85) continue;
-      tomados.add(a.nome);
+      tomados.add(a.nome); ultimaVez.set(a.nome, agora);
       rastros.set(a.nome, { x: a.x, y: a.y, em: agora });
       vistos.push({ campeao: a.nome, x: (a.x + t.d / 2) / s, y: (a.y + t.d / 2) / s, score: Math.round(a.score * 100) / 100 });
       if (a.score >= 0.85) aprenderCor('inimigo', a.cor);
@@ -896,11 +913,13 @@ async function quadro() {
     const semRastro = soltos.filter((j) => !rastros.has(j.campeao));
     // todo mundo sem rastro procura o mapa todo a cada quadro (5 ms cada): a mancha vermelha é só atalho —
     // com 100+ blocos vermelhos/azuis (torres, minions, rio) o corte de 14 manchas deixava metade de fora
-    const daVez = new Set((LEVE ? semRastro.slice(rodada % Math.max(1, semRastro.length)).slice(0, 2) : semRastro).map((j) => j.campeao));
+    const sumidoHa = (nome) => agora - (ultimaVez.get(nome) ?? 0);
+    const buscaCheia = semRastro.filter((j) => sumidoHa(j.campeao) < 4000 || (rodada + j.campeao.length) % 4 === 0);
+    const daVez = new Set((LEVE ? buscaCheia.slice(rodada % Math.max(1, buscaCheia.length)).slice(0, 2) : buscaCheia).map((j) => j.campeao));
     for (const j of soltos) {
       const t = tpls.get(j.campeao); if (!t) continue;
       const p = procurar(m, rgba, s, t, j.campeao, agora, daVez.has(j.campeao), []);
-      if (p) { vistos.push({ campeao: j.campeao, x: p.x, y: p.y, score: p.score }); if (p.crua >= 0.85) aprenderCor('inimigo', p.cor); }
+      if (p) { vistos.push({ campeao: j.campeao, x: p.x, y: p.y, score: p.score }); ultimaVez.set(j.campeao, agora); if (p.crua >= 0.85) aprenderCor('inimigo', p.cor); }
     }
     // dois ícones no mesmo lugar: fica o de maior score
     const limpos = vistos.filter((a) => !vistos.some((b) => b !== a && b.score > a.score && Math.hypot(a.x - b.x, a.y - b.y) < 0.03));

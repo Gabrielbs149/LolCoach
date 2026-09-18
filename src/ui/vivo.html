@@ -526,14 +526,20 @@ function desenhar(d){
 
 // Redesenha só quando algo mudou: reescrever o DOM inteiro a cada 2s com o
 // jogo rodando é trabalho de GPU que o jogo prefere ter pra ele.
+let ultimoDesenho = 0;
 let ultimoJson = '';
 async function tick(){
   if (document.visibilityState !== 'visible') return;
   try {
     const d = await fetch('/api/vivo').then(r => r.json());
-    const json = JSON.stringify(d);
-    if (json === ultimoJson) return;
-    ultimoJson = json;
+    // Remontar o DOM inteiro custa: só quando muda algo que a tela mostra de verdade (fala nova, situação,
+    // fase, morte, item, objetivo virando), ou a cada 4 s pra atualizar os contadores. O relógio é atualizado à parte.
+    const chave = JSON.stringify([d.emJogo, d.selecao && [d.selecao.fase, d.selecao.meuCampeao, d.selecao.inimigos?.length, d.selecao.aliados?.length, d.selecao.sugestao?.fala?.serio, d.selecao.sugestao?.travado, d.selecao.sugestao?.escolhido, d.selecao.intel?.lista?.length],
+      d.falas?.at(-1)?.seq, d.situacoes?.at(-1)?.t, d.conselhos?.length, d.estado?.eu && [d.estado.eu.morto, d.estado.eu.nivel, (d.estado.eu.itens ?? []).length, d.estado.eu.kills, d.estado.eu.mortes],
+      d.estado?.jogadores?.map((j) => [j.morto, j.nivel, j.kills, j.mortes]), d.objetivos?.map((o) => [o.nome, o.vivo]), d.flashes?.length, d.flashesAliados?.length, d.ultimaPartida?.pasta, d.olho?.ligado]);
+    const agora = Date.now();
+    if (chave === ultimoJson && agora - (ultimoDesenho ?? 0) < 4000) { const rel = document.querySelector('.relogio'); if (rel && d.estado?.tempo != null) rel.firstChild.nodeValue = mmss(d.estado.tempo); return; }
+    ultimoJson = chave; ultimoDesenho = agora;
     desenhar(d);
     if (d.emJogo) { pastaSituAtual = d.pastaSitu ?? pastaSituAtual; } ultimoDado = d;
     ajustarRitmo(!!d.emJogo);
