@@ -218,7 +218,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   // jungler deles prestes a nascer (a API dá o tempo de respawn)
   if (jg) {
     const jj = estado.jogadores.find((x) => x.nome === jg.nome);
-    if (jj?.morto && jj.renasceEm > 0 && jj.renasceEm <= 10) situ(`jg-nasce-${Math.floor(t / 30)}`, { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles nasce em ${Math.round(jj.renasceEm)} segundos.`, cooldown: 25 });
+    if (jj?.morto && jj.renasceEm > 0 && jj.renasceEm <= 10) situ('jg-nasce', { tipo: 'jungler', prioridade: 1, modulo: 'jungler', serio: F`Jungler deles nasce em ${Math.round(jj.renasceEm)} segundos.`, cooldown: 25 });   // chave fixa: com o bloco de 30 s virava dupla (954 e 960 s)
   }
   // lado do jungler pela chegada do duo deles (leash)
   if (!mundo.duo.dito && t >= 95 && t < 200) {
