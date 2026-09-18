@@ -3206,10 +3206,12 @@ function desenharSkins(){
     ${cartao('Patcher', d.patcher ? `<span class="v">ligado</span>` : 'parado', d.patcher ? esc(d.patcher.mod) : 'sobe sozinho quando você trava o campeão')}
     ${cartao('Skins', String(d.mods.length), `${Object.keys(d.porCampeao ?? {}).length} campeões com skin escolhida`)}
   </div>
+  ${d.ultimoErroPatcher ? `<div class="aviso" style="margin-top:10px"><b>A skin não está aplicando:</b> a ferramenta (cslol-dll) não engancha nesta versão do jogo — a última versão oficial do cslol-manager é de abril e o LoL mudou. O próprio Rose não distribui essa DLL (DMCA); quem tem o Rose funcionando pode apontar a pasta dele em "Usar ferramenta de outra pasta".<div class="sub">${esc(d.ultimoErroPatcher.linha)}</div></div>` : ''}
   <div class="skBarra">
     <label class="skLigar"><input type="checkbox" ${d.ativo ? 'checked' : ''} onchange="skLigar(this.checked)"> aplicar skin ao travar o campeão</label>
     ${d.instalado ? `<button class="acao" onclick="skAcao('/api/skins/instalar')">Atualizar cslol-tools</button>` : `<button class="acao" onclick="skAcao('/api/skins/instalar')" ${d.instalando ? 'disabled' : ''}>Instalar cslol-tools (≈37 MB)</button>`}
     ${d.patcher ? `<button class="acao" onclick="skAcao('/api/skins/parar')">Parar patcher</button>` : ''}
+    <button class="acao" onclick="skAcao('/api/skins/escolher-ferramenta')" title="copia mod-tools.exe e cslol-dll.dll de uma pasta sua (ex.: a instalação do Rose)">Usar ferramenta de outra pasta</button>
   </div>`;
   $('#skImport').innerHTML = `<div class="skZona" id="skZona" ondragover="event.preventDefault(); this.classList.add('sobre')" ondragleave="this.classList.remove('sobre')" ondrop="skSoltar(event)">
     <div class="skZonaTexto"><b>Arrasta aqui</b> os arquivos ou a pasta inteira de skins (.fantome / .zip)</div>

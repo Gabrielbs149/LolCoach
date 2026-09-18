@@ -194,11 +194,50 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
     patcherDesde = Date.now(); patcherMod = nomeMod;
     const eco = (b) => { const t = String(b).trim(); if (t && !/^\[DLL\]|^\s*$/.test(t)) log(`skins: ${t.split('\n').at(-1).slice(0, 140)}`); };
     patcher.stdout.on('data', eco); patcher.stderr.on('data', eco);
-    patcher.on('exit', (code) => { if (patcherMod === nomeMod) { log(`skins: patcher fechou (${code})`); patcher = null; } });
+    patcher.on('exit', (code) => { if (patcherMod === nomeMod) { log(`skins: patcher fechou (${code})`); patcher = null; } conferirLogDoPatcher(); });
+    // o log do overlay (escrito pela DLL dentro do jogo) diz se enganchou: "ah_result != 0" = ferramenta velha pra esta versão do jogo
+    setTimeout(conferirLogDoPatcher, 45_000);
     log(`skins: "${nomeMod}" pronta pra ${campeao} — patcher esperando o jogo abrir`);
     return { mod: nomeMod };
   }
 
+  let ultimoErroPatcher = null;
+  async function conferirLogDoPatcher() {
+    try {
+      const txt = await readFile(join(pastaOverlay(), 'log.txt'), 'utf8');
+      if (/ah_result != 0|error:/i.test(txt)) {
+        const linha = txt.split(/\r?\n/).find((l) => /error:/i.test(l)) ?? 'erro';
+        if (ultimoErroPatcher?.linha !== linha) log('skins: a ferramenta NÃO enganchou no jogo (cslol-dll velha pra esta versão do LoL) — a skin não foi aplicada');
+        ultimoErroPatcher = { em: Date.now(), linha: linha.slice(0, 160) };
+      } else if (/Init in process/i.test(txt)) ultimoErroPatcher = null;
+    } catch { /* sem log ainda */ }
+  }
+  /** Usa a ferramenta de outra pasta (ex.: a instalação do Rose do próprio usuário, que tem mod-tools + cslol-dll mais novos). */
+  async function usarFerramentaDe({ pasta }) {
+    if (!pasta) throw new Error('pasta?');
+    const achar = async (dir, nome, prof = 0) => {
+      if (prof > 4) return null;
+      for (const n of await readdir(dir).catch(() => [])) {
+        const c = join(dir, n); let st; try { st = await stat(c); } catch { continue; }
+        if (st.isFile() && n.toLowerCase() === nome) return c;
+        if (st.isDirectory()) { const r = await achar(c, nome, prof + 1); if (r) return r; }
+      }
+      return null;
+    };
+    const exe = await achar(pasta, 'mod-tools.exe'), dll = await achar(pasta, 'cslol-dll.dll');
+    if (!exe || !dll) throw new Error(`não achei ${!exe ? 'mod-tools.exe' : 'cslol-dll.dll'} nessa pasta (procurei até 4 níveis)`);
+    await mkdir(pastaTools(), { recursive: true });
+    await copyFile(exe, join(pastaTools(), 'mod-tools.exe'));
+    await copyFile(dll, join(pastaTools(), 'cslol-dll.dll'));
+    // runtime do C++ que o mod-tools do Rose precisa, se estiver ao lado
+    for (const n of ['MSVCP140.dll', 'VCRUNTIME140.dll', 'VCRUNTIME140_1.dll', 'ucrtbase.dll']) { const f = await achar(pasta, n.toLowerCase()); if (f) await copyFile(f, join(pastaTools(), n)).catch(() => {}); }
+    const hashes = await achar(pasta, 'hashes.game.txt'); if (hashes) await copyFile(hashes, join(pastaTools(), 'hashes.game.txt')).catch(() => {});
+    const dt = (await stat(dll)).mtime.toISOString().slice(0, 10);
+    await writeFile(join(pastaTools(), 'version.txt'), `Version: manual (${dt}, de ${basename(dirname(exe))})`);
+    ultimoErroPatcher = null;
+    log(`skins: usando mod-tools + cslol-dll de ${dirname(exe)} (dll de ${dt})`);
+    return { ok: true, versao: await versaoInstalada() };
+  }
   async function parar() {
     if (!patcher) return;
     try { patcher.kill(); } catch { /* já morreu */ }
@@ -234,9 +273,9 @@ export function criarSkins({ config, salvarConfig, log = () => {}, lcu = null })
       jogo: pastaDoJogo(), ativo: config.skins?.ativo !== false,
       mods, porCampeao: config.skins?.porCampeao ?? {},
       patcher: patcher ? { mod: patcherMod, desde: patcherDesde } : null,
-      importando, ultimaImportacao,
+      importando, ultimaImportacao, ultimoErroPatcher,
     };
   }
 
-  return { instalar, importar, importarPastas, remover, escolher, aplicar, parar, estado, instalado };
+  return { instalar, importar, importarPastas, remover, escolher, aplicar, parar, estado, instalado, usarFerramentaDe };
 }

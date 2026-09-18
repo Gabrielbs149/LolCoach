@@ -195,6 +195,13 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.skinsImportar({ nome: url.searchParams.get('nome') ?? 'mod', corpo: Buffer.concat(pedacos) }))); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
+      if (req.method === 'POST' && url.pathname === '/api/skins/escolher-ferramenta' && acoes.skinsEscolherFerramenta) {
+        try {
+          const pasta = await acoes.skinsEscolherFerramenta();
+          if (!pasta) return enviar(200, 'application/json', JSON.stringify({ cancelado: true }));
+          return enviar(200, 'application/json', JSON.stringify(await acoes.skinsUsarFerramenta({ pasta })));
+        } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       if (req.method === 'POST' && url.pathname === '/api/skins/escolher-pastas' && acoes.skinsEscolherPastas) {
         try {
           const pastas = await acoes.skinsEscolherPastas();

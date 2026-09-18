@@ -104,6 +104,11 @@ async function skinsEscolherPastas() {
   const r = await dialog.showOpenDialog(janela ?? undefined, { title: 'Pastas com skins (.fantome / .zip) — pode marcar várias', properties: ['openDirectory', 'multiSelections'] });
   return r.canceled ? [] : r.filePaths;
 }
+async function skinsEscolherFerramenta() {
+  if (faseAtual === 'InProgress') return null;
+  const r = await dialog.showOpenDialog(janela ?? undefined, { title: 'Pasta que tem mod-tools.exe e cslol-dll.dll (ex.: a instalação do Rose)', properties: ['openDirectory'] });
+  return r.canceled ? null : r.filePaths[0];
+}
 function ligarAtualizacao() {
   if (!app.isPackaged) return;
   autoUpdater.autoDownload = true;
@@ -513,7 +518,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado, skinsEscolherPastas },
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado, skinsEscolherPastas, skinsEscolherFerramenta },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.
