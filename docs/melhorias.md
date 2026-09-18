@@ -134,3 +134,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.137 — Perfil: embaixo do elo, quanto falta pra subir — "Faltam 84 PDL pra o próximo tier: 4 vitórias seguidas ou ~20 jogos no seu ritmo (39%)" (ou "no ritmo atual não sobe", quando o winrate não paga).
 - v2.28.138 — Na primeira abertura do dia, notificação "Ontem no LoL: 3V 6D em 9 jogos · mais jogado: Caitlyn (3) — detalhes em Estatísticas → Tendências" (só com 3+ jogos no dia anterior, uma vez por dia).
 - v2.28.139 — Configuração → Avançado mostra "O que mudou" (as últimas 15 versões deste arquivo, que agora vai junto no instalador) — a rapaziada vê o que entrou sem perguntar.
+- v2.28.140 — Painel escondido há 10 min solta a janela (um processo do Chromium e ~100 MB a menos enquanto a pessoa joga); a bandeja, o clique duplo e o Num8 recriam na hora. Nunca durante partida.

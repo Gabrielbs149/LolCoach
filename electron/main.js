@@ -98,7 +98,7 @@ async function diagnostico() {
 }
 async function backup() {
   if (faseAtual === 'InProgress') return { erro: 'espera acabar a partida' };
-  const r = await dialog.showOpenDialog(janela, { title: 'Onde guardar o backup', properties: ['openDirectory', 'createDirectory'] });
+  const r = await dialog.showOpenDialog(janela && !janela.isDestroyed() ? janela : undefined, { title: 'Onde guardar o backup', properties: ['openDirectory', 'createDirectory'] });
   if (r.canceled || !r.filePaths[0]) return { cancelado: true };
   const carimbo = new Date().toISOString().slice(0, 10);
   const destino = join(r.filePaths[0], `LolCoach-backup-${carimbo}`);
@@ -112,7 +112,7 @@ async function backup() {
 }
 async function restaurar() {
   if (faseAtual === 'InProgress') return { erro: 'espera acabar a partida' };
-  const r = await dialog.showOpenDialog(janela, { title: 'Pasta do backup (LolCoach-backup-…)', properties: ['openDirectory'] });
+  const r = await dialog.showOpenDialog(janela && !janela.isDestroyed() ? janela : undefined, { title: 'Pasta do backup (LolCoach-backup-…)', properties: ['openDirectory'] });
   if (r.canceled || !r.filePaths[0]) return { cancelado: true };
   const origem = r.filePaths[0];
   const tem = (await readdir(origem).catch(() => [])).includes('config.json');
@@ -218,6 +218,12 @@ function criarJanela({ esconder = false } = {}) {
     e.preventDefault();       // fechar a janela só esconde: o daemon continua
     janela.hide();
   });
+  // Painel escondido há 10 min: solta o renderer (~100 MB de RAM e um processo a menos enquanto ele joga);
+  // a bandeja/Num8 recriam na hora. Nunca durante partida (não mexe em janela com o jogo aberto).
+  let soltar = null;
+  janela.on('hide', () => { clearTimeout(soltar); soltar = setTimeout(() => { if (janela && !janela.isDestroyed() && !janela.isVisible() && faseAtual !== 'InProgress' && !app.saindo) { janela.destroy(); janela = null; painelPendente = false; } }, 10 * 60 * 1000); });
+  janela.on('show', () => clearTimeout(soltar));
+  janela.on('closed', () => { clearTimeout(soltar); if (janela && janela.isDestroyed()) janela = null; });
 }
 
 /**
@@ -440,7 +446,8 @@ function acoesDasTeclas() {
     bom: () => { if (endereco) fetch(`${endereco}/api/situacoes/avaliar-ultima?nota=1`, { method: 'POST' }).catch(() => {}); },
     ruim: () => { if (endereco) fetch(`${endereco}/api/situacoes/avaliar-ultima?nota=-1`, { method: 'POST' }).catch(() => {}); },
     painel: () => {
-      if (!janela || janela.isDestroyed() || faseAtual === 'InProgress') return;
+      if (faseAtual === 'InProgress') return;
+      if (!janela || janela.isDestroyed()) { criarJanela(); return; }   // painel solto por inatividade: recria
       if (janela.isVisible() && janela.isFocused()) janela.hide(); else { janela.show(); janela.focus(); }
     },
   };
