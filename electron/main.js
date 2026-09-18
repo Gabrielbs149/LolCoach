@@ -446,6 +446,8 @@ function acoesDasTeclas() {
 }
 /** Chamado pelo servidor local quando o vigia vê uma tecla: "flash3", "overlay", "painel". */
 function teclaApertada(acao) {
+  const nl = String(acao).match(/^numlock-(\d)$/);
+  if (nl) { const ligado = nl[1] === '1'; estado.set('numlock', ligado); if (!ligado) estado.log('NumLock DESLIGADO: as teclas Num1–9 do app não funcionam até ligar'); return { ok: true }; }
   const f = acoesDasTeclas();
   const flash = String(acao).match(/^flash(\d)$/);
   if (flash) return f.flash(Number(flash[1]));

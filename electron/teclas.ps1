@@ -14,6 +14,7 @@ using System;
 using System.Runtime.InteropServices;
 public static class Tecla {
   [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vk);
+  [DllImport("user32.dll")] public static extern short GetKeyState(int vk);
 }
 "@
 
@@ -46,7 +47,15 @@ if ($mapa.Count -eq 0) { exit 0 }
 
 $apertada = @{}
 $web = New-Object System.Net.WebClient
+$numlock = -1
+$ciclo = 0
 while ($true) {
+  # NumLock desligado = Num1..9 viram End/Seta e as teclas do app não funcionam: avisa o app quando mudar (a cada ~2 s)
+  $ciclo++
+  if ($ciclo % 80 -eq 0) {
+    $nl = ([Tecla]::GetKeyState(0x90) -band 1)
+    if ($nl -ne $numlock) { $numlock = $nl; try { $web.UploadString("http://127.0.0.1:$Porta/api/tecla?acao=numlock-$nl", 'POST', '') | Out-Null } catch {} }
+  }
   foreach ($acao in @($mapa.Keys)) {
     $d = $mapa[$acao]
     $agora = ([Tecla]::GetAsyncKeyState($d.vk) -band 0x8000) -ne 0

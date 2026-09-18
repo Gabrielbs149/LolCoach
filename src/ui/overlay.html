@@ -102,7 +102,7 @@ function jgLinha(d){
 }
 // Olho cego: outra janela na frente do jogo (o olho lê a tela, não o jogo)
 function linhaAvaliada(d){ const a = d.olho?.avaliada; return a ? `<div class="jg" style="font-size:11px;color:var(--fraco)"><span></span><span>${a.nota === 1 ? '👍' : '👎'} ${esc(a.texto)}</span></div>` : ''; }
-function linhaCego(d){ return d.olho?.cego ? `<div class="jg perigo"><span></span><span>Olho cego: <b>janela na frente do jogo</b></span></div>` : ''; }
+function linhaCego(d){ return (d.olho?.cego ? `<div class="jg perigo"><span></span><span>Olho cego: <b>janela na frente do jogo</b></span></div>` : '') + (d.numlock === false ? `<div class="jg perigo"><span></span><span><b>NumLock desligado</b> — Num1–9 não funcionam</span></div>` : ''); }
 let escalaAtual = 1, ajuste = false;
 /* ---- modo ajuste: arrastar, redimensionar, escala ---- */
 async function lerAjuste(){

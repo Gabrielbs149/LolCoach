@@ -881,6 +881,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       // O olho: minimapa achado? onde cada um foi visto pela última vez.
       olho: resumoDoOlho(estado, objs),
       overlayEscala: Number(config.overlay?.escala) || 1,
+      numlock: estado?.instantaneo?.().numlock ?? null,
       overlayRadar: config.overlay?.radar ?? 'm',
       // pro radar: aliados vistos agora pelo olho e eu
       radarNossos: (() => { const o = partidaVivo.olho; if (!o || Date.now() - o.recebidoEm > 5000) return []; const l = (o.aliados ?? []).map((a) => ({ campeao: a.campeao, x: a.x, y: a.y })); if (o.eu) l.push({ campeao: estado.eu.campeao, x: o.eu.x, y: o.eu.y, eu: true }); return l; })(),

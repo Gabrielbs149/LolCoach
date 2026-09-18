@@ -465,6 +465,7 @@ function desenhar(d){
 
   const e = d.estado, eu = e.eu;
   const meuTime = e.jogadores.filter(j => j.time === eu.time);
+  const avisoNumlock = d.numlock === false ? `<div class="conselho u3"><b>NumLock desligado</b> — as teclas Num1–9 (flash, avaliar, overlay) não funcionam até ligar.</div>` : '';
   const deles = e.jogadores.filter(j => j.time !== eu.time);
   const vidaPct = eu.vidaMax ? Math.round(eu.vida / eu.vidaMax * 100) : null;
 
@@ -492,6 +493,7 @@ function desenhar(d){
     ${vidaPct !== null ? `<div class="vida ${vidaPct < 35 ? 'baixa' : ''}"><i style="width:${vidaPct}%"></i></div>` : ''}
     <main class="largo">
       <div class="col">
+      ${avisoNumlock}
       ${d.conselhos.length
         ? d.conselhos.slice(0, 4).map(c => `<div class="conselho u${c.urgencia}">
             <div class="cab"><h3>${esc(c.titulo)}</h3><span class="etiqueta">${URGENTE[c.urgencia] ?? ''}</span>
