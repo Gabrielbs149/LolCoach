@@ -134,6 +134,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         contas: [...new Set([eu.conta, ...Object.entries(tags).map(([n, tg]) => `${n}#${tg}`)].filter(Boolean))],
         so: Number(versaoDoWindows().split('.')[2]) >= 22000 ? 'Windows 11' : 'Windows 10', partidas,
         uso, registro: (estado?.instantaneo?.().log ?? []).slice(0, 40).map((l) => `${String(l.em).slice(11, 19)} ${l.texto}`),
+        // pra diagnosticar de longe: há quanto tempo o app está aberto, em que fase o client está e se tem atualização parada
+        ligadoHa: Math.round(process.uptime()), fase: estado?.instantaneo?.().fase ?? null, atualizacao: estado?.instantaneo?.().atualizacao ?? null,
+        olho: config.olho?.ligado === false ? 'off' : config.olho?.leve ? 'leve' : 'ligado', voz: config.voz?.motor ?? 'edge',
       });
     } catch (erro) {
       log(`controle: não consegui me apresentar (${erro.message})`);

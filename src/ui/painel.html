@@ -2697,7 +2697,7 @@ function desenharAdmin(){
         <td class="sub" title="${esc(u.vistoEm ?? '')}">${u.vistoEm ? haQuanto(u.vistoEm) : '—'}</td>
         <td>${num(u.partidas ?? 0)}</td>
         <td class="sub">${u.uso ? `${u.uso.aceitas ?? 0} · ${u.uso.travadas ?? 0} · ${u.uso.banidas ?? 0}` : '—'}</td>
-        <td class="sub">${esc(u.so ?? '—')}</td>
+        <td class="sub">${esc(u.so ?? '—')}${u.ligadoHa != null ? `<div>aberto há ${u.ligadoHa >= 3600 ? Math.round(u.ligadoHa / 3600) + ' h' : Math.round(u.ligadoHa / 60) + ' min'}${u.fase ? ' · ' + esc(u.fase) : ''}${u.atualizacao?.pronta ? ' · <span class="aviso">' + esc(u.atualizacao.pronta) + ' pronta, não instalou</span>' : u.atualizacao?.baixando ? ' · baixando ' + esc(String(u.atualizacao.baixando)) : ''}${u.olho ? ' · olho ' + esc(u.olho) : ''}</div>` : ''}</td>
         <td><span class="estadoU ${cls}">${rot}</span></td>
         <td><div class="acoesU">
           ${st === 'bloqueado' ? `<button onclick="liberar('${esc(u.id)}')">Liberar</button>`
