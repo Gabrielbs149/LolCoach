@@ -558,7 +558,7 @@ app.whenReady().then(async () => {
   criarJanela({ esconder: true });
   criarBandeja();
   ligarInicioComWindows(daemon?.config?.iniciarComWindows !== false);
-  if (ABERTO_PELO_WINDOWS) { painelPendente = false; estado.log('aberto junto com o Windows — fica na bandeja'); }
+  if (ABERTO_PELO_WINDOWS) { painelPendente = false; estado.log('aberto junto com o Windows — fica na bandeja'); setTimeout(() => { if (janela && !janela.isDestroyed() && !janela.isVisible() && faseAtual !== 'InProgress') { janela.destroy(); janela = null; } }, 10 * 60 * 1000); }
   ligarAtualizacao();
   registrarAtalhos(daemon.config);
   prepararCaptura();
