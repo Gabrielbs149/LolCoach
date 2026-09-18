@@ -1550,7 +1550,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       conta: nome, desde,
       hoje: { jogos: deHoje.length, vitorias: deHoje.filter((p) => p.venci).length, seguidas,
         saldoPdl: antesDeHoje && ultimo ? pontos(ultimo) - pontos(antesDeHoje) : null },
-      curva: curva.slice(-60).map((h) => ({ em: h.em, pontos: pontos(h), tier: h.tier, rank: h.rank, pdl: h.pdl })),
+      // só as leituras em que o PDL mudou (o resto é a mesma linha repetida a cada 10 min), últimos 30 dias
+      curva: (() => { const corte = new Date(Date.now() - 30 * 86400_000).toISOString(); const saida = []; for (const h of curva) { const p = pontos(h); if (h.em < corte && saida.length) continue; if (saida.length && saida.at(-1).pontos === p) { saida.at(-1).em = h.em; continue; } saida.push({ em: h.em, pontos: p, tier: h.tier, rank: h.rank, pdl: h.pdl }); } return saida.slice(-80); })(),
     };
   }
 
@@ -1942,6 +1943,25 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * o limite da chave. `conta` é a sua conta nas telas: vira o "você" da
    * comparação, com a tag lembrada de quando logou no client.
    */
+  /**
+   * Convida um amigo pro lobby pelo client: acha o summonerId pelo riot id (alias), cria um lobby de solo/duo se
+   * não tem nenhum e manda o convite. Só funciona com quem é amigo no LoL (regra do client).
+   */
+  async function convidarAmigo({ nome, tag } = {}) {
+    if (!lcu.conectado) throw new Error('client fechado');
+    if (!nome || !tag) throw new Error('amigo?');
+    const fase = estado?.instantaneo?.().fase;
+    if (['ChampSelect', 'InProgress', 'GameStart', 'Matchmaking', 'ReadyCheck'].includes(fase)) throw new Error('espera sair da fila/partida');
+    let alias = await lcu.get(`/lol-summoner/v1/alias/lookup?gameName=${encodeURIComponent(nome)}&tagLine=${encodeURIComponent(tag)}`).catch(() => null);
+    if (!alias) alias = await lcu.get(`/lol-summoner/v1/summoners?name=${encodeURIComponent(nome + "#" + tag)}`).catch(() => null);   // clients mais antigos
+    const summonerId = alias?.summonerId ?? alias?.[0]?.summonerId ?? null, puuid = alias?.puuid ?? alias?.[0]?.puuid ?? null;
+    if (!summonerId && !puuid) throw new Error('não achei essa conta no client');
+    const lobby = await lcu.get('/lol-lobby/v2/lobby').catch(() => null);
+    if (!lobby?.gameConfig) { await lcu.post('/lol-lobby/v2/lobby', { queueId: 420 }); await new Promise((r) => setTimeout(r, 800)); }
+    await lcu.post('/lol-lobby/v2/lobby/invitations', [summonerId ? { toSummonerId: summonerId } : { toPuuid: puuid }]);
+    log(`convite pro lobby: ${nome}#${tag}`);
+    return { ok: true };
+  }
   async function amigos({ conta } = {}) {
     const { perfilDeAmigo } = await import('./dados/amigos.js');
     const soDisco = { ...config.riot, apiKey: null };
@@ -2032,7 +2052,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     campeoes, lerConfig, salvarConfig, vivo,
     perfil, estatisticas, sugestoes, patchLista, patchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
-    amigos, amigoPerfil, adicionarAmigo, removerAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
+    amigos, amigoPerfil, adicionarAmigo, removerAmigo, convidarAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
     adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesDe, avaliarSituacao, avaliarUltima, overlayTamanho, situacoesResumo,
     imagemItem: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeItem, 'image/png')(id),
     imagemRuna: async (id) => imagem((await import('./dados/ddragon.js')).imagemDeRuna, 'image/png')(id),

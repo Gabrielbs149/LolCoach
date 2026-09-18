@@ -186,6 +186,10 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       if (url.pathname === '/api/overlay/ajustar' && acoes.overlayAjustar) return enviar(200, 'application/json', JSON.stringify(acoes.overlayAjustar({ ligar: url.searchParams.get('ligar') })));
       if (url.pathname === '/api/overlay/mover' && acoes.overlayMover) return enviar(200, 'application/json', JSON.stringify(acoes.overlayMover(Object.fromEntries(url.searchParams))));
       if (url.pathname === '/api/overlay/estado' && acoes.overlayEstado) return enviar(200, 'application/json', JSON.stringify(acoes.overlayEstado()));
+      if (req.method === 'POST' && url.pathname === '/api/amigos/convidar' && acoes.convidarAmigo) {
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes.convidarAmigo({ nome: url.searchParams.get('nome'), tag: url.searchParams.get('tag') }))); }
+        catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
       if (req.method === 'POST' && url.pathname === '/api/overlay/tamanho' && acoes.overlayTamanho) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.overlayTamanho(Object.fromEntries(url.searchParams)))); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
@@ -260,7 +264,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
-      if (req.method === 'POST' && (url.pathname === '/api/backup' || url.pathname === '/api/restaurar')) {
+      if (req.method === 'POST' && (url.pathname === '/api/backup' || url.pathname === '/api/restaurar' || url.pathname === '/api/diagnostico')) {
         const fn = acoes[url.pathname.slice(5)];
         if (!fn) return enviar(404, 'application/json', JSON.stringify({ erro: 'só no app instalado' }));
         try { return enviar(200, 'application/json', JSON.stringify(await fn())); }

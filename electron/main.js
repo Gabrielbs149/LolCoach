@@ -1,5 +1,6 @@
+import os from 'node:os';
 import { app, BrowserWindow, Tray, Menu, shell, nativeImage, Notification, dialog, globalShortcut, screen, session, desktopCapturer } from 'electron';
-import { cp, mkdir, readdir } from 'node:fs/promises';
+import { cp, mkdir, readdir, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -68,6 +69,31 @@ async function atualizarAgora() {
  */
 const pastaDados = () => process.env.LOLCOACH_DIR ?? process.env.PORTABLE_EXECUTABLE_DIR ?? process.cwd();
 const ARQUIVOS_BACKUP = ['config.json', 'dados/partidas.db', 'dados/contas.json', 'dados/uso.json'];
+/**
+ * Diagnóstico pra suporte: um .txt na Área de Trabalho com versão, sistema, config SEM chaves, o registro do app,
+ * as fases recentes e a última partida gravada (contagens). Quem tem problema manda esse arquivo pro Gabriel.
+ */
+async function diagnostico() {
+  const semChaves = (o) => JSON.parse(JSON.stringify(o ?? {}, (k, v) => (/apiKey|token|senha|password/i.test(k) ? '***' : v)));
+  const linhas = [];
+  linhas.push(`LolCoach ${app.getVersion()} · ${process.platform} ${process.arch} · Windows ${os.release()} · ${os.cpus()[0]?.model ?? ''} (${os.cpus().length} núcleos) · RAM ${Math.round(os.totalmem() / 1e9)} GB`);
+  linhas.push(`gerado em ${new Date().toISOString()} · fase ${faseAtual ?? '?'} · pasta ${pastaDados()}`);
+  linhas.push('', '== config (sem chaves) ==', JSON.stringify(semChaves(daemon?.config), null, 1));
+  const inst = estado?.instantaneo?.() ?? {};
+  linhas.push('', '== estado ==', JSON.stringify({ fase: inst.fase, conta: inst.conta, versao: inst.versao, controle: inst.controle, atualizacao: inst.atualizacao }, null, 1));
+  linhas.push('', '== registro (últimas 300 linhas) ==', ...(inst.log ?? []).slice(0, 300).reverse().map((l) => `${l.em} ${l.texto}`));
+  try {
+    const base = join(pastaDados(), 'dados', 'situacoes');
+    const pastas = (await readdir(base)).sort().slice(-3);
+    linhas.push('', '== últimas partidas gravadas ==');
+    for (const p of pastas) { const arqs = await readdir(join(base, p)).catch(() => []); linhas.push(`${p}: ${arqs.join(', ')}`); }
+  } catch { /* sem gravações */ }
+  const destino = join(app.getPath('desktop'), `LolCoach-diagnostico-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.txt`);
+  await writeFile(destino, linhas.join('\n'), 'utf8');
+  estado.log(`diagnóstico salvo em ${destino}`);
+  shell.showItemInFolder(destino);
+  return { ok: true, arquivo: destino };
+}
 async function backup() {
   if (faseAtual === 'InProgress') return { erro: 'espera acabar a partida' };
   const r = await dialog.showOpenDialog(janela, { title: 'Onde guardar o backup', properties: ['openDirectory', 'createDirectory'] });
@@ -507,7 +533,7 @@ app.whenReady().then(async () => {
     });
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
-      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },
+      acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, diagnostico, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },
     }));
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.

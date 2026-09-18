@@ -887,6 +887,7 @@ button.acao{box-shadow:0 1px 0 rgba(0,0,0,.35)} button.acao:hover:not(:disabled)
 h2{letter-spacing:1px}
 .vazio{border-style:dashed}
 ::selection{background:#3a3220;color:var(--ouro-claro)}
+.acoesA .convidar{border-color:rgba(120,200,100,.5);color:var(--vit,#9c6)}
 </style>
 </head>
 <body>
@@ -1222,6 +1223,7 @@ h2{letter-spacing:1px}
         <button class="acao" data-acao="reprocessar">Reprocessar detectores</button>
         <button class="acao" onclick="backupApp(this, 'backup')">Fazer backup</button>
         <button class="acao" onclick="backupApp(this, 'restaurar')">Restaurar backup</button>
+        <button class="acao" onclick="backupApp(this, 'diagnostico')" title="gera um .txt na Área de Trabalho com versão, config (sem chaves) e o registro — manda pro Gabriel quando algo não funcionar">Diagnóstico pra suporte</button>
         <button class="acao" data-acao="aplicarBuildsNoLol" title="grava na loja do jogo um conjunto de itens por campeão, vindo do op.gg. Precisa do League aberto. Leva uns 2 minutos.">Aplicar builds no LoL</button>
       </div>
       <pre class="log" id="log"></pre>
@@ -1443,10 +1445,13 @@ function curvaPdl(curva){
   const W = 330, H = 90, m = 8;
   const ys = pts.map(x => x.pontos), min = Math.min(...ys), max = Math.max(...ys), amp = Math.max(max - min, 40), meio = (min + max) / 2;
   // Curva centrada: sem mudança de PDL a linha fica no meio, não colada embaixo.
-  const X = (i) => m + i * (W - 2*m) / (pts.length - 1), Y = (v) => H / 2 - (v - meio) / amp * (H - 2*m);
+  // eixo x pelo TEMPO (dias), não pelo índice: dois jogos no mesmo dia ficam juntos, uma semana parada fica um vão
+  const t0 = Date.parse(pts[0].em), t1 = Date.parse(pts.at(-1).em), span = Math.max(t1 - t0, 3600_000);
+  const X = (i) => m + (Date.parse(pts[i].em) - t0) / span * (W - 2*m), Y = (v) => H / 2 - (v - meio) / amp * (H - 2*m);
   const linha = pts.map((x, i) => `${X(i).toFixed(1)},${Y(x.pontos).toFixed(1)}`).join(' ');
   const ult = pts.at(-1), delta = ult.pontos - pts[0].pontos;
-  return `<div class="curva"><div class="rot">PDL na solo · últimas ${pts.length} leituras <b class="${delta>=0?'v':'d'}" style="float:right">${delta>=0?'+':''}${delta}</b></div>
+  const dias = Math.max(1, Math.round(span / 86400_000));
+  return `<div class="curva"><div class="rot">PDL na solo · ${dias === 1 ? 'hoje' : 'últimos ' + dias + ' dias'} · ${pts.length} mudanças <b class="${delta>=0?'v':'d'}" style="float:right">${delta>=0?'+':''}${delta}</b></div>
     <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
       <polyline points="${linha}" fill="none" stroke="#c8aa6e" stroke-width="2" vector-effect="non-scaling-stroke"/>
       ${pts.map((x, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(x.pontos).toFixed(1)}" r="2.2" fill="#f0d9a8"><title>${x.tier} ${x.rank} ${x.pdl} PDL · ${dia(x.em)}</title></circle>`).join('')}
@@ -2220,6 +2225,7 @@ const pontosElo = (e) => !e ? 0 :
   (['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'].indexOf(e.tier) * 400)
   + ({IV:0,III:1,II:2,I:3}[e.rank] ?? 0) * 100 + (e.pdl ?? 0);
 
+async function convidarAmigo(ev, nome, tag){ ev.stopPropagation(); const b = ev.currentTarget; b.disabled = true; b.textContent = 'convidando…'; try { const r = await fetch(`/api/amigos/convidar?nome=${encodeURIComponent(nome)}&tag=${encodeURIComponent(tag)}`, { method: 'POST' }).then(r => r.json()); b.textContent = r.erro ? r.erro : 'convidado ✓'; } catch(e) { b.textContent = e.message; } setTimeout(() => { b.textContent = 'Convidar'; b.disabled = false; }, 4000); }
 function cartaoDeAmigo(p, { eu = false } = {}){
   const perfil = p.perfil, r = perfil?.recente, solo = eloSolo(perfil), chave = chaveAm(p);
   const taxa = r ? Math.round(r.taxa*100) : null;
@@ -2245,6 +2251,7 @@ function cartaoDeAmigo(p, { eu = false } = {}){
     <div class="acoesA">
       <button onclick="atualizarAmigo(event,'${esc(chave)}')" ${p.carregando?'disabled':''}>Atualizar</button>
       ${eu ? '' : `<button class="tirar" onclick="removerAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">Tirar</button>`}
+      ${!eu && p.online && p.online !== 'offline' ? `<button class="convidar" title="convida pro lobby de solo/duo pelo client" onclick="convidarAmigo(event,'${esc(p.nome)}','${esc(p.tag)}')">Convidar</button>` : ''}
     </div>
   </div>`;
 }
@@ -2257,7 +2264,8 @@ function desenharAmigos(){
     ? '<div class="aviso amAviso">Sem chave da Riot: só o que já foi baixado.</div>'
     : (eu && !eu.tag ? '<div class="aviso amAviso">Abre o League com essa conta uma vez pra entrar na comparação.</div>' : '');
 
-  const todos = [...(eu ? [eu] : []), ...d.amigos];
+  const peso = (p) => ({ chat: 0, away: 1, dnd: 0, mobile: 2 })[p.online] ?? 3;
+  const todos = [...(eu ? [eu] : []), ...[...d.amigos].sort((a, b) => peso(a) - peso(b))];   // quem está online vem primeiro
   $('#amGrade').innerHTML = todos.length
     ? todos.map(p => cartaoDeAmigo(p, { eu: p === eu })).join('')
     : '<div class="vazio">ninguém ainda</div>';
@@ -2672,7 +2680,7 @@ function desenharAdmin(){
 async function backupApp(botao, qual){
   const rot = botao.textContent; botao.disabled = true; botao.textContent = '…';
   let r; try { r = await fetch('/api/' + qual, { method: 'POST' }).then(x => x.json()); } catch { r = { erro: 'sem resposta' }; }
-  botao.textContent = r.ok ? (qual === 'backup' ? `salvo (${r.arquivos} arquivos)` : 'restaurado — reabrindo') : r.cancelado ? rot : (r.erro ?? 'não deu');
+  botao.textContent = r.ok ? (qual === 'backup' ? `salvo (${r.arquivos} arquivos)` : qual === 'diagnostico' ? 'salvo na Área de Trabalho' : 'restaurado — reabrindo') : r.cancelado ? rot : (r.erro ?? 'não deu');
   setTimeout(() => { botao.disabled = false; botao.textContent = rot; }, 4000);
 }
 /** Botão de atualizar: pergunta ao app e mostra a resposta no próprio botão. */
