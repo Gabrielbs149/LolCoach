@@ -255,7 +255,12 @@ export function tendencias(db, { conta = null } = {}) {
     let pior = 0; for (let i = 1; i < 4; i++) if (pa[i] - pb[i] > pa[pior] - pb[pior]) pior = i;
     if (pa[pior] - pb[pior] >= 0.08) itens.push({ chave: 'faixa', rotulo: `Mortes entre ${NOMES[pior]} min`, agora: Math.round(pa[pior] * 100) + '%', antes: Math.round(pb[pior] * 100) + '%', delta: Math.round((pa[pior] - pb[pior]) * 100), bom: false, unidade: 'pp', dica: pior === 0 ? 'morrendo cedo: respeita o level 2–3 e o primeiro gank' : pior === 1 ? 'morrendo no meio do jogo: rotação depois do primeiro item, não força' : 'morrendo tarde: uma morte aos 30 min decide o jogo; anda com o time' });
   }
-  return { jogosAgora: atual.length, jogosAntes: antes.length, itens, curvaMortes: fA.n ? fA.faixas.map((x, i) => ({ rotulo: NOMES[i], fatia: x / fA.n })) : null };
+  // campeão da semana: melhor e pior com 3+ jogos
+  const porCamp = new Map();
+  for (const j of db.prepare(`SELECT p.meuCampeao c, p.venci v ${BASE}${recorte(semana, null, conta)}`).all()) { const x = porCamp.get(j.c) ?? { campeao: j.c, jogos: 0, vitorias: 0 }; x.jogos++; x.vitorias += j.v; porCamp.set(j.c, x); }
+  const camps = [...porCamp.values()].filter((x) => x.jogos >= 3).map((x) => ({ ...x, taxa: x.vitorias / x.jogos }));
+  const campeaoSemana = camps.length >= 2 ? { melhor: camps.reduce((p, q) => (q.taxa > p.taxa ? q : p)), pior: camps.reduce((p, q) => (q.taxa < p.taxa ? q : p)) } : null;
+  return { campeaoSemana, jogosAgora: atual.length, jogosAntes: antes.length, itens, curvaMortes: fA.n ? fA.faixas.map((x, i) => ({ rotulo: NOMES[i], fatia: x / fA.n })) : null };
 }
 
 /* ----------------------------------------------------------- classes */

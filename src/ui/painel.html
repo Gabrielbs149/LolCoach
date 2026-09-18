@@ -1849,7 +1849,7 @@ async function carregarEstat(){
     $('#eTend').innerHTML = !t || t.jogosAgora < 5 ? `<div class="vazio">precisa de 5 jogos na semana (tem ${t?.jogosAgora ?? 0})</div>`
       : !t.itens.length ? '<div class="vazio">sem mudança que valha comentar</div>'
       : `<div class="cartoes">${t.itens.map(x => cartao(x.rotulo, `<span class="${x.bom ? 'v' : 'd'}">${esc(String(x.agora))}</span>`, `antes ${esc(String(x.antes))} · ${sinal(x)}${x.dica ? ' · ' + esc(x.dica) : ''}`)).join('')}</div>
-         <div class="dica" style="margin-top:6px">${t.jogosAgora} jogos na semana · ${t.jogosAntes} nas 4 semanas anteriores</div>${horarioInsight(e.atividade)}`;
+         <div class="dica" style="margin-top:6px">${t.jogosAgora} jogos na semana · ${t.jogosAntes} nas 4 semanas anteriores</div>${horarioInsight(e.atividade)}${t.campeaoSemana && t.campeaoSemana.melhor.campeao !== t.campeaoSemana.pior.campeao ? `<div class="dica" style="margin-top:4px">Na semana: melhor com <b>${esc(t.campeaoSemana.melhor.campeao)}</b> (${Math.round(t.campeaoSemana.melhor.taxa * 100)}% em ${t.campeaoSemana.melhor.jogos}), pior com <b>${esc(t.campeaoSemana.pior.campeao)}</b> (${Math.round(t.campeaoSemana.pior.taxa * 100)}% em ${t.campeaoSemana.pior.jogos}).</div>` : ''}`;
   }
   $('#eDias').innerHTML = colunas(e.atividade.dias, {minimo:5}) + legendaColunas;
   $('#eHoras').innerHTML = colunas(e.atividade.horas, {minimo:8}) + legendaColunas;
