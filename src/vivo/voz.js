@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, utimes, readdir, stat, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { MsEdgeTTS, OUTPUT_FORMAT } from 'msedge-tts';
 
@@ -53,7 +53,7 @@ export async function falarEdge({ vozId = VOZ_PADRAO, ritmo = '+5%', texto, past
   if (!RITMOS.has(ritmo)) ritmo = '+5%';
   const dir = join(pasta, 'voz');
   const caminho = join(dir, `${vozId}-${createHash('sha1').update(`${ritmo}|${texto}`).digest('hex').slice(0, 20)}.mp3`);
-  try { return await readFile(caminho); } catch { /* ainda não falou essa */ }
+  try { const mp3 = await readFile(caminho); utimes(caminho, new Date(), new Date()).catch(() => {}); return mp3; } catch { /* ainda não falou essa */ }
 
   const gerar = async () => {
     const tts = await clienteParaVoz(vozId, ritmo);
@@ -69,5 +69,20 @@ export async function falarEdge({ vozId = VOZ_PADRAO, ritmo = '+5%', texto, past
   });
   if (!mp3.length) throw new Error('a Microsoft não devolveu áudio');
   await mkdir(dir, { recursive: true }).then(() => writeFile(caminho, mp3)).catch(() => {});
+  podarCache(dir).catch(() => {});
   return mp3;
+}
+
+/** Cache de áudio: passou de 3000 mp3 (~80 MB), apaga os 1000 menos usados (mtime renovado a cada acerto). */
+let podando = null;
+async function podarCache(dir) {
+  if (podando) return podando;
+  podando = (async () => {
+    const nomes = (await readdir(dir)).filter((n) => n.endsWith('.mp3'));
+    if (nomes.length <= 3000) return;
+    const comData = await Promise.all(nomes.map(async (n) => ({ n, t: (await stat(join(dir, n)).catch(() => ({ mtimeMs: 0 }))).mtimeMs })));
+    comData.sort((a, b) => a.t - b.t);
+    for (const { n } of comData.slice(0, nomes.length - 2000)) await rm(join(dir, n), { force: true }).catch(() => {});
+  })().finally(() => { podando = null; });
+  return podando;
 }
