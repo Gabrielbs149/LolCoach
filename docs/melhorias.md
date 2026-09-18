@@ -152,3 +152,4 @@ Uma linha por rodada: versão, o que mudou, como foi testado.
 - v2.28.155 — Intel falada do jogador deles sem repetir a mesma coisa: "100% nas últimas 6, …, 6 vitórias seguidas" vira só "6 vitórias seguidas".
 - v2.28.156 — Oponente de lane na base: com a sua wave já na torre dele diz "30 segundos pra roam ou ward" (não tem o que empurrar); com a wave no nosso lado, "Empurra a wave". docs/olho-falas.md atualizado (7 itens 🟡 já estavam feitos).
 - v2.28.157 — "1 deles na nossa base" diz quem ("Leona na nossa base.") — backdoor de um só é o caso em que o nome importa.
+- v2.28.158 — Primeira torre da SUA lane vem com o que fazer: deles caiu → "Lane aberta: roam ou ward, não fica sozinho nela."; nossa caiu → "Sem torre, joga atrás da wave e warda o rio."

@@ -130,7 +130,12 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       const lane = ti?.lane ?? '';
       const inib = ti?.camada === 'inib';
       if (ti?.camada === 'nexus') continue;
+      // primeira torre da SUA lane: o que muda no jogo (lane aberta) e o que fazer
+      const minhaLaneTorre = lane && ti?.camada === 'externa' && LANE_DE_ROLE[minhaRole] === lane && !mem.torreMinhaLaneDita;
+      if (minhaLaneTorre) mem.torreMinhaLaneDita = true;   // só a primeira (o nome antigo da torre não separa externa de interna)
       if (!lane) dizer(`tk-${e.id}`, 'timers', nossa ? F('Torre nossa caiu.') : F('Torre deles caiu.'), nossa ? F('Torre nossa caiu.') : F('Torre deles caiu.'), nossa ? 1 : 2);
+      else if (minhaLaneTorre && !nossa) dizer(`tk-${e.id}`, 'timers', F`Torre deles no ${lane} caiu. Lane aberta: roam ou ward, não fica sozinho nela.`, F`Torre deles no ${lane} caiu. Agora é roam ou ward, sozinho ali você morre.`, 2);
+      else if (minhaLaneTorre && nossa) dizer(`tk-${e.id}`, 'timers', F`Torre nossa do ${lane} caiu. Sem torre, joga atrás da wave e warda o rio.`, F`Torre nossa do ${lane} caiu. Sem torre, sem herói: atrás da wave e ward.`, 2);
       else if (nossa) dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? F`Torre do inibidor do ${lane} caiu.` : F`Torre nossa do ${lane} caiu.`, inib ? 3 : 1);
       else dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, 2);
     }
