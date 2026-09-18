@@ -406,8 +406,11 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     const minhaRegiao = lugar(minhaPos.x, minhaPos.y, meuTime);
     const esperado = (f) => minhaLane && minhaLane !== 'jungle' && LANE_DE[f.role] === minhaLane && minhaRegiao.lane === minhaLane;   // oponente de lane, na lane
     const perto = pertoTodos.length >= 3 ? pertoTodos : pertoTodos.filter((f) => !esperado(f));
-    if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) situ('perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: perto.length >= 2 ? F`${perto.length} deles a menos de 8 segundos de você.` : F`${perto[0].campeao} a menos de 8 segundos de você, com o ${pertoTodos.find((f) => f !== perto[0]).campeao}.`, divertido: F`${pertoTodos.length} deles vindo te buscar. Sai.`, cooldown: 30, dados: { quem: pertoTodos.map((f) => f.campeao) } });
+    const escalou = (mundo.perigoN ?? 0) >= 2 && perto.length > mundo.perigoN && t - (mundo.perigoEm ?? -99) >= 10;   // 2→3, 3→4: fala de novo mesmo dentro do cooldown (mas não 4 s depois da anterior)
+    if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) situ(escalou ? 'perigo-perto-mais' : 'perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: perto.length >= 2 ? F`${perto.length} deles a menos de 8 segundos de você.` : F`${perto[0].campeao} a menos de 8 segundos de você, com o ${pertoTodos.find((f) => f !== perto[0]).campeao}.`, divertido: F`${pertoTodos.length} deles vindo te buscar. Sai.`, cooldown: 45, dados: { quem: pertoTodos.map((f) => f.campeao) } });
     const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
+    if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) mundo.perigoEm = t;
+    mundo.perigoN = perto.length;
     if (vidaPct < 0.35 && perto.length) situ('vida-baixa-vindo', { tipo: 'perigo', prioridade: 3, modulo: 'kills', serio: F`Vida baixa e ${perto[0].campeao} vindo. Sai.`, cooldown: 20 });
     if (!ladoNosso(minhaPos) && jg && vistoHa(jg, t) > 15 && t > 180) situ('na-frente-sem-jg', { tipo: 'perigo', prioridade: 2, modulo: 'mapa', serio: F('Você no lado deles sem saber do jungler.'), cooldown: 150 });
     const pertoLane = fIni.filter((f) => visivel(f, t) && seg(dist(f.ultimo, minhaPos)) <= 20);
@@ -435,7 +438,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
   if (meuJg && minhaPos && visivel(meuJg, t)) {
     const s = seg(dist(meuJg.ultimo, minhaPos));
     const v = velocidade(meuJg, t), vindo = v ? dist({ x: meuJg.ultimo.x + v.vx * 3, y: meuJg.ultimo.y + v.vy * 3 }, minhaPos) < dist(meuJg.ultimo, minhaPos) : false;
-    if (s <= 12 && vindo && minhaLane !== 'jungle') situ('meu-jg-vindo', { tipo: 'aliado', prioridade: 2, modulo: 'jungler', serio: F`Seu jungler a ${s} segundos, vindo. Prepara.`, divertido: F`Seu jungler chegando em ${s} segundos. Prepara o CC.`, cooldown: 90 });
+    if (s <= 12 && vindo && minhaLane !== 'jungle') situ('meu-jg-vindo', { tipo: 'aliado', prioridade: 2, modulo: 'jungler', serio: F`Seu jungler a ${s} segundos, vindo. Prepara.`, divertido: F`Seu jungler chegando em ${s} segundos. Prepara o CC.`, cooldown: 150 });
     else if (s >= 28 && minhaLane !== 'jungle') situ('meu-jg-longe', { tipo: 'aliado', prioridade: 0, modulo: 'jungler', serio: F`Seu jungler longe (${s} segundos). Não troca de graça.`, cooldown: 120 });
   }
   {
