@@ -215,6 +215,29 @@ function manchasVermelhas(rgba, s, d, cor = 'vermelho') {
   return juntos.slice(0, 14);
 }
 const d0 = () => escala?.d ?? 24;
+/**
+ * Diâmetro do ícone medido pelo anel: nos aglomerados de cor de anel (vermelho e azul), a fração de pixels
+ * da cor num círculo de raio r tem pico no raio do anel. Mediana dos picos = raio; diâmetro = 2·raio.
+ */
+function diametroPeloAnel(rgba, s, m) {
+  const padrao = Math.round(H * 0.0235);
+  const picos = [];
+  for (const cor of ['vermelho', 'azul']) {
+    const regra = cor === 'azul' ? FIXA.aliado : FIXA.inimigo;
+    for (const p of manchasVermelhas(rgba, s, padrao, cor).slice(0, 8)) {
+      let melhor = { r: 0, f: 0 };
+      for (let cy = p.y - 4; cy <= p.y + 4; cy += 2) for (let cx = p.x - 4; cx <= p.x + 4; cx += 2) for (let r = padrao * 0.35; r <= padrao * 0.7; r += 0.5) {
+        let k = 0, nn = 0;
+        for (let a = 0; a < 360; a += 10) { const px = Math.round(cx + Math.cos(a / 57.3) * r), py = Math.round(cy + Math.sin(a / 57.3) * r); if (px < 0 || py < 0 || px >= s || py >= s) continue; const q = (py * s + px) * 4; nn++; if (regra(rgba[q], rgba[q + 1], rgba[q + 2])) k++; }
+        const f = nn ? k / nn : 0; if (f > melhor.f) melhor = { r, f };
+      }
+      if (melhor.f >= 0.5) picos.push(melhor.r);
+    }
+  }
+  if (picos.length < 2) return null;
+  picos.sort((a, b) => a - b);
+  return Math.round(2 * picos[Math.floor(picos.length / 2)]);
+}
 
 /**
  * Onde está a wave de cada lane: minions são pontinhos vermelhos/azuis ao
@@ -754,6 +777,22 @@ function buscar(img, tpl, area = null, quantos = 3, passo = 1) {
   }
   return top;
 }
+/** NCC descartando a fração `fora` dos pixels (RGB juntos) que mais destoam do template já normalizado. */
+function nccAparado(vals, cheia, fora) {
+  const { z, norma } = cheia, n = z.length / 3;
+  let s = 0; for (const v of vals) s += v; const m = s / vals.length;
+  let da = 0; for (let i = 0; i < vals.length; i++) { const x = vals[i] - m; da += x * x; }
+  const na = Math.sqrt(da) + 1e-6;
+  const dif = new Float32Array(n);
+  for (let k = 0; k < n; k++) { let d2 = 0; for (let c = 0; c < 3; c++) { const i = 3 * k + c; const e = (vals[i] - m) / na - z[i] / norma; d2 += e * e; } dif[k] = d2; }
+  const ordem = Array.from({ length: n }, (_, k) => k).sort((a, b) => dif[a] - dif[b]).slice(0, Math.max(8, Math.round(n * (1 - fora))));
+  // re-normaliza os dois lados só nos pixels que ficaram
+  let sa = 0, sb = 0; for (const k of ordem) for (let c = 0; c < 3; c++) { sa += vals[3 * k + c]; sb += z[3 * k + c]; }
+  const ma = sa / (ordem.length * 3), mb = sb / (ordem.length * 3);
+  let num = 0, qa = 0, qb = 0;
+  for (const k of ordem) for (let c = 0; c < 3; c++) { const a = vals[3 * k + c] - ma, b = z[3 * k + c] - mb; num += a * b; qa += a * a; qb += b * b; }
+  return num / (Math.sqrt(qa * qb) + 1e-6);
+}
 /** Confirma na resolução cheia, em cor, em volta de (x, y) (coordenadas cheias). */
 function confirmar(rgba, s, tpl, x, y) {
   const { w: tw, idx, z, norma } = tpl.cheia;
@@ -766,8 +805,16 @@ function confirmar(rgba, s, tpl, x, y) {
       vals[3 * k] = rgba[q]; vals[3 * k + 1] = rgba[q + 1]; vals[3 * k + 2] = rgba[q + 2];
     }
     const score = ncc(vals, { z, norma });
-    if (score > melhor.score) melhor = { score, x: px, y: py };
+    if (score > melhor.score) melhor = { score, x: px, y: py, vals };
   }
+  // Ícone com metade coberta (outro ícone em cima, linha branca da câmera, ping): compara de novo sem o quarto
+  // dos pixels que mais destoam. Só quando já existe casamento real (≥ 0,5) e vale no máximo +0,2 sobre o cheio.
+  if (melhor.vals && melhor.score >= 0.5) {
+    const aparado = nccAparado(melhor.vals, tpl.cheia, 0.25);
+    melhor.cheio = melhor.score;
+    melhor.score = Math.min(aparado, melhor.score + 0.2);
+  }
+  delete melhor.vals;
   // Anel do ícone (medido): inimigo vermelho, aliado azul, o meu teal — todos na BORDA (raio d/2).
   // O que conta é a FRAÇÃO de pixels da cor no círculo (não a média: dois pontinhos de minion
   // já mudam a média), o NCC pode parar 1–2 px deslocado (testa 9 centros) e tem que ser ANEL:
@@ -899,7 +946,12 @@ async function quadro() {
       let melhor = { media: medias.get(padrao) ?? -1, d: padrao };
       for (const [d, media] of medias) if (media > melhor.media + 0.04 || (Math.abs(d - padrao) < Math.abs(melhor.d - padrao) && media > melhor.media)) melhor = { media, d };
       if (melhor.media >= 0.7 || (melhor.media >= 0.6 && nomesEscala.length >= 3)) { const antes = escala.d; escala = { d: melhor.d, score: Math.round(melhor.media * 100) / 100, confiavel: true, em: agora }; if (antes !== melhor.d) log(`ícone: ${melhor.d}px (média ${escala.score} em ${nomesEscala.length} ícones)`); fracoDesde = 0; }
-      else if (!escala.d) { escala = { d: Math.round(H * 0.0235), score: 0, confiavel: false, em: agora }; log(`tamanho do ícone incerto (melhor média ${Math.round(melhor.media * 100) / 100} com ${melhor.d}px); usando ${escala.d}px por enquanto`); }
+      else if (!escala.d) {
+        // template não bateu (skin errada, ícone coberto): mede o RAIO do anel direto nos ícones do quadro
+        const dAnel = diametroPeloAnel(rgba, s, m);
+        if (dAnel) { escala = { d: dAnel, score: 0.5, confiavel: true, em: agora }; log(`ícone: ${dAnel}px pelo raio do anel (template deu só ${Math.round(melhor.media * 100) / 100})`); }
+        else { escala = { d: Math.round(H * 0.0235), score: 0, confiavel: false, em: agora }; log(`tamanho do ícone incerto (melhor média ${Math.round(melhor.media * 100) / 100} com ${melhor.d}px); usando ${escala.d}px por enquanto`); }
+      }
     }
     if (!escala?.d) return;
     const d = escala.d;
@@ -1085,7 +1137,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   for (const c of cand) {
     if (c.score < LIMIAR_MEIO) continue;
     const ok = confirmar(rgba, s, t, c.x * 2, c.y * 2);
-    ok.crua = ok.score;
+    ok.crua = ok.cheio ?? ok.score;   // as regras "sem anel só com 0,88" usam o NCC cheio, não o aparado
     if (ok.anelVermelho) ok.score += 0.08;
     if (chave === 'eu' && ok.anelTeal >= 0.4) ok.score += 0.15;   // anel teal = sou eu mesmo com seta/linha por cima
     if (!melhor || ok.score > melhor.score) melhor = ok;
