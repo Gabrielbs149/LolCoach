@@ -983,6 +983,7 @@ h2{letter-spacing:1px}
         <div id="hoje"></div>
         <div id="forma"></div>
         <h2>Últimas partidas</h2><div id="recentes"></div>
+        <h2>Com quem você jogou <small>últimas 20</small></h2><div id="companheiros" class="dica">carregando…</div>
         <h2>Campeões das últimas 20</h2><div id="camp20"></div>
       </div>
     </div>
@@ -1352,9 +1353,25 @@ async function carregarVisao(){
       <h3>${esc(conta?.nome ?? '—')}<span>#${esc(conta?.tag ?? '')}</span></h3>
       <div class="sub">${perfil?.nivel ? 'nível ' + num(perfil.nivel) + ' · ' : ''}${num(g.n)} partidas analisadas · ${taxa}% de vitória${perfil?.desatualizado ? ' · <span class="aviso">a Riot não respondeu, elo pode estar velho</span>' : ''}</div>
     </div>
-    ${solo ? `<div class="eloGrande">${emblema(solo.tier)}<div><div class="n">${esc(solo.nome)}</div><div class="p">${num(solo.pdl)} PDL · ${solo.vitorias}V ${solo.derrotas}D</div></div></div>` : ''}
+    ${solo ? `<div class="eloGrande">${emblema(solo.tier)}<div><div class="n">${esc(solo.nome)}</div><div class="p">${num(solo.pdl)} PDL · ${solo.vitorias}V ${solo.derrotas}D</div><div class="p" id="topLadder"></div></div></div>` : ''}
+    <div class="temporadas" id="temporadasElo"></div>
     <div class="acoesP"><button class="acao" onclick="atualizarPerfil(this)">Atualizar</button></div>
   </div>`;
+
+  /* ---- temporadas passadas (op.gg) e top % ---- */
+  if (conta?.nome && conta?.tag) pegar(`/api/temporadas-elo?nome=${encodeURIComponent(conta.nome)}&tag=${encodeURIComponent(conta.tag)}${solo ? '&tier=' + encodeURIComponent(solo.tier) + '&rank=' + encodeURIComponent(solo.rank ?? '') : ''}`).then((t) => {
+    const el = $('#temporadasElo'); if (el && t.temporadas?.length) el.innerHTML = t.temporadas.slice(0, 6).map((x) => `<span title="${x.pico ? 'pico ' + esc(x.pico) + ' · fim ' : ''}${esc(x.fim ?? '')}"><b>${esc(x.temporada)}</b> ${esc(x.pico ?? x.fim ?? '—')}</span>`).join('');
+    const tl = $('#topLadder'); if (tl && t.top != null) tl.textContent = `top ~${t.top}% do BR`;
+  }).catch(() => {});
+
+  /* ---- com quem você jogou (chega depois, sem travar) ---- */
+  pegar(comConta('/api/companheiros?n=20')).then((c) => {
+    const el = $('#companheiros'); if (!el) return;
+    const linha = (r, rot) => `<div class="compLinha"><img src="/icone/${r.championId ?? 0}" alt=""><b>${esc(r.nome)}</b><span class="t">#${esc(r.tag)}</span><span class="j">${r.jogos} jogo${r.jogos > 1 ? 's' : ''}</span><span class="wr ${r.vitorias / r.jogos >= 0.6 ? 'v' : r.vitorias / r.jogos <= 0.4 ? 'd' : ''}">${r.vitorias}V ${r.jogos - r.vitorias}D · ${Math.round(100 * r.vitorias / r.jogos)}%</span>${rot ? `<span class="rotC">${rot}</span>` : ''}</div>`;
+    el.className = '';
+    el.innerHTML = (c.com.length ? c.com.map((r) => linha(r, '')).join('') : '<div class="dica">ninguém repetiu no seu time nas últimas 20</div>')
+      + (c.contra.length ? `<div class="rotSec" style="margin-top:10px">Contra quem mais jogou</div>` + c.contra.map((r) => linha(r, '')).join('') : '');
+  }).catch(() => { const el = $('#companheiros'); if (el) el.textContent = ''; });
 
   /* ---- elos ---- */
   const elos = perfil?.elos ?? [];

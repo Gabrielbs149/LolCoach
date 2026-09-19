@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path';
 import { temporadaDe, resumoPorTemporada } from '../dados/temporadas.js';
 import { notasDaPartida, laningPct, selosDaPartida } from '../analise/nota.js';
 import { elosGuardados } from '../dados/elo-partida.js';
+import { temporadasDoOpgg, topPorcento } from '../dados/opgg-perfil.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
@@ -65,6 +66,33 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       return { geral: g, porRole, campeoes };
     },
 
+    // Com quem você jogou (mesmo time) nas últimas N partidas: jogos e V-D com cada um; e contra quem mais jogou
+    // Temporadas passadas (op.gg) + top X% estimado
+    '/api/temporadas-elo': async (q) => {
+      const nome = q.get('nome'), tag = q.get('tag');
+      if (!nome || !tag) return { temporadas: [] };
+      const temporadas = await temporadasDoOpgg(nome, tag, 'br').catch(() => []);
+      return { temporadas, top: topPorcento(q.get('tier'), q.get('rank')) };
+    },
+    '/api/companheiros': (q) => {
+      const n = Math.max(5, Math.min(200, Number(q.get('n')) || 20));
+      const fc = filtroConta(q.get('conta'));
+      const ids = db.prepare(`SELECT p.gameId, p.meuId, p.venci FROM partidas p WHERE p.duracaoS >= 300${fc} ORDER BY p.quando DESC LIMIT ?`).all(n);
+      const com = new Map(), contra = new Map();
+      const sel = db.prepare('SELECT participantId, time, nome, tag, championId FROM jogadores WHERE gameId = ?');
+      for (const p of ids) {
+        const js = sel.all(p.gameId); const eu = js.find((j) => j.participantId === p.meuId); if (!eu) continue;
+        for (const j of js) {
+          if (j.participantId === p.meuId || !j.nome || j.nome === '?') continue;
+          const k = `${j.nome}#${j.tag ?? ''}`;
+          const m = j.time === eu.time ? com : contra;
+          const r = m.get(k) ?? { nome: j.nome, tag: j.tag ?? '', jogos: 0, vitorias: 0, championId: j.championId };
+          r.jogos++; if (p.venci) r.vitorias++; m.set(k, r);
+        }
+      }
+      const lista = (m) => [...m.values()].filter((r) => r.jogos >= 2).sort((a, b) => b.jogos - a.jogos || b.vitorias - a.vitorias).slice(0, 12);
+      return { n: ids.length, com: lista(com), contra: lista(contra) };
+    },
     '/api/partidas': (q) => partidas(q),
     // Evolução por split: winrate, KDA, cs/min, participação, erros graves.
     '/api/temporadas': (q) => resumoPorTemporada(partidas(q)),
@@ -485,7 +513,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       }
 
       if (rotas[url.pathname]) {
-        return enviar(200, 'application/json', JSON.stringify(rotas[url.pathname](url.searchParams)));
+        return enviar(200, 'application/json', JSON.stringify(await rotas[url.pathname](url.searchParams)));
       }
 
       // Emblemas de elo recortados do client (scripts/emblemas.cjs), no pacote.
