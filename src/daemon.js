@@ -1899,6 +1899,24 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   }
   setTimeout(() => atualizarGalera().catch(() => {}), 40_000);
   setInterval(() => atualizarGalera().catch(() => {}), 30 * 60_000).unref?.();
+  // Chroma não tem círculo próprio: o ícone é o da skin "mãe". O client lista skins e chromas de cada campeão.
+  const skinsCache = new Map();   // championId -> [{ num, chromas: [num] }]
+  async function skinMae(championId, skin) {
+    skin = Number(skin) || 0;
+    if (!skin) return 0;
+    try {
+      if (!skinsCache.has(championId)) {
+        let j = null;
+        if (lcu.conectado) j = await lcu.get(`/lol-game-data/assets/v1/champions/${championId}.json`).catch(() => null);
+        if (!j) j = await fetch(`https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/champions/${championId}.json`, { signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+        skinsCache.set(championId, (j?.skins ?? []).map((s) => ({ num: s.id % 1000, chromas: (s.chromas ?? []).map((c) => c.id % 1000) })));
+      }
+      const lista = skinsCache.get(championId) ?? [];
+      if (lista.some((s) => s.num === skin)) return skin;
+      const mae = lista.find((s) => s.chromas.includes(skin));
+      return mae ? mae.num : skin;
+    } catch { return skin; }
+  }
   const listaDeAmigos = () => {
     const meus = (config.amigos ?? []).filter((a) => a?.nome && a?.tag);
     const chave = (a) => `${a.nome}#${a.tag}`.toLowerCase();
@@ -2167,7 +2185,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     },
     // Client primeiro (melhor qualidade e instantâneo); com o League fechado,
     // cai no Data Dragon pra nenhuma tela ficar com quadrado vazio.
-    circulo: async (championId, skin, forma) => { const { circuloDoCampeao } = await import('./dados/ddragon.js'); return circuloDoCampeao(championId, skin, forma); },
+    circulo: async (championId, skin, forma) => { const { circuloDoCampeao } = await import('./dados/ddragon.js'); return circuloDoCampeao(championId, await skinMae(championId, skin), forma); },
     icone: async (championId) => {
       try {
         return await lcu.getBinario(`/lol-game-data/assets/v1/champion-icons/${championId}.png`);
