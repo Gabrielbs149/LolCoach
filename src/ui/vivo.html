@@ -229,6 +229,7 @@ body{font:14px/1.5 var(--corpo)}
 .numeros div b{font-family:var(--titulo);font-size:22px;font-weight:400;letter-spacing:.6px}
 .numeros div span{font-size:9px}
 h3{font-family:var(--titulo);letter-spacing:.6px;font-weight:400}
+.previsao{text-align:center;margin-left:6px} .previsao b{display:block;font-family:var(--titulo);font-size:26px;line-height:1;letter-spacing:.5px} .previsao span{font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--apagado)} .previsao.v b{color:var(--vit)} .previsao.d b{color:var(--der)}
 </style>
 </head>
 <body>
@@ -496,6 +497,7 @@ function desenhar(d){
   $('#tudo').innerHTML = `
     <header style="background-image:url(/arte/${idDe(eu.campeao)})">
       <div class="relogio">${mmss(e.tempo)}<span>tempo</span></div>
+      ${d.previsao?.pct != null ? `<div class="previsao ${d.previsao.pct >= 55 ? 'v' : d.previsao.pct <= 45 ? 'd' : ''}" title="${esc((d.previsao.motivos ?? []).join(' · '))}"><b>${d.previsao.pct}%</b><span>previsão</span></div>` : ''}
       <div class="meu">${icone(eu.campeao)}
         <div><div class="l1">${esc(eu.campeao)}</div>
         <div class="l2">nível ${eu.nivel}${eu.role ? ' · ' + esc(eu.role) : ''}</div></div></div>

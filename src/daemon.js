@@ -908,6 +908,21 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         if (frase) partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 2, id: 'plano-bot', serio: F(frase), divertido: F(frase) }));
       } catch { /* sem plano */ }
     }
+    // previsão de vitória: precisa das duas intels (deles + nossos); fala uma vez até 3:00
+    if (!partidaVivo.previsao && partidaVivo.intelJogadores?.size && partidaVivo.intelNossos?.size && estado.tempo < 180) {
+      const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time), nossos = estado.jogadores.filter((j) => j.time === estado.eu.time && j.nome !== estado.eu.nome);
+      if ([...partidaVivo.intelNossos.values()].filter((f) => f && !f.erro).length >= Math.min(3, nossos.length)) {
+        try {
+          const { previsaoDeVitoria, fatosDe } = await import('./vivo/intel-jogadores.js');
+          // eu entro pelo meu próprio perfil (do banco), se der
+          let meu = null;
+          try { const { perfilDeAmigo } = await import('./dados/amigos.js'); const [n, t] = String(estado.eu.nome).split('#'); const pf = await perfilDeAmigo({ ...config.riot, apiKey: null }, { nome: n, tag: t }, {}).catch(() => null); meu = pf ? fatosDe(pf, { campeao: estado.eu.campeao, role: estado.eu.role }) : null; } catch { /* sem meu perfil */ }
+          const p = previsaoDeVitoria([meu, ...nossos.map((j) => partidaVivo.intelNossos.get(j.nome))], deles.map((j) => partidaVivo.intelJogadores.get(j.nome)));
+          partidaVivo.previsao = p ?? { pct: null };
+          if (p) partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 1, id: 'previsao', serio: F`Previsão: ${p.pct}% pra vocês${p.motivos.length ? ' — ' + p.motivos.slice(0, 2).join(', ') : ''}.`, divertido: F`${p.pct}% de chance${p.motivos.length ? ': ' + p.motivos[0] : ''}.` }));
+        } catch { partidaVivo.previsao = { pct: null }; }
+      }
+    }
     if (partidaVivo.intelJogadores?.size && estado.tempo < 150 && !partidaVivo.intelFalada) {
       const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time);
       const alvos = [deles.find((j) => j.role === estado.eu.role && estado.eu.role !== 'jungle'), deles.find((j) => j.role === 'jungle')].filter(Boolean);
@@ -981,6 +996,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       radarNossos: (() => { const o = partidaVivo.olho; if (!o || Date.now() - o.recebidoEm > 5000) return []; const l = (o.aliados ?? []).map((a) => ({ campeao: a.campeao, x: a.x, y: a.y })); if (o.eu) l.push({ campeao: estado.eu.campeao, x: o.eu.x, y: o.eu.y, eu: true }); return l; })(),
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
+      previsao: partidaVivo.previsao?.pct != null ? partidaVivo.previsao : null,
       intelNossos: partidaVivo.intelNossos ? Object.fromEntries([...partidaVivo.intelNossos].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       intelDeles: partidaVivo.intelJogadores ? Object.fromEntries([...partidaVivo.intelJogadores].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
