@@ -140,6 +140,7 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       else dizer(`tk-${e.id}`, 'timers', inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, inib ? F`Torre do inibidor deles no ${lane} caiu.` : F`Torre deles no ${lane} caiu.`, 2);
     }
     if (e.tipo === 'InhibKilled') dizer(`ik-${e.id}`, 'timers', ehAliado(e.autor) ? F('Inibidor deles caiu.') : F('Inibidor nosso caiu.'), ehAliado(e.autor) ? F('Inibidor deles caiu.') : F('Inibidor nosso caiu.'), 2);
+    if (e.tipo === 'InhibKilled') (mem.inibs ??= []).push({ deles: ehAliado(e.autor), t: e.t, avisado: false, voltou: false });   // volta em 5 min
   }
 
   /* ---- extras: build, dano deles, mains ---- */
@@ -244,6 +245,11 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   if (!vidaBaixaAgora && !eu.morto && eu.ouro >= 2000 && !jaFalouDoGold) dizer(`gold-${Math.floor(tempo / 240)}`, 'economia', F`${eu.ouro} de gold parado.`, F`${eu.ouro} de gold parado.`, 1);
   mem.vidaBaixaAntes = vidaBaixaAgora;
 
+  /* ---- inibidor: volta em 5 min (aviso a 1 min e na volta) ---- */
+  for (const ib of mem.inibs ?? []) {
+    if (!ib.avisado && tempo >= ib.t + 240) { ib.avisado = true; dizer(`ib60-${ib.t}`, 'timers', ib.deles ? F('Inibidor deles volta em um minuto. Última onda de super minions.') : F('Inibidor nosso volta em um minuto. Segura mais um pouco.'), ib.deles ? F('Inibidor deles volta em um minuto.') : F('Inibidor nosso volta em um minuto.'), 1); }
+    if (!ib.voltou && tempo >= ib.t + 300) { ib.voltou = true; dizer(`ibv-${ib.t}`, 'timers', ib.deles ? F('Inibidor deles voltou.') : F('Inibidor nosso voltou.'), ib.deles ? F('Inibidor deles voltou.') : F('Inibidor nosso voltou.'), 1); }
+  }
   /* ---- estado do jogo ---- */
   const nossosKills = aliados.reduce((s, j) => s + j.kills, 0), delesKills = inimigos.reduce((s, j) => s + j.kills, 0);
   if (tempo >= 900 && tempo < 908 && nossosKills !== delesKills) dizer('jogo-15', 'lane', F`Quinze minutos: ${nossosKills} a ${delesKills} em kills.`, F`Quinze minutos: ${nossosKills} a ${delesKills}.`, 1);

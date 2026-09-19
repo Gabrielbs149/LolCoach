@@ -908,6 +908,31 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         if (frase) partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 2, id: 'plano-bot', serio: F(frase), divertido: F(frase) }));
       } catch { /* sem plano */ }
     }
+    // Benchmark ao vivo (Blitz): aos 5/10/15 compara CS e gold com a SUA média e o SEU melhor nesse minuto, na mesma rota
+    if (!partidaVivo.bench) {
+      partidaVivo.bench = { ditos: new Set(), ref: null };
+      try {
+        const role = { top: 'TOP', jungle: 'JUNGLE', mid: 'MID', adc: 'ADC', sup: 'SUPORTE' }[estado.eu.role] ?? null;
+        if (role) {
+          const linhas = db.prepare(`SELECT f.minuto, AVG(f.cs + f.csSelva) mcs, MAX(f.cs + f.csSelva) bcs, AVG(f.ouroTotal) mg, COUNT(*) n FROM frames f
+            JOIN partidas p ON p.gameId = f.gameId AND f.participantId = p.meuId
+            WHERE p.minhaRole = ? AND p.duracaoS >= 900 AND f.minuto IN (5, 10, 15)
+              AND p.gameId IN (SELECT gameId FROM partidas WHERE minhaRole = ? AND duracaoS >= 900 ORDER BY quando DESC LIMIT 60) GROUP BY f.minuto`).all(role, role);
+          if (linhas.length && linhas[0].n >= 8) partidaVivo.bench.ref = Object.fromEntries(linhas.map((l) => [l.minuto, { mcs: l.mcs, bcs: l.bcs, mg: l.mg }]));
+        }
+      } catch { /* sem banco */ }
+    }
+    if (partidaVivo.bench?.ref) {
+      const min = Math.floor(estado.tempo / 60);
+      if ([5, 10, 15].includes(min) && estado.tempo - min * 60 < 6 && !partidaVivo.bench.ditos.has(min) && estado.eu.role !== 'sup') {
+        partidaVivo.bench.ditos.add(min);
+        const r = partidaVivo.bench.ref[min], cs = estado.eu.cs ?? 0, ouro = estado.eu.ouro ?? null;
+        const dif = cs - r.mcs;
+        const txt = `Aos ${min}: ${cs} de CS, sua média ${Math.round(r.mcs)}${cs >= r.bcs ? ' — seu melhor até hoje' : Math.abs(dif) >= 6 ? (dif > 0 ? `, ${Math.round(dif)} na frente` : `, ${Math.round(-dif)} atrás`) : ''}.`;
+        partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'economia', prioridade: 1, id: `bench-${min}`, serio: F(txt), divertido: F(txt) }));
+        void ouro;
+      }
+    }
     // previsão de vitória: precisa das duas intels (deles + nossos); fala uma vez até 3:00
     if (!partidaVivo.previsao && partidaVivo.intelJogadores?.size && partidaVivo.intelNossos?.size && estado.tempo < 180) {
       const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time), nossos = estado.jogadores.filter((j) => j.time === estado.eu.time && j.nome !== estado.eu.nome);
@@ -997,6 +1022,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       previsao: partidaVivo.previsao?.pct != null ? partidaVivo.previsao : null,
+      bench: partidaVivo.bench?.ref ? (() => { const min = Math.floor(estado.tempo / 60); const alvo = min < 5 ? 5 : min < 10 ? 10 : 15; const r = partidaVivo.bench.ref[alvo]; return r ? { alvo, mediaCs: Math.round(r.mcs), melhorCs: r.bcs, mediaGold: Math.round(r.mg) } : null; })() : null,
       intelNossos: partidaVivo.intelNossos ? Object.fromEntries([...partidaVivo.intelNossos].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       intelDeles: partidaVivo.intelJogadores ? Object.fromEntries([...partidaVivo.intelJogadores].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
