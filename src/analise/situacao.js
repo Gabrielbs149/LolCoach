@@ -123,6 +123,25 @@ export async function analiseDaLane(p, eu, opcoes = {}) {
   return { meus: meus.map((j) => ({ campeao: j.campeao, championId: j.championId, role: R(j.role) })), rivais: rivais.map((j) => ({ campeao: j.campeao, championId: j.championId, role: R(j.role) })), taxas, media: media == null ? null : Math.round(media), veredito, ouro, primeiraTorre, plano, bot };
 }
 
+/** Uma frase pra voz na tela de carregamento: como se joga o 2v2 do bot (só pelo estilo dos 4). */
+export function planoRapidoDoBot({ meuCampeao, minhaRole, jogadores, meuTime }) {
+  if (!['adc', 'sup'].includes(R(minhaRole))) return null;
+  const meus = jogadores.filter((j) => j.time === meuTime), deles = jogadores.filter((j) => j.time !== meuTime);
+  const meuAdc = meus.find((j) => R(j.role) === 'adc'), meuSup = meus.find((j) => R(j.role) === 'sup');
+  const adcDeles = deles.find((j) => R(j.role) === 'adc'), supDeles = deles.find((j) => R(j.role) === 'sup');
+  if (!meuAdc || !meuSup || !adcDeles || !supDeles) return null;
+  const eA = estiloDe(ADC, meuAdc.campeao), eS = estiloDe(SUP, meuSup.campeao), dA = estiloDe(ADC, adcDeles.campeao), dS = estiloDe(SUP, supDeles.campeao);
+  const duo = `${adcDeles.campeao} e ${supDeles.campeao}`;
+  if (dS === 'engage' && (eS === 'poke' || eA === 'poke')) return `Bot contra ${duo}: vocês têm alcance, eles têm entrada. Trade curta enquanto o ${supDeles.campeao} está sem engage; ele entra, vocês recuam.`;
+  if (eS === 'engage' && (dS === 'poke' || dA === 'poke')) return `Bot contra ${duo}: eles pokam. Ou o ${meuSup.campeao} acha a entrada, ou farma atrás — não troca de longe.`;
+  if (dS === 'enchanter' && eS === 'engage') return `Bot contra ${duo}: sem engage do lado deles — o all-in é de vocês antes dos itens de cura.`;
+  if (eS === 'enchanter' && dS === 'engage') return `Bot contra ${duo}: o ${supDeles.campeao} decide com a entrada. Ward no arbusto e posição atrás dos minions.`;
+  if (dA === 'hyper' && eA !== 'hyper') return `Bot contra ${duo}: ${adcDeles.campeao} escala — o que vocês tiram cedo vale o dobro.`;
+  if (eA === 'hyper') return `Bot contra ${duo}: você escala — a lane é sobreviver e farmar.`;
+  if (dS === 'poke' || dA === 'poke') return `Bot contra ${duo}: eles pokam de longe — minions na frente e trade só quando gastam a magia.`;
+  return `Bot contra ${duo}: lane parelha — decide quem troca com a wave a favor.`;
+}
+
 /* ------------------------------------------------------------- as mortes */
 
 export async function situacoesDasMortes(p, eu) {

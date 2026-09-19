@@ -861,6 +861,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         jogadores: estado.jogadores.map((j) => ({ c: j.campeao, time: j.time, role: j.role, nivel: j.nivel, k: j.kills, m: j.mortes, a: j.assists, cs: j.cs, morto: j.morto, renasce: j.renasceEm, itens: (j.itens ?? []).map((i) => i.id) })),
         eventos: (estado.eventos ?? []).length }) + '\n').catch(() => {});
     }
+    // plano do 2v2 do bot: uma frase, uma vez, entre 0:40 e 1:30 (antes da intel dos jogadores)
+    if (!partidaVivo.planoDito && estado.tempo >= 40 && estado.tempo < 90 && ['adc', 'sup'].includes(estado.eu.role)) {
+      partidaVivo.planoDito = true;
+      try {
+        const { planoRapidoDoBot } = await import('./analise/situacao.js');
+        const frase = planoRapidoDoBot({ meuCampeao: estado.eu.campeao, minhaRole: estado.eu.role, jogadores: estado.jogadores, meuTime: estado.eu.time });
+        if (frase) partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 2, id: 'plano-bot', serio: F(frase), divertido: F(frase) }));
+      } catch { /* sem plano */ }
+    }
     if (partidaVivo.intelJogadores?.size && estado.tempo < 150 && !partidaVivo.intelFalada) {
       const deles = estado.jogadores.filter((j) => j.time !== estado.eu.time);
       const alvos = [deles.find((j) => j.role === estado.eu.role && estado.eu.role !== 'jungle'), deles.find((j) => j.role === 'jungle')].filter(Boolean);
