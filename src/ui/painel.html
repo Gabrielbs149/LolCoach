@@ -1564,7 +1564,8 @@ const POR_PAGINA = 50;
 let todasPartidas = [], mostrando = POR_PAGINA, filtro = 'todas', temporada = '', temporadas = [];
 
 const FILTROS = [['todas','Todas'],['v','Vitórias'],['d','Derrotas'],
-  ['jungle','jungle'],['mid','mid'],['adc','adc'],['top','top'],['sup','sup'],['marcadas','★ Estudar']];
+  ['jungle','jungle'],['mid','mid'],['adc','adc'],['top','top'],['sup','sup'],
+  ['fila:420','Solo'],['fila:440','Flex'],['fila:400','Normal'],['fila:450','ARAM'],['marcadas','★ Estudar']];
 
 let marcadasIds = new Set();
 function filtrar(){
@@ -1578,6 +1579,7 @@ function filtrar(){
   if(filtro === 'v') return ps.filter(p => p.venci);
   if(filtro === 'd') return ps.filter(p => !p.venci);
   if(filtro === 'marcadas') return ps.filter(p => marcadasIds.has(p.gameId));
+  if(filtro.startsWith('fila:')) { const f = Number(filtro.slice(5)); return ps.filter(p => f === 400 ? [400, 430, 490].includes(p.fila) : p.fila === f); }
   return ps.filter(p => role(p.minhaRole) === filtro);
 }
 async function marcarPartida(ev, gameId){
@@ -1886,6 +1888,10 @@ async function carregarEstat(){
     sub: `${x.jogos} jogos · ${Math.round(x.taxa*100)}% de vitória`,
   })));
 
+  const OG = e.ondeGanha;
+  const blocoOG = (tit, lista) => lista?.length ? `<div class="ogBloco"><div class="rot">${tit}</div>${lista.map(x => `<div class="ogLinha"><span>${esc(x.rotulo)}</span><i><b style="width:${x.taxa}%"></b></i><b class="${x.taxa >= 53 ? 'v' : x.taxa <= 47 ? 'd' : ''}">${x.taxa}%</b><small>${x.n}</small></div>`).join('')}</div>` : '';
+  document.getElementById('ondeGanha')?.remove();
+  if (OG) ($('#eRadar').closest('.colunas2') ?? $('#eRadar').parentElement).insertAdjacentHTML('afterend', `<div class="ondeGanha" id="ondeGanha">${blocoOG('POR LADO DO MAPA', OG.lados)}${blocoOG('POR DURAÇÃO', OG.duracao)}${blocoOG('PRIMEIRO SANGUE', OG.primeiroSangue)}</div>`);
   $('#eRadar').innerHTML = desenharRadar(e.radar) + (e.estilo ? `<div class="estilo"><div class="rot">SEU ESTILO · ÚLTIMOS 45 DIAS</div><div class="nome">${esc(e.estilo.nome)}</div>
     <div class="rot" style="margin-top:10px">CONTRA O ${esc(nomeTier(e.estilo.tier))} E O ${esc(nomeTier(e.estilo.tierCima))} (APROX.)</div>
     <table class="cmpElo"><tr><th></th><th>você</th><th>${esc(nomeTier(e.estilo.tier))}</th><th>${esc(nomeTier(e.estilo.tierCima))}</th></tr>

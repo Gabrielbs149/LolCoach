@@ -308,3 +308,14 @@ h2 small a{color:var(--marca);text-decoration:none}
 .buildP.compacta .finais img{width:34px;height:34px}
 .buildP.compacta .finais .mag{font-family:var(--titulo);font-size:16px;letter-spacing:1px;color:var(--fraco)}
 .buildP.compacta .compras{margin-top:10px}
+
+/* ---- onde você ganha ---- */
+.ondeGanha{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:16px}
+.ogBloco{background:var(--f1);border-radius:var(--r-g);padding:12px 14px}
+.ogBloco .rot{font-size:11px;letter-spacing:1.4px;color:var(--apagado);margin-bottom:8px}
+.ogLinha{display:grid;grid-template-columns:minmax(0,1fr) 70px 46px 30px;align-items:center;gap:8px;font-size:13px;padding:4px 0}
+.ogLinha i{display:block;height:5px;background:var(--f3);border-radius:3px;overflow:hidden}
+.ogLinha i b{display:block;height:100%;background:var(--marca)}
+.ogLinha > b{font-family:var(--titulo);font-size:18px;letter-spacing:.4px;text-align:right}
+.ogLinha > b.v{color:var(--vit)} .ogLinha > b.d{color:var(--der)}
+.ogLinha small{color:var(--apagado);font-size:11px;text-align:right}

@@ -1796,6 +1796,21 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       atividade: E.atividade(db, o),
       radar: E.radar(db, o),
       tendencias: E.tendencias(db, o),
+      // onde você ganha (League of Graphs): lado do mapa, duração, primeiro sangue, com o jungler do lado…
+      ondeGanha: (() => {
+        try {
+          const fc = o.conta ? ` AND EXISTS (SELECT 1 FROM jogadores mc WHERE mc.gameId = p.gameId AND mc.participantId = p.meuId AND mc.nome = '${String(o.conta).replace(/'/g, "''")}')` : '';
+          const lados = db.prepare(`SELECT j.time lado, COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId WHERE p.duracaoS >= 300${fc} GROUP BY j.time`).all();
+          const duracao = db.prepare(`SELECT CASE WHEN p.duracaoS < 1500 THEN 'curta' WHEN p.duracaoS < 1920 THEN 'media' ELSE 'longa' END faixa, COUNT(*) n, SUM(p.venci) v FROM partidas p WHERE p.duracaoS >= 300${fc} GROUP BY faixa`).all();
+          const fb = db.prepare(`SELECT (SELECT CASE WHEN a.time = eu.time THEN 'nosso' ELSE 'deles' END FROM eventos e JOIN jogadores a ON a.gameId = e.gameId AND a.participantId = e.autorId WHERE e.gameId = p.gameId AND e.tipo = 'CHAMPION_KILL' ORDER BY e.t LIMIT 1) fb, COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores eu ON eu.gameId = p.gameId AND eu.participantId = p.meuId WHERE p.duracaoS >= 300${fc} GROUP BY fb`).all();
+          const item = (rot, r) => r ? { rotulo: rot, n: r.n, v: r.v, taxa: r.n ? Math.round(100 * r.v / r.n) : null } : null;
+          return {
+            lados: [item('Lado azul', lados.find((l) => l.lado === 100)), item('Lado vermelho', lados.find((l) => l.lado === 200))].filter(Boolean),
+            duracao: [item('Curta (< 25 min)', duracao.find((d) => d.faixa === 'curta')), item('Média (25–32)', duracao.find((d) => d.faixa === 'media')), item('Longa (32+)', duracao.find((d) => d.faixa === 'longa'))].filter(Boolean),
+            primeiroSangue: [item('Primeiro sangue nosso', fb.find((f) => f.fb === 'nosso')), item('Primeiro sangue deles', fb.find((f) => f.fb === 'deles'))].filter(Boolean),
+          };
+        } catch { return null; }
+      })(),
       // estilo com nome + comparação com o seu elo e o de cima (últimas 30 partidas)
       estilo: await (async () => {
         try {
