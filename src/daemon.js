@@ -1910,7 +1910,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       galera = lista;
     } catch (erro) { log(`galera do app: não consegui ler (${erro.message})`); }
   }
-  setTimeout(() => atualizarGalera().catch(() => {}), 40_000);
+  setTimeout(() => atualizarGalera().catch(() => {}), 8_000);
   setInterval(() => atualizarGalera().catch(() => {}), 30 * 60_000).unref?.();
   // Chroma não tem círculo próprio: o ícone é o da skin "mãe". O client lista skins e chromas de cada campeão.
   const skinsCache = new Map();   // championId -> [{ num, chromas: [num] }]
@@ -2087,6 +2087,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     return { ok: true };
   }
   async function amigos({ conta } = {}) {
+    if (!galera.length) await atualizarGalera().catch(() => {});   // painel abriu antes da primeira leitura do controle
     const { perfilDeAmigo } = await import('./dados/amigos.js');
     const soDisco = { ...config.riot, apiKey: null };
     const lista = await Promise.all(listaDeAmigos().map(async (a) => ({

@@ -142,3 +142,15 @@ h2 small{font-family:var(--corpo);font-size:12px;letter-spacing:0;color:var(--ap
 /* placar no fim */
 .placar .lj{font-size:13.5px}
 .placar .lj.cab{font-size:11px;letter-spacing:1.2px}
+
+/* ---- o resto das caixas: sem borda, só o fundo e o respiro ---- */
+.achado,.admTabela,.amCartao,.artigo,.avancado,.bloco,.blocoBarras,.cmp,.curva,.forma,.mLinha,.nota,.painelCfg,.patchTopo,.placar,.radar,.semElo,.situ{border-color:transparent}
+.amCartao{padding:16px 18px}
+.amCartao .quem b{font-family:var(--titulo);font-size:22px;letter-spacing:.5px;font-weight:400}
+.amCartao .eloL .n{font-family:var(--titulo);font-size:20px;letter-spacing:.5px}
+.amCartao .num3 b{font-family:var(--titulo);font-size:24px;font-weight:400;letter-spacing:.5px}
+.amCartao .eloL .emblema{width:48px;height:48px;flex:0 0 48px}
+.miniLinha{font-size:14px}
+.blocoBarras .rot,.bloco .rot{font-size:11px;letter-spacing:1.2px}
+.barra .n,.blocoBarras b{font-size:14px}
+.cmp{font-size:14px}
