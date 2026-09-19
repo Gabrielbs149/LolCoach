@@ -1022,6 +1022,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
       previsao: partidaVivo.previsao?.pct != null ? partidaVivo.previsao : null,
+      proximaMagia: (() => { const o = partidaVivo.extras?.build?.magias; const m = estado.eu?.magias; if (!o?.length || !m) return null; const g = m.Q + m.W + m.E + m.R; return g < o.length ? o[g] : null; })(),
       bench: partidaVivo.bench?.ref ? (() => { const min = Math.floor(estado.tempo / 60); const alvo = min < 5 ? 5 : min < 10 ? 10 : 15; const r = partidaVivo.bench.ref[alvo]; return r ? { alvo, mediaCs: Math.round(r.mcs), melhorCs: r.bcs, mediaGold: Math.round(r.mg) } : null; })() : null,
       intelNossos: partidaVivo.intelNossos ? Object.fromEntries([...partidaVivo.intelNossos].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       intelDeles: partidaVivo.intelJogadores ? Object.fromEntries([...partidaVivo.intelJogadores].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,

@@ -245,6 +245,33 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   if (!vidaBaixaAgora && !eu.morto && eu.ouro >= 2000 && !jaFalouDoGold) dizer(`gold-${Math.floor(tempo / 240)}`, 'economia', F`${eu.ouro} de gold parado.`, F`${eu.ouro} de gold parado.`, 1);
   mem.vidaBaixaAntes = vidaBaixaAgora;
 
+  /* ---- ordem de magias (Blitz): ponto sobrando → "sobe W" (uma vez por nível, e só se está seguindo a ordem) ---- */
+  const ordemMagias = extras?.build?.magias ?? null;
+  if (ordemMagias?.length && eu.magias && eu.nivel >= 2) {
+    const gastos = eu.magias.Q + eu.magias.W + eu.magias.E + eu.magias.R;
+    if (gastos < eu.nivel && gastos < ordemMagias.length && mem.nivelMagiaDito !== eu.nivel) {
+      // confere se o que ele já subiu bate com a ordem até aqui (senão ele tem a própria ordem: não atrapalha)
+      const cont = { Q: 0, W: 0, E: 0, R: 0 }; for (let i = 0; i < gastos; i++) cont[ordemMagias[i]]++;
+      const segue = ['Q', 'W', 'E', 'R'].every((k) => cont[k] === eu.magias[k]);
+      mem.nivelMagiaDito = eu.nivel;
+      if (segue && tempo - (mem.ultimoNivelEm ?? -99) > 2) dizer(`magia-${eu.nivel}`, 'economia', F`Sobe ${ordemMagias[gastos]}.`, F`${ordemMagias[gastos]}.`, 1);
+    }
+  }
+  /* ---- valor dos itens (Blitz "item value"): aos 12 e 20, contra o seu oponente de rota ---- */
+  const valorDe = (j) => (j.itens ?? []).reduce((s, i) => s + (i.preco ?? 0), 0);
+  for (const marco of [720, 1200]) {
+    if (tempo >= marco && tempo < marco + 8) {
+      const rival = inimigos.find((j) => j.role === minhaRole && minhaRole !== 'jungle') ?? jgDeles;
+      if (rival) {
+        const dif = valorDe(rival) - valorDe(eu);
+        if (Math.abs(dif) >= 1500) dizer(`itens-${marco}`, 'economia', dif > 0 ? F`${rival.campeao} tem ${Math.round(dif / 100) * 100} de gold em item a mais que você. Não troca de igual pra igual.` : F`Você tem ${Math.round(-dif / 100) * 100} de gold em item a mais que ${rival.campeao}. A troca é sua.`, dif > 0 ? F`${rival.campeao} ${Math.round(dif / 100) * 100} na frente em item.` : F`${Math.round(-dif / 100) * 100} na frente do ${rival.campeao} em item.`, 1);
+      }
+      if (marco === 1200) {
+        const nossos = aliados.reduce((s, j) => s + valorDe(j), 0) + valorDe(eu), deles = inimigos.reduce((s, j) => s + valorDe(j), 0);
+        if (Math.abs(nossos - deles) >= 4000) dizer('itens-time', 'economia', nossos > deles ? F`Time ${Math.round((nossos - deles) / 1000)} mil de gold na frente em itens. Força objetivo, não fica esperando.` : F`Time ${Math.round((deles - nossos) / 1000)} mil de gold atrás em itens. Sem briga de 5: farma e espera erro deles.`, nossos > deles ? F`${Math.round((nossos - deles) / 1000)} mil na frente. Força.` : F`${Math.round((deles - nossos) / 1000)} mil atrás. Não briga.`, 2);
+      }
+    }
+  }
   /* ---- inibidor: volta em 5 min (aviso a 1 min e na volta) ---- */
   for (const ib of mem.inibs ?? []) {
     if (!ib.avisado && tempo >= ib.t + 240) { ib.avisado = true; dizer(`ib60-${ib.t}`, 'timers', ib.deles ? F('Inibidor deles volta em um minuto. Última onda de super minions.') : F('Inibidor nosso volta em um minuto. Segura mais um pouco.'), ib.deles ? F('Inibidor deles volta em um minuto.') : F('Inibidor nosso volta em um minuto.'), 1); }

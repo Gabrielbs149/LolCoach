@@ -31,7 +31,8 @@ export async function buildDaPartida(campeao, role, opcoes) {
     const principais = b.itens?.principais?.[0]?.itens ?? [];
     const botas = b.itens?.botas?.[0]?.item ?? null;
     const finais = (b.itens?.finais ?? []).map((f) => f.item).filter(Boolean).slice(0, 3);
-    return { principais, botas, finais, ordem: [...principais, ...(botas ? [botas] : []), ...finais] };
+    const magias = b.habilidades?.ordem?.[0]?.ordem ?? null;   // 15–18 teclas na ordem em que sobem
+    return { principais, botas, finais, ordem: [...principais, ...(botas ? [botas] : []), ...finais], magias };
   } catch { return null; }
 }
 

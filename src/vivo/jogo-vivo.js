@@ -109,6 +109,7 @@ export async function lerEstado() {
       ouro: Math.round(eu0.currentGold ?? 0),
       vida: Math.round(stats.currentHealth ?? 0),
       vidaMax: Math.round(stats.maxHealth ?? 0),
+      magias: { Q: eu0.abilities?.Q?.abilityLevel ?? 0, W: eu0.abilities?.W?.abilityLevel ?? 0, E: eu0.abilities?.E?.abilityLevel ?? 0, R: eu0.abilities?.R?.abilityLevel ?? 0 },
     },
     jogadores,
     eventos,
