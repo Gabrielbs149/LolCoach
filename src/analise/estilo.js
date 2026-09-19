@@ -32,7 +32,10 @@ export function estiloDeJogo(g, p, tier) {
     { chave: 'vspm', rotulo: 'Visão por minuto', meu: meu.vspm, ref: ref.vspm, cima: cima.vspm, fmt: (v) => v.toFixed(2) },
   ];
   if (meu.mortes != null) eixos.push({ chave: 'mortes', rotulo: 'Mortes por jogo', meu: meu.mortes, ref: ref.mortes, cima: cima.mortes, fmt: (v) => v.toFixed(1), menorMelhor: true });
-  for (const e of eixos) { const r = e.menorMelhor ? e.ref / Math.max(0.1, e.meu) : e.meu / Math.max(0.01, e.ref); e.razao = Math.round(r * 100) / 100; e.acimaDoDeCima = e.menorMelhor ? e.meu <= e.cima : e.meu >= e.cima; }
+  // percentil aproximado no seu elo: distribuição normal em volta da referência (desvios típicos por métrica)
+  const SD = { csm: 1.1, part: 0.1, dpm: 170, vspm: 0.35, mortes: 1.7 };
+  const Phi = (z) => 0.5 * (1 + Math.tanh(z * 0.7978845608 * (1 + 0.044715 * z * z)));
+  for (const e of eixos) { const r = e.menorMelhor ? e.ref / Math.max(0.1, e.meu) : e.meu / Math.max(0.01, e.ref); e.razao = Math.round(r * 100) / 100; e.acimaDoDeCima = e.menorMelhor ? e.meu <= e.cima : e.meu >= e.cima; const z = (e.meu - e.ref) / (SD[e.chave] ?? 1); e.percentil = Math.round(100 * (e.menorMelhor ? 1 - Phi(z) : Phi(z))); }
   // nome do estilo: os dois traços mais fortes
   const traco = [];
   if (meu.dpm >= ref.dpm * 1.1) traco.push('Carry de dano');

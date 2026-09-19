@@ -319,3 +319,8 @@ h2 small a{color:var(--marca);text-decoration:none}
 .ogLinha > b{font-family:var(--titulo);font-size:18px;letter-spacing:.4px;text-align:right}
 .ogLinha > b.v{color:var(--vit)} .ogLinha > b.d{color:var(--der)}
 .ogLinha small{color:var(--apagado);font-size:11px;text-align:right}
+
+.cartaoCamp:hover{outline:2px solid var(--marca)}
+.itemN{position:relative;display:inline-block}
+.itemN img{width:36px;height:36px;border-radius:var(--r-s);background:var(--f3)}
+.itemN small{position:absolute;right:-4px;bottom:-4px;background:var(--marca);color:#0a0c10;font-size:9px;font-weight:700;border-radius:99px;padding:0 5px}

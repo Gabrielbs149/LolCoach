@@ -74,6 +74,29 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       const temporadas = await temporadasDoOpgg(nome, tag, 'br').catch(() => []);
       return { temporadas, top: topPorcento(q.get('tier'), q.get('rank')) };
     },
+    // Sua página de um campeão: por split, KDA/CS, confrontos (rival), duos (parceiro de bot), itens que você mais fecha
+    '/api/meu-campeao': (q) => {
+      const nome = q.get('nome'); if (!nome) return { erro: 'campeão?' };
+      const fc = filtroConta(q.get('conta'));
+      const ps = db.prepare(`SELECT p.gameId, p.quando, p.duracaoS, p.venci, p.minhaRole, p.meuId, j.kills, j.deaths, j.assists, j.cs, j.dano, j.visao FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId WHERE p.meuCampeao = ? AND p.duracaoS >= 300${fc} ORDER BY p.quando DESC`).all(nome);
+      if (!ps.length) return { nome, jogos: 0 };
+      const soma = (k) => ps.reduce((s, p) => s + (p[k] ?? 0), 0);
+      const min = soma('duracaoS') / 60;
+      const porSplit = {};
+      for (const p of ps) { const t = temporadaDe(p.quando); const r = porSplit[t] ??= { temporada: t, n: 0, v: 0, k: 0, d: 0, a: 0 }; r.n++; r.v += p.venci; r.k += p.kills; r.d += p.deaths; r.a += p.assists; }
+      const rivais = new Map(), duos = new Map();
+      const rivalStmt = db.prepare('SELECT r.campeao FROM jogadores r JOIN jogadores eu ON eu.gameId = r.gameId AND eu.participantId = ? WHERE r.gameId = ? AND r.time <> eu.time AND r.role = eu.role LIMIT 1');
+      const duoStmt = db.prepare("SELECT d.campeao FROM jogadores d JOIN jogadores eu ON eu.gameId = d.gameId AND eu.participantId = ? WHERE d.gameId = ? AND d.time = eu.time AND d.participantId <> eu.participantId AND ((eu.role = 'ADC' AND d.role = 'SUPORTE') OR (eu.role = 'SUPORTE' AND d.role = 'ADC')) LIMIT 1");
+      for (const p of ps) {
+        const rv = rivalStmt.get(p.meuId, p.gameId)?.campeao; if (rv) { const r = rivais.get(rv) ?? { campeao: rv, n: 0, v: 0 }; r.n++; r.v += p.venci; rivais.set(rv, r); }
+        const du = duoStmt.get(p.meuId, p.gameId)?.campeao; if (du) { const r = duos.get(du) ?? { campeao: du, n: 0, v: 0 }; r.n++; r.v += p.venci; duos.set(du, r); }
+      }
+      const ids = ps.map((p) => p.gameId);
+      const itens = ids.length ? db.prepare(`SELECT e.itemId, COUNT(DISTINCT e.gameId) n FROM eventos e JOIN partidas p ON p.gameId = e.gameId AND e.autorId = p.meuId WHERE e.tipo = 'ITEM_PURCHASED' AND e.gameId IN (${ids.map(() => '?').join(',')}) GROUP BY e.itemId ORDER BY n DESC LIMIT 40`).all(...ids) : [];
+      const lista = (m) => [...m.values()].filter((r) => r.n >= 2).sort((a, b) => b.n - a.n).slice(0, 8);
+      return { nome, jogos: ps.length, vitorias: soma('venci'), kda: soma('deaths') ? Math.round(10 * (soma('kills') + soma('assists')) / soma('deaths')) / 10 : null, media: { k: soma('kills') / ps.length, d: soma('deaths') / ps.length, a: soma('assists') / ps.length }, csm: min ? Math.round(10 * soma('cs') / min) / 10 : null, dpm: min ? Math.round(soma('dano') / min) : null,
+        porSplit: Object.values(porSplit), rivais: lista(rivais), duos: lista(duos), itens, ultimas: ps.slice(0, 10).map((p) => ({ gameId: p.gameId, venci: !!p.venci, kda: `${p.kills}/${p.deaths}/${p.assists}`, quando: p.quando })) };
+    },
     '/api/companheiros': (q) => {
       const n = Math.max(5, Math.min(200, Number(q.get('n')) || 20));
       const fc = filtroConta(q.get('conta'));

@@ -1459,7 +1459,7 @@ async function carregarVisao(){
 
   $('#campeoes').innerHTML = `<div class="gradeCamp">${r.campeoes.map(x => {
     const t = Math.round(x.v/x.n*100);
-    return `<div class="cartaoCamp" style="background-image:url(/arte/${x.championId ?? 0})">
+    return `<div class="cartaoCamp" style="background-image:url(/arte/${x.championId ?? 0});cursor:pointer" onclick="abrirMeuCampeao('${esc(x.campeao).replace(/'/g, '&#39;')}', ${x.championId ?? 0})">
       <span class="wr ${t>=53?'bom':t<=47?'ruim':''}">${t}%</span>
       <div class="info"><div class="nome">${esc(x.campeao)}</div>
       <div class="sub">${x.n} jogos · ${(x.graves/x.n).toFixed(1)} graves por jogo</div></div></div>`;
@@ -1651,6 +1651,31 @@ async function carregarPartidas(){
   desenharSeletorCamp();
   desenharPartidas();
 }
+
+/* ======================================================== sua página de um campeão */
+async function abrirMeuCampeao(nome, championId){
+  origemDetalhe = abaAtual; abrirAba('detalhe');
+  $('#det').innerHTML = carregando('juntando suas partidas de ' + nome + '…');
+  let c; try { c = await pegar(comConta('/api/meu-campeao?nome=' + encodeURIComponent(nome))); } catch { c = null; }
+  if(!c || c.erro || !c.jogos){ $('#det').innerHTML = '<button class="voltar" onclick="abrirAba(origemDetalhe)">← Voltar</button><div class="vazio">sem partidas desse campeão</div>'; return; }
+  const itensTab = await pegar('/api/itens').catch(() => null);
+  const nomeItem = (id) => itensTab?.[id]?.nome ?? itensTab?.find?.((i) => i.id === id)?.nome ?? '';
+  const taxa = Math.round(100 * c.vitorias / c.jogos);
+  const h = [];
+  h.push(`<div class="pHero" style="background-image:url(/arte/${championId})"><button class="voltar" onclick="abrirAba(origemDetalhe)">← Voltar</button>
+    <div><div class="res ${taxa >= 53 ? 'v' : taxa <= 47 ? 'd' : ''}">${taxa}%</div><div class="camp">${esc(c.nome)} <span style="color:var(--apagado)">·</span> você</div><div class="meta">${c.jogos} partidas · ${c.vitorias}V ${c.jogos - c.vitorias}D</div></div>
+    <div class="nums"><div><b>${c.kda ?? '—'}</b><span>KDA</span></div><div><b>${c.media.k.toFixed(1)}/${c.media.d.toFixed(1)}/${c.media.a.toFixed(1)}</b><span>MÉDIA</span></div><div><b>${c.csm ?? '—'}</b><span>CS/MIN</span></div><div><b>${c.dpm ?? '—'}</b><span>DANO/MIN</span></div></div></div>`);
+  const bloco = (tit, lista, rot) => lista?.length ? `<div class="ogBloco"><div class="rot">${tit}</div>${lista.map(x => { const t = Math.round(100 * x.v / x.n); return `<div class="ogLinha"><span>${esc(rot ? rot(x) : x.campeao)}</span><i><b style="width:${t}%"></b></i><b class="${t >= 55 ? 'v' : t <= 45 ? 'd' : ''}">${t}%</b><small>${x.n}</small></div>`; }).join('')}</div>` : '';
+  h.push('<div class="ondeGanha" style="margin-top:0">');
+  h.push(bloco('POR SPLIT', c.porSplit.map(s => ({ ...s, campeao: nomeDaTemporadaJs(s.temporada) }))));
+  h.push(bloco('CONTRA QUEM (RIVAL DE ROTA)', c.rivais));
+  h.push(bloco(c.duos.length ? 'COM QUEM NO BOT (DUO)' : '', c.duos));
+  h.push('</div>');
+  if (c.itens?.length) h.push(`<h2>Itens que você mais compra de ${esc(c.nome)}</h2><div class="buildP compacta"><div class="finais">${c.itens.slice(0, 12).map(i => `<span class="itemN" title="em ${i.n} partidas"><img src="/item/${i.itemId}" alt=""><small>${i.n}</small></span>`).join('')}</div></div>`);
+  h.push(`<h2>Últimas de ${esc(c.nome)}</h2><div class="listaP compacta">${(todasPartidas ?? []).filter(p => c.ultimas.some(u => u.gameId === p.gameId)).slice(0, 10).map(cartaoDePartida).join('')}</div>`);
+  $('#det').innerHTML = h.join('');
+}
+const nomeDaTemporadaJs = (k) => ({ '2024-1': 'Split 1 · 2024', '2024-2': 'Split 2 · 2024', '2024-3': 'Split 3 · 2024', '2025-1': 'Split 1 · 2025', '2025-2': 'Split 2 · 2025', '2025-3': 'Split 3 · 2025', '2026-1': 'Split 1 · 2026', '2026-2': 'Split 2 · 2026', '2026-3': 'Split 3 · 2026', antes: 'Antes de 2024' })[k] ?? k;
 
 /* ======================================================== detalhe da partida */
 async function abrirPartida(gameId){
@@ -1897,8 +1922,8 @@ async function carregarEstat(){
   if (OG) ($('#eRadar').closest('.colunas2') ?? $('#eRadar').parentElement).insertAdjacentHTML('afterend', `<div class="ondeGanha" id="ondeGanha">${blocoOG('POR LADO DO MAPA', OG.lados)}${blocoOG('POR DURAÇÃO', OG.duracao)}${blocoOG('PRIMEIRO SANGUE', OG.primeiroSangue)}</div>`);
   $('#eRadar').innerHTML = desenharRadar(e.radar) + (e.estilo ? `<div class="estilo"><div class="rot">SEU ESTILO · ÚLTIMOS 45 DIAS</div><div class="nome">${esc(e.estilo.nome)}</div>
     <div class="rot" style="margin-top:10px">CONTRA O ${esc(nomeTier(e.estilo.tier))} E O ${esc(nomeTier(e.estilo.tierCima))} (APROX.)</div>
-    <table class="cmpElo"><tr><th></th><th>você</th><th>${esc(nomeTier(e.estilo.tier))}</th><th>${esc(nomeTier(e.estilo.tierCima))}</th></tr>
-    ${e.estilo.eixos.map(x => `<tr><td>${esc(x.rotulo)}</td><td class="${x.razao >= 1.05 ? 'v' : x.razao <= 0.95 ? 'd' : ''}"><b>${x.fmt(x.meu)}</b></td><td>${x.fmt(x.ref)}</td><td class="${x.acimaDoDeCima ? 'v' : ''}">${x.fmt(x.cima)}</td></tr>`).join('')}</table>
+    <table class="cmpElo"><tr><th></th><th>você</th><th>${esc(nomeTier(e.estilo.tier))}</th><th>${esc(nomeTier(e.estilo.tierCima))}</th><th title="melhor que X% do seu elo (aprox.)">top</th></tr>
+    ${e.estilo.eixos.map(x => `<tr><td>${esc(x.rotulo)}</td><td class="${x.razao >= 1.05 ? 'v' : x.razao <= 0.95 ? 'd' : ''}"><b>${x.fmt(x.meu)}</b></td><td>${x.fmt(x.ref)}</td><td class="${x.acimaDoDeCima ? 'v' : ''}">${x.fmt(x.cima)}</td><td class="${x.percentil >= 60 ? 'v' : x.percentil <= 40 ? 'd' : ''}">${x.percentil != null ? x.percentil + '%' : ''}</td></tr>`).join('')}</table>
     <div class="txt">Ponto forte: <b>${esc(e.estilo.forte ?? '—')}</b> · pra subir: <b>${esc(e.estilo.fraco ?? '—')}</b></div></div>` : '');
   const legendaColunas = '';
   {
