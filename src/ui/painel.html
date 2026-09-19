@@ -1674,6 +1674,30 @@ async function abrirPartida(gameId){
     h.push('</div>');
   }
 
+  // A lane como confronto: quem contra quem, taxa por função, plano por fase e como foi no jogo
+  const L = d.lane;
+  if(L){
+    h.push('<h2>A lane</h2><div class="confronto">');
+    h.push(`<div class="cab">${L.meus.map(j => icone(j.championId)).join('')}<b>${esc(L.meus.map(j => j.campeao).join(' + '))}</b><span style="margin:0 8px;color:var(--apagado)">contra</span>${L.rivais.map(j => icone(j.championId)).join('')}<b>${esc(L.rivais.map(j => j.campeao).join(' + '))}</b>
+      ${L.veredito ? `<span class="taxa ${L.veredito === 'difícil' ? 'ruim' : L.veredito === 'favorável' ? 'bom' : ''}">${L.veredito} · ${L.media}%</span>` : ''}</div>`);
+    if(L.taxas.length) h.push(`<div class="rotSec">Confronto por função (op.gg)</div><ul class="dicas">${L.taxas.map(t => `<li>${esc(t.meu)} contra ${esc(t.contra)}: <b>${t.taxa}%</b> em ${num(t.jogos)} jogos${t.taxa < 47 ? ' — difícil, joga pra empatar' : t.taxa > 53 ? ' — é pra ganhar' : ''}</li>`).join('')}</ul>`);
+    if(L.plano.length) h.push(`<div class="rotSec">Como se joga</div><ul class="dicas">${L.plano.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`);
+    const como = [];
+    for(const o of L.ouro) como.push(`aos ${o.minuto}: <b class="${o.diff > 300 ? 'v' : o.diff < -300 ? 'd' : ''}">${o.diff > 0 ? '+' : ''}${num(o.diff)}</b> de gold`);
+    if(L.primeiraTorre) como.push(`primeira torre da lane caiu aos ${L.primeiraTorre.minuto} (${L.primeiraTorre.nossa ? 'a de vocês' : 'a deles'})`);
+    if(como.length) h.push(`<div class="rotSec">Como foi no jogo</div><p class="dica">${como.join(' · ')}</p>`);
+    h.push('</div>');
+  }
+  const SIT = d.situacoes;
+  if(SIT?.mortes?.length){
+    h.push(`<h2>Suas mortes, uma por uma</h2>`);
+    if(SIT.padrao.length) h.push(`<div class="aviso" style="margin-bottom:10px">${SIT.padrao.map(esc).join('<br>')}</div>`);
+    for(const s of SIT.mortes){
+      h.push(`<div class="achado g2 simples"><div><div><span class="hora">${esc(s.minuto)}</span><span class="tit">${esc(s.fase === 'lane' ? 'fase de lane' : s.fase === 'meio' ? 'meio de jogo' : 'fim de jogo')}</span></div>
+        <ul>${s.linhas.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+        ${s.fazer.length ? `<div class="resolucao"><b>O que fazer</b>${s.fazer.map(l => `<div>${esc(l)}</div>`).join('')}</div>` : ''}</div></div>`);
+    }
+  }
   if(d.prioridades.length){
     h.push('<h2>O que melhorar</h2>');
     d.prioridades.forEach((p,i) => h.push(`<div class="prio">

@@ -129,6 +129,7 @@ function normalizarEvento(e) {
     // Campos que só existem na API oficial:
     wardType: e.wardType ?? null,
     itemId: e.itemId ?? null,
+    antes: e.beforeId ?? null, depois: e.afterId ?? null,   // ITEM_UNDO
     skillSlot: e.skillSlot ?? null,
     danoRecebido: e.victimDamageReceived ?? null,
     danoCausado: e.victimDamageDealt ?? null,
