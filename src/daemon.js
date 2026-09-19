@@ -859,7 +859,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       partidaVivo.montandoIntel = import('./vivo/intel-jogadores.js')
         .then(({ intelDosJogadores }) => intelDosJogadores(config.riot, deles, { quantas: 6, aoAtualizar: (nome, f) => { partidaVivo?.intelJogadores?.set(nome, f); } }))
         .then((m) => { if (partidaVivo) { partidaVivo.intelJogadores = m; const prontos = [...m.values()].filter((f) => f && !f.erro).length; log(`intel deles: ${prontos}/${deles.length} perfis em ${Math.round((Date.now() - t0Intel) / 1000)} s`); } })
-        .catch((erro) => log(`intel deles falhou: ${erro.message}`));
+        .catch((erro) => log(`intel deles falhou: ${erro.message}`))
+        // depois dos 5 deles, os 4 nossos: a janela ao vivo vira o "multi-search" dos 10
+        .then(() => { partidaVivo.intelNossos = new Map(); const nossos = estado.jogadores.filter((j) => j.time === estado.eu.time && j.nome !== estado.eu.nome); return import('./vivo/intel-jogadores.js').then(({ intelDosJogadores }) => intelDosJogadores(config.riot, nossos, { quantas: 6, aoAtualizar: (nome, f) => { partidaVivo?.intelNossos?.set(nome, f); } })); })
+        .catch(() => {});
     }
     if (!partidaVivo.fichas && !partidaVivo.montandoFichas) {
       partidaVivo.montandoFichas = fichasDaPartida(db, estado, { regiao: config.runas?.regiao ?? 'br' })
@@ -976,6 +979,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       radarNossos: (() => { const o = partidaVivo.olho; if (!o || Date.now() - o.recebidoEm > 5000) return []; const l = (o.aliados ?? []).map((a) => ({ campeao: a.campeao, x: a.x, y: a.y })); if (o.eu) l.push({ campeao: estado.eu.campeao, x: o.eu.x, y: o.eu.y, eu: true }); return l; })(),
       situacoes: (partidaVivo.situacoesRecentes ?? []).slice(-10), pastaSitu: partidaVivo.pastaSitu ? basename(partidaVivo.pastaSitu) : null,
       // Pro overlay: cada inimigo com a tecla que marca o flash dele.
+      intelNossos: partidaVivo.intelNossos ? Object.fromEntries([...partidaVivo.intelNossos].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       intelDeles: partidaVivo.intelJogadores ? Object.fromEntries([...partidaVivo.intelJogadores].map(([n, f]) => [n, f && !f.erro ? { elo: f.elo, marcas: f.marcas, forte: f.forte, fraco: f.fraco, mains: f.mains } : null])) : null,
       inimigos: estado.jogadores.filter((j) => j.time !== estado.eu.time).map((j, i) => {
         const f = partidaVivo.flashes.get(j.nome);

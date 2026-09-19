@@ -532,7 +532,7 @@ function desenhar(d){
       <div class="col">
       <h2 class="sec">Placar</h2>
       <div class="placar">
-        <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador({ ...j, feiticoEm: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao) ? { nome: 'sem flash', em: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao).em, aproximado: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao).aproximado } : null }, j.souEu)).join('')}</div>
+        <div class="time"><h3>Seu time</h3>${meuTime.map(j => linhaJogador({ ...j, feiticoEm: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao) ? { nome: 'sem flash', em: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao).em, aproximado: (d.flashesAliados ?? []).find(f => f.campeao === j.campeao).aproximado } : null }, j.souEu, 0, null, j.souEu ? null : (d.intelNossos?.[j.nome] ?? null))).join('')}</div>
         <div class="time deles"><h3>Inimigos <small>F = flash usado</small></h3>${jgLinhaVivo(d)}${deles.map((j, i) => linhaJogador({ ...j, visto: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.visto ?? null, feiticoEm: (d.inimigos ?? []).find(x => x.campeao === j.campeao)?.feiticoEm ?? null }, false, i + 1, (d.flashes ?? []).find(f => f.campeao === j.campeao) ?? null, d.intelDeles?.[j.nome] ?? null)).join('')}</div>
       </div>
 
