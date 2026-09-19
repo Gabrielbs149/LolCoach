@@ -720,6 +720,16 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
           return { compras, finais, runas: runaTxt, ordemMagias: maxOrdem.join(' > '), sequencia: ordem.slice(0, 18).join('') };
         } catch { return null; }
       })(),
+      // nota ao longo da partida (op.gg mostra a curva): a cada minuto, você contra os outros 9 em gold, xp e cs
+      notaCurva: p.frames.filter((f) => f.minuto >= 2).map((f) => {
+        const val = (id) => { const d = f.dados[id]; return d ? { g: d.ouroTotal ?? 0, x: d.xp ?? 0, c: (d.cs ?? 0) + (d.csSelva ?? 0) } : null; };
+        const todos = p.jogadores.map((j) => ({ id: j.id, v: val(j.id) })).filter((x) => x.v);
+        const max = (k) => Math.max(1, ...todos.map((x) => x.v[k]));
+        const pontos = todos.map((x) => ({ id: x.id, n: 0.5 * x.v.g / max('g') + 0.3 * x.v.x / max('x') + 0.2 * x.v.c / max('c') })).sort((a, b) => b.n - a.n);
+        const i = pontos.findIndex((x) => x.id === eu.id); if (i < 0) return null;
+        const nota = 0.5 * (10 - (i / Math.max(1, pontos.length - 1)) * 6.5) + 0.5 * (3 + 7 * pontos[i].n / (pontos[0].n || 1));
+        return { min: Math.round(f.minuto * 10) / 10, nota: Math.round(nota * 10) / 10 };
+      }).filter(Boolean),
       ouroCurva: p.frames.map((f) => ({ min: Math.round(f.minuto * 10) / 10, diff: p.jogadores.reduce((s, j) => s + (f.dados[j.id]?.ouroTotal ?? 0) * (j.time === eu.time ? 1 : -1), 0) })),
       eu: { id: eu.id, campeao: eu.campeao, championId: eu.championId, role: eu.role, time: eu.time },
       jogadores: p.jogadores.map((j) => ({

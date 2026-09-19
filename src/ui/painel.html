@@ -1019,11 +1019,13 @@ h2{letter-spacing:1px}
         <input class="busca" id="amNome" placeholder="nome#tag — ex.: roIindo#br1" autocomplete="off" oninput="sugerirNicks()" onkeydown="teclaSugestao(event)" onblur="setTimeout(fecharSugestoes, 150)" onfocus="sugerirNicks()">
         <div class="sugestoes" id="amSug" hidden></div>
       </div>
+      <button class="acao" id="amVer" onclick="verJogador()" title="olha a ficha sem salvar (como no op.gg)">Ver</button>
       <button class="acao" id="amAdicionar" onclick="adicionarAmigo()">Adicionar</button>
       <button class="acao" onclick="carregarAmigos(true)" title="pergunta de novo à Riot o elo e as partidas de todo mundo">Atualizar todos</button>
       <span class="salvo" id="amSalvo"></span>
     </div>
     <div id="amAviso"></div>
+    <div id="amBusca"></div>
     <div class="amGrade" id="amGrade"></div>
     <div id="amDetalhe"></div>
     <div id="amSemana"></div>
@@ -1724,8 +1726,9 @@ async function abrirPartida(gameId){
         <path d="${area}" fill="url(#gv)" clip-path="url(#cima)"/><path d="${area}" fill="url(#gd)" clip-path="url(#baixo)"/>
         <polyline points="${pts}" fill="none" stroke="#eef2f6" stroke-width="1.5"/>
         ${mortesX.map(mx => `<line x1="${mx.toFixed(1)}" y1="${pad}" x2="${mx.toFixed(1)}" y2="${H - pad}" stroke="#ff5c5c" stroke-width="1" stroke-dasharray="2 2" opacity=".8"/>`).join('')}
+        ${(d.notaCurva ?? []).length > 3 ? `<polyline points="${d.notaCurva.map(c => `${x(c.min).toFixed(1)},${(H - pad - ((c.nota - 3) / 7) * (H - 2 * pad)).toFixed(1)}`).join(' ')}" fill="none" stroke="#3ad6c4" stroke-width="1.5" opacity=".9"/>` : ''}
         <text x="${pad}" y="12" font-size="9" fill="#9aa8b8">+${num(maxAbs)}</text><text x="${pad}" y="${H - 3}" font-size="9" fill="#9aa8b8">-${num(maxAbs)}</text></svg>
-      <div class="leg">gold do time por minuto · tracejado = suas mortes</div></div>`);
+      <div class="leg">gold do time por minuto · <span style="color:var(--marca)">sua nota</span> minuto a minuto (3–10) · tracejado = suas mortes</div></div>`);
   } else h.push('<div></div>');
   h.push('</div>');
 
@@ -2251,6 +2254,21 @@ function escolherSugestao(i){
   else { inp.value = `${x.nome}#`; inp.focus(); $('#amAviso').innerHTML = '<div class="aviso amAviso">não sei a #tag desse nick — completa aí</div>'; }
 }
 
+/** Buscar qualquer jogador (o básico do op.gg): a mesma ficha de amigo, sem entrar na lista. */
+async function verJogador(){
+  const texto = $('#amNome').value.trim();
+  const [nome, tag] = texto.split('#').map(s => s.trim());
+  if(!nome || !tag){ $('#amAviso').innerHTML = '<div class="aviso amAviso">formato: nome#tag</div>'; return; }
+  const b = $('#amVer'); b.disabled = true; b.textContent = 'buscando…'; $('#amAviso').innerHTML = '';
+  $('#amBusca').innerHTML = carregando('perguntando à Riot…');
+  try {
+    const perfil = await pegar(`/api/amigo?nome=${encodeURIComponent(nome)}&tag=${encodeURIComponent(tag)}`);
+    if(perfil?.erro) throw new Error(perfil.erro);
+    const p = { nome: perfil.conta?.nome ?? nome, tag: perfil.conta?.tag ?? tag, perfil, online: null, emComum: [] };
+    $('#amBusca').innerHTML = `<div class="rotSec" style="margin:6px 0">RESULTADO DA BUSCA <a href="#" onclick="event.preventDefault();$('#amBusca').innerHTML=''" style="color:var(--marca);margin-left:8px">fechar</a></div><div class="amGrade">${cartaoDeAmigo(p)}</div>${detalheDeAmigo(p)}`;
+  } catch (e) { $('#amBusca').innerHTML = `<div class="aviso amAviso">${esc(e.message)}</div>`; }
+  b.disabled = false; b.textContent = 'Ver';
+}
 async function adicionarAmigo(){
   const texto = $('#amNome').value.trim();
   const [nome, tag] = texto.split('#').map(s => s.trim());
