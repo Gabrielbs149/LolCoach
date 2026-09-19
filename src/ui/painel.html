@@ -1718,8 +1718,35 @@ async function abrirPartida(gameId){
     ${mortesPos.map((m, i) => `<g><circle cx="${(m.pos.x*100).toFixed(1)}" cy="${(m.pos.y*100).toFixed(1)}" r="3.4" fill="rgba(255,92,92,.25)" stroke="#ff5c5c" stroke-width=".8"/><text x="${(m.pos.x*100).toFixed(1)}" y="${(m.pos.y*100+1.4).toFixed(1)}" text-anchor="middle" font-size="4" font-weight="700" fill="#fff">${i+1}</text></g>`).join('')}
   </svg>`);
   h.push(`<div class="leg">${mortesPos.length ? mortesPos.map((m, i) => `<b>${i+1}</b> ${esc(m.minuto)}${m.onde ? ' · ' + esc(m.onde) : ''}`).join('<br>') : 'sem posição das mortes nesta partida'}</div></div>`);
+  // gráfico de gold do time (diferença por minuto) com as suas mortes marcadas
+  const C = d.ouroCurva ?? [];
+  if (C.length > 3) {
+    const W = 340, H = 120, pad = 6, maxAbs = Math.max(1000, ...C.map(c => Math.abs(c.diff)));
+    const x = (min) => pad + (min / C.at(-1).min) * (W - 2 * pad), y = (v) => H / 2 - (v / maxAbs) * (H / 2 - pad);
+    const pts = C.map(c => `${x(c.min).toFixed(1)},${y(c.diff).toFixed(1)}`).join(' ');
+    const area = `M${x(0).toFixed(1)},${(H/2).toFixed(1)} L${pts.replace(/ /g, ' L')} L${x(C.at(-1).min).toFixed(1)},${(H/2).toFixed(1)} Z`;
+    const mortesX = (SIT?.mortes ?? []).map(m => x(m.t / 60000));
+    h.push(`<div class="graficoOuro"><div class="rot">GOLD DO TIME · DIFERENÇA POR MINUTO</div>
+      <svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ecf8e" stop-opacity=".45"/><stop offset="1" stop-color="#3ecf8e" stop-opacity="0"/></linearGradient><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5c5c" stop-opacity="0"/><stop offset="1" stop-color="#ff5c5c" stop-opacity=".45"/></linearGradient><clipPath id="cima"><rect x="0" y="0" width="${W}" height="${H/2}"/></clipPath><clipPath id="baixo"><rect x="0" y="${H/2}" width="${W}" height="${H/2}"/></clipPath></defs>
+        <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#2a3441" stroke-width="1"/>
+        <path d="${area}" fill="url(#gv)" clip-path="url(#cima)"/><path d="${area}" fill="url(#gd)" clip-path="url(#baixo)"/>
+        <polyline points="${pts}" fill="none" stroke="#eef2f6" stroke-width="1.5"/>
+        ${mortesX.map(mx => `<line x1="${mx.toFixed(1)}" y1="${pad}" x2="${mx.toFixed(1)}" y2="${H - pad}" stroke="#ff5c5c" stroke-width="1" stroke-dasharray="2 2" opacity=".8"/>`).join('')}
+        <text x="${pad}" y="12" font-size="9" fill="#9aa8b8">+${num(maxAbs)}</text><text x="${pad}" y="${H - 3}" font-size="9" fill="#9aa8b8">-${num(maxAbs)}</text>
+        <text x="${W - pad}" y="${H - 3}" font-size="9" fill="#9aa8b8" text-anchor="end">${Math.round(C.at(-1).min)} min</text></svg>
+      <div class="leg">verde = seu time na frente · linhas vermelhas = suas mortes</div></div>`);
+  }
   h.push('</div>');   // pGrade
 
+  // build da partida: o que comprou e quando, itens finais, runas, ordem de magias
+  const B = d.build;
+  if (B && (B.compras?.length || B.finais?.length)) {
+    h.push('<h2>Sua build nesta partida</h2><div class="buildP">');
+    if (B.finais?.length) h.push(`<div class="finais">${B.finais.map(i => `<img src="/item/${i.id}" title="${esc(i.nome)}" alt="">`).join('')}${B.runas?.principal ? `<span class="sep"></span><img class="runa" src="/runa/${B.runas.principal}" title="${esc(B.runas.principalNome ?? '')}" alt="">${(B.runas.selecoes ?? []).slice(1).map(id => `<img class="runaMini" src="/runa/${id}" alt="">`).join('')}` : ''}</div>`);
+    if (B.runas?.primaria) h.push(`<div class="linhaB"><b>Runas</b> ${esc(B.runas.principalNome ?? '')} · ${esc(B.runas.primaria)} + ${esc(B.runas.secundaria ?? '')}${B.ordemMagias ? ` <b style="margin-left:14px">Magias</b> ${esc(B.ordemMagias)}${B.sequencia ? ` <span class="seq">${esc(B.sequencia)}</span>` : ''}` : ''}</div>`);
+    if (B.compras?.length) h.push(`<div class="compras">${B.compras.map(g => `<div class="volta"><span class="t">${mmss(g.t)}</span>${g.itens.map(i => `<img src="/item/${i.id}" title="${esc(i.nome)}" alt="">`).join('')}</div>`).join('<span class="seta">›</span>')}</div>`);
+    h.push('</div>');
+  }
   h.push('<h2>Placar</h2><div class="placar">');
   h.push(`<div class="lj cab"><span></span><span>Campeão</span><span>Role</span>
     <span class="num">KDA</span><span class="num">Farm</span><span class="num">Dano</span><span class="num">Visão</span><span class="num">Nota</span></div>`);
@@ -1737,7 +1764,7 @@ async function abrirPartida(gameId){
       <span style="color:var(--apagado)">${role(j.role)}</span>
       <span class="num">${j.kills}/${j.deaths}/${j.assists}</span>
       <span class="num">${num(j.cs)}</span>
-      <span class="num">${num(j.dano)}</span>
+      <span class="num danoBarra"><i style="width:${Math.round(100 * j.dano / Math.max(1, ...d.jogadores.map(x => x.dano)))}%"></i>${num(j.dano)}</span>
       <span class="num">${num(j.visao)}</span>
       <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}${j.mvp ? ' <em class="seloN mvp">MVP</em>' : j.ace ? ' <em class="seloN ace">ACE</em>' : ''}</span></div>`);
   }

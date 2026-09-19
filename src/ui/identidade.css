@@ -214,3 +214,27 @@ body.recolhida .estado .versaoBaixo{display:none}
 .perfilHero .temporadas{position:absolute;left:28px;bottom:10px;display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--fraco)}
 .perfilHero .temporadas b{color:var(--apagado);font-weight:600;margin-right:4px}
 .perfilHero{padding-bottom:40px}
+
+/* ---- gráfico de gold e barras de dano ---- */
+.graficoOuro{margin-top:18px}
+.graficoOuro .rot{font-size:11px;letter-spacing:1.4px;color:var(--apagado);margin-bottom:6px}
+.graficoOuro svg{width:100%;height:auto;display:block;background:var(--f1);border-radius:var(--r-g)}
+.graficoOuro .leg{font-size:12px;color:var(--fraco);margin-top:6px}
+.placar .lj .danoBarra{position:relative}
+.placar .lj .danoBarra i{position:absolute;left:0;bottom:-2px;height:3px;background:var(--marca);opacity:.7;border-radius:2px}
+
+/* ---- build da partida ---- */
+.buildP{background:var(--f1);border-radius:var(--r-g);padding:16px 18px}
+.buildP .finais{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.buildP .finais img{width:40px;height:40px;border-radius:var(--r-s);background:var(--f3)}
+.buildP .finais .sep{width:1px;height:32px;background:var(--borda-forte);margin:0 8px}
+.buildP .finais img.runa{width:40px;height:40px;border-radius:50%;background:none}
+.buildP .finais img.runaMini{width:24px;height:24px;border-radius:50%;background:none;opacity:.85}
+.buildP .linhaB{margin-top:10px;font-size:13.5px;color:var(--fraco)}
+.buildP .linhaB b{color:var(--apagado);font-size:11px;letter-spacing:1.2px;font-weight:600}
+.buildP .seq{font-family:var(--titulo);letter-spacing:2px;color:var(--fraco);margin-left:6px}
+.buildP .compras{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-top:14px}
+.buildP .volta{display:flex;align-items:center;gap:3px;background:var(--f2);border-radius:var(--r-m);padding:4px 6px}
+.buildP .volta .t{font-family:var(--titulo);font-size:14px;letter-spacing:.5px;color:var(--apagado);margin-right:4px}
+.buildP .volta img{width:26px;height:26px;border-radius:3px;background:var(--f3)}
+.buildP .seta{color:var(--apagado);font-size:16px}

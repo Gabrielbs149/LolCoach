@@ -693,6 +693,32 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       resumo: d.resumo,
       prioridades: d.prioridades,
       confronto, lane, situacoes, acertos, eloMedio: eloMedio?.nome ?? null, nota: notas.get(eu.id) ?? null,
+      // diferença de gold do time por minuto (positivo = seu time na frente) e minutos das suas mortes, pro gráfico
+      // build da partida: compras agrupadas por volta à base (30 s), itens finais, runas e ordem de magias
+      build: await (async () => {
+        try {
+          const { tabelaDeItens, tabelaDeRunas } = await import('./dados/ddragon.js');
+          const [itens, runas] = await Promise.all([tabelaDeItens().catch(() => new Map()), tabelaDeRunas().catch(() => new Map())]);
+          const compras = [];
+          for (const e of p.eventos) {
+            if (e.tipo !== 'ITEM_PURCHASED' || e.autorId !== eu.id || !e.itemId) continue;
+            const it = itens.get(e.itemId); if (!it || it.preco < 300) continue;   // poções/wards não entram
+            const g = compras.at(-1);
+            if (g && e.t - g.t <= 30000) g.itens.push({ id: e.itemId, nome: it.nome }); else compras.push({ t: e.t, itens: [{ id: e.itemId, nome: it.nome }] });
+          }
+          const s = eu.stats ?? {};
+          const finais = [s.item0, s.item1, s.item2, s.item3, s.item4, s.item5, s.item6].filter((id) => id).map((id) => ({ id, nome: itens.get(id)?.nome ?? '' }));
+          const estilos = s.perks?.styles ?? [];
+          const sel = (i) => (estilos[i]?.selections ?? []).map((x) => x.perk);
+          const runaTxt = { primaria: runas.get(estilos[0]?.style)?.nome ?? null, secundaria: runas.get(estilos[1]?.style)?.nome ?? null, principal: sel(0)[0] ?? null, principalNome: runas.get(sel(0)[0])?.nome ?? null, selecoes: [...sel(0), ...sel(1)], fragmentos: [s.perks?.statPerks?.offense, s.perks?.statPerks?.flex, s.perks?.statPerks?.defense].filter(Boolean) };
+          const ordem = p.eventos.filter((e) => e.tipo === 'SKILL_LEVEL_UP' && e.autorId === eu.id && e.skillSlot).map((e) => ['Q', 'W', 'E', 'R'][e.skillSlot - 1]);
+          const cont = { Q: 0, W: 0, E: 0 }; const maxOrdem = [];
+          for (const k of ordem) { if (k === 'R' || !(k in cont)) continue; cont[k]++; if (cont[k] === 5 && !maxOrdem.includes(k)) maxOrdem.push(k); }
+          for (const k of ['Q', 'W', 'E'].sort((a, b) => cont[b] - cont[a])) if (!maxOrdem.includes(k)) maxOrdem.push(k);
+          return { compras, finais, runas: runaTxt, ordemMagias: maxOrdem.join(' > '), sequencia: ordem.slice(0, 18).join('') };
+        } catch { return null; }
+      })(),
+      ouroCurva: p.frames.map((f) => ({ min: Math.round(f.minuto * 10) / 10, diff: p.jogadores.reduce((s, j) => s + (f.dados[j.id]?.ouroTotal ?? 0) * (j.time === eu.time ? 1 : -1), 0) })),
       eu: { id: eu.id, campeao: eu.campeao, championId: eu.championId, role: eu.role, time: eu.time },
       jogadores: p.jogadores.map((j) => ({
         id: j.id, time: j.time, campeao: j.campeao, championId: j.championId,
