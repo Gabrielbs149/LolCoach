@@ -1520,7 +1520,7 @@ function cartaoDePartida(p){
       ${haQuanto(p.quando)} · ${mmssCurto(p.duracaoS)}${coachIds?.[p.gameId] ? ` · <span title="o coach ao vivo gravou esta partida: mortes cruzadas, previsões e o que a voz falou no detalhe" style="color:var(--vit,#9c6)">🎧${coachIds[p.gameId].previsoes ? ' ' + Math.round(coachIds[p.gameId].previsoes.certas / coachIds[p.gameId].previsoes.total * 100) + '%' : ''}</span>` : ''}</div>
     <div class="arte" style="background-image:url(/arte/${p.championId ?? 0})"></div>
     <div><div class="nomeCamp">${esc(p.meuCampeao)}</div>
-      <div class="sub">${role(p.minhaRole)}${p.rival ? ` · contra <b>${esc(p.rival)}</b>` : ''}</div></div>
+      <div class="sub">${role(p.minhaRole)}${p.rival ? ` · contra <b>${esc(p.rival)}</b>` : ''}${p.eloMedio ? ` · <span class="eloMedio" title="elo médio dos 10 na solo">${esc(p.eloMedio)}</span>` : ''}</div></div>
     <div class="kda"><b>${k}/${d}/${a}</b>
       <em class="${ratio>=3?'v':ratio<1.5?'d':''}">${ratio.toFixed(2)}<i> KDA</i></em></div>
     <div class="nums">
@@ -1641,9 +1641,10 @@ async function abrirPartida(gameId){
     <div>
       <div class="res ${r.venci?'v':'d'}">${r.venci?'VITÓRIA':'DERROTA'}${d.acertos?.limpa ? '<span class="limpa">partida limpa</span>' : ''}</div>
       <div class="camp">${esc(r.campeao)}${r.rival?` <span style="color:var(--apagado)">contra</span> ${esc(r.rival.campeao)}`:''}</div>
-      <div class="meta">${role(r.role)} · ${dur} · ${dia(d.quando)}${partidaLista ? ' · ' + esc(FILA_NOME[partidaLista.fila] ?? '') : ''}</div>
+      <div class="meta">${role(r.role)} · ${dur} · ${dia(d.quando)}${partidaLista ? ' · ' + esc(FILA_NOME[partidaLista.fila] ?? '') : ''}${d.eloMedio ? ' · partida nível <b>' + esc(d.eloMedio) + '</b>' : ''}</div>
     </div>
     <div class="nums">
+      ${d.nota ? `<div><b class="${d.nota.nota >= 8 ? 'v' : ''}">${d.nota.nota.toFixed(1)}</b><span>NOTA${d.nota.mvp ? ' · MVP' : d.nota.ace ? ' · ACE' : ''}</span></div>` : ''}
       <div><b>${esc(r.kda)}</b><span>KDA</span></div>
       <div><b>${r.csMin}</b><span>CS/MIN</span></div>
       <div><b>${r.fatiaDeDano}%</b><span>DO DANO</span></div>
@@ -1704,7 +1705,7 @@ async function abrirPartida(gameId){
 
   h.push('<h2>Placar</h2><div class="placar">');
   h.push(`<div class="lj cab"><span></span><span>Campeão</span><span>Role</span>
-    <span class="num">KDA</span><span class="num">Farm</span><span class="num">Dano</span><span class="num">Visão</span></div>`);
+    <span class="num">KDA</span><span class="num">Farm</span><span class="num">Dano</span><span class="num">Visão</span><span class="num">Nota</span></div>`);
   // Seu time primeiro, sempre — nao depende de qual lado do mapa voce caiu.
   const ordenados = [...d.jogadores].sort((a,b)=>
     (a.time===d.eu.time?0:1)-(b.time===d.eu.time?0:1)||a.id-b.id);
@@ -1720,7 +1721,8 @@ async function abrirPartida(gameId){
       <span class="num">${j.kills}/${j.deaths}/${j.assists}</span>
       <span class="num">${num(j.cs)}</span>
       <span class="num">${num(j.dano)}</span>
-      <span class="num">${num(j.visao)}</span></div>`);
+      <span class="num">${num(j.visao)}</span>
+      <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}${j.mvp ? ' <em class="seloN mvp">MVP</em>' : j.ace ? ' <em class="seloN ace">ACE</em>' : ''}</span></div>`);
   }
   h.push('</div>');
 

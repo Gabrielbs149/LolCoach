@@ -681,6 +681,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const lane = await S.analiseDaLane(p, eu, opcoesRes).catch((e) => { log(`análise da lane falhou: ${e.message}`); return null; });
     const situacoes = await S.situacoesDasMortes(p, eu).catch((e) => { log(`situações das mortes falharam: ${e.message}`); return null; });
     const acertos = (() => { try { return S.acertosDaPartida(p, eu); } catch (e) { log(`acertos falharam: ${e.message}`); return null; } })();
+    const { notasDaPartida } = await import('./analise/nota.js');
+    const notas = notasDaPartida(p.jogadores.map((j) => ({ participantId: j.id, time: j.time, role: j.role, kills: j.stats.kills, deaths: j.stats.deaths, assists: j.stats.assists, cs: j.stats.totalMinionsKilled + j.stats.neutralMinionsKilled, ouro: j.stats.goldEarned, dano: j.stats.totalDamageDealtToChampions, visao: j.stats.visionScore })), { duracaoS: p.duracaoS, vencedor: p.vencedor, eventos: p.eventos });
+    const E = await import('./dados/elo-partida.js'); E.garantirTabelas(db);
+    const eloMedio = await E.eloMedioDaPartida(db, new RiotApi(config.riot), chave).catch(() => null);
 
     const resultado = {
       gameId: chave,
@@ -688,7 +692,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       fila: linha.fila,
       resumo: d.resumo,
       prioridades: d.prioridades,
-      confronto, lane, situacoes, acertos,
+      confronto, lane, situacoes, acertos, eloMedio: eloMedio?.nome ?? null, nota: notas.get(eu.id) ?? null,
       eu: { id: eu.id, campeao: eu.campeao, championId: eu.championId, role: eu.role, time: eu.time },
       jogadores: p.jogadores.map((j) => ({
         id: j.id, time: j.time, campeao: j.campeao, championId: j.championId,
@@ -696,6 +700,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         kills: j.stats.kills, deaths: j.stats.deaths, assists: j.stats.assists,
         cs: j.stats.totalMinionsKilled + j.stats.neutralMinionsKilled,
         dano: j.stats.totalDamageDealtToChampions, visao: j.stats.visionScore,
+        nota: notas.get(j.id)?.nota ?? null, mvp: !!notas.get(j.id)?.mvp, ace: !!notas.get(j.id)?.ace,
       })),
       achados: d.achados.map((a) => {
         const frame = p.frameEm(a.t);
@@ -1764,6 +1769,25 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       estado?.avisar?.('Ontem no LoL', `${v}V ${d}D em ${jogos.length} jogos${mais ? ` · mais jogado: ${mais[0]} (${mais[1]})` : ''} — detalhes em Estatísticas → Tendências`);
     } catch { /* sem banco */ }
   }, 45_000);
+  // Elo médio da partida (op.gg mostra em cada jogo): últimas 25 sem elo, uma por vez, devagar (a chave é pessoal)
+  setTimeout(async function eloMedio() {
+    if (!config.riot?.apiKey) return;
+    try {
+      const { RiotApi } = await import('./dados/riot.js');
+      const E = await import('./dados/elo-partida.js');
+      E.garantirTabelas(db);
+      const pendentes = db.prepare('SELECT p.gameId FROM partidas p WHERE p.duracaoS >= 300 AND NOT EXISTS (SELECT 1 FROM elo_partida e WHERE e.gameId = p.gameId) ORDER BY p.quando DESC LIMIT 25').all();
+      const riot = new RiotApi(config.riot);
+      for (const p of pendentes) {
+        const f = estado?.instantaneo?.().fase;
+        if (f === 'InProgress' || f === 'ChampSelect') break;   // não gasta a chave no meio do jogo
+        await E.eloMedioDaPartida(db, riot, p.gameId).catch(() => {});
+        await new Promise((r) => setTimeout(r, 1500));
+      }
+      if (pendentes.length) log(`elo médio calculado pra ${pendentes.length} partida(s)`);
+    } catch (e) { log(`elo médio: ${e.message}`); }
+    setTimeout(eloMedio, 20 * 60_000);
+  }, 90_000);
   setTimeout(vigiarPatch, 20_000);
   setInterval(vigiarPatch, 6 * 60 * 60 * 1000);
 

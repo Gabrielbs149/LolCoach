@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { temporadaDe, resumoPorTemporada } from '../dados/temporadas.js';
 import { notasDaPartida, laningPct, selosDaPartida } from '../analise/nota.js';
+import { elosGuardados } from '../dados/elo-partida.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
@@ -94,7 +95,8 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
              (SELECT j.nome FROM jogadores j
               WHERE j.gameId = p.gameId AND j.participantId = p.meuId) conta
       FROM partidas p WHERE p.duracaoS >= 300${filtroConta(q.get('conta'))}
-      ORDER BY p.quando DESC`).all().map((p, i) => { if (i === 0) faltantesNaChamada = 0; return { ...p, temporada: temporadaDe(p.quando), ...extrasDaPartida(p) }; });
+      ORDER BY p.quando DESC`).all().map((p, i, arr) => { if (i === 0) { faltantesNaChamada = 0; try { elosLista = elosGuardados(db); } catch { elosLista = new Map(); } } return { ...p, temporada: temporadaDe(p.quando), eloMedio: elosLista.get(p.gameId) ?? null, ...extrasDaPartida(p) }; });
+  let elosLista = new Map();
   // pré-cálculo de fundo: 20 partidas por vez, sem travar o servidor
   setTimeout(function fundo() {
     try {
