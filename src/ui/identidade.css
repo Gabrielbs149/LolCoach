@@ -82,10 +82,18 @@ h2 small{font-family:var(--corpo);font-size:12px;letter-spacing:0;color:var(--ap
 .acao:hover{background:rgba(58,214,196,.18)}
 
 /* ---- lista de partidas: a arte manda ---- */
-.cartaoP{background:var(--f1);border-left:3px solid transparent;grid-template-columns:120px 112px minmax(0,1fr) 110px 120px 60px;min-height:78px;padding:0 14px 0 0;gap:14px;overflow:hidden}
+.listaP:not(.compacta) .cartaoP{background:var(--f1);border-left:3px solid transparent;grid-template-columns:120px 112px minmax(0,1fr) 110px 120px 60px;min-height:78px;padding:0 14px 0 0;gap:14px;overflow:hidden}
+.cartaoP{border-left:3px solid transparent;background:var(--f1)}
 .cartaoP.venceu,.cartaoP.perdeu{background:var(--f1)}
 .cartaoP.venceu{border-left-color:var(--vit)} .cartaoP.perdeu{border-left-color:var(--der)}
-.cartaoP .arte{width:112px;height:78px;border-radius:0;background-size:cover;background-position:center 22%;margin:0;order:-1}
+.listaP:not(.compacta) .cartaoP .arte{width:112px;height:78px;border-radius:0;background-size:cover;background-position:center 22%;margin:0;order:-1}
+/* lista compacta (Perfil): arte, resultado, campeão, KDA — sem quebrar linha */
+.listaP.compacta .cartaoP{grid-template-columns:72px 86px minmax(0,1fr) 96px;gap:12px;min-height:64px;padding:0 12px 0 0;overflow:hidden}
+.listaP.compacta .cartaoP .arte{width:72px;height:64px;border-radius:0;background-size:cover;background-position:center 22%;margin:0;order:-1}
+.listaP.compacta .cartaoP .ctx{font-size:11px;line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.listaP.compacta .cartaoP .ctx .res{font-size:15px;margin:0}
+.listaP.compacta .cartaoP .nomeCamp{font-size:20px}
+.listaP.compacta .cartaoP .kda b{font-size:20px}
 .cartaoP .ctx{padding-left:0}
 .cartaoP.venceu:hover,.cartaoP.perdeu:hover{background:var(--f2)}
 .cartaoP .res{font-family:var(--titulo);font-size:17px;letter-spacing:.8px}
@@ -160,3 +168,14 @@ h2 small{font-family:var(--corpo);font-size:12px;letter-spacing:0;color:var(--ap
 .bom div{margin:2px 0}
 .ev.bom h4{color:var(--vit)}
 .pHero .res .limpa{display:inline-block;vertical-align:middle;margin-left:16px;font-family:var(--corpo);font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:var(--vit);border:1px solid var(--vit);border-radius:99px;padding:3px 10px}
+
+/* ---- ajustes do Perfil (junta das colunas, elo espremido) e versão no rodapé ---- */
+.colunas{gap:36px}
+.elo{gap:12px}
+.elo .emblema{width:64px;height:64px;flex:0 0 64px;margin:-4px 0 -4px -4px}
+.elo .nome{font-size:26px}
+.elo .txt .pdl:nth-of-type(n+2),.elo .txt .pdl[style]{font-size:12.5px;line-height:1.4}
+.elo .placar{min-width:66px}
+.elo .placar b{font-size:26px}
+aside .estado .versaoBaixo{color:var(--apagado);font-size:11px;letter-spacing:.6px}
+body.recolhida .estado .versaoBaixo{display:none}
