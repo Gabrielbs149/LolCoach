@@ -693,6 +693,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       resumo: d.resumo,
       prioridades: d.prioridades,
       confronto, lane, situacoes, acertos, eloMedio: eloMedio?.nome ?? null, nota: notas.get(eu.id) ?? null,
+      sorte: (() => { const m = (l) => l.length ? Math.round(10 * l.reduce((s, x) => s + x, 0) / l.length) / 10 : null; return { aliados: m(p.jogadores.filter((j) => j.time === eu.time && j.id !== eu.id).map((j) => notas.get(j.id)?.nota ?? 0)), inimigos: m(p.jogadores.filter((j) => j.time !== eu.time).map((j) => notas.get(j.id)?.nota ?? 0)) }; })(),
       // diferença de gold do time por minuto (positivo = seu time na frente) e minutos das suas mortes, pro gráfico
       // build da partida: compras agrupadas por volta à base (30 s), itens finais, runas e ordem de magias
       build: await (async () => {

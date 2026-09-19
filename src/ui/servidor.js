@@ -153,7 +153,11 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       const laning = laningPct(f15, p.meuId, jogadores, p.minhaRole);
       const danoTime = jogadores.filter((j) => j.time === meu.time).reduce((s, j) => s + (j.dano ?? 0), 0);
       const selos = selosDaPartida({ eu: { id: p.meuId }, eventos, duracaoS: p.duracaoS, venci: !!p.venci, nota: minha?.nota ?? null, dano: meu.dano ?? 0, danoTime });
-      r = { nota: minha?.nota ?? null, mvp: !!minha?.mvp, ace: !!minha?.ace, laning, selos };
+      // sorte de time: nota média dos 4 aliados contra a dos 5 inimigos
+      const media = (lista) => lista.length ? Math.round(10 * lista.reduce((s, x) => s + x, 0) / lista.length) / 10 : null;
+      const aliados = media(jogadores.filter((j) => j.time === meu.time && j.participantId !== p.meuId).map((j) => notas.get(j.participantId)?.nota ?? 0));
+      const inimigos = media(jogadores.filter((j) => j.time !== meu.time).map((j) => notas.get(j.participantId)?.nota ?? 0));
+      r = { nota: minha?.nota ?? null, mvp: !!minha?.mvp, ace: !!minha?.ace, laning, selos, aliados, inimigos };
     } catch { /* partida velha sem dado */ }
     cacheExtras.set(p.gameId, r);
     return r;

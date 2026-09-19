@@ -982,6 +982,7 @@ h2{letter-spacing:1px}
         <div class="cartoes" id="cartoes"></div>
         <div id="hoje"></div>
         <div id="forma"></div>
+        <div id="sorteTime"></div>
         <h2>Últimas partidas</h2><div id="recentes"></div>
         <h2>Com quem você jogou <small>últimas 20</small></h2><div id="companheiros" class="dica">carregando…</div>
         <h2>Campeões das últimas 20</h2><div id="camp20"></div>
@@ -1358,6 +1359,17 @@ async function carregarVisao(){
     <div class="acoesP"><button class="acao" onclick="atualizarPerfil(this)">Atualizar</button></div>
   </div>`;
 
+  /* ---- sorte de time nas últimas 20 (nota média dos aliados × inimigos) ---- */
+  (() => {
+    const u = (ps ?? []).slice(0, 20).filter(p => p.aliados != null && p.inimigos != null);
+    const el = $('#sorteTime'); if (!el) return;
+    if (u.length < 5) { el.innerHTML = ''; return; }
+    const m = (k) => u.reduce((s, p) => s + p[k], 0) / u.length;
+    const a = m('aliados'), i = m('inimigos'), dif = a - i;
+    const piores = u.filter(p => p.aliados - p.inimigos <= -1).length, melhores = u.filter(p => p.aliados - p.inimigos >= 1).length;
+    el.innerHTML = `<div class="sorte"><div class="rot">SORTE DE TIME · ÚLTIMAS ${u.length}</div><div class="nums"><div><b class="${dif >= 0.3 ? 'v' : dif <= -0.3 ? 'd' : ''}">${a.toFixed(1)}</b><span>seus aliados</span></div><div><b>${i.toFixed(1)}</b><span>inimigos</span></div></div><div class="txt">${dif <= -0.3 ? `Seu time veio pior que o deles em média (${piores} partidas com time bem pior). Não é desculpa pra tudo, mas é real.` : dif >= 0.3 ? `Seu time veio melhor que o deles em média (${melhores} partidas com time bem melhor) — as derrotas pesam mais em você.` : 'Times parelhos em média: o que decide é você.'}</div></div>`;
+  })();
+
   /* ---- temporadas passadas (op.gg) e top % ---- */
   if (conta?.nome && conta?.tag) pegar(`/api/temporadas-elo?nome=${encodeURIComponent(conta.nome)}&tag=${encodeURIComponent(conta.tag)}${solo ? '&tier=' + encodeURIComponent(solo.tier) + '&rank=' + encodeURIComponent(solo.rank ?? '') : ''}`).then((t) => {
     const el = $('#temporadasElo'); if (el && t.temporadas?.length) el.innerHTML = t.temporadas.slice(0, 6).map((x) => `<span title="${x.pico ? 'pico ' + esc(x.pico) + ' · fim ' : ''}${esc(x.fim ?? '')}"><b>${esc(x.temporada)}</b> ${esc(x.pico ?? x.fim ?? '—')}</span>`).join('');
@@ -1658,7 +1670,7 @@ async function abrirPartida(gameId){
     <div>
       <div class="res ${r.venci?'v':'d'}">${r.venci?'VITÓRIA':'DERROTA'}${d.acertos?.limpa ? '<span class="limpa">partida limpa</span>' : ''}</div>
       <div class="camp">${esc(r.campeao)}${r.rival?` <span style="color:var(--apagado)">contra</span> ${esc(r.rival.campeao)}`:''}</div>
-      <div class="meta">${role(r.role)} · ${dur} · ${dia(d.quando)}${partidaLista ? ' · ' + esc(FILA_NOME[partidaLista.fila] ?? '') : ''}${d.eloMedio ? ' · partida nível <b>' + esc(d.eloMedio) + '</b>' : ''}</div>
+      <div class="meta">${role(r.role)} · ${dur} · ${dia(d.quando)}${partidaLista ? ' · ' + esc(FILA_NOME[partidaLista.fila] ?? '') : ''}${d.eloMedio ? ' · partida nível <b>' + esc(d.eloMedio) + '</b>' : ''}${d.sorte?.aliados != null ? ` · time <b class="${d.sorte.aliados - d.sorte.inimigos >= 0.5 ? 'v' : d.sorte.aliados - d.sorte.inimigos <= -0.5 ? 'd' : ''}" title="nota média dos seus 4 aliados contra a dos 5 inimigos">${d.sorte.aliados.toFixed(1)} × ${d.sorte.inimigos.toFixed(1)}</b>` : ''}</div>
     </div>
     <div class="nums">
       ${d.nota ? `<div><b class="${d.nota.nota >= 8 ? 'v' : ''}">${d.nota.nota.toFixed(1)}</b><span>NOTA${d.nota.mvp ? ' · MVP' : d.nota.ace ? ' · ACE' : ''}</span></div>` : ''}

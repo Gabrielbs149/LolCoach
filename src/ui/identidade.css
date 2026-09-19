@@ -238,3 +238,11 @@ body.recolhida .estado .versaoBaixo{display:none}
 .buildP .volta .t{font-family:var(--titulo);font-size:14px;letter-spacing:.5px;color:var(--apagado);margin-right:4px}
 .buildP .volta img{width:26px;height:26px;border-radius:3px;background:var(--f3)}
 .buildP .seta{color:var(--apagado);font-size:16px}
+
+/* ---- sorte de time ---- */
+.sorte{background:var(--f1);border-radius:var(--r-g);padding:14px 18px;margin-top:22px;display:grid;grid-template-columns:auto 1fr;gap:6px 24px;align-items:center}
+.sorte .rot{grid-column:1/3;font-size:11px;letter-spacing:1.4px;color:var(--apagado)}
+.sorte .nums{display:flex;gap:22px}
+.sorte .nums b{display:block;font-family:var(--titulo);font-size:34px;line-height:1;letter-spacing:.5px}
+.sorte .nums span{font-size:11px;color:var(--fraco);letter-spacing:1px}
+.sorte .txt{font-size:14px;color:#d3dce6;line-height:1.5}
