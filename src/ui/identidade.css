@@ -260,3 +260,6 @@ body.recolhida .estado .versaoBaixo{display:none}
 .cmpElo td.v b,.cmpElo td.v{color:var(--vit)} .cmpElo td.d b{color:var(--der)}
 .estilo .txt{margin-top:8px;font-size:13px;color:var(--fraco)}
 .estilo .txt b{color:var(--texto)}
+
+.placar .lj{grid-template-columns:34px minmax(0,1fr) 60px 110px 76px 60px 70px 60px 90px}
+.placar .lj .eloJ{font-size:12.5px;color:var(--fraco)}

@@ -51,6 +51,17 @@ export async function eloMedioDaPartida(db, riot, gameId) {
   return { gameId, tier: d.tier, rank: d.rank, nome: d.nome, pontos: media, n: pontos.length };
 }
 
+/** Elo de cada um dos 10 (nome em português) — busca quem não está no cache. Map(participantId -> nome). */
+export async function elosDosJogadores(db, riot, gameId) {
+  await eloMedioDaPartida(db, riot, gameId).catch(() => null);   // garante puuids e cache
+  const m = new Map();
+  for (const j of db.prepare('SELECT participantId, puuid FROM jogadores WHERE gameId = ? AND puuid IS NOT NULL').all(gameId)) {
+    const e = db.prepare('SELECT tier, rank, pdl FROM elo_jogador WHERE puuid = ?').get(j.puuid);
+    m.set(j.participantId, e?.tier ? `${NOME[e.tier]}${TIERS.indexOf(e.tier) >= 7 ? ` ${e.pdl} PDL` : ' ' + e.rank}` : (e ? 'sem elo' : null));
+  }
+  return m;
+}
+
 /** Lê o que já está guardado (sem rede) pra lista. Map(gameId -> nome). */
 export function elosGuardados(db) {
   garantirTabelas(db);

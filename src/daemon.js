@@ -685,6 +685,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const notas = notasDaPartida(p.jogadores.map((j) => ({ participantId: j.id, time: j.time, role: j.role, kills: j.stats.kills, deaths: j.stats.deaths, assists: j.stats.assists, cs: j.stats.totalMinionsKilled + j.stats.neutralMinionsKilled, ouro: j.stats.goldEarned, dano: j.stats.totalDamageDealtToChampions, visao: j.stats.visionScore })), { duracaoS: p.duracaoS, vencedor: p.vencedor, eventos: p.eventos });
     const E = await import('./dados/elo-partida.js'); E.garantirTabelas(db);
     const eloMedio = await E.eloMedioDaPartida(db, new RiotApi(config.riot), chave).catch(() => null);
+    const elosJog = await E.elosDosJogadores(db, new RiotApi(config.riot), chave).catch(() => new Map());
 
     const resultado = {
       gameId: chave,
@@ -728,6 +729,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         cs: j.stats.totalMinionsKilled + j.stats.neutralMinionsKilled,
         dano: j.stats.totalDamageDealtToChampions, visao: j.stats.visionScore,
         nota: notas.get(j.id)?.nota ?? null, mvp: !!notas.get(j.id)?.mvp, ace: !!notas.get(j.id)?.ace,
+        elo: elosJog.get(j.id) ?? null,
       })),
       achados: d.achados.map((a) => {
         const frame = p.frameEm(a.t);
@@ -1842,17 +1844,20 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const { RiotApi } = await import('./dados/riot.js');
       const E = await import('./dados/elo-partida.js');
       E.garantirTabelas(db);
-      const pendentes = db.prepare('SELECT p.gameId FROM partidas p WHERE p.duracaoS >= 300 AND NOT EXISTS (SELECT 1 FROM elo_partida e WHERE e.gameId = p.gameId) ORDER BY p.quando DESC LIMIT 25').all();
+      const pendentes = db.prepare('SELECT p.gameId FROM partidas p WHERE p.duracaoS >= 300 AND NOT EXISTS (SELECT 1 FROM elo_partida e WHERE e.gameId = p.gameId) ORDER BY p.quando DESC').all();
       const riot = new RiotApi(config.riot);
+      let feitas = 0;
       for (const p of pendentes) {
         const f = estado?.instantaneo?.().fase;
         if (f === 'InProgress' || f === 'ChampSelect') break;   // não gasta a chave no meio do jogo
         await E.eloMedioDaPartida(db, riot, p.gameId).catch(() => {});
-        await new Promise((r) => setTimeout(r, 1500));
+        feitas++;
+        if (feitas % 25 === 0) log(`elo médio: ${feitas}/${pendentes.length} partidas`);
+        await new Promise((r) => setTimeout(r, 400));
       }
-      if (pendentes.length) log(`elo médio calculado pra ${pendentes.length} partida(s)`);
+      if (feitas) log(`elo médio calculado pra ${feitas} partida(s)${feitas < pendentes.length ? ' (continua depois do jogo)' : ''}`);
     } catch (e) { log(`elo médio: ${e.message}`); }
-    setTimeout(eloMedio, 20 * 60_000);
+    setTimeout(eloMedio, 10 * 60_000);
   }, 90_000);
   setTimeout(vigiarPatch, 20_000);
   setInterval(vigiarPatch, 6 * 60 * 60 * 1000);

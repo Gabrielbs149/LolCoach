@@ -1760,7 +1760,7 @@ async function abrirPartida(gameId){
     h.push('</div>');
   }
   h.push('<h2>Placar</h2><div class="placar">');
-  h.push(`<div class="lj cab"><span></span><span>Campeão</span><span>Role</span>
+  h.push(`<div class="lj cab"><span></span><span>Campeão</span><span>Role</span><span>Elo</span>
     <span class="num">KDA</span><span class="num">Farm</span><span class="num">Dano</span><span class="num">Visão</span><span class="num">Nota</span></div>`);
   // Seu time primeiro, sempre — nao depende de qual lado do mapa voce caiu.
   const ordenados = [...d.jogadores].sort((a,b)=>
@@ -1774,6 +1774,7 @@ async function abrirPartida(gameId){
     h.push(`<div class="lj ${j.id===d.eu.id?'eu':''}">${icone(j.championId)}
       <span class="nomej">${esc(j.campeao)}</span>
       <span style="color:var(--apagado)">${role(j.role)}</span>
+      <span class="eloJ">${j.elo ? esc(j.elo) : '<i style="color:var(--apagado)">…</i>'}</span>
       <span class="num">${j.kills}/${j.deaths}/${j.assists}</span>
       <span class="num">${num(j.cs)}</span>
       <span class="num danoBarra"><i style="width:${Math.round(100 * j.dano / Math.max(1, ...d.jogadores.map(x => x.dano)))}%"></i>${num(j.dano)}</span>
