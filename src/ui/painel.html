@@ -1826,6 +1826,7 @@ function comparar(rot, agora, antes, {formato = (v)=>v, maiorMelhor = true, sufi
 }
 
 /** Radar de sete eixos, desenhado à mão — nenhuma biblioteca entra no app. */
+const nomeTier = (t) => ({ IRON: 'Ferro', BRONZE: 'Bronze', SILVER: 'Prata', GOLD: 'Ouro', PLATINUM: 'Platina', EMERALD: 'Esmeralda', DIAMOND: 'Diamante', MASTER: 'Mestre', GRANDMASTER: 'Grão-Mestre', CHALLENGER: 'Desafiante' })[t] ?? t;
 function desenharRadar(eixos){
   if(!eixos?.length) return '<div class="vazio">sem dados</div>';
   const cx = 150, cy = 140, raio = 104, n = eixos.length;
@@ -1919,7 +1920,11 @@ async function carregarEstat(){
     sub: `${x.jogos} jogos · ${Math.round(x.taxa*100)}% de vitória`,
   })));
 
-  $('#eRadar').innerHTML = desenharRadar(e.radar);
+  $('#eRadar').innerHTML = desenharRadar(e.radar) + (e.estilo ? `<div class="estilo"><div class="rot">SEU ESTILO · ÚLTIMOS 45 DIAS</div><div class="nome">${esc(e.estilo.nome)}</div>
+    <div class="rot" style="margin-top:10px">CONTRA O ${esc(nomeTier(e.estilo.tier))} E O ${esc(nomeTier(e.estilo.tierCima))} (APROX.)</div>
+    <table class="cmpElo"><tr><th></th><th>você</th><th>${esc(nomeTier(e.estilo.tier))}</th><th>${esc(nomeTier(e.estilo.tierCima))}</th></tr>
+    ${e.estilo.eixos.map(x => `<tr><td>${esc(x.rotulo)}</td><td class="${x.razao >= 1.05 ? 'v' : x.razao <= 0.95 ? 'd' : ''}"><b>${x.fmt(x.meu)}</b></td><td>${x.fmt(x.ref)}</td><td class="${x.acimaDoDeCima ? 'v' : ''}">${x.fmt(x.cima)}</td></tr>`).join('')}</table>
+    <div class="txt">Ponto forte: <b>${esc(e.estilo.forte ?? '—')}</b> · pra subir: <b>${esc(e.estilo.fraco ?? '—')}</b></div></div>` : '');
   const legendaColunas = '';
   {
     const t = e.tendencias;

@@ -1724,6 +1724,18 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       atividade: E.atividade(db, o),
       radar: E.radar(db, o),
       tendencias: E.tendencias(db, o),
+      // estilo com nome + comparação com o seu elo e o de cima (últimas 30 partidas)
+      estilo: await (async () => {
+        try {
+          const { estiloDeJogo } = await import('./analise/estilo.js');
+          const nome = o.conta || estado?.instantaneo?.().conta?.split('#')[0] || config.riot?.gameName || null;
+          const tier = nome ? db.prepare("SELECT tier FROM elo_hist WHERE conta = ? AND fila = 'RANKED_SOLO_5x5' ORDER BY em DESC LIMIT 1").get(nome)?.tier ?? null : null;
+          const desde = new Date(Date.now() - 45 * 86400_000).toISOString();
+          const g = E.resumoGeral(db, { ...o, desde }) ?? E.resumoGeral(db, o), p = E.participacao(db, { ...o, desde });
+          if (g) g.mortesPorJogo = g.media?.d ?? null;
+          return estiloDeJogo(g, p, tier);
+        } catch { return null; }
+      })(),
     };
   }
 

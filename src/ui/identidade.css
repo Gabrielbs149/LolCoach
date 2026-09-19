@@ -246,3 +246,17 @@ body.recolhida .estado .versaoBaixo{display:none}
 .sorte .nums b{display:block;font-family:var(--titulo);font-size:34px;line-height:1;letter-spacing:.5px}
 .sorte .nums span{font-size:11px;color:var(--fraco);letter-spacing:1px}
 .sorte .txt{font-size:14px;color:#d3dce6;line-height:1.5}
+
+/* ---- estilo de jogo ---- */
+.estilo{margin-top:14px;padding-top:12px;border-top:1px solid var(--borda)}
+.estilo .rot{font-size:11px;letter-spacing:1.4px;color:var(--apagado)}
+.estilo .nome{font-family:var(--titulo);font-size:30px;letter-spacing:.8px;color:var(--marca);line-height:1.1;margin-top:2px}
+.cmpElo{width:100%;border-collapse:collapse;margin-top:6px;font-size:13px}
+.cmpElo th{font-size:10px;letter-spacing:1.2px;color:var(--apagado);font-weight:600;text-align:right;padding:2px 4px}
+.cmpElo th:first-child{text-align:left}
+.cmpElo td{padding:3px 4px;text-align:right;border-top:1px solid var(--borda);color:var(--fraco)}
+.cmpElo td:first-child{text-align:left;color:var(--texto)}
+.cmpElo td b{font-family:var(--titulo);font-size:17px;letter-spacing:.4px;color:var(--texto)}
+.cmpElo td.v b,.cmpElo td.v{color:var(--vit)} .cmpElo td.d b{color:var(--der)}
+.estilo .txt{margin-top:8px;font-size:13px;color:var(--fraco)}
+.estilo .txt b{color:var(--texto)}
