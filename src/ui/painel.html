@@ -1681,56 +1681,35 @@ async function abrirPartida(gameId){
     </div>
   </div>`);
 
-  h.push('<div class="pGrade"><div>');
-  // A lane
-  const L = d.lane;
-  if(L){
-    h.push(`<div class="pLane"><div class="vs">${L.meus.map(j => icone(j.championId)).join('')}<b>${esc(L.meus.map(j => j.campeao).join(' + '))}</b><span class="x">×</span>${L.rivais.map(j => icone(j.championId)).join('')}<b>${esc(L.rivais.map(j => j.campeao).join(' + '))}</b>
-      ${L.veredito ? `<span class="veredito ${L.veredito === 'difícil' ? 'dificil' : L.veredito === 'favorável' ? 'favoravel' : 'jogavel'}">${L.veredito} · ${L.media}%</span>` : ''}</div>`);
-    if(L.taxas.length) h.push(`<div class="rot">CONFRONTO POR FUNÇÃO (OP.GG)</div><ul>${L.taxas.map(t => `<li>${esc(t.meu)} contra ${esc(t.contra)}: <b>${t.taxa}%</b> em ${num(t.jogos)} jogos${t.taxa < 47 ? ' — difícil, joga pra empatar' : t.taxa > 53 ? ' — é pra ganhar' : ''}</li>`).join('')}</ul>`);
-    if(L.plano.length) h.push(`<div class="rot">COMO SE JOGA</div><ul>${L.plano.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`);
-    const como = [];
-    for(const o of L.ouro) como.push(`aos ${o.minuto}: <b class="${o.diff > 300 ? 'v' : o.diff < -300 ? 'd' : ''}">${o.diff > 0 ? '+' : ''}${num(o.diff)}</b> de gold`);
-    if(L.primeiraTorre) como.push(`primeira torre da lane aos ${L.primeiraTorre.minuto} (${L.primeiraTorre.nossa ? 'a de vocês' : 'a deles'})`);
-    if(como.length) h.push(`<div class="rot">COMO FOI NO JOGO</div><div class="como">${como.join(' · ')}</div>`);
-    h.push('</div>');
-  } else if (d.confronto) {
-    const c = d.confronto;
-    h.push(`<div class="pLane"><div class="vs">${icone(c.rival.championId)}<b>${esc(r.campeao)} contra ${esc(c.rival.campeao)}</b>${c.taxa!==null?`<span class="veredito ${c.taxa<47?'dificil':c.taxa>53?'favoravel':'jogavel'}">${c.taxa}%</span>`:''}</div>${c.dicas.length?`<ul>${c.dicas.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}</div>`);
-  }
+  const L = d.lane, SIT = d.situacoes, B = d.build;
+  const maxDano = Math.max(1, ...d.jogadores.map(x => x.dano));
+  const linhaP = (j) => `<div class="lj ${j.id===d.eu.id?'eu':''}">${icone(j.championId)}
+      <span class="nomej"><b>${esc(j.campeao)}</b><small>${esc(j.nome)}</small></span>
+      <span class="eloJ">${j.elo ? esc(j.elo) : '…'}</span>
+      <span class="num kdaP">${j.kills}/${j.deaths}/${j.assists}</span>
+      <span class="num">${num(j.cs)}</span>
+      <span class="num danoBarra"><i style="width:${Math.round(100 * j.dano / maxDano)}%"></i>${Math.round(j.dano / 1000)}k</span>
+      <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}${j.mvp ? '<em class="seloN mvp">MVP</em>' : j.ace ? '<em class="seloN ace">ACE</em>' : ''}</span></div>`;
+  const timeDe = (t) => d.jogadores.filter(j => j.time === t).sort((a, b) => a.id - b.id);
+  const cab = `<div class="lj cab"><span></span><span>Campeão</span><span>Elo</span><span class="num">KDA</span><span class="num">CS</span><span class="num">Dano</span><span class="num">Nota</span></div>`;
+  // 1. Placar primeiro: os dois times lado a lado
+  h.push(`<div class="placar2">
+    <div class="timeP nosso"><div class="tit">Seu time${d.sorte?.aliados != null ? ` <small>nota média ${d.sorte.aliados.toFixed(1)}</small>` : ''}</div>${cab}${timeDe(d.eu.time).map(linhaP).join('')}</div>
+    <div class="timeP deles"><div class="tit">Inimigos${d.sorte?.inimigos != null ? ` <small>nota média ${d.sorte.inimigos.toFixed(1)}</small>` : ''}</div>${cab}${timeDe(d.eu.time === 100 ? 200 : 100).map(linhaP).join('')}</div>
+  </div>`);
 
-  // Linha do tempo: mortes (situação por situação) + o resto dos apontamentos, em ordem
-  const SIT = d.situacoes;
-  const eventos = [];
-  for (const s of (SIT?.mortes ?? [])) eventos.push({ t: s.t, tipo: 'morte', titulo: `Morte ${eventos.filter(e => e.tipo === 'morte').length + 1}`, sub: s.fase === 'lane' ? 'fase de lane' : s.fase === 'meio' ? 'meio de jogo' : 'fim de jogo', linhas: s.linhas, fazer: s.fazer });
-  for (const a of d.achados) { if (a.tipo === 'morte' && SIT?.mortes?.length) continue; eventos.push({ t: a.t, tipo: a.tipo, gravidade: a.gravidade, titulo: a.titulo, linhas: [...a.motivos, ...a.contexto.slice(0, 1)], fazer: a.resolucao ?? [] }); }
-  for (const a of (d.acertos?.momentos ?? [])) eventos.push({ t: a.t, tipo: 'bom', titulo: a.titulo, linhas: a.linhas, fazer: [] });
-  eventos.sort((a, b) => a.t - b.t);
-  if (d.acertos?.resumo?.length) h.push(`<h2>O que foi bom</h2><div class="bom">${d.acertos.resumo.map(t => `<div>✓ ${esc(t)}</div>`).join('')}</div>`);
-  h.push(`<h2>A partida, minuto a minuto <small>${eventos.length} momentos</small></h2>`);
-  if(SIT?.padrao?.length) h.push(`<div class="padroes">${SIT.padrao.map(esc).join('<br>')}</div>`);
-  h.push('<div class="linha">');
-  for (const e of eventos) {
-    h.push(`<div class="ev ${e.tipo === 'morte' ? 'morte' : e.tipo === 'bom' ? 'bom' : 'g' + (e.gravidade ?? 1)}"><div class="t">${mmss(e.t)}</div>
-      <h4>${esc(e.titulo)}${e.sub ? `<small>${esc(e.sub)}</small>` : ''}</h4>
-      <ul>${e.linhas.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
-      ${e.fazer?.length ? `<div class="fazer"><b>O QUE FAZER</b>${e.fazer.map(l => `<div>${esc(l)}</div>`).join('')}</div>` : ''}</div>`);
-  }
-  h.push('</div>');
-  if(d.prioridades.length){
-    h.push('<h2>O que levar pra próxima</h2>');
-    d.prioridades.forEach((p,i) => h.push(`<div class="prio"><div class="cab"><span class="num">${i+1}</span><h4>${esc(p.titulo)}</h4></div><p>${esc(p.texto)}</p><div class="quando">Aconteceu em ${p.momentos.map(t=>`<b>${mmss(t)}</b>`).join(', ')}</div></div>`));
-  }
-  h.push('</div>');   // coluna principal
-
-  // coluna do mapa: suas mortes marcadas
+  // 2. Lane (curta) + mapa das mortes + gold, numa linha só
+  h.push('<div class="pTres">');
+  if (L) {
+    h.push(`<div class="pLane"><div class="vs">${L.meus.map(j => icone(j.championId)).join('')}<span class="x">×</span>${L.rivais.map(j => icone(j.championId)).join('')}
+      ${L.veredito ? `<span class="veredito ${L.veredito === 'difícil' ? 'dificil' : L.veredito === 'favorável' ? 'favoravel' : 'jogavel'}">${L.veredito} · ${L.media}%</span>` : ''}</div>
+      <ul>${L.plano.slice(1, 3).map(t => `<li>${esc(t)}</li>`).join('')}</ul>
+      <div class="como">${[...L.ouro.map(o => `aos ${o.minuto} <b class="${o.diff > 300 ? 'v' : o.diff < -300 ? 'd' : ''}">${o.diff > 0 ? '+' : ''}${num(o.diff)}</b>`), L.primeiraTorre ? `torre aos ${L.primeiraTorre.minuto} (${L.primeiraTorre.nossa ? 'de vocês' : 'deles'})` : ''].filter(Boolean).join(' · ')}</div></div>`);
+  } else h.push('<div></div>');
   const mortesPos = (SIT?.mortes ?? []).filter(m => m.pos);
-  h.push('<div class="mapaMortes"><div class="rot">SUAS MORTES NO MAPA</div>');
-  h.push(`<svg viewBox="0 0 100 100"><image href="/minimapa.png" width="100" height="100" opacity=".9"/>
-    ${mortesPos.map((m, i) => `<g><circle cx="${(m.pos.x*100).toFixed(1)}" cy="${(m.pos.y*100).toFixed(1)}" r="3.4" fill="rgba(255,92,92,.25)" stroke="#ff5c5c" stroke-width=".8"/><text x="${(m.pos.x*100).toFixed(1)}" y="${(m.pos.y*100+1.4).toFixed(1)}" text-anchor="middle" font-size="4" font-weight="700" fill="#fff">${i+1}</text></g>`).join('')}
-  </svg>`);
-  h.push(`<div class="leg">${mortesPos.length ? mortesPos.map((m, i) => `<b>${i+1}</b> ${esc(m.minuto)}${m.onde ? ' · ' + esc(m.onde) : ''}`).join('<br>') : 'sem posição das mortes nesta partida'}</div></div>`);
-  // gráfico de gold do time (diferença por minuto) com as suas mortes marcadas
+  h.push(`<div class="mapaMortes"><svg viewBox="0 0 100 100"><image href="/minimapa.png" width="100" height="100" opacity=".9"/>
+    ${mortesPos.map((m, i) => `<g><circle cx="${(m.pos.x*100).toFixed(1)}" cy="${(m.pos.y*100).toFixed(1)}" r="3.4" fill="rgba(255,92,92,.25)" stroke="#ff5c5c" stroke-width=".8"/><text x="${(m.pos.x*100).toFixed(1)}" y="${(m.pos.y*100+1.4).toFixed(1)}" text-anchor="middle" font-size="4" font-weight="700" fill="#fff">${i+1}</text></g>`).join('')}</svg>
+    <div class="leg">${mortesPos.length ? 'suas mortes: ' + mortesPos.map((m, i) => `<b>${i+1}</b> ${esc(m.minuto)}`).join(' · ') : 'sem mortes com posição'}</div></div>`);
   const C = d.ouroCurva ?? [];
   if (C.length > 3) {
     const W = 340, H = 120, pad = 6, maxAbs = Math.max(1000, ...C.map(c => Math.abs(c.diff)));
@@ -1738,50 +1717,36 @@ async function abrirPartida(gameId){
     const pts = C.map(c => `${x(c.min).toFixed(1)},${y(c.diff).toFixed(1)}`).join(' ');
     const area = `M${x(0).toFixed(1)},${(H/2).toFixed(1)} L${pts.replace(/ /g, ' L')} L${x(C.at(-1).min).toFixed(1)},${(H/2).toFixed(1)} Z`;
     const mortesX = (SIT?.mortes ?? []).map(m => x(m.t / 60000));
-    h.push(`<div class="graficoOuro"><div class="rot">GOLD DO TIME · DIFERENÇA POR MINUTO</div>
-      <svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ecf8e" stop-opacity=".45"/><stop offset="1" stop-color="#3ecf8e" stop-opacity="0"/></linearGradient><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5c5c" stop-opacity="0"/><stop offset="1" stop-color="#ff5c5c" stop-opacity=".45"/></linearGradient><clipPath id="cima"><rect x="0" y="0" width="${W}" height="${H/2}"/></clipPath><clipPath id="baixo"><rect x="0" y="${H/2}" width="${W}" height="${H/2}"/></clipPath></defs>
+    h.push(`<div class="graficoOuro"><svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="gv" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3ecf8e" stop-opacity=".45"/><stop offset="1" stop-color="#3ecf8e" stop-opacity="0"/></linearGradient><linearGradient id="gd" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ff5c5c" stop-opacity="0"/><stop offset="1" stop-color="#ff5c5c" stop-opacity=".45"/></linearGradient><clipPath id="cima"><rect x="0" y="0" width="${W}" height="${H/2}"/></clipPath><clipPath id="baixo"><rect x="0" y="${H/2}" width="${W}" height="${H/2}"/></clipPath></defs>
         <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#2a3441" stroke-width="1"/>
         <path d="${area}" fill="url(#gv)" clip-path="url(#cima)"/><path d="${area}" fill="url(#gd)" clip-path="url(#baixo)"/>
         <polyline points="${pts}" fill="none" stroke="#eef2f6" stroke-width="1.5"/>
         ${mortesX.map(mx => `<line x1="${mx.toFixed(1)}" y1="${pad}" x2="${mx.toFixed(1)}" y2="${H - pad}" stroke="#ff5c5c" stroke-width="1" stroke-dasharray="2 2" opacity=".8"/>`).join('')}
-        <text x="${pad}" y="12" font-size="9" fill="#9aa8b8">+${num(maxAbs)}</text><text x="${pad}" y="${H - 3}" font-size="9" fill="#9aa8b8">-${num(maxAbs)}</text>
-        <text x="${W - pad}" y="${H - 3}" font-size="9" fill="#9aa8b8" text-anchor="end">${Math.round(C.at(-1).min)} min</text></svg>
-      <div class="leg">verde = seu time na frente · linhas vermelhas = suas mortes</div></div>`);
-  }
-  h.push('</div>');   // pGrade
-
-  // build da partida: o que comprou e quando, itens finais, runas, ordem de magias
-  const B = d.build;
-  if (B && (B.compras?.length || B.finais?.length)) {
-    h.push('<h2>Sua build nesta partida</h2><div class="buildP">');
-    if (B.finais?.length) h.push(`<div class="finais">${B.finais.map(i => `<img src="/item/${i.id}" title="${esc(i.nome)}" alt="">`).join('')}${B.runas?.principal ? `<span class="sep"></span><img class="runa" src="/runa/${B.runas.principal}" title="${esc(B.runas.principalNome ?? '')}" alt="">${(B.runas.selecoes ?? []).slice(1).map(id => `<img class="runaMini" src="/runa/${id}" alt="">`).join('')}` : ''}</div>`);
-    if (B.runas?.primaria) h.push(`<div class="linhaB"><b>Runas</b> ${esc(B.runas.principalNome ?? '')} · ${esc(B.runas.primaria)} + ${esc(B.runas.secundaria ?? '')}${B.ordemMagias ? ` <b style="margin-left:14px">Magias</b> ${esc(B.ordemMagias)}${B.sequencia ? ` <span class="seq">${esc(B.sequencia)}</span>` : ''}` : ''}</div>`);
-    if (B.compras?.length) h.push(`<div class="compras">${B.compras.map(g => `<div class="volta"><span class="t">${mmss(g.t)}</span>${g.itens.map(i => `<img src="/item/${i.id}" title="${esc(i.nome)}" alt="">`).join('')}</div>`).join('<span class="seta">›</span>')}</div>`);
-    h.push('</div>');
-  }
-  h.push('<h2>Placar</h2><div class="placar">');
-  h.push(`<div class="lj cab"><span></span><span>Campeão</span><span>Role</span><span>Elo</span>
-    <span class="num">KDA</span><span class="num">Farm</span><span class="num">Dano</span><span class="num">Visão</span><span class="num">Nota</span></div>`);
-  // Seu time primeiro, sempre — nao depende de qual lado do mapa voce caiu.
-  const ordenados = [...d.jogadores].sort((a,b)=>
-    (a.time===d.eu.time?0:1)-(b.time===d.eu.time?0:1)||a.id-b.id);
-  let timeAtual = null;
-  for(const j of ordenados){
-    if(j.time !== timeAtual){
-      timeAtual = j.time;
-      h.push(`<div class="divisor">${j.time===d.eu.time?'Seu time':'Inimigos'}</div>`);
-    }
-    h.push(`<div class="lj ${j.id===d.eu.id?'eu':''}">${icone(j.championId)}
-      <span class="nomej">${esc(j.campeao)}</span>
-      <span style="color:var(--apagado)">${role(j.role)}</span>
-      <span class="eloJ">${j.elo ? esc(j.elo) : '<i style="color:var(--apagado)">…</i>'}</span>
-      <span class="num">${j.kills}/${j.deaths}/${j.assists}</span>
-      <span class="num">${num(j.cs)}</span>
-      <span class="num danoBarra"><i style="width:${Math.round(100 * j.dano / Math.max(1, ...d.jogadores.map(x => x.dano)))}%"></i>${num(j.dano)}</span>
-      <span class="num">${num(j.visao)}</span>
-      <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}${j.mvp ? ' <em class="seloN mvp">MVP</em>' : j.ace ? ' <em class="seloN ace">ACE</em>' : ''}</span></div>`);
-  }
+        <text x="${pad}" y="12" font-size="9" fill="#9aa8b8">+${num(maxAbs)}</text><text x="${pad}" y="${H - 3}" font-size="9" fill="#9aa8b8">-${num(maxAbs)}</text></svg>
+      <div class="leg">gold do time por minuto · tracejado = suas mortes</div></div>`);
+  } else h.push('<div></div>');
   h.push('</div>');
+
+  // 3. O que foi bom + linha do tempo (mortes e acertos abertos; o resto atrás de "mostrar tudo")
+  const eventos = [];
+  for (const s of (SIT?.mortes ?? [])) eventos.push({ t: s.t, tipo: 'morte', titulo: `Morte ${eventos.filter(e => e.tipo === 'morte').length + 1}`, sub: s.fase === 'lane' ? 'fase de lane' : s.fase === 'meio' ? 'meio de jogo' : 'fim de jogo', linhas: s.linhas, fazer: s.fazer });
+  for (const a of (d.acertos?.momentos ?? [])) eventos.push({ t: a.t, tipo: 'bom', titulo: a.titulo, linhas: a.linhas, fazer: [] });
+  const outros = [];
+  for (const a of d.achados) { if (a.tipo === 'morte' && SIT?.mortes?.length) continue; outros.push({ t: a.t, tipo: a.tipo, gravidade: a.gravidade, titulo: a.titulo, linhas: [...a.motivos, ...a.contexto.slice(0, 1)], fazer: a.resolucao ?? [] }); }
+  eventos.sort((a, b) => a.t - b.t); outros.sort((a, b) => a.t - b.t);
+  const ev = (e) => `<div class="ev ${e.tipo === 'morte' ? 'morte' : e.tipo === 'bom' ? 'bom' : 'g' + (e.gravidade ?? 1)}"><div class="t">${mmss(e.t)}</div>
+      <h4>${esc(e.titulo)}${e.sub ? `<small>${esc(e.sub)}</small>` : ''}</h4>
+      <ul>${e.linhas.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+      ${e.fazer?.length ? `<div class="fazer"><b>O QUE FAZER</b>${e.fazer.map(l => `<div>${esc(l)}</div>`).join('')}</div>` : ''}</div>`;
+  if (d.acertos?.resumo?.length || SIT?.padrao?.length) h.push(`<div class="resumoP">${(d.acertos?.resumo ?? []).map(t => `<div class="ok">✓ ${esc(t)}</div>`).join('')}${(SIT?.padrao ?? []).map(t => `<div class="atencao">! ${esc(t)}</div>`).join('')}</div>`);
+  h.push(`<h2>Minuto a minuto <small>${eventos.length} momentos${outros.length ? ` · <a href="#" onclick="event.preventDefault();this.closest('h2').nextElementSibling.classList.toggle('tudo');this.textContent=this.textContent.startsWith('mostrar')?'esconder os outros':'mostrar os outros ${outros.length}'">mostrar os outros ${outros.length}</a>` : ''}</small></h2>`);
+  h.push(`<div class="linha">${[...eventos.map(e => ({ ...e, principal: true })), ...outros].sort((a, b) => a.t - b.t).map(e => e.principal ? ev(e) : `<div class="outro">${ev(e)}</div>`).join('')}</div>`);
+
+  // 4. Build, compacta
+  if (B && (B.compras?.length || B.finais?.length)) {
+    h.push(`<div class="buildP compacta"><div class="finais">${(B.finais ?? []).map(i => `<img src="/item/${i.id}" title="${esc(i.nome)}" alt="">`).join('')}${B.runas?.principal ? `<span class="sep"></span><img class="runa" src="/runa/${B.runas.principal}" title="${esc(B.runas.principalNome ?? '')}" alt="">${(B.runas.selecoes ?? []).slice(1).map(id => `<img class="runaMini" src="/runa/${id}" alt="">`).join('')}` : ''}${B.ordemMagias ? `<span class="sep"></span><span class="mag">${esc(B.ordemMagias)}</span>` : ''}</div>
+      ${B.compras?.length ? `<div class="compras">${B.compras.map(g => `<div class="volta"><span class="t">${mmss(g.t)}</span>${g.itens.map(i => `<img src="/item/${i.id}" title="${esc(i.nome)}" alt="">`).join('')}</div>`).join('<span class="seta">›</span>')}</div>` : ''}</div>`);
+  }
 
   $('#det').innerHTML = h.join('');
   // O que o olho viu nessa partida (se foi gravada).
