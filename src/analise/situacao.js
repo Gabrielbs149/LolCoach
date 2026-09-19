@@ -142,6 +142,82 @@ export function planoRapidoDoBot({ meuCampeao, minhaRole, jogadores, meuTime }) 
   return `Bot contra ${duo}: lane parelha — decide quem troca com a wave a favor.`;
 }
 
+/* ------------------------------------------------------------- o que foi bom */
+
+/**
+ * Acertos da partida, com o mesmo cuidado das mortes: kill solo na lane, kill com vantagem criada (ele atrás em
+ * nível/item), objetivo com você lá, torre da sua lane primeiro, lane ganha em gold, sequência sem morrer,
+ * participação alta, virada. Vira momentos verdes na linha do tempo e um resumo no topo.
+ */
+export function acertosDaPartida(p, eu) {
+  const t0 = Date.now();
+  const kills = p.eventos.filter((e) => e.tipo === 'CHAMPION_KILL');
+  const minhasKills = kills.filter((e) => e.autorId === eu.id);
+  const minhasMortes = kills.filter((e) => e.vitimaId === eu.id);
+  const participei = kills.filter((e) => e.autorId === eu.id || (e.assists ?? []).includes(eu.id));
+  const meuTime = eu.time, souBot = ['adc', 'sup'].includes(R(eu.role));
+  const laneIds = p.jogadores.filter((j) => j.time === meuTime && (souBot ? ['adc', 'sup'].includes(R(j.role)) : R(j.role) === R(eu.role))).map((j) => j.id);
+  const laneDelesIds = p.jogadores.filter((j) => j.time !== meuTime && (souBot ? ['adc', 'sup'].includes(R(j.role)) : R(j.role) === R(eu.role))).map((j) => j.id);
+  const momentos = [], resumo = [];
+  const mmssT = (t) => mmss(t);
+
+  // kills: solo, com vantagem criada, ou em desvantagem (virada)
+  for (const e of minhasKills) {
+    const v = p.jogador(e.vitimaId); if (!v) continue;
+    const t = e.t;
+    const nossos = e.pos ? p.perto(e.pos, t - 1, 2500, { time: meuTime, exceto: [eu.id] }) : [];
+    const deles = e.pos ? p.perto(e.pos, t - 1, 2500, { time: meuTime === 100 ? 200 : 100, exceto: [v.id] }) : [];
+    const nEu = nivelEm(p, eu.id, t), nV = nivelEm(p, v.id, t);
+    const solo = !(e.assists ?? []).length && nossos.length === 0;
+    const onde = e.pos ? zonaRelativa(e.pos, meuTime) : null;
+    if (solo && deles.length === 0) momentos.push({ t, titulo: `Kill solo no ${v.campeao}`, linhas: [`${mmssT(t)} — 1v1${onde ? ' ' + onde : ''}: você nv ${nEu} contra ${v.campeao} nv ${nV}${nV > nEu ? ' — na frente em nível e mesmo assim a kill foi sua' : ''}. Troca lida certa: entrou quando tinha o dano pra fechar.`] });
+    else if (deles.length >= nossos.length + 1 && deles.length >= 1 && !(e.assists ?? []).length) momentos.push({ t, titulo: `Kill em desvantagem numérica (${nossos.length + 1}v${deles.length + 1})`, linhas: [`${mmssT(t)} — ${v.campeao} caiu com ${deles.map((j) => j.campeao).join(', ')} por perto. Escolheu o alvo certo e saiu: é isso que vira jogo.`] });
+    else if ((e.assists ?? []).length >= 2 && momentos.filter((m) => m.titulo.startsWith('Kill com o time')).length < 2) momentos.push({ t, titulo: `Kill com o time (${v.campeao})`, linhas: [`${mmssT(t)} — você fechou a kill que ${(e.assists ?? []).length} aliados prepararam: estava no lugar certo na hora certa.`] });
+  }
+  // primeira torre da minha lane pra nós
+  const laneNome = { adc: 'BOT_LANE', sup: 'BOT_LANE', mid: 'MID_LANE', top: 'TOP_LANE' }[R(eu.role)] ?? null;
+  const torre = p.eventos.find((e) => e.tipo === 'BUILDING_KILL' && e.predio === 'TOWER_BUILDING' && e.rota === laneNome);
+  if (torre && torre.timeVitima !== meuTime) { const f = p.frameEm(torre.t); const pertoEu = f?.pos?.[eu.id] && torre.pos ? dist(f.pos[eu.id], torre.pos) < 3000 : false; momentos.push({ t: torre.t, titulo: 'Primeira torre da sua lane foi de vocês', linhas: [`${mmssT(torre.t)} — a torre deles caiu primeiro${pertoEu ? ' com você nela' : ''}: a lane abriu do seu lado e o mapa ficou seu pra rodar.`] }); resumo.push('Primeira torre da lane foi de vocês.'); }
+  // objetivos com você lá
+  for (const e of p.eventos) {
+    if (e.tipo !== 'ELITE_MONSTER_KILL' || !['DRAGON', 'BARON_NASHOR', 'RIFTHERALD', 'HORDE'].includes(e.monstro)) continue;
+    const autor = p.jogador(e.autorId); if (!autor || autor.time !== meuTime) continue;
+    const pos = p.frameEm(e.t)?.pos?.[eu.id]; if (!pos || !e.pos || dist(pos, e.pos) > 3500 || !p.vivo(eu.id, e.t)) continue;
+    const nome = { DRAGON: 'Dragão', BARON_NASHOR: 'Barão', RIFTHERALD: 'Arauto', HORDE: 'Vastilarvas' }[e.monstro];
+    if (e.monstro === 'HORDE') continue;
+    momentos.push({ t: e.t, titulo: `${nome} com você lá`, linhas: [`${mmssT(e.t)} — ${nome} pro seu time e você presente: objetivo não é do jungler, é de quem chega.`] });
+  }
+  // lane em gold
+  const f10 = p.frames.find((x) => x.minuto >= 10), f15 = p.frames.find((x) => x.minuto >= 15);
+  const somaOuro = (f, ids) => ids.reduce((s, id) => s + (f?.dados?.[id]?.ouroTotal ?? 0), 0);
+  if (f15 && laneIds.length && laneDelesIds.length) { const d15 = somaOuro(f15, laneIds) - somaOuro(f15, laneDelesIds); if (d15 >= 800) { resumo.push(`Lane ganha: +${d15} de gold aos 15 min contra o ${souBot ? 'duo' : 'laner'} deles.`); momentos.push({ t: f15.t, titulo: `Lane ganha em gold (+${d15} aos 15)`, linhas: [`15:00 — ${souBot ? 'o duo de vocês' : 'você'} estava ${d15} de gold na frente. Farm, torre e trocas certas: a fase de lane foi sua.`] }); } }
+  else if (f10 && laneIds.length && laneDelesIds.length) { const d10 = somaOuro(f10, laneIds) - somaOuro(f10, laneDelesIds); if (d10 >= 600) resumo.push(`Lane ganha: +${d10} de gold aos 10 min.`); }
+  // sequência sem morrer
+  const dur = p.duracaoS * 1000;
+  const marcos = [0, ...minhasMortes.map((m) => m.t), dur];
+  let maior = { de: 0, ate: 0 }; for (let i = 1; i < marcos.length; i++) if (marcos[i] - marcos[i - 1] > maior.ate - maior.de) maior = { de: marcos[i - 1], ate: marcos[i] };
+  const semMorrerMin = (maior.ate - maior.de) / 60000;
+  if (minhasMortes.length === 0) resumo.push(`Partida sem morrer. ${minhasKills.length} kill${minhasKills.length === 1 ? '' : 's'} e ${participei.length - minhasKills.length} assistência${participei.length - minhasKills.length === 1 ? '' : 's'} sem dar uma morte: isso é jogar o jogo certo.`);
+  else if (semMorrerMin >= 12 && p.duracaoS >= 900) resumo.push(`${Math.round(semMorrerMin)} min seguidos sem morrer (de ${mmssT(maior.de)} a ${mmssT(maior.ate)}).`);
+  // participação e dano
+  const nossasKills = kills.filter((e) => p.jogador(e.autorId)?.time === meuTime).length;
+  const part = nossasKills ? Math.round(100 * participei.length / nossasKills) : 0;
+  if (part >= 65 && nossasKills >= 8) resumo.push(`Participou de ${part}% das kills do time: esteve em todas as brigas que importaram.`);
+  const dano = (j) => j.stats?.totalDamageDealtToChampions ?? 0;
+  const maiorDano = [...p.jogadores].filter((j) => j.time === meuTime).sort((a, b) => dano(b) - dano(a))[0];
+  if (maiorDano?.id === eu.id && dano(eu) > 0) resumo.push(`Maior dano em campeões do time (${Math.round(dano(eu) / 1000)}k).`);
+  // virada: kill/objetivo estando atrás em gold
+  const ouroTime = (f, time) => p.jogadores.filter((j) => j.time === time).reduce((s, j) => s + (f?.dados?.[j.id]?.ouroTotal ?? 0), 0);
+  const fFim = p.frames.at(-1); const fMeio = p.frames.find((x) => x.minuto >= Math.max(10, p.duracaoS / 120));
+  if (p.vencedor === meuTime && fMeio && ouroTime(fMeio, meuTime) - ouroTime(fMeio, meuTime === 100 ? 200 : 100) <= -2500) resumo.push(`Virada: vocês estavam ${Math.abs(ouroTime(fMeio, meuTime) - ouroTime(fMeio, meuTime === 100 ? 200 : 100))} de gold atrás aos ${Math.round(fMeio.minuto)} min e ganharam.`);
+  // partida limpa
+  const cs = (eu.stats?.totalMinionsKilled ?? 0) + (eu.stats?.neutralMinionsKilled ?? 0), csMin = p.duracaoS ? cs / (p.duracaoS / 60) : 0;
+  if (csMin >= 8 && ['adc', 'mid', 'top'].includes(R(eu.role))) resumo.push(`${csMin.toFixed(1)} de CS por minuto: farm de quem não deixa gold na lane.`);
+  const limpa = p.vencedor === meuTime && minhasMortes.length <= 2 && (minhasKills.length + (participei.length - minhasKills.length)) >= 8;
+  momentos.sort((a, b) => a.t - b.t);
+  return { momentos: momentos.slice(0, 8), resumo, limpa, ms: Date.now() - t0 };
+}
+
 /* ------------------------------------------------------------- as mortes */
 
 export async function situacoesDasMortes(p, eu) {

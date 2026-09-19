@@ -1638,7 +1638,7 @@ async function abrirPartida(gameId){
   h.push(`<div class="pHero" style="background-image:url(/arte/${d.eu.championId})">
     <button class="voltar" onclick="abrirAba(origemDetalhe)">← Voltar</button>
     <div>
-      <div class="res ${r.venci?'v':'d'}">${r.venci?'VITÓRIA':'DERROTA'}</div>
+      <div class="res ${r.venci?'v':'d'}">${r.venci?'VITÓRIA':'DERROTA'}${d.acertos?.limpa ? '<span class="limpa">partida limpa</span>' : ''}</div>
       <div class="camp">${esc(r.campeao)}${r.rival?` <span style="color:var(--apagado)">contra</span> ${esc(r.rival.campeao)}`:''}</div>
       <div class="meta">${role(r.role)} · ${dur} · ${dia(d.quando)}${partidaLista ? ' · ' + esc(FILA_NOME[partidaLista.fila] ?? '') : ''}</div>
     </div>
@@ -1673,12 +1673,14 @@ async function abrirPartida(gameId){
   const eventos = [];
   for (const s of (SIT?.mortes ?? [])) eventos.push({ t: s.t, tipo: 'morte', titulo: `Morte ${eventos.filter(e => e.tipo === 'morte').length + 1}`, sub: s.fase === 'lane' ? 'fase de lane' : s.fase === 'meio' ? 'meio de jogo' : 'fim de jogo', linhas: s.linhas, fazer: s.fazer });
   for (const a of d.achados) { if (a.tipo === 'morte' && SIT?.mortes?.length) continue; eventos.push({ t: a.t, tipo: a.tipo, gravidade: a.gravidade, titulo: a.titulo, linhas: [...a.motivos, ...a.contexto.slice(0, 1)], fazer: a.resolucao ?? [] }); }
+  for (const a of (d.acertos?.momentos ?? [])) eventos.push({ t: a.t, tipo: 'bom', titulo: a.titulo, linhas: a.linhas, fazer: [] });
   eventos.sort((a, b) => a.t - b.t);
+  if (d.acertos?.resumo?.length) h.push(`<h2>O que foi bom</h2><div class="bom">${d.acertos.resumo.map(t => `<div>✓ ${esc(t)}</div>`).join('')}</div>`);
   h.push(`<h2>A partida, minuto a minuto <small>${eventos.length} momentos</small></h2>`);
   if(SIT?.padrao?.length) h.push(`<div class="padroes">${SIT.padrao.map(esc).join('<br>')}</div>`);
   h.push('<div class="linha">');
   for (const e of eventos) {
-    h.push(`<div class="ev ${e.tipo === 'morte' ? 'morte' : 'g' + (e.gravidade ?? 1)}"><div class="t">${mmss(e.t)}</div>
+    h.push(`<div class="ev ${e.tipo === 'morte' ? 'morte' : e.tipo === 'bom' ? 'bom' : 'g' + (e.gravidade ?? 1)}"><div class="t">${mmss(e.t)}</div>
       <h4>${esc(e.titulo)}${e.sub ? `<small>${esc(e.sub)}</small>` : ''}</h4>
       <ul>${e.linhas.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
       ${e.fazer?.length ? `<div class="fazer"><b>O QUE FAZER</b>${e.fazer.map(l => `<div>${esc(l)}</div>`).join('')}</div>` : ''}</div>`);

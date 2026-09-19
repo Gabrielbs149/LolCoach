@@ -154,3 +154,9 @@ h2 small{font-family:var(--corpo);font-size:12px;letter-spacing:0;color:var(--ap
 .blocoBarras .rot,.bloco .rot{font-size:11px;letter-spacing:1.2px}
 .barra .n,.blocoBarras b{font-size:14px}
 .cmp{font-size:14px}
+
+/* ---- o que foi bom ---- */
+.bom{background:rgba(62,207,142,.08);border-left:3px solid var(--vit);padding:12px 16px;font-size:14.5px;line-height:1.6;color:#d9f3e6}
+.bom div{margin:2px 0}
+.ev.bom h4{color:var(--vit)}
+.pHero .res .limpa{display:inline-block;vertical-align:middle;margin-left:16px;font-family:var(--corpo);font-size:12px;letter-spacing:1.6px;text-transform:uppercase;color:var(--vit);border:1px solid var(--vit);border-radius:99px;padding:3px 10px}

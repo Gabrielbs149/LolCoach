@@ -680,6 +680,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const S = await import('./analise/situacao.js');
     const lane = await S.analiseDaLane(p, eu, opcoesRes).catch((e) => { log(`análise da lane falhou: ${e.message}`); return null; });
     const situacoes = await S.situacoesDasMortes(p, eu).catch((e) => { log(`situações das mortes falharam: ${e.message}`); return null; });
+    const acertos = (() => { try { return S.acertosDaPartida(p, eu); } catch (e) { log(`acertos falharam: ${e.message}`); return null; } })();
 
     const resultado = {
       gameId: chave,
@@ -687,7 +688,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       fila: linha.fila,
       resumo: d.resumo,
       prioridades: d.prioridades,
-      confronto, lane, situacoes,
+      confronto, lane, situacoes, acertos,
       eu: { id: eu.id, campeao: eu.campeao, championId: eu.championId, role: eu.role, time: eu.time },
       jogadores: p.jogadores.map((j) => ({
         id: j.id, time: j.time, campeao: j.campeao, championId: j.championId,
