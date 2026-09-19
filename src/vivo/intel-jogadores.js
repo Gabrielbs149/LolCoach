@@ -34,7 +34,7 @@ export function fatosDe(perfil, { campeao, role }) {
   // ameaça: bom elo, ou muito jogo no campeão, ou sequência de vitórias
   const forte = (solo && ['DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER', 'EMERALD'].includes(solo.tier)) || (noCampeao?.jogos >= 4 && noCampeao.vitorias / noCampeao.jogos >= 0.6) || seq >= 4;
   const fraco = foraDaRota || (rec?.jogos >= 5 && rec.taxa <= 0.35) || seq <= -3 || (rec?.jogos >= 5 && !noCampeao);
-  return { elo: solo?.nome ?? null, taxaRecente: rec?.taxa ?? null, jogosRecentes: rec?.jogos ?? 0, noCampeao: noCampeao ? { jogos: noCampeao.jogos, vitorias: noCampeao.vitorias } : null, mains, rotaPrincipal, foraDaRota: !!foraDaRota, sequencia: seq, nivel, marcas, forte: !!forte, fraco: !!fraco };
+  return { gameIds: ultimas.map((u) => u.gameId).filter(Boolean), primeiraVez: !!(rec?.jogos >= 5 && !noCampeao), elo: solo?.nome ?? null, taxaRecente: rec?.taxa ?? null, jogosRecentes: rec?.jogos ?? 0, noCampeao: noCampeao ? { jogos: noCampeao.jogos, vitorias: noCampeao.vitorias } : null, mains, rotaPrincipal, foraDaRota: !!foraDaRota, sequencia: seq, nivel, marcas, forte: !!forte, fraco: !!fraco };
 }
 
 /**

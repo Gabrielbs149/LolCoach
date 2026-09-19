@@ -909,6 +909,29 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const prontas = alvos.map((j) => [j, partidaVivo.intelJogadores.get(j.nome)]).filter(([, f]) => f && !f.erro);
       // fala quando os dois estão prontos; ou, a partir de 1:45, o que já estiver (a Riot demora ~5 s por perfil)
       partidaVivo.intelDitas ??= new Set();
+      // tags à la Porofessor: premade (2+ deles com 3+ partidas recentes em comum) e o seu retrospecto contra o campeão do laner
+      if (!partidaVivo.tagsDitas && estado.tempo >= 60 && [...partidaVivo.intelJogadores.values()].filter((f) => f && !f.erro).length >= 3) {
+        partidaVivo.tagsDitas = true;
+        try {
+          const nomes = deles.filter((j) => partidaVivo.intelJogadores.get(j.nome)?.gameIds?.length);
+          const pares = [];
+          for (let a = 0; a < nomes.length; a++) for (let b = a + 1; b < nomes.length; b++) {
+            const A = new Set(partidaVivo.intelJogadores.get(nomes[a].nome).gameIds), B = partidaVivo.intelJogadores.get(nomes[b].nome).gameIds;
+            const comum = B.filter((g) => A.has(g)).length;
+            if (comum >= 3) pares.push([nomes[a], nomes[b], comum]);
+          }
+          if (pares.length) {
+            const grupo = [...new Set(pares.flatMap(([a, b]) => [a.campeao, b.campeao]))];
+            partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 2, id: 'premade', serio: F`Premade deles: ${grupo.join(' e ')} jogam juntos. Vão chegar juntos.`, divertido: F`${grupo.join(' e ')} são premade. Chegam em dupla.` }));
+          }
+          const laner = deles.find((j) => j.role === estado.eu.role && estado.eu.role !== 'jungle');
+          if (laner) {
+            const r = db.prepare(`SELECT COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores r ON r.gameId = p.gameId AND r.campeao = ? AND r.role = p.minhaRole
+              JOIN jogadores eu ON eu.gameId = p.gameId AND eu.participantId = p.meuId AND eu.time <> r.time WHERE p.duracaoS >= 300`).get(laner.campeao);
+            if (r?.n >= 3) partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 1, id: 'retrospecto', serio: F`Contra ${laner.campeao} na sua rota você tem ${r.v} vitória${r.v === 1 ? '' : 's'} em ${r.n}${r.v / r.n <= 0.4 ? ' — confronto que te custa; joga pra empatar' : r.v / r.n >= 0.6 ? ' — confronto seu' : ''}.`, divertido: F`${r.v} de ${r.n} contra ${laner.campeao}.` }));
+          }
+        } catch { /* sem tags */ }
+      }
       if ((prontas.length === alvos.length || estado.tempo >= 105) && prontas.length) {
         if (prontas.length === alvos.length) partidaVivo.intelFalada = true;
         for (const [j, f] of prontas) {
@@ -918,7 +941,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
           if (f.elo) partes.push(f.elo); else partes.push('sem ranqueada');
           // "100% nas últimas 6" + "6 vitórias seguidas" é a mesma coisa duas vezes: fica só a sequência
           if (f.jogosRecentes && Math.abs(f.sequencia ?? 0) !== f.jogosRecentes) partes.push(`${Math.round(f.taxaRecente * 100)}% nas últimas ${f.jogosRecentes}`);
-          if (f.noCampeao) partes.push(`${f.noCampeao.jogos} de ${j.campeao} recente${f.noCampeao.jogos > 1 ? 's' : ''}`); else if (f.jogosRecentes) partes.push(`nenhum jogo recente de ${j.campeao}`);
+          if (f.noCampeao) partes.push(`${f.noCampeao.jogos} de ${j.campeao} recente${f.noCampeao.jogos > 1 ? 's' : ''}`); else if (f.primeiraVez) partes.push(`primeira vez de ${j.campeao} em muito tempo`); else if (f.jogosRecentes) partes.push(`nenhum jogo recente de ${j.campeao}`);
           if (f.foraDaRota) partes.push(`fora da rota dele, joga ${f.rotaPrincipal}`);
           if (Math.abs(f.sequencia) >= 3) partes.push(f.sequencia > 0 ? `${f.sequencia} vitórias seguidas` : `${-f.sequencia} derrotas seguidas`);
           partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 2, id: `intel-${j.role}`, serio: F`${quem}: ${partes.join(', ')}.`, divertido: F`${quem}: ${partes.join(', ')}.` }));
