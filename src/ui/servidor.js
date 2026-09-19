@@ -464,6 +464,10 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       if (url.pathname === '/olho') {
         return enviar(200, 'text/html; charset=utf-8', await readFile(join(AQUI, 'olho.html'), 'utf8'));
       }
+      if (url.pathname === '/identidade.css') {
+        res.writeHead(200, { 'Content-Type': 'text/css; charset=utf-8', 'Cache-Control': 'no-cache' });
+        return res.end(await readFile(join(AQUI, 'identidade.css'), 'utf8'));
+      }
       if (url.pathname === '/minimapa.png') {
         res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=604800' });
         return res.end(await readFile(join(AQUI, 'minimapa.png')));

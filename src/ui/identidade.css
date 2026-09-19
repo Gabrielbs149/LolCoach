@@ -1,0 +1,144 @@
+/* ===========================================================================
+   LolCoach — identidade visual (camada por cima do sistema antigo do painel).
+   Uma cor de marca (teal frio, a cor do "olho"), uma fonte de título com cara
+   (Bebas Neue), hierarquia por TAMANHO e ESPAÇO — não por caixa. O que era
+   cartão com borda vira bloco separado por respiro; o que importa fica grande.
+   =========================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap');
+
+:root{
+  --f0:#0a0c10; --f1:#0f1318; --f2:#151a21; --f3:#1c232c;
+  --borda:#1c232c; --borda-forte:#2a3441;
+  --texto:#eef2f6; --fraco:#9aa8b8; --apagado:#6a7787;
+  --marca:#3ad6c4; --marca-escura:#1f8f84; --marca-fundo:rgba(58,214,196,.10);
+  --ouro:#3ad6c4; --ouro-claro:#8ef0e4; --ouro-escuro:#1f8f84;   /* o "destaque" antigo agora é a marca */
+  --vit:#3ecf8e; --der:#ff5c5c;
+  --g3:#ff5c5c; --g2:#f0b048; --g1:#3ad6c4;
+  --titulo:"Bebas Neue","Oswald","Impact","Arial Narrow",sans-serif;
+  --corpo:"Inter","Segoe UI",system-ui,-apple-system,sans-serif;
+  --r-s:3px; --r-m:4px; --r-g:6px;
+  --largura:1180px;
+}
+body{font:14.5px/1.55 var(--corpo);background:var(--f0)}
+main{padding:28px 36px 80px}
+
+/* ---- barra lateral: o olho é a marca ---- */
+aside{background:var(--f0);border-right:1px solid var(--borda)}
+aside .marca h1{display:flex;align-items:center;gap:10px;font-family:var(--titulo);font-size:26px;letter-spacing:1px;font-weight:400;color:var(--texto)}
+aside .marca h1 .longo::before,aside .marca h1 .curto::before{content:"";display:inline-block;width:22px;height:22px;margin-right:2px;vertical-align:-4px;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%233ad6c4' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12z'/%3E%3Ccircle cx='12' cy='12' r='3' fill='%233ad6c4' stroke='none'/%3E%3C/svg%3E") no-repeat center/contain}
+aside .marca h1 .versao{font-family:var(--corpo);font-size:10px;letter-spacing:0;color:var(--apagado)}
+aside nav button{font-size:13.5px;border-radius:0;border-left:2px solid transparent;padding-left:14px}
+aside nav button.ativo{background:var(--marca-fundo);color:var(--marca);border-left-color:var(--marca)}
+aside nav button.ativo svg{stroke:var(--marca)}
+aside nav .grupo{font-size:10px;letter-spacing:1.6px;color:var(--apagado)}
+
+/* ---- tipografia: hierarquia por tamanho ---- */
+.titulo{font-family:var(--titulo);font-size:34px;letter-spacing:.5px;font-weight:400;margin:0 0 14px}
+h2{font-family:var(--titulo);font-size:22px;letter-spacing:.8px;text-transform:none;color:var(--texto);margin:34px 0 12px;padding:0;border:0}
+h2::after{content:none}
+h2 small{font-family:var(--corpo);font-size:12px;letter-spacing:0;color:var(--apagado);margin-left:10px}
+.dica{font-size:13.5px}
+
+/* ---- cartões viram blocos ---- */
+.cartoes{gap:22px 28px;grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}
+.cartao{background:none;border:0;padding:0}
+.cartao .rot{font-size:11px;letter-spacing:1.2px;color:var(--apagado)}
+.cartao .val{font-family:var(--titulo);font-size:44px;letter-spacing:.5px;font-weight:400;line-height:1;margin-top:2px}
+.cartao .pe{font-size:12.5px}
+.elo{background:none;border:0;padding:10px 0;gap:14px;align-items:center}
+.elo .emblema{width:84px;height:84px;flex:0 0 84px;margin:-8px 0 -8px -8px}
+.elo .txt{flex:1;min-width:0}
+.elo .placar{flex:0 0 auto;text-align:right}
+.elo .nome{font-family:var(--titulo);font-size:30px;letter-spacing:.5px;line-height:1}
+.elo .fila{font-size:11px;letter-spacing:1.2px;color:var(--apagado)}
+.elo .pdl{font-size:13.5px;color:var(--fraco)}
+.elo .placar b{font-family:var(--titulo);font-size:30px;font-weight:400;letter-spacing:.5px}
+.confronto,.prio,.achado,.amCartao,.perfil,.situ,.falasCaixa,.cfgBloco,.bloco{border-color:transparent;background:var(--f1)}
+.confronto{padding:18px 20px}
+.confronto .cab b{font-size:18px;font-family:var(--titulo);letter-spacing:.6px;font-weight:400}
+.confronto .cab img{width:36px;height:36px;border:0}
+.confronto .taxa{font-family:var(--titulo);font-size:20px;letter-spacing:.5px}
+.confronto .rotSec{font-size:11px;letter-spacing:1.4px;color:var(--apagado);margin:14px 0 6px}
+.confronto ul.dicas{font-size:14px;line-height:1.6;color:#d3dce6}
+.prio{border-left:3px solid var(--marca)}
+.prio h4{font-size:16px}
+.prio p{font-size:14px}
+
+/* ---- perfil: a splash como fundo, o emblema grande ---- */
+.perfilHero{position:relative;border-radius:var(--r-g);overflow:hidden;min-height:220px;display:flex;align-items:flex-end;padding:26px 28px;margin-bottom:26px;background-size:cover;background-position:center 20%}
+.perfilHero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,12,16,.96) 0%,rgba(10,12,16,.75) 45%,rgba(10,12,16,.25) 100%),linear-gradient(0deg,rgba(10,12,16,.9),transparent 60%)}
+.perfilHero>*{position:relative}
+.perfilHero .quem h3{font-family:var(--titulo);font-size:46px;letter-spacing:1px;font-weight:400;margin:0;line-height:1}
+.perfilHero .quem h3 span{font-family:var(--corpo);font-size:15px;color:var(--fraco);letter-spacing:0;margin-left:8px}
+.perfilHero .quem .sub{font-size:13.5px;color:var(--fraco);margin-top:6px}
+.perfilHero .retrato{width:72px;height:72px;border-radius:50%;border:2px solid var(--marca);margin-right:18px;object-fit:cover}
+.perfilHero .eloGrande{margin-left:auto;display:flex;align-items:center;gap:12px}
+.perfilHero .eloGrande img{width:128px;height:128px;object-fit:contain;filter:drop-shadow(0 6px 18px rgba(0,0,0,.6))}
+.perfilHero .eloGrande .n{font-family:var(--titulo);font-size:36px;letter-spacing:.8px;line-height:1}
+.perfilHero .eloGrande .p{font-size:13px;color:var(--fraco)}
+.perfilHero .acoesP{position:absolute;top:16px;right:16px}
+.acao{background:var(--marca-fundo);color:var(--marca);border:1px solid var(--marca-escura);border-radius:var(--r-m);font-weight:600}
+.acao:hover{background:rgba(58,214,196,.18)}
+
+/* ---- lista de partidas: a arte manda ---- */
+.cartaoP{background:var(--f1);border-left:3px solid transparent;grid-template-columns:120px 112px minmax(0,1fr) 110px 120px 60px;min-height:78px;padding:0 14px 0 0;gap:14px;overflow:hidden}
+.cartaoP.venceu,.cartaoP.perdeu{background:var(--f1)}
+.cartaoP.venceu{border-left-color:var(--vit)} .cartaoP.perdeu{border-left-color:var(--der)}
+.cartaoP .arte{width:112px;height:78px;border-radius:0;background-size:cover;background-position:center 22%;margin:0;order:-1}
+.cartaoP .ctx{padding-left:0}
+.cartaoP.venceu:hover,.cartaoP.perdeu:hover{background:var(--f2)}
+.cartaoP .res{font-family:var(--titulo);font-size:17px;letter-spacing:.8px}
+.cartaoP .nomeCamp{font-family:var(--titulo);font-size:22px;letter-spacing:.5px}
+.cartaoP .kda b{font-family:var(--titulo);font-size:22px;letter-spacing:.6px;font-weight:400}
+.cartaoP:hover{background:var(--f2)}
+
+/* ---- a tela da partida: a partida ---- */
+.pHero{position:relative;margin:-28px -36px 26px;min-height:300px;background-size:cover;background-position:center 18%;display:flex;align-items:flex-end;padding:30px 36px}
+.pHero::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(10,12,16,.95) 0%,rgba(10,12,16,.6) 50%,rgba(10,12,16,.15) 100%),linear-gradient(0deg,var(--f0) 0%,rgba(10,12,16,.2) 55%,transparent 100%)}
+.pHero>*{position:relative}
+.pHero .res{font-family:var(--titulo);font-size:84px;line-height:.9;letter-spacing:2px}
+.pHero .res.v{color:var(--vit)} .pHero .res.d{color:var(--der)}
+.pHero .camp{font-family:var(--titulo);font-size:34px;letter-spacing:1px;color:var(--texto);margin-top:6px}
+.pHero .meta{font-size:14px;color:var(--fraco);margin-top:4px}
+.pHero .nums{margin-left:auto;display:flex;gap:34px;text-align:right}
+.pHero .nums b{display:block;font-family:var(--titulo);font-size:44px;line-height:1;letter-spacing:.5px;font-weight:400}
+.pHero .nums span{font-size:11px;letter-spacing:1.2px;color:var(--fraco)}
+.pHero .voltar{position:absolute;top:18px;left:36px}
+.pGrade{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:36px;align-items:start}
+.pLane{background:var(--f1);padding:18px 20px;border-radius:var(--r-g)}
+.pLane .vs{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pLane .vs img{width:44px;height:44px;border-radius:50%;border:2px solid var(--borda-forte)}
+.pLane .vs b{font-family:var(--titulo);font-size:24px;letter-spacing:.6px;font-weight:400}
+.pLane .vs .x{font-family:var(--titulo);font-size:18px;color:var(--apagado);margin:0 6px}
+.pLane .veredito{margin-left:auto;font-family:var(--titulo);font-size:22px;letter-spacing:.8px}
+.pLane .veredito.dificil{color:var(--der)} .pLane .veredito.favoravel{color:var(--vit)} .pLane .veredito.jogavel{color:var(--marca)}
+.pLane ul{margin:10px 0 0;padding-left:18px;font-size:14px;line-height:1.6;color:#d3dce6}
+.pLane .rot{font-size:11px;letter-spacing:1.4px;color:var(--apagado);margin:14px 0 4px}
+.pLane .como{font-size:13.5px;color:var(--fraco)}
+.pLane .como b{color:var(--texto)}
+/* linha do tempo */
+.linha{position:relative;margin-top:8px;padding-left:92px}
+.linha::before{content:"";position:absolute;left:70px;top:6px;bottom:6px;width:2px;background:var(--borda-forte)}
+.ev{position:relative;padding:6px 0 26px}
+.ev .t{position:absolute;left:-92px;width:58px;text-align:right;font-family:var(--titulo);font-size:22px;letter-spacing:.6px;color:var(--fraco);line-height:1;top:8px}
+.ev::before{content:"";position:absolute;left:-27px;top:11px;width:12px;height:12px;border-radius:50%;background:var(--f0);border:2px solid var(--apagado)}
+.ev.morte::before{border-color:var(--der);background:var(--der)}
+.ev.g3::before{border-color:var(--der)} .ev.g2::before{border-color:var(--g2)} .ev.bom::before{border-color:var(--vit);background:var(--vit)}
+.ev h4{margin:0 0 6px;font-size:17px;font-weight:600;letter-spacing:-.1px}
+.ev h4 small{font-size:12px;color:var(--apagado);font-weight:500;margin-left:8px;letter-spacing:.6px;text-transform:uppercase}
+.ev ul{margin:0;padding-left:18px;font-size:14.5px;line-height:1.6;color:#d3dce6}
+.ev ul li{margin-bottom:2px}
+.ev .fazer{margin-top:8px;padding:10px 14px;border-left:3px solid var(--marca);background:var(--marca-fundo);font-size:14px;line-height:1.55}
+.ev .fazer b{color:var(--marca);font-size:11px;letter-spacing:1.4px;display:block;margin-bottom:4px}
+.ev .fazer div{margin-top:3px}
+.ev .padrao{font-size:14px;color:var(--fraco)}
+/* mapa das mortes */
+.mapaMortes{position:sticky;top:12px}
+.mapaMortes .rot{font-size:11px;letter-spacing:1.4px;color:var(--apagado);margin-bottom:8px}
+.mapaMortes svg{width:100%;height:auto;border-radius:var(--r-g);display:block}
+.mapaMortes .leg{font-size:12.5px;color:var(--fraco);margin-top:8px;line-height:1.5}
+.padroes{background:var(--f1);border-left:3px solid var(--g2);padding:12px 16px;margin:14px 0 22px;font-size:14px;line-height:1.55}
+/* placar no fim */
+.placar .lj{font-size:13.5px}
+.placar .lj.cab{font-size:11px;letter-spacing:1.2px}

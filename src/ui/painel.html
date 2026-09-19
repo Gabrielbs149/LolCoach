@@ -890,6 +890,7 @@ h2{letter-spacing:1px}
 ::selection{background:#3a3220;color:var(--ouro-claro)}
 .acoesA .convidar{border-color:rgba(120,200,100,.5);color:var(--vit,#9c6)}
 </style>
+<link rel="stylesheet" href="/identidade.css">
 </head>
 <body>
 
@@ -1060,7 +1061,6 @@ h2{letter-spacing:1px}
   </section>
 
   <section id="detalhe">
-    <button class="voltar" onclick="abrirAba(origemDetalhe)">← Voltar</button>
     <div id="det"></div>
   </section>
 
@@ -1342,16 +1342,17 @@ async function carregarVisao(){
 
   /* ---- cabeçalho: quem é você, direto da Riot ---- */
   const conta = perfil?.conta;
-  $('#cabecalhoPerfil').innerHTML = `<div class="perfil">
+  // a splash do campeão que você mais jogou nas últimas 20 é o fundo; o emblema da solo, grande
+  const maisJogado = (() => { const c = new Map(); for (const p of (ps ?? []).slice(0, 20)) if (p.championId) c.set(p.championId, (c.get(p.championId) ?? 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? (ps?.[0]?.championId ?? 0); })();
+  const solo = (perfil?.elos ?? []).find(e => e.chave === 'RANKED_SOLO_5x5') ?? (perfil?.elos ?? [])[0] ?? null;
+  $('#cabecalhoPerfil').innerHTML = `<div class="perfilHero" style="background-image:url(/arte/${maisJogado})">
     <img class="retrato" src="${perfil?.icone != null ? '/iconeperfil/'+perfil.icone : ''}" alt="">
     <div class="quem">
-      <h3>${esc(conta?.nome ?? '—')}<span> #${esc(conta?.tag ?? '')}</span></h3>
-      <div class="sub">${perfil?.nivel ? 'nível ' + num(perfil.nivel) + ' · ' : ''}${num(g.n)} partidas analisadas aqui</div>
+      <h3>${esc(conta?.nome ?? '—')}<span>#${esc(conta?.tag ?? '')}</span></h3>
+      <div class="sub">${perfil?.nivel ? 'nível ' + num(perfil.nivel) + ' · ' : ''}${num(g.n)} partidas analisadas · ${taxa}% de vitória${perfil?.desatualizado ? ' · <span class="aviso">a Riot não respondeu, elo pode estar velho</span>' : ''}</div>
     </div>
-    <div class="acoesP">
-      ${perfil?.desatualizado ? '<span class="aviso">Riot não respondeu — elo pode estar velho</span>' : ''}
-      <button class="acao" onclick="atualizarPerfil(this)">Atualizar</button>
-    </div>
+    ${solo ? `<div class="eloGrande">${emblema(solo.tier)}<div><div class="n">${esc(solo.nome)}</div><div class="p">${num(solo.pdl)} PDL · ${solo.vitorias}V ${solo.derrotas}D</div></div></div>` : ''}
+    <div class="acoesP"><button class="acao" onclick="atualizarPerfil(this)">Atualizar</button></div>
   </div>`;
 
   /* ---- elos ---- */
@@ -1632,101 +1633,71 @@ async function abrirPartida(gameId){
   }
 
   const r = d.resumo, h = [];
+  const partidaLista = (todasPartidas ?? []).find(p => p.gameId === d.gameId);
+  const dur = r.duracao ? `${Math.floor(r.duracao)} min` : '';
+  h.push(`<div class="pHero" style="background-image:url(/arte/${d.eu.championId})">
+    <button class="voltar" onclick="abrirAba(origemDetalhe)">← Voltar</button>
+    <div>
+      <div class="res ${r.venci?'v':'d'}">${r.venci?'VITÓRIA':'DERROTA'}</div>
+      <div class="camp">${esc(r.campeao)}${r.rival?` <span style="color:var(--apagado)">contra</span> ${esc(r.rival.campeao)}`:''}</div>
+      <div class="meta">${role(r.role)} · ${dur} · ${dia(d.quando)}${partidaLista ? ' · ' + esc(FILA_NOME[partidaLista.fila] ?? '') : ''}</div>
+    </div>
+    <div class="nums">
+      <div><b>${esc(r.kda)}</b><span>KDA</span></div>
+      <div><b>${r.csMin}</b><span>CS/MIN</span></div>
+      <div><b>${r.fatiaDeDano}%</b><span>DO DANO</span></div>
+      ${r.gd15 != null ? `<div><b class="${r.gd15<-500?'d':r.gd15>500?'v':''}">${r.gd15>0?'+':''}${num(r.gd15)}</b><span>GOLD AOS 15</span></div>` : ''}
+    </div>
+  </div>`);
 
-  h.push(`<div class="heroi" style="background-image:url(/arte/${d.eu.championId})">
-    <img class="retrato" src="/icone/${d.eu.championId}" alt="">
-    <div><h3>${esc(r.campeao)}<span class="marcaRes ${r.venci?'venceu':'perdeu'}">${r.venci?'VITÓRIA':'DERROTA'}</span></h3>
-    <div class="meta">${role(r.role)} · ${r.duracao.toFixed(0)} min · ${dia(d.quando)}${r.rival?` · contra ${esc(r.rival.campeao)}`:''}</div></div></div>`);
-
-  h.push('<div class="cartoes">');
-  if(r.gd15 !== null && r.gd15 !== undefined){
-    h.push(cartao('Gold aos 15',
-      `<span class="${r.gd15<-500?'d':r.gd15>500?'v':''}">${r.gd15>0?'+':''}${num(r.gd15)}</span>`,
-      r.rival ? `contra ${r.rival.campeao}` : ''));
-  }
-  h.push(cartao('KDA', esc(r.kda), `participou de ${r.participacao}% das kills`));
-  h.push(cartao('Farm', `${r.csMin}<span style="font-size:15px;color:var(--apagado)">/min</span>`, `${num(r.cs)} no total`));
-  h.push(cartao('Dano', `${r.fatiaDeDano}%`, 'do dano do time'));
-  h.push(cartao('Gold entregue', num(r.custoTotal), 'morrendo'));
-  h.push('</div>');
-
-  if(r.virada){
-    h.push(`<p class="dica" style="margin-top:18px">O jogo virou no minuto
-      <b class="o">${r.virada.minuto}</b> — o placar de gold mexeu
-      ${r.virada.delta>0?'+':''}${num(Math.round(r.virada.delta))} num único minuto.</p>`);
-  }
-
-  const c = d.confronto;
-  if(c){
-    h.push('<h2>O confronto</h2><div class="confronto">');
-    h.push(`<div class="cab">${icone(c.rival.championId)}<b>${esc(r.campeao)} contra ${esc(c.rival.campeao)}</b>
-      ${c.taxa!==null?`<span class="taxa ${c.taxa<47?'ruim':c.taxa>53?'bom':''}">${c.taxa}% de vitória em ${num(c.jogos)} jogos</span>`:''}</div>`);
-    if(c.dicas.length) h.push(`<ul class="dicas">${c.dicas.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`);
-    if(c.magias.length){
-      h.push('<div class="rotSec">O que te matou nesta partida</div><div class="magias">');
-      for(const m of c.magias){
-        h.push(`<div class="magia"><span class="tecla">${m.tecla}</span>
-          <div class="txt"><b>${esc(m.nome)}</b><span>${num(m.dano)} de dano em você</span></div>
-          <div class="nums">${m.recarga?`${m.recarga}s de recarga`:''}${m.alcance>1?`<br>alcance ${m.alcance}`:''}</div></div>`);
-      }
-      h.push('</div>');
-    }
-    h.push('</div>');
-  }
-
-  // A lane como confronto: quem contra quem, taxa por função, plano por fase e como foi no jogo
+  h.push('<div class="pGrade"><div>');
+  // A lane
   const L = d.lane;
   if(L){
-    h.push('<h2>A lane</h2><div class="confronto">');
-    h.push(`<div class="cab">${L.meus.map(j => icone(j.championId)).join('')}<b>${esc(L.meus.map(j => j.campeao).join(' + '))}</b><span style="margin:0 8px;color:var(--apagado)">contra</span>${L.rivais.map(j => icone(j.championId)).join('')}<b>${esc(L.rivais.map(j => j.campeao).join(' + '))}</b>
-      ${L.veredito ? `<span class="taxa ${L.veredito === 'difícil' ? 'ruim' : L.veredito === 'favorável' ? 'bom' : ''}">${L.veredito} · ${L.media}%</span>` : ''}</div>`);
-    if(L.taxas.length) h.push(`<div class="rotSec">Confronto por função (op.gg)</div><ul class="dicas">${L.taxas.map(t => `<li>${esc(t.meu)} contra ${esc(t.contra)}: <b>${t.taxa}%</b> em ${num(t.jogos)} jogos${t.taxa < 47 ? ' — difícil, joga pra empatar' : t.taxa > 53 ? ' — é pra ganhar' : ''}</li>`).join('')}</ul>`);
-    if(L.plano.length) h.push(`<div class="rotSec">Como se joga</div><ul class="dicas">${L.plano.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`);
+    h.push(`<div class="pLane"><div class="vs">${L.meus.map(j => icone(j.championId)).join('')}<b>${esc(L.meus.map(j => j.campeao).join(' + '))}</b><span class="x">×</span>${L.rivais.map(j => icone(j.championId)).join('')}<b>${esc(L.rivais.map(j => j.campeao).join(' + '))}</b>
+      ${L.veredito ? `<span class="veredito ${L.veredito === 'difícil' ? 'dificil' : L.veredito === 'favorável' ? 'favoravel' : 'jogavel'}">${L.veredito} · ${L.media}%</span>` : ''}</div>`);
+    if(L.taxas.length) h.push(`<div class="rot">CONFRONTO POR FUNÇÃO (OP.GG)</div><ul>${L.taxas.map(t => `<li>${esc(t.meu)} contra ${esc(t.contra)}: <b>${t.taxa}%</b> em ${num(t.jogos)} jogos${t.taxa < 47 ? ' — difícil, joga pra empatar' : t.taxa > 53 ? ' — é pra ganhar' : ''}</li>`).join('')}</ul>`);
+    if(L.plano.length) h.push(`<div class="rot">COMO SE JOGA</div><ul>${L.plano.map(t => `<li>${esc(t)}</li>`).join('')}</ul>`);
     const como = [];
     for(const o of L.ouro) como.push(`aos ${o.minuto}: <b class="${o.diff > 300 ? 'v' : o.diff < -300 ? 'd' : ''}">${o.diff > 0 ? '+' : ''}${num(o.diff)}</b> de gold`);
-    if(L.primeiraTorre) como.push(`primeira torre da lane caiu aos ${L.primeiraTorre.minuto} (${L.primeiraTorre.nossa ? 'a de vocês' : 'a deles'})`);
-    if(como.length) h.push(`<div class="rotSec">Como foi no jogo</div><p class="dica">${como.join(' · ')}</p>`);
+    if(L.primeiraTorre) como.push(`primeira torre da lane aos ${L.primeiraTorre.minuto} (${L.primeiraTorre.nossa ? 'a de vocês' : 'a deles'})`);
+    if(como.length) h.push(`<div class="rot">COMO FOI NO JOGO</div><div class="como">${como.join(' · ')}</div>`);
     h.push('</div>');
+  } else if (d.confronto) {
+    const c = d.confronto;
+    h.push(`<div class="pLane"><div class="vs">${icone(c.rival.championId)}<b>${esc(r.campeao)} contra ${esc(c.rival.campeao)}</b>${c.taxa!==null?`<span class="veredito ${c.taxa<47?'dificil':c.taxa>53?'favoravel':'jogavel'}">${c.taxa}%</span>`:''}</div>${c.dicas.length?`<ul>${c.dicas.map(t=>`<li>${esc(t)}</li>`).join('')}</ul>`:''}</div>`);
   }
+
+  // Linha do tempo: mortes (situação por situação) + o resto dos apontamentos, em ordem
   const SIT = d.situacoes;
-  if(SIT?.mortes?.length){
-    h.push(`<h2>Suas mortes, uma por uma</h2>`);
-    if(SIT.padrao.length) h.push(`<div class="aviso" style="margin-bottom:10px">${SIT.padrao.map(esc).join('<br>')}</div>`);
-    for(const s of SIT.mortes){
-      h.push(`<div class="achado g2 simples"><div><div><span class="hora">${esc(s.minuto)}</span><span class="tit">${esc(s.fase === 'lane' ? 'fase de lane' : s.fase === 'meio' ? 'meio de jogo' : 'fim de jogo')}</span></div>
-        <ul>${s.linhas.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
-        ${s.fazer.length ? `<div class="resolucao"><b>O que fazer</b>${s.fazer.map(l => `<div>${esc(l)}</div>`).join('')}</div>` : ''}</div></div>`);
-    }
+  const eventos = [];
+  for (const s of (SIT?.mortes ?? [])) eventos.push({ t: s.t, tipo: 'morte', titulo: `Morte ${eventos.filter(e => e.tipo === 'morte').length + 1}`, sub: s.fase === 'lane' ? 'fase de lane' : s.fase === 'meio' ? 'meio de jogo' : 'fim de jogo', linhas: s.linhas, fazer: s.fazer });
+  for (const a of d.achados) { if (a.tipo === 'morte' && SIT?.mortes?.length) continue; eventos.push({ t: a.t, tipo: a.tipo, gravidade: a.gravidade, titulo: a.titulo, linhas: [...a.motivos, ...a.contexto.slice(0, 1)], fazer: a.resolucao ?? [] }); }
+  eventos.sort((a, b) => a.t - b.t);
+  h.push(`<h2>A partida, minuto a minuto <small>${eventos.length} momentos</small></h2>`);
+  if(SIT?.padrao?.length) h.push(`<div class="padroes">${SIT.padrao.map(esc).join('<br>')}</div>`);
+  h.push('<div class="linha">');
+  for (const e of eventos) {
+    h.push(`<div class="ev ${e.tipo === 'morte' ? 'morte' : 'g' + (e.gravidade ?? 1)}"><div class="t">${mmss(e.t)}</div>
+      <h4>${esc(e.titulo)}${e.sub ? `<small>${esc(e.sub)}</small>` : ''}</h4>
+      <ul>${e.linhas.map(l => `<li>${esc(l)}</li>`).join('')}</ul>
+      ${e.fazer?.length ? `<div class="fazer"><b>O QUE FAZER</b>${e.fazer.map(l => `<div>${esc(l)}</div>`).join('')}</div>` : ''}</div>`);
   }
+  h.push('</div>');
   if(d.prioridades.length){
-    h.push('<h2>O que melhorar</h2>');
-    d.prioridades.forEach((p,i) => h.push(`<div class="prio">
-      <div class="cab"><span class="num">${i+1}</span><h4>${esc(p.titulo)}</h4></div>
-      <p>${esc(p.texto)}</p>
-      <div class="quando">Aconteceu em ${p.momentos.map(t=>`<b>${mmss(t)}</b>`).join(', ')}</div></div>`));
+    h.push('<h2>O que levar pra próxima</h2>');
+    d.prioridades.forEach((p,i) => h.push(`<div class="prio"><div class="cab"><span class="num">${i+1}</span><h4>${esc(p.titulo)}</h4></div><p>${esc(p.texto)}</p><div class="quando">Aconteceu em ${p.momentos.map(t=>`<b>${mmss(t)}</b>`).join(', ')}</div></div>`));
   }
+  h.push('</div>');   // coluna principal
 
-  h.push(`<h2>Momento a momento — ${d.achados.length} apontamentos</h2>`);
-  h.push(`<div class="legenda">
-    <span><i style="background:#c8aa6e"></i>você</span>
-    <span><i style="background:#4b90b8"></i>seu time</span>
-    <span><i style="background:#c94f49"></i>inimigos</span>
-    <span><i style="background:#e05252"></i>quem causou o dano</span>
-    <span>✕ onde aconteceu</span></div>
-`);
-
-  // Mapa e narrativa só nos graves: quinze blocos completos entulhavam a tela.
-  for(const a of d.achados){
-    const grave = a.gravidade === 3;
-    const corpo = `<div>
-      <div><span class="hora">${mmss(a.t)}</span><span class="tit">${esc(a.titulo)}</span></div>
-      <ul>${a.motivos.map(m=>`<li>${esc(m)}</li>`).join('')}${(grave?a.contexto:a.contexto.slice(0,1)).map(x=>`<li class="ctx">${esc(x)}</li>`).join('')}</ul>
-      ${a.resolucao?.length?`<div class="resolucao"><b>O que fazer</b>${a.resolucao.map(l=>`<div>${esc(l)}</div>`).join('')}</div>`:''}
-      ${grave&&(a.narrativa??[]).length?`<div class="comojogou">Como a jogada aconteceu</div><ul>${a.narrativa.map(n=>`<li class="nar">${esc(n)}</li>`).join('')}</ul>`:''}
-      <div class="cmd">npm run ver -- ${d.gameId} ${mmss(a.t)}</div></div>`;
-    h.push(grave ? `<div class="achado g3">${corpo}<div>${a.mapa}</div></div>`
-                 : `<div class="achado g${a.gravidade} simples">${corpo}</div>`);
-  }
+  // coluna do mapa: suas mortes marcadas
+  const mortesPos = (SIT?.mortes ?? []).filter(m => m.pos);
+  h.push('<div class="mapaMortes"><div class="rot">SUAS MORTES NO MAPA</div>');
+  h.push(`<svg viewBox="0 0 100 100"><image href="/minimapa.png" width="100" height="100" opacity=".9"/>
+    ${mortesPos.map((m, i) => `<g><circle cx="${(m.pos.x*100).toFixed(1)}" cy="${(m.pos.y*100).toFixed(1)}" r="3.4" fill="rgba(255,92,92,.25)" stroke="#ff5c5c" stroke-width=".8"/><text x="${(m.pos.x*100).toFixed(1)}" y="${(m.pos.y*100+1.4).toFixed(1)}" text-anchor="middle" font-size="4" font-weight="700" fill="#fff">${i+1}</text></g>`).join('')}
+  </svg>`);
+  h.push(`<div class="leg">${mortesPos.length ? mortesPos.map((m, i) => `<b>${i+1}</b> ${esc(m.minuto)}${m.onde ? ' · ' + esc(m.onde) : ''}`).join('<br>') : 'sem posição das mortes nesta partida'}</div></div>`);
+  h.push('</div>');   // pGrade
 
   h.push('<h2>Placar</h2><div class="placar">');
   h.push(`<div class="lj cab"><span></span><span>Campeão</span><span>Role</span>
