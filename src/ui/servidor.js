@@ -98,7 +98,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     '/api/temporadas': (q) => resumoPorTemporada(partidas(q)),
   };
   const partidas = (q) => db.prepare(`
-      SELECT p.gameId, p.quando, p.fila, p.duracaoS, p.meuCampeao, p.minhaRole, p.venci,
+      SELECT p.gameId, p.quando, p.fila, p.duracaoS, p.meuCampeao, p.minhaRole, p.venci, p.meuId,
              (SELECT COUNT(*) FROM achados a WHERE a.gameId = p.gameId) achados,
              (SELECT COUNT(*) FROM achados a WHERE a.gameId = p.gameId AND a.gravidade = 3) graves,
              (SELECT kills || '/' || deaths || '/' || assists FROM jogadores j
