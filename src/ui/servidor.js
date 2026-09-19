@@ -4,6 +4,7 @@ import { pastaBase } from '../caminhos.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { temporadaDe, resumoPorTemporada } from '../dados/temporadas.js';
+import { notasDaPartida, laningPct, selosDaPartida } from '../analise/nota.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
@@ -93,7 +94,40 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
              (SELECT j.nome FROM jogadores j
               WHERE j.gameId = p.gameId AND j.participantId = p.meuId) conta
       FROM partidas p WHERE p.duracaoS >= 300${filtroConta(q.get('conta'))}
-      ORDER BY p.quando DESC`).all().map((p) => ({ ...p, temporada: temporadaDe(p.quando) }));
+      ORDER BY p.quando DESC`).all().map((p, i) => { if (i === 0) faltantesNaChamada = 0; return { ...p, temporada: temporadaDe(p.quando), ...extrasDaPartida(p) }; });
+  // pré-cálculo de fundo: 20 partidas por vez, sem travar o servidor
+  setTimeout(function fundo() {
+    try {
+      const ids = db.prepare('SELECT gameId, meuId, minhaRole, duracaoS, venci FROM partidas WHERE duracaoS >= 300 ORDER BY quando DESC').all().filter((p) => !cacheExtras.has(p.gameId)).slice(0, 20);
+      faltantesNaChamada = -1000;
+      for (const p of ids) extrasDaPartida(p);
+      if (ids.length === 20) setTimeout(fundo, 300);
+    } catch { /* banco ocupado */ }
+  }, 12000);
+  // Nota (0–10, MVP/ACE), fase de lane em % e selos — calculados uma vez por partida e guardados em memória.
+  const cacheExtras = new Map();
+  let faltantesNaChamada = 0;
+  function extrasDaPartida(p) {
+    if (cacheExtras.has(p.gameId)) return cacheExtras.get(p.gameId);
+    if (++faltantesNaChamada > 40) return {};   // o resto vem no pré-cálculo de fundo
+    let r = {};
+    try {
+      const jogadores = db.prepare('SELECT participantId, time, role, campeao, kills, deaths, assists, cs, ouro, dano, visao FROM jogadores WHERE gameId = ?').all(p.gameId);
+      const meu = jogadores.find((j) => j.participantId === p.meuId);
+      if (!meu || jogadores.length < 10) { cacheExtras.set(p.gameId, r); return r; }
+      const vencedor = db.prepare('SELECT vencedor FROM partidas WHERE gameId = ?').get(p.gameId)?.vencedor ?? null;
+      const eventos = db.prepare("SELECT t, tipo, autorId FROM eventos WHERE gameId = ? AND tipo IN ('BUILDING_KILL','ELITE_MONSTER_KILL','CHAMPION_KILL')").all(p.gameId);
+      const notas = notasDaPartida(jogadores, { duracaoS: p.duracaoS, vencedor, eventos });
+      const minha = notas.get(p.meuId);
+      const f15 = db.prepare('SELECT participantId, ouroTotal FROM frames WHERE gameId = ? AND minuto = (SELECT MIN(minuto) FROM frames WHERE gameId = ? AND t >= 900000)').all(p.gameId, p.gameId);
+      const laning = laningPct(f15, p.meuId, jogadores, p.minhaRole);
+      const danoTime = jogadores.filter((j) => j.time === meu.time).reduce((s, j) => s + (j.dano ?? 0), 0);
+      const selos = selosDaPartida({ eu: { id: p.meuId }, eventos, duracaoS: p.duracaoS, venci: !!p.venci, nota: minha?.nota ?? null, dano: meu.dano ?? 0, danoTime });
+      r = { nota: minha?.nota ?? null, mvp: !!minha?.mvp, ace: !!minha?.ace, laning, selos };
+    } catch { /* partida velha sem dado */ }
+    cacheExtras.set(p.gameId, r);
+    return r;
+  }
   Object.assign(rotas, {
     '/api/padroes': (q) => {
       const fc = filtroConta(q.get('conta'));

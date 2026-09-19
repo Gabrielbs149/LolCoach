@@ -179,3 +179,19 @@ h2 small{font-family:var(--corpo);font-size:12px;letter-spacing:0;color:var(--ap
 .elo .placar b{font-size:26px}
 aside .estado .versaoBaixo{color:var(--apagado);font-size:11px;letter-spacing:.6px}
 body.recolhida .estado .versaoBaixo{display:none}
+
+/* ---- nota da partida, MVP/ACE, lane %, selos ---- */
+.cartaoP .gr{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.cartaoP .nota{font-family:var(--titulo);font-size:26px;letter-spacing:.5px;line-height:1;color:var(--texto)}
+.cartaoP .nota.alta{color:var(--marca)} .cartaoP .nota.baixa{color:var(--fraco)}
+.seloN{display:inline-block;font-size:10px;font-weight:700;letter-spacing:1px;padding:1px 7px;border-radius:99px;border:1px solid var(--borda-forte);color:var(--fraco)}
+.seloN.mvp{color:#0a0c10;background:var(--marca);border-color:var(--marca)} .seloN.ace{color:var(--marca);border-color:var(--marca)}
+.seloN.penta{color:#0a0c10;background:#f0b048;border-color:#f0b048} .seloN.quadra{color:#f0b048;border-color:#f0b048} .seloN.tripla{color:#f0b048;border-color:#7a5a24}
+.seloN.carregou{color:var(--vit);border-color:var(--vit)} .seloN.surrender,.seloN.remake{color:var(--apagado)}
+.cartaoP .lane{position:relative;display:inline-block;width:64px;height:6px;background:var(--der);border-radius:3px;overflow:visible;margin-top:2px}
+.cartaoP .lane i{position:absolute;left:0;top:0;bottom:0;background:var(--vit);border-radius:3px}
+.cartaoP .lane b{position:absolute;right:-30px;top:-6px;font-size:10px;color:var(--fraco);font-weight:500}
+.listaP:not(.compacta) .cartaoP{grid-template-columns:120px 112px minmax(0,1fr) 110px 120px 130px}
+.listaP.compacta .cartaoP .gr{display:flex}
+.listaP.compacta .cartaoP{grid-template-columns:72px 86px minmax(0,1fr) 96px 70px}
+.listaP.compacta .cartaoP .lane{display:none}

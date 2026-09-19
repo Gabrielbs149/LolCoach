@@ -1526,7 +1526,7 @@ function cartaoDePartida(p){
     <div class="nums">
       ${csMin ? `<span>CS</span> ${p.cs} (${csMin})<br>` : ''}
       ${p.participacao != null ? `<span>Part.</span> ${p.participacao}%` : ''}</div>
-    <div class="gr"><span class="selo ${p.graves?'tem':'zero'}">${p.graves}</span><span class="rotp">graves</span></div>
+    <div class="gr">${p.nota != null ? `<span class="nota ${p.nota >= 8 ? 'alta' : p.nota < 5 ? 'baixa' : ''}">${p.nota.toFixed(1)}</span>${p.mvp ? '<span class="seloN mvp">MVP</span>' : p.ace ? '<span class="seloN ace">ACE</span>' : ''}` : `<span class="selo ${p.graves?'tem':'zero'}">${p.graves}</span><span class="rotp">graves</span>`}${(p.selos ?? []).map(s => `<span class="seloN ${s.toLowerCase()}">${s}</span>`).join('')}${p.laning != null ? `<span class="lane" title="fase de lane: sua parte do gold da lane aos 15 min"><i style="width:${p.laning}%"></i><b>${p.laning}%</b></span>` : ''}</div>
     <button class="marca ${marcadasIds.has(p.gameId)?'on':''}" title="marcar pra estudar depois" onclick="marcarPartida(event, ${p.gameId})">${marcadasIds.has(p.gameId)?'★':'☆'}</button>
   </div>`;
 }
