@@ -379,3 +379,7 @@ h2 small a{color:var(--marca);text-decoration:none}
 .pvGrade{margin-bottom:26px}
 .pvGrade .rdC.bom{border-left:3px solid var(--vit)}
 .pvGrade .rdC.ruim{border-left:3px solid var(--der)}
+
+.mtL:not(.cab),.rdC{cursor:pointer}
+.mtL:not(.cab):hover{background:var(--f2);border-radius:var(--r-s)}
+.rdC:hover{background:var(--f2)}

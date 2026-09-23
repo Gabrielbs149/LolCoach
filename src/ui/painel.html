@@ -3312,6 +3312,12 @@ async function tick(){
 async function carregarNovidades(){ try { const n = await pegar('/api/novidades'); const el = $('#novidades'); if (!el) return; el.innerHTML = n.itens?.length ? `<b>O que mudou</b> (últimas versões)<div style="max-height:220px;overflow:auto;margin-top:4px">${n.itens.map(i => `<div style="margin:3px 0"><b>${esc(i.versao)}</b> — ${esc(i.texto).slice(0, 400)}${i.texto.length > 400 ? '…' : ''}</div>`).join('')}</div>` : ''; } catch {} }
 /* ======================================================== Meta: estatísticas por rota + radar de abuso */
 const MT_ROTAS = [['TOP','Top'],['JUNGLE','Jungle'],['MID','Mid'],['ADC','ADC'],['SUPPORT','Suporte']];
+/** Da tabela do meta pra prática: abre a build (runas, itens, feitiços) do campeão naquela rota. */
+async function buildDoMeta(id, pos){
+  if(!listaCampeoes.length) await carregarCampeoes();
+  abrirAba('builds');
+  abrirBuild(id, pos);
+}
 let mtRota = 'ADC', mtDados = null, mtRadarFeito = false;
 const mtTier = (t) => t === 0 ? '<span class="tierB t0">OP</span>' : `<span class="tierB t${t}">${t}</span>`;
 const mtVar = (c) => { if (!c.rank || !c.rankAntes) return ''; const d = c.rankAntes - c.rank; if (!d) return '<span class="mtIgual">—</span>'; return `<span class="${d > 0 ? 'mtSobe' : 'mtDesce'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`; };
@@ -3319,7 +3325,7 @@ const mtMeus = () => new Set((todasPartidas ?? []).map(p => String(p.meuCampeao)
 
 function mtLinha(c, i, meus){
   const meu = meus.has(String(c.nome).replace(/[^a-z]/gi, '').toLowerCase()) || (c.chave && meus.has(String(c.chave).replace(/[^a-z]/gi, '').toLowerCase()));
-  return `<div class="mtL ${meu ? 'meu' : ''}"><span class="mtPos">${c.rank ?? i + 1}</span>
+  return `<div class="mtL ${meu ? 'meu' : ''}" onclick="buildDoMeta(${c.id}, '${mtRota}')" title="ver a build de ${esc(c.nome)}"><span class="mtPos">${c.rank ?? i + 1}</span>
     <img src="/icone/${c.id}" alt="" loading="lazy">
     <span class="mtNome">${esc(c.nome)}${meu ? '<i>seu</i>' : ''}</span>
     <span class="num">${mtTier(c.tier)}</span>
@@ -3343,7 +3349,7 @@ async function carregarMeta(recarregar){
   const lista = mtDados.posicoes[mtRota] ?? [], meus = mtMeus();
   corpo.innerHTML = `<div class="mtTab"><div class="mtL cab"><span class="mtPos">#</span><span></span><span>Campeão</span><span class="num">Nível</span><span class="num">Vitória</span><span class="num">Pick</span><span class="num">Ban</span><span class="num">KDA</span><span class="num">Patch</span></div>
     ${lista.map((c, i) => mtLinha(c, i, meus)).join('')}</div>
-    <div class="dica" style="margin-top:8px">Nível 0 (OP) é o que ganha jogo sozinho no elo escolhido. "Patch" é quantas posições o campeão subiu ou caiu desde a atualização passada.</div>`;
+    <div class="dica" style="margin-top:8px">Clique num campeão pra abrir a build dele nessa rota. Nível 0 (OP) é o que ganha jogo sozinho no elo escolhido. "Patch" é quantas posições o campeão subiu ou caiu desde a atualização passada.</div>`;
   carregarMetaVoce();
   if (!mtRadarFeito) { mtRadarFeito = true; carregarRadar(); }
 }
@@ -3356,7 +3362,7 @@ async function carregarMetaVoce(){
   if (mtVoceChave === ch) return; mtVoceChave = ch;
   let v; try { v = await pegar(comConta(`/api/meta-voce?regiao=${$('#mtRegiao').value}&tier=${$('#mtTier').value}`)); } catch { v = null; }
   if (!v || v.erro || v.vazio || (!v.manda?.length && !v.cuidado?.length && !v.testar?.length)) { el.innerHTML = ''; return; }
-  const card = (c, pe, cls) => `<div class="rdC ${cls ?? ''}"><img src="/icone/${c.id}" alt="" loading="lazy"><div class="rdT"><b>${esc(c.nome)}</b><span>${PV_ROTA[c.posicao] ?? c.posicao}${c.meus ? ` · ${c.meus.n} jogos seus` : ''}</span></div><div class="rdN"><b class="${c.meus ? (c.meus.taxa >= 55 ? 'v' : c.meus.taxa <= 45 ? 'd' : '') : (c.taxa >= 52 ? 'v' : '')}">${c.meus ? c.meus.taxa.toFixed(0) : c.taxa.toFixed(1)}%</b><span>${pe}</span></div></div>`;
+  const card = (c, pe, cls) => `<div class="rdC ${cls ?? ''}" onclick="buildDoMeta(${c.id}, '${c.posicao}')" title="ver a build"><img src="/icone/${c.id}" alt="" loading="lazy"><div class="rdT"><b>${esc(c.nome)}</b><span>${PV_ROTA[c.posicao] ?? c.posicao}${c.meus ? ` · ${c.meus.n} jogos seus` : ''}</span></div><div class="rdN"><b class="${c.meus ? (c.meus.taxa >= 55 ? 'v' : c.meus.taxa <= 45 ? 'd' : '') : (c.taxa >= 52 ? 'v' : '')}">${c.meus ? c.meus.taxa.toFixed(0) : c.taxa.toFixed(1)}%</b><span>${pe}</span></div></div>`;
   const bloco = (tit, sub, itens) => itens?.length ? `<div class="rdBloco"><div class="rot">${tit}</div><div class="rdSub">${sub}</div>${itens.join('')}</div>` : '';
   const nivel = (c) => c.tier === 0 ? 'nível OP no patch' : `nível ${c.tier} no patch`;
   el.innerHTML = `<h2 style="margin-top:0">Pra você <small>o patch cruzado com as suas ${v.principal ? PV_ROTA[v.principal] : ''} partidas</small></h2><div class="rdGrade pvGrade">
@@ -3372,7 +3378,7 @@ async function carregarRadar(){
   let r; try { r = await pegar('/api/radar'); } catch (e) { r = { erro: e.message }; }
   if (r?.erro || !r) { el.innerHTML = '<div class="aviso">o radar não respondeu agora</div>'; return; }
   const rotaBr = { TOP: 'top', JUNGLE: 'jungle', MID: 'mid', ADC: 'adc', SUPPORT: 'sup' };
-  const card = (c, pe) => `<div class="rdC"><img src="/icone/${c.id}" alt=""><div class="rdT"><b>${esc(c.nome)}</b><span>${rotaBr[c.posicao] ?? c.posicao}</span></div><div class="rdN"><b class="${c.taxa >= 52 ? 'v' : ''}">${c.taxa.toFixed(1)}%</b><span>${pe}</span></div></div>`;
+  const card = (c, pe) => `<div class="rdC" onclick="buildDoMeta(${c.id}, '${c.posicao}')" title="ver a build"><img src="/icone/${c.id}" alt=""><div class="rdT"><b>${esc(c.nome)}</b><span>${rotaBr[c.posicao] ?? c.posicao}</span></div><div class="rdN"><b class="${c.taxa >= 52 ? 'v' : ''}">${c.taxa.toFixed(1)}%</b><span>${pe}</span></div></div>`;
   const bloco = (tit, sub, itens) => itens?.length ? `<div class="rdBloco"><div class="rot">${tit}</div><div class="rdSub">${sub}</div><div class="rdLista">${itens.join('')}</div></div>` : '';
   el.innerHTML = `<div class="rdGrade">
     ${bloco('SUBINDO AGORA', 'quem mais ganhou posições no BR Esmeralda+ neste patch', r.subindo.slice(0, 6).map(c => card(c, `subiu ${c.subiu} posições`)))}
