@@ -993,11 +993,14 @@ h2{letter-spacing:1px}
         <h2>Campeões das últimas 20</h2><div id="camp20"></div>
       </div>
     </div>
+    <div id="planoSemana"></div>
     <div id="conquistas"></div>
     <h2>Seus campeões</h2><div id="campeoes"></div>
   </section>
 
   <section id="estat">
+    <div id="evolucao"></div>
+    <div id="mapaMortes"></div>
     <div class="titulo">Estatísticas</div>
     <div class="cartoes" id="eGeral"></div>
     <h2>Últimas 20 × o resto</h2><div id="eForma"></div>
@@ -1394,6 +1397,7 @@ async function carregarVisao(){
   const maisJogado = (() => { const c = new Map(); for (const p of (ps ?? []).slice(0, 20)) if (p.championId) c.set(p.championId, (c.get(p.championId) ?? 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? (ps?.[0]?.championId ?? 0); })();
   aplicarFundo(ps?.[0]?.championId ?? maisJogado);
   carregarConquistas().catch(() => {});
+  carregarPlano().catch(() => {});
   const solo = (perfil?.elos ?? []).find(e => e.chave === 'RANKED_SOLO_5x5') ?? (perfil?.elos ?? [])[0] ?? null;
   $('#cabecalhoPerfil').innerHTML = `<div class="perfilHero" style="background-image:url(/arte/${maisJogado})">
     <img class="retrato" src="${perfil?.icone != null ? '/iconeperfil/'+perfil.icone : ''}" alt="">
@@ -1719,6 +1723,11 @@ async function abrirMeuCampeao(nome, championId){
   h.push(bloco('CONTRA QUEM (RIVAL DE ROTA)', c.rivais));
   h.push(bloco(c.duos.length ? 'COM QUEM NO BOT (DUO)' : '', c.duos));
   h.push('</div>');
+  try {
+    const dif = await pegar(comConta('/api/diferenca?campeao=' + encodeURIComponent(nome)));
+    if (dif?.diferencas?.length) h.push(`<h2>O que quem ganha faz diferente <small>a build de maior taxa no op.gg contra as suas ${dif.jogos} partidas</small></h2>
+      <div class="difLista">${dif.diferencas.map(x => `<div class="difL"><span class="tipo">${x.tipo === 'item' ? 'ITEM' : x.tipo === 'magia' ? 'MAGIA' : 'FEITIÇO'}</span><p>${esc(x.texto)}</p></div>`).join('')}</div>`);
+  } catch { /* sem rede */ }
   if (c.itens?.length) h.push(`<h2>Itens que você mais compra de ${esc(c.nome)}</h2><div class="buildP compacta"><div class="finais">${c.itens.slice(0, 12).map(i => `<span class="itemN" title="em ${i.n} partidas"><img src="/item/${i.itemId}" alt=""><small>${i.n}</small></span>`).join('')}</div></div>`);
   h.push(`<h2>Últimas de ${esc(c.nome)}</h2><div class="listaP compacta">${(todasPartidas ?? []).filter(p => c.ultimas.some(u => u.gameId === p.gameId)).slice(0, 10).map(cartaoDePartida).join('')}</div>`);
   $('#det').innerHTML = h.join('');
@@ -1934,6 +1943,8 @@ function colunas(itens, {minimo = 1} = {}){
 }
 
 async function carregarEstat(){
+  carregarEvolucao().catch(() => {});
+  carregarMapaMortes().catch(() => {});
   const e = await pegar(comConta('/api/estatisticas'));
   if(e.erro){ $('#eGeral').innerHTML = `<div class="vazio">${esc(e.erro)}</div>`; return; }
   const g = e.geral;
@@ -3492,6 +3503,79 @@ async function verDia(dia){
   $('#calDia').innerHTML = `<h2>${dia.split('-').reverse().join('/')} <small>${d ? `${d.n} partidas · KDA ${kda} · ${csm} CS/min${d.pdlSabido ? ` · ${d.pdl > 0 ? '+' : ''}${d.pdl} PDL` : ''}` : ''}</small></h2>
     <div class="listaP">${ps.map(cartaoDePartida).join('') || '<div class="vazio">as partidas desse dia ainda não carregaram</div>'}</div>`;
   $('#calDia').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ======================================================== você contra você */
+async function carregarEvolucao(){
+  const el = $('#evolucao'); if(!el) return;
+  let e; try { e = await pegar(comConta('/api/evolucao?dias=30')); } catch { e = null; }
+  if(!e || e.erro) { el.innerHTML = ''; return; }
+  if(e.faltaAmostra){ el.innerHTML = `<h2>Você contra você</h2><div class="dica">precisa de partidas nos dois períodos pra comparar (agora: ${e.agora}, antes: ${e.antes}).</div>`; return; }
+  el.innerHTML = `<h2>Você contra você <small>últimos 30 dias (${e.jogos.agora} partidas) contra os 30 anteriores (${e.jogos.antes})</small></h2>
+    <div class="evoGrade">${e.eixos.map(x => `
+      <div class="evo ${x.melhor === null ? '' : x.melhor ? 'sobe' : 'desce'}">
+        <div class="rot">${esc(x.rotulo)}</div>
+        <div class="val">${x.agora}<small> de ${x.antes}</small></div>
+        <div class="dif">${x.melhor === null ? 'igual' : `${x.pct > 0 ? '+' : ''}${x.pct}%`}</div>
+      </div>`).join('')}</div>`;
+}
+
+/* ======================================================== onde você morre */
+let mmFiltro = { fase: '', role: '' };
+async function carregarMapaMortes(){
+  const el = $('#mapaMortes'); if(!el) return;
+  const qs = [mmFiltro.fase ? 'fase=' + mmFiltro.fase : '', mmFiltro.role ? 'role=' + mmFiltro.role : ''].filter(Boolean).join('&');
+  let m; try { m = await pegar(comConta('/api/mapa-mortes' + (qs ? '?' + qs : ''))); } catch { m = null; }
+  if(!m || m.erro || !m.total){ el.innerHTML = ''; return; }
+  const botao = (chave, valor, texto) => `<button class="mtR ${mmFiltro[chave] === valor ? 'ativo' : ''}" onclick="mmTrocar('${chave}','${valor}')">${texto}</button>`;
+  const cels = m.grade.map((n, i) => {
+    if(!n) return '';
+    const x = i % m.n, y = Math.floor(i / m.n);
+    const f = Math.min(1, n / m.maior);
+    return `<i style="left:${(100 * x) / m.n}%;top:${(100 * y) / m.n}%;width:${100 / m.n}%;height:${100 / m.n}%;opacity:${0.12 + 0.88 * f}" title="${n} mortes"></i>`;
+  }).join('');
+  el.innerHTML = `<h2>Onde você morre <small>${num(m.total)} mortes de todas as suas partidas, sempre com a sua base embaixo à esquerda</small></h2>
+    <div class="mtBarra">
+      <div class="mtRotas">${botao('fase','','tudo')}${botao('fase','lane','até 14 min')}${botao('fase','meio','14 a 25')}${botao('fase','fim','depois dos 25')}</div>
+      <div class="mtRotas">${botao('role','','todas as rotas')}${['ADC','SUPORTE','MID','TOP','JUNGLE'].map(r => botao('role', r, r.toLowerCase())).join('')}</div>
+    </div>
+    <div class="mapaCalor"><img src="/minimapa.png" alt="" onerror="this.style.display='none'">${cels}</div>`;
+}
+function mmTrocar(chave, valor){ mmFiltro[chave] = valor; carregarMapaMortes(); }
+
+/* ======================================================== plano da semana */
+async function carregarPlano(){
+  const el = $('#planoSemana'); if(!el) return;
+  let p; try { p = await pegar(comConta('/api/plano')); } catch { p = null; }
+  if(!p || p.erro) { el.innerHTML = ''; return; }
+  const opcoes = (p.metas ?? []).map(m => `<option value="${m.chave}" ${p.plano?.meta === m.chave ? 'selected' : ''}>${esc(m.rotulo)} ${m.alvoPadrao} ${esc(m.unidade)}</option>`).join('');
+  if(!p.plano){
+    el.innerHTML = `<h2>Plano da semana <small>uma meta só, medida partida a partida</small></h2>
+      <div class="planoCaixa vazio2">
+        <select class="contaSel" id="planoSel" style="margin:0;width:auto"><option value="">escolhe uma meta…</option>${opcoes}</select>
+        <button class="acao" onclick="salvarPlano()">Começar</button>
+        <span class="dica">dica avulsa não treina nada; meta medida treina.</span>
+      </div>`;
+    return;
+  }
+  const pct = p.total ? Math.round((100 * p.bateram) / p.total) : 0;
+  const ults = (p.partidas ?? []).slice(-12);
+  el.innerHTML = `<h2>Plano da semana <small>desde ${new Date(p.plano.em).toLocaleDateString('pt-BR')}</small></h2>
+    <div class="planoCaixa">
+      <div class="planoAlvo"><b>${esc(p.plano.rotulo)} ${p.plano.alvo}</b><span>${esc(p.plano.unidade)}</span></div>
+      <div class="planoBar"><i style="width:${pct}%"></i><span>${p.bateram} de ${p.total} partidas dentro da meta (${pct}%)</span></div>
+      <div class="planoPontos">${ults.map(x => `<span class="${x.bateu ? 'ok' : 'nao'}" title="${x.valor}">${x.bateu ? '●' : '○'}</span>`).join('')}</div>
+      <button class="acao" onclick="trocarPlano()">Trocar meta</button>
+    </div>`;
+}
+async function salvarPlano(){
+  const v = $('#planoSel')?.value; if(!v) return;
+  await fetch('/api/plano?meta=' + encodeURIComponent(v), { method: 'POST' });
+  carregarPlano();
+}
+async function trocarPlano(){
+  await fetch('/api/plano?meta=nenhuma', { method: 'POST' });
+  carregarPlano();
 }
 
 /* ======================================================== nível e conquistas */

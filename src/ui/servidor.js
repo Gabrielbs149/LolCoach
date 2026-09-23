@@ -32,6 +32,20 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
   // quem analisa é que ignora. (o ABSOL tirou o ARAM do histórico pelo mesmo motivo)
   const SO_SR = ' AND fila NOT IN (450,900,1300,1700,1710,1810,1820,1830,1840,1900,2300)';
 
+  // Metas do plano da semana: cada uma é uma conta simples em cima de UMA partida.
+  const METAS_PLANO = [
+    { chave: 'mortes', rotulo: 'Morrer no máximo', unidade: 'mortes', alvoPadrao: 5, menorMelhor: true, valor: (p) => p.d },
+    { chave: 'csm', rotulo: 'CS por minuto de pelo menos', unidade: 'cs/min', alvoPadrao: 7, valor: (p) => (p.duracaoS ? (p.cs * 60) / p.duracaoS : 0) },
+    { chave: 'visao', rotulo: 'Pontuação de visão de pelo menos', unidade: 'de visão', alvoPadrao: 20, valor: (p) => p.visao ?? 0 },
+    { chave: 'kda', rotulo: 'KDA de pelo menos', unidade: 'de KDA', alvoPadrao: 3, valor: (p) => (p.d ? (p.k + p.a) / p.d : p.k + p.a) },
+  ];
+  let planoPronto = false;
+  const garantirPlano = () => {
+    if (planoPronto) return;
+    db.exec('CREATE TABLE IF NOT EXISTS plano (id INTEGER PRIMARY KEY AUTOINCREMENT, meta TEXT, alvo REAL, em TEXT)');
+    planoPronto = true;
+  };
+
   // A chave da Riot nunca sai pro painel: nenhuma tela precisa dela, e o
   // servidor é local mas a página tem iframe e fetch de sobra pra vazar.
   const semChave = (cfg) => {
@@ -73,6 +87,167 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
 
     // Com quem você jogou (mesmo time) nas últimas N partidas: jogos e V-D com cada um; e contra quem mais jogou
     // Temporadas passadas (op.gg) + top X% estimado
+    /**
+     * O que quem ganha com o seu campeão faz diferente de você: item principal,
+     * feitiços e ordem de magia. Compara as SUAS partidas com a build mais vitoriosa
+     * do op.gg naquele campeão e rota, e só mostra o que é realmente diferente.
+     */
+    '/api/diferenca': async (q) => {
+      const nome = q.get('campeao'); if (!nome) return { erro: 'campeão?' };
+      const fc = filtroConta(q.get('conta'));
+      const ps = db.prepare(`SELECT p.gameId, p.minhaRole, p.venci, p.meuId FROM partidas p
+        WHERE p.meuCampeao = ? AND p.duracaoS >= 300${SO_SR}${fc} ORDER BY p.quando DESC LIMIT 60`).all(nome);
+      if (ps.length < 5) return { nome, poucas: true, jogos: ps.length };
+      const role = (() => { const c = new Map(); for (const p of ps) c.set(p.minhaRole, (c.get(p.minhaRole) ?? 0) + 1); return [...c].sort((a, b) => b[1] - a[1])[0][0]; })();
+      const ids = ps.map((p) => p.gameId);
+      const marcas = ids.map(() => '?').join(',');
+
+      // o primeiro item grande (1000+) que você fecha, e em que ordem
+      const compras = db.prepare(`SELECT e.gameId, e.itemId, e.t FROM eventos e
+        JOIN partidas p ON p.gameId = e.gameId AND e.autorId = p.meuId
+        WHERE e.tipo = 'ITEM_PURCHASED' AND e.gameId IN (${marcas}) ORDER BY e.gameId, e.t`).all(...ids);
+
+      let build = null;
+      try { const { buildsDoCampeao } = await import('../dados/builds.js'); build = await buildsDoCampeao(nome, role, { regiao: 'br' }); } catch { /* sem rede */ }
+      if (!build) return { nome, role, semRede: true };
+
+      const itensTab = await (async () => { try { const { tabelaDeItens } = await import('../dados/ddragon.js'); return await tabelaDeItens(); } catch { return new Map(); } })();
+      const grande = (id) => (itensTab.get(id)?.preco ?? 0) >= 1000;
+      const meuPrimeiro = new Map();
+      for (const c of compras) { if (!grande(c.itemId) || meuPrimeiro.has(c.gameId)) continue; meuPrimeiro.set(c.gameId, c.itemId); }
+      const cont = new Map();
+      for (const id of meuPrimeiro.values()) cont.set(id, (cont.get(id) ?? 0) + 1);
+      const meuItem = [...cont].sort((a, b) => b[1] - a[1])[0] ?? null;
+
+      // a build de maior taxa entre as que têm amostra
+      const melhores = (build.itens?.principais ?? build.itens?.finais ?? []).filter((b) => (b.jogos ?? 0) >= 200);
+      const deles = melhores.sort((a, b) => (b.taxa ?? 0) - (a.taxa ?? 0))[0] ?? null;
+      const itemDeles = deles?.itens?.[0] ?? null;
+
+      const diferencas = [];
+      if (meuItem && itemDeles && meuItem[0] !== itemDeles.id) {
+        diferencas.push({ tipo: 'item', texto: `Você fecha ${itensTab.get(meuItem[0])?.nome ?? 'um item'} primeiro em ${meuItem[1]} das ${meuPrimeiro.size} partidas. A build de maior taxa (${deles.taxa}% em ${deles.jogos}) começa com ${itemDeles.nome}.` });
+      }
+      const ordemDeles = build.habilidades?.prioridade?.sort?.((a, b) => (b.taxa ?? 0) - (a.taxa ?? 0))?.[0] ?? null;
+      if (ordemDeles) diferencas.push({ tipo: 'magia', texto: `A ordem de magia que mais ganha é ${ordemDeles.ordem.join(' > ')} (${ordemDeles.taxa}% em ${ordemDeles.jogos} jogos).` });
+      const fDeles = build.feiticos?.[0]?.feiticos ?? null;
+      if (fDeles) diferencas.push({ tipo: 'feitico', texto: `Feitiços mais jogados: ${fDeles.map((f) => f.nome).join(' + ')}.` });
+
+      return { nome, role, jogos: ps.length, taxaSua: Math.round((1000 * ps.filter((p) => p.venci).length) / ps.length) / 10, diferencas, deles: deles ? { taxa: deles.taxa, jogos: deles.jogos, itens: deles.itens } : null };
+    },
+
+    /**
+     * Onde você morre, juntando TODAS as partidas. Uma partida só não diz nada; 200
+     * partidas mostram o arbusto em que você morre sempre. As posições vêm viradas
+     * pro seu lado do mapa (quem joga no time vermelho tem tudo espelhado), então o
+     * canto de baixo à esquerda é sempre a sua base.
+     */
+    '/api/mapa-mortes': (q) => {
+      const fc = filtroConta(q.get('conta'));
+      const role = q.get('role') || null;
+      const campeao = q.get('campeao') || null;
+      const fase = q.get('fase') || null;   // lane | meio | fim
+      const cond = [];
+      if (role) cond.push(`AND p.minhaRole = '${String(role).replace(/'/g, "''")}'`);
+      if (campeao) cond.push(`AND p.meuCampeao = '${String(campeao).replace(/'/g, "''")}'`);
+      const linhas = db.prepare(`SELECT e.x, e.y, e.t, j.time lado
+        FROM eventos e
+        JOIN partidas p ON p.gameId = e.gameId AND e.vitimaId = p.meuId
+        JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
+        WHERE e.tipo = 'CHAMPION_KILL' AND e.x IS NOT NULL AND p.duracaoS >= 300${SO_SR}${fc} ${cond.join(' ')}`).all();
+      const N = 24, MAPA = 14820;
+      const grade = Array.from({ length: N * N }, () => 0);
+      let total = 0;
+      for (const l of linhas) {
+        const min = (l.t ?? 0) / 60000;
+        if (fase === 'lane' && min >= 14) continue;
+        if (fase === 'meio' && (min < 14 || min >= 25)) continue;
+        if (fase === 'fim' && min < 25) continue;
+        // time 200 joga do outro lado: espelha pra todo mundo olhar o mesmo mapa
+        const x = l.lado === 200 ? MAPA - l.x : l.x;
+        const y = l.lado === 200 ? MAPA - l.y : l.y;
+        const cx = Math.max(0, Math.min(N - 1, Math.floor((x / MAPA) * N)));
+        const cy = Math.max(0, Math.min(N - 1, Math.floor((1 - y / MAPA) * N)));
+        grade[cy * N + cx]++; total++;
+      }
+      const maior = Math.max(1, ...grade);
+      const quentes = grade.map((n, i) => ({ n, x: i % N, y: Math.floor(i / N) })).filter((c) => c.n > 0).sort((a, b) => b.n - a.n).slice(0, 3);
+      return { n: N, total, maior, grade, quentes, filtros: { role, campeao, fase } };
+    },
+
+    /**
+     * Você contra você: os últimos N dias contra os N anteriores, métrica por métrica.
+     * Saber se está melhorando é outra coisa que saber como está — e é a pergunta que
+     * o histórico responde e o elo não.
+     */
+    '/api/evolucao': (q) => {
+      const fc = filtroConta(q.get('conta'));
+      const dias = Math.max(7, Math.min(120, Number(q.get('dias')) || 30));
+      const agora = Date.now();
+      const corte1 = new Date(agora - dias * 86400_000).toISOString();
+      const corte2 = new Date(agora - 2 * dias * 86400_000).toISOString();
+      const pega = (de, ate) => db.prepare(`SELECT COUNT(*) n, SUM(p.venci) v, SUM(p.duracaoS) dur,
+          SUM(j.kills) k, SUM(j.deaths) d, SUM(j.assists) a, SUM(j.cs) cs, SUM(j.dano) dano, SUM(j.visao) visao
+        FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
+        WHERE p.duracaoS >= 300${SO_SR}${fc} AND p.quando >= ? AND p.quando < ?`).get(de, ate);
+      const agoraR = pega(corte1, new Date(agora + 60_000).toISOString());
+      const antes = pega(corte2, corte1);
+      if (!agoraR?.n || !antes?.n) return { dias, faltaAmostra: true, agora: agoraR?.n ?? 0, antes: antes?.n ?? 0 };
+      const metricas = (r) => {
+        const min = (r.dur ?? 0) / 60;
+        return {
+          taxa: Math.round((1000 * r.v) / r.n) / 10,
+          kda: r.d ? Math.round((10 * (r.k + r.a)) / r.d) / 10 : null,
+          mortes: Math.round((10 * r.d) / r.n) / 10,
+          csm: min ? Math.round((10 * r.cs) / min) / 10 : null,
+          dpm: min ? Math.round(r.dano / min) : null,
+          vspm: min ? Math.round((100 * r.visao) / min) / 100 : null,
+          jogos: r.n,
+        };
+      };
+      const A = metricas(agoraR), B = metricas(antes);
+      const EIXOS = [
+        { chave: 'taxa', rotulo: 'Vitórias', fmt: (v) => v + '%' },
+        { chave: 'kda', rotulo: 'KDA', fmt: (v) => v?.toFixed(1) },
+        { chave: 'mortes', rotulo: 'Mortes por jogo', fmt: (v) => v?.toFixed(1), menorMelhor: true },
+        { chave: 'csm', rotulo: 'CS por minuto', fmt: (v) => v?.toFixed(1) },
+        { chave: 'dpm', rotulo: 'Dano por minuto', fmt: (v) => Math.round(v) },
+        { chave: 'vspm', rotulo: 'Visão por minuto', fmt: (v) => v?.toFixed(2) },
+      ];
+      const eixos = EIXOS.map((e) => {
+        const ag = A[e.chave], an = B[e.chave];
+        if (ag == null || an == null) return null;
+        const dif = Math.round((ag - an) * 100) / 100;
+        const melhor = e.menorMelhor ? dif < 0 : dif > 0;
+        const pct = an ? Math.round((1000 * (ag - an)) / Math.abs(an)) / 10 : 0;
+        return { chave: e.chave, rotulo: e.rotulo, agora: ag, antes: an, dif, pct, melhor: dif === 0 ? null : melhor };
+      }).filter(Boolean);
+      return { dias, jogos: { agora: A.jogos, antes: B.jogos }, eixos };
+    },
+
+    /**
+     * Plano da semana: uma meta só, medida partida a partida. Coaching é repetição
+     * medida — dica avulsa todo mundo dá. A meta fica guardada no banco e o progresso
+     * é contado nas partidas desde que ela foi criada.
+     */
+    '/api/plano': (q) => {
+      garantirPlano();
+      const fc = filtroConta(q.get('conta'));
+      const p = db.prepare('SELECT * FROM plano ORDER BY em DESC LIMIT 1').get();
+      if (!p) return { plano: null, metas: METAS_PLANO };
+      const ps = db.prepare(`SELECT p.gameId, p.quando, p.venci, p.duracaoS, j.kills k, j.deaths d, j.assists a, j.cs cs, j.visao visao
+        FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
+        WHERE p.duracaoS >= 300${SO_SR}${fc} AND p.quando >= ? ORDER BY p.quando`).all(p.em);
+      const def = METAS_PLANO.find((m) => m.chave === p.meta);
+      if (!def) return { plano: null, metas: METAS_PLANO };
+      const partidas = ps.map((x) => {
+        const valor = def.valor(x);
+        return { gameId: x.gameId, quando: x.quando, valor: Math.round(valor * 100) / 100, bateu: def.menorMelhor ? valor <= p.alvo : valor >= p.alvo };
+      });
+      const bateram = partidas.filter((x) => x.bateu).length;
+      return { plano: { ...p, rotulo: def.rotulo, unidade: def.unidade, menorMelhor: !!def.menorMelhor }, partidas, bateram, total: partidas.length, metas: METAS_PLANO };
+    },
+
     /** O mês dia a dia: partidas, vitórias, PDL, KDA e CS/min de cada dia (hora local). */
     '/api/calendario': (q) => {
       const fc = filtroConta(q.get('conta'));
@@ -444,6 +619,21 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       if (req.method === 'POST' && url.pathname === '/api/flash' && acoes.marcarFlash) {
         try { return enviar(200, 'application/json', JSON.stringify(await acoes.marcarFlash({ posicao: url.searchParams.get('posicao'), nome: url.searchParams.get('nome') }))); }
         catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
+
+      // Meta da semana: escolher, trocar ou tirar.
+      if (req.method === 'POST' && url.pathname === '/api/plano') {
+        try {
+          garantirPlano();
+          const meta = url.searchParams.get('meta');
+          if (!meta || meta === 'nenhuma') { db.exec('DELETE FROM plano'); return enviar(200, 'application/json', JSON.stringify({ plano: null })); }
+          const def = METAS_PLANO.find((m) => m.chave === meta);
+          if (!def) return enviar(400, 'application/json', JSON.stringify({ erro: 'meta desconhecida' }));
+          const alvo = Number(url.searchParams.get('alvo')) || def.alvoPadrao;
+          db.exec('DELETE FROM plano');
+          db.prepare('INSERT INTO plano (meta, alvo, em) VALUES (?,?,?)').run(meta, alvo, new Date().toISOString());
+          return enviar(200, 'application/json', JSON.stringify({ plano: { meta, alvo } }));
+        } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
 
       // Marcar/desmarcar partida pra estudar depois.

@@ -451,3 +451,39 @@ body.comFundo main{background:transparent}
 .licaoP small{display:block;margin-top:6px;font-size:11.5px;color:var(--apagado)}
 .licaoP.boa{background:linear-gradient(90deg,rgba(62,207,142,.10),transparent 70%),var(--f1);border-left-color:var(--vit)}
 .licaoP.boa .rot{color:var(--vit)}
+
+/* ---- você contra você ---- */
+.evoGrade{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:26px}
+.evo{background:var(--f1);border-radius:var(--r-m);padding:10px 12px;border-left:3px solid var(--borda-forte)}
+.evo.sobe{border-left-color:var(--vit)} .evo.desce{border-left-color:var(--der)}
+.evo .rot{font-size:10.5px;letter-spacing:1.1px;color:var(--apagado)}
+.evo .val{font-family:var(--titulo);font-size:26px;letter-spacing:.5px;line-height:1.15}
+.evo .val small{font-family:var(--corpo);font-size:12px;color:var(--apagado)}
+.evo .dif{font-size:12px;font-weight:600;color:var(--fraco)}
+.evo.sobe .dif{color:var(--vit)} .evo.desce .dif{color:var(--der)}
+
+/* ---- mapa de calor das mortes ---- */
+.mapaCalor{position:relative;width:100%;max-width:520px;aspect-ratio:1;background:var(--f1);border-radius:var(--r-g);overflow:hidden;margin-bottom:26px}
+.mapaCalor img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.5}
+.mapaCalor i{position:absolute;background:radial-gradient(circle,rgba(255,92,92,.95),rgba(255,92,92,0) 70%)}
+
+/* ---- plano da semana ---- */
+.planoCaixa{background:var(--f1);border-radius:var(--r-g);padding:14px 18px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:22px}
+.planoCaixa.vazio2{gap:10px}
+.planoAlvo b{display:block;font-family:var(--titulo);font-size:22px;letter-spacing:.5px;font-weight:400;line-height:1.1}
+.planoAlvo span{font-size:11px;letter-spacing:1px;color:var(--apagado)}
+.planoBar{flex:1;min-width:180px;position:relative;height:10px;background:var(--f3);border-radius:99px}
+.planoBar i{position:absolute;inset:0 auto 0 0;background:var(--marca);border-radius:99px}
+.planoBar span{position:absolute;top:16px;left:0;font-size:12px;color:var(--fraco);white-space:nowrap}
+.planoPontos{display:flex;gap:3px;font-size:13px}
+.planoPontos .ok{color:var(--vit)} .planoPontos .nao{color:var(--der)}
+
+/* ---- o que quem ganha faz diferente ---- */
+.difLista{display:grid;gap:8px;margin-bottom:22px}
+.difL{display:flex;gap:12px;align-items:flex-start;background:var(--f1);border-radius:var(--r-m);padding:10px 14px}
+.difL .tipo{font-size:9.5px;letter-spacing:1.4px;color:var(--marca);padding-top:3px;min-width:52px}
+.difL p{margin:0;font-size:14px;line-height:1.55;color:#d3dce6}
+
+/* o mapa de calor precisa parecer calor, não grade: borra as células e apaga o mapa */
+.mapaCalor img{opacity:.32}
+.mapaCalor i{filter:blur(7px)}
