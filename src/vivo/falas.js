@@ -28,7 +28,7 @@ const DRAGAO = {
 };
 
 export function novaMemoriaFalas() {
-  return { ditas: new Set(), vistos: new Set(), ultimoTempo: 0, farmDito: new Set(), mortesPor: new Map(), meusKills: 0, meusItens: new Set(), mortosAntes: new Set(), nivelAntes: 0 };
+  return { ditas: new Set(), vistos: new Set(), ultimoTempo: 0, farmDito: new Set(), mortesPor: new Map(), meusKills: 0, meusItens: new Set(), mortosAntes: new Set(), nivelAntes: 0, espera: [], ultimaOrientacaoT: -999, perigoT: -999 };
 }
 
 /**
@@ -39,11 +39,29 @@ export function novaMemoriaFalas() {
 export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olho = false, ultimoPerigoT = null }, mem) {
   const { tempo, eu, jogadores, eventos } = estado;
   const novas = [];
-  const dizer = (id, modulo, serio, divertido, prioridade = 1) => {
+  /**
+   * Duas orientações diferentes em cima da mesma situação viram ruído — e às vezes
+   * se contradizem ("farma e espera" logo depois de "força objetivo"). Orientação
+   * (economia/lane, prioridade 1–2) espera 30 s da última e nunca sai em cima de um
+   * aviso de perigo. O que não pôde sair agora vai pra fila e volta em até 90 s, em
+   * vez de sumir: a maioria só é calculada numa janela de poucos segundos.
+   */
+  const ORIENTA = new Set(['economia', 'lane']);
+  const dizer = (id, modulo, serio, divertido, prioridade = 1, em = null) => {
     if (mem.ditas.has(id)) return;
+    if (prioridade >= 3) mem.perigoT = tempo;
+    else if (ORIENTA.has(modulo)) {
+      if (tempo - (mem.ultimaOrientacaoT ?? -999) < 30 || tempo - (mem.perigoT ?? -999) < 12) {
+        if (!(mem.espera ?? []).some((f) => f.id === id)) (mem.espera ??= []).push({ id, modulo, serio, divertido, prioridade, em: em ?? tempo });
+        return;
+      }
+      mem.ultimaOrientacaoT = tempo;
+    }
     mem.ditas.add(id);
     novas.push({ id, modulo, serio, divertido: divertido ?? serio, prioridade });
   };
+  // o que ficou esperando volta primeiro (some depois de 90 s: conselho velho não serve)
+  for (const f of (mem.espera ?? []).splice(0)) { if (tempo - f.em <= 90) dizer(f.id, f.modulo, f.serio, f.divertido, f.prioridade, f.em); }
   const inimigos = jogadores.filter((j) => j.time !== eu.time);
   const aliados = jogadores.filter((j) => j.time === eu.time);
   const ehAliado = (n) => aliados.some((j) => j.nome === n);

@@ -893,6 +893,7 @@ h2{letter-spacing:1px}
 <link rel="stylesheet" href="/identidade.css">
 </head>
 <body>
+  <div id="fundoApp" aria-hidden="true"></div>
 
 <aside>
   <div class="marca">
@@ -907,6 +908,8 @@ h2{letter-spacing:1px}
     <div class="grupo">Você</div>
     <button data-aba="visao" class="ativo" title="Perfil">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7"/></svg><span class="nome">Perfil</span></button>
+    <button data-aba="calendario" title="Calendário">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span class="nome">Calendário</span></button>
     <button data-aba="partidas" title="Partidas">
       <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="nome">Partidas</span></button>
     <button data-aba="estat" title="Estatísticas">
@@ -990,6 +993,7 @@ h2{letter-spacing:1px}
         <h2>Campeões das últimas 20</h2><div id="camp20"></div>
       </div>
     </div>
+    <div id="conquistas"></div>
     <h2>Seus campeões</h2><div id="campeoes"></div>
   </section>
 
@@ -1073,6 +1077,18 @@ h2{letter-spacing:1px}
     </div>
   </section>
 
+  <section id="calendario">
+    <div class="titulo">Calendário</div>
+    <div class="calBarra">
+      <button class="acao" onclick="mudarMes(-1)">‹</button>
+      <select class="contaSel" id="calMes" onchange="carregarCalendario($('#calMes').value)"></select>
+      <button class="acao" onclick="mudarMes(1)">›</button>
+      <span class="calResumo" id="calResumo"></span>
+    </div>
+    <div id="calGrade"></div>
+    <div id="calDia"></div>
+  </section>
+
   <section id="partidas">
     <div class="titulo">Partidas</div>
     <div class="amForma" style="margin-bottom:var(--e2)">
@@ -1143,6 +1159,13 @@ h2{letter-spacing:1px}
         <div class="txt"><b>Versão</b></div>
         <span class="sub" id="cfgVersao" style="color:var(--fraco);font-size:12.5px"></span>
         <button class="acao" onclick="atualizarAgora(this)">Atualizar agora</button>
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Fundo do app</b><small>a arte do campeão da sua última partida atrás de tudo, bem apagada — muda sozinha quando você joga</small></div>
+        <select class="contaSel" id="cFundo" style="margin:0;width:auto" onchange="trocarFundo(this.value)">
+          <option value="auto">Último campeão</option>
+          <option value="off">Sem fundo</option>
+        </select>
       </div>
       <div class="linhaCfg">
         <div class="txt"><b>Aceitar a fila</b></div>
@@ -1369,6 +1392,8 @@ async function carregarVisao(){
   const conta = perfil?.conta;
   // a splash do campeão que você mais jogou nas últimas 20 é o fundo; o emblema da solo, grande
   const maisJogado = (() => { const c = new Map(); for (const p of (ps ?? []).slice(0, 20)) if (p.championId) c.set(p.championId, (c.get(p.championId) ?? 0) + 1); return [...c.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? (ps?.[0]?.championId ?? 0); })();
+  aplicarFundo(ps?.[0]?.championId ?? maisJogado);
+  carregarConquistas().catch(() => {});
   const solo = (perfil?.elos ?? []).find(e => e.chave === 'RANKED_SOLO_5x5') ?? (perfil?.elos ?? [])[0] ?? null;
   $('#cabecalhoPerfil').innerHTML = `<div class="perfilHero" style="background-image:url(/arte/${maisJogado})">
     <img class="retrato" src="${perfil?.icone != null ? '/iconeperfil/'+perfil.icone : ''}" alt="">
@@ -1568,7 +1593,7 @@ function cartaoDePartida(p){
   <div class="cartaoP ${p.venci?'venceu':'perdeu'}" onclick="abrirPartida(${p.gameId})">
     <div class="ctx">${esc(FILA_NOME[p.fila] ?? 'Partida')}
       <span class="res">${p.venci?'Vitória':'Derrota'}</span>
-      ${haQuanto(p.quando)} · ${mmssCurto(p.duracaoS)}${coachIds?.[p.gameId] ? ` · <span title="o coach ao vivo gravou esta partida: mortes cruzadas, previsões e o que a voz falou no detalhe" style="color:var(--vit,#9c6)">🎧${coachIds[p.gameId].previsoes ? ' ' + Math.round(coachIds[p.gameId].previsoes.certas / coachIds[p.gameId].previsoes.total * 100) + '%' : ''}</span>` : ''}</div>
+      ${haQuanto(p.quando)} · ${mmssCurto(p.duracaoS)}${p.pdl != null ? ` · <span class="pdlP ${p.pdl > 0 ? 'ganhou' : p.pdl < 0 ? 'perdeu' : ''}" title="PDL que esta partida rendeu">${p.pdl > 0 ? '+' : ''}${p.pdl} PDL</span>` : ''}${coachIds?.[p.gameId] ? ` · <span title="o coach ao vivo gravou esta partida: mortes cruzadas, previsões e o que a voz falou no detalhe" style="color:var(--vit,#9c6)">🎧${coachIds[p.gameId].previsoes ? ' ' + Math.round(coachIds[p.gameId].previsoes.certas / coachIds[p.gameId].previsoes.total * 100) + '%' : ''}</span>` : ''}</div>
     <div class="arte" style="background-image:url(/arte/${p.championId ?? 0})"></div>
     <div><div class="nomeCamp">${esc(p.meuCampeao)}</div>
       <div class="sub">${role(p.minhaRole)}${p.rival ? ` · contra <b>${esc(p.rival)}</b>` : ''}${p.eloMedio ? ` · <span class="eloMedio" title="elo médio dos 10 na solo">${esc(p.eloMedio)}</span>` : ''}</div></div>
@@ -3387,8 +3412,100 @@ async function carregarRadar(){
   </div>`;
 }
 
+/* ======================================================== o fundo do app
+   A arte do campeão da última partida atrás de tudo, bem apagada — muda sozinha
+   quando você joga. Desliga em Configuração (fica guardado neste computador). */
+function aplicarFundo(championId){
+  const sel = $('#cFundo'); if(sel) sel.value = localStorage.getItem('fundoApp') ?? 'auto';
+  const el = $('#fundoApp'); if(!el) return;
+  const modo = localStorage.getItem('fundoApp') ?? 'auto';
+  if(modo === 'off' || !championId){ el.classList.remove('on'); el.style.backgroundImage = ''; document.body.classList.remove('comFundo'); return; }
+  el.style.backgroundImage = `url(/arte/${championId})`;
+  el.classList.add('on'); document.body.classList.add('comFundo');
+}
+function trocarFundo(valor){
+  localStorage.setItem('fundoApp', valor);
+  aplicarFundo(todasPartidas?.[0]?.championId ?? 0);
+}
+
+/* ======================================================== calendário do mês */
+const MES_NOME = ['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+let calMesAtual = null, calDados = null;
+function mudarMes(passo){
+  const lista = calDados?.meses ?? [];
+  const i = lista.indexOf(calMesAtual);
+  const novo = lista[i + passo];         // a lista vem do mais novo pro mais velho
+  if (novo) carregarCalendario(novo);
+}
+async function carregarCalendario(mes){
+  const grade = $('#calGrade');
+  grade.innerHTML = carregando('montando o mês…');
+  $('#calDia').innerHTML = '';
+  let c; try { c = await pegar(comConta('/api/calendario' + (mes ? '?mes=' + mes : ''))); } catch { c = null; }
+  if(!c || c.erro){ grade.innerHTML = '<div class="vazio">não consegui montar o calendário</div>'; return; }
+  calDados = c; calMesAtual = c.mes;
+  $('#calMes').innerHTML = (c.meses ?? [c.mes]).map(m => `<option value="${m}" ${m === c.mes ? 'selected' : ''}>${MES_NOME[Number(m.slice(5, 7)) - 1]} de ${m.slice(0, 4)}</option>`).join('');
+
+  const porDia = new Map(c.dias.map(d => [d.dia, d]));
+  const [ano, mesN] = c.mes.split('-').map(Number);
+  const primeiro = new Date(ano, mesN - 1, 1), diasNoMes = new Date(ano, mesN, 0).getDate();
+  const vazios = (primeiro.getDay() + 6) % 7;          // segunda é o começo da semana
+  const tot = c.dias.reduce((s, d) => ({ n: s.n + d.n, v: s.v + d.v, pdl: s.pdl + d.pdl, min: s.min + d.minutos }), { n: 0, v: 0, pdl: 0, min: 0 });
+  $('#calResumo').innerHTML = tot.n
+    ? `${tot.n} partidas · ${tot.v}V ${tot.n - tot.v}D (${Math.round(100 * tot.v / tot.n)}%) · <b class="${tot.pdl > 0 ? 'v' : tot.pdl < 0 ? 'd' : ''}">${tot.pdl > 0 ? '+' : ''}${tot.pdl} PDL</b> · ${Math.round(tot.min / 60)} h`
+    : 'nenhuma partida neste mês';
+
+  const cel = [];
+  for(let i = 0; i < vazios; i++) cel.push('<div class="calC fora"></div>');
+  for(let dia = 1; dia <= diasNoMes; dia++){
+    const chave = `${c.mes}-${String(dia).padStart(2, '0')}`;
+    const d = porDia.get(chave);
+    if(!d){ cel.push(`<div class="calC"><span class="n">${dia}</span></div>`); continue; }
+    const taxa = Math.round(100 * d.v / d.n);
+    const forca = Math.min(1, d.n / 8);
+    cel.push(`<div class="calC tem ${taxa >= 60 ? 'bom' : taxa <= 40 ? 'ruim' : ''}" style="--f:${forca}" onclick="verDia('${chave}')" title="${d.n} partidas">
+      <span class="n">${dia}</span>
+      <span class="vd">${d.v}V ${d.n - d.v}D</span>
+      ${d.pdlSabido ? `<span class="pdl ${d.pdl > 0 ? 'v' : d.pdl < 0 ? 'd' : ''}">${d.pdl > 0 ? '+' : ''}${d.pdl}</span>` : ''}
+      <span class="ic">${d.camps.map(x => `<img src="/icone/${x.id}" alt="" loading="lazy">`).join('')}</span></div>`);
+  }
+  grade.innerHTML = `<div class="calSem">${['seg','ter','qua','qui','sex','sáb','dom'].map(x => `<span>${x}</span>`).join('')}</div><div class="calGrade">${cel.join('')}</div>`;
+}
+/** Clicou no dia: as partidas daquele dia, com os mesmos cartões da lista. */
+async function verDia(dia){
+  const d = (calDados?.dias ?? []).find(x => x.dia === dia);
+  if(!todasPartidas?.length){ $('#calDia').innerHTML = carregando('buscando as partidas…'); await carregarPartidas().catch(() => {}); }
+  const ps = (todasPartidas ?? []).filter(p => new Date(Date.parse(p.quando) - 3 * 3600_000).toISOString().slice(0, 10) === dia);
+  if(!ps.length && !d){ $('#calDia').innerHTML = ''; return; }
+  const kda = d ? ((d.k + d.a) / Math.max(1, d.d)).toFixed(2) : '—';
+  const csm = d && d.minutos ? (d.cs / d.minutos).toFixed(1) : '—';
+  $('#calDia').innerHTML = `<h2>${dia.split('-').reverse().join('/')} <small>${d ? `${d.n} partidas · KDA ${kda} · ${csm} CS/min${d.pdlSabido ? ` · ${d.pdl > 0 ? '+' : ''}${d.pdl} PDL` : ''}` : ''}</small></h2>
+    <div class="listaP">${ps.map(cartaoDePartida).join('') || '<div class="vazio">as partidas desse dia ainda não carregaram</div>'}</div>`;
+  $('#calDia').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ======================================================== nível e conquistas */
+async function carregarConquistas(){
+  const el = $('#conquistas'); if(!el) return;
+  let c; try { c = await pegar(comConta('/api/conquistas')); } catch { c = null; }
+  if(!c || c.erro || c.vazio){ el.innerHTML = ''; return; }
+  const pct = Math.min(100, Math.round(100 * c.doNivel / c.custo));
+  el.innerHTML = `<h2>Nível e conquistas <small>tudo calculado das suas ${c.jogos} partidas</small></h2>
+    <div class="nivelCaixa">
+      <div class="nivelN"><b>${c.nivel}</b><span>NÍVEL</span></div>
+      <div class="nivelBar"><i style="width:${pct}%"></i><span>${c.doNivel} / ${c.custo} XP — faltam ${c.faltaPro} pro nível ${c.nivel + 1}</span></div>
+    </div>
+    <div class="conqGrade">${c.conquistas.map(q => `
+      <div class="conq ${q.nivel ? 'tem' : ''}">
+        <div class="cTopo"><b>${esc(q.nome)}</b><span class="cEstrelas">${'★'.repeat(q.nivel)}${'☆'.repeat(q.metas.length - q.nivel)}</span></div>
+        <div class="cVal">${q.valor}<small>${q.proxima ? ' / ' + q.proxima : ''}</small></div>
+        <div class="cDesc">${esc(q.desc)}</div>
+        <i class="cBar"><b style="width:${q.pct}%"></b></i>
+      </div>`).join('')}</div>`;
+}
+
 const CARREGADORES = {
-  estat: carregarEstat, meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
+  estat: carregarEstat, calendario: () => carregarCalendario(), meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
 };
 const jaCarregou = new Set();
 

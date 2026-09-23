@@ -383,3 +383,57 @@ h2 small a{color:var(--marca);text-decoration:none}
 .mtL:not(.cab),.rdC{cursor:pointer}
 .mtL:not(.cab):hover{background:var(--f2);border-radius:var(--r-s)}
 .rdC:hover{background:var(--f2)}
+
+/* ---- PDL de cada partida ---- */
+.pdlP{font-weight:600;font-variant-numeric:tabular-nums}
+.pdlP.ganhou{color:var(--vit)} .pdlP.perdeu{color:var(--der)}
+
+/* ---- calendário do mês ---- */
+.calBarra{display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.calBarra .contaSel{margin:0;width:auto}
+.calBarra .acao{padding:4px 12px;font-size:16px;line-height:1}
+.calResumo{margin-left:auto;font-size:13px;color:var(--fraco)}
+.calResumo b.v{color:var(--vit)} .calResumo b.d{color:var(--der)}
+.calSem{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:6px}
+.calSem span{font-size:10px;letter-spacing:1.4px;color:var(--apagado);text-align:center}
+.calGrade{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.calC{position:relative;min-height:84px;border-radius:var(--r-m);background:var(--f1);padding:6px 8px;display:flex;flex-direction:column;gap:2px}
+.calC.fora{background:none}
+.calC .n{font-size:11px;color:var(--apagado);font-variant-numeric:tabular-nums}
+.calC.tem{cursor:pointer;background:linear-gradient(0deg,rgba(58,214,196,calc(.10 * var(--f,1))),rgba(58,214,196,calc(.10 * var(--f,1)))),var(--f1)}
+.calC.tem:hover{outline:1px solid var(--marca-escura)}
+.calC.tem.bom{background:linear-gradient(0deg,rgba(62,207,142,calc(.16 * var(--f,1))),rgba(62,207,142,calc(.16 * var(--f,1)))),var(--f1)}
+.calC.tem.ruim{background:linear-gradient(0deg,rgba(255,92,92,calc(.16 * var(--f,1))),rgba(255,92,92,calc(.16 * var(--f,1)))),var(--f1)}
+.calC .vd{font-family:var(--titulo);font-size:17px;letter-spacing:.5px;line-height:1.1}
+.calC .pdl{font-size:11px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--fraco)}
+.calC .pdl.v{color:var(--vit)} .calC .pdl.d{color:var(--der)}
+.calC .ic{margin-top:auto;display:flex;gap:2px}
+.calC .ic img{width:18px;height:18px;border-radius:50%}
+@media (max-width:760px){.calC{min-height:66px}.calC .vd{font-size:14px}.calC .ic{display:none}}
+
+/* ---- nível e conquistas ---- */
+.nivelCaixa{display:flex;align-items:center;gap:18px;background:var(--f1);border-radius:var(--r-g);padding:14px 18px;margin-bottom:16px}
+.nivelN{text-align:center;line-height:1}
+.nivelN b{font-family:var(--titulo);font-size:42px;letter-spacing:1px;font-weight:400;color:var(--marca)}
+.nivelN span{display:block;font-size:9.5px;letter-spacing:1.6px;color:var(--apagado)}
+.nivelBar{flex:1;min-width:0;position:relative;height:10px;background:var(--f3);border-radius:99px}
+.nivelBar i{position:absolute;inset:0 auto 0 0;background:var(--marca);border-radius:99px}
+.nivelBar span{position:absolute;top:16px;left:0;font-size:12px;color:var(--fraco)}
+.conqGrade{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.conq{background:var(--f1);border-radius:var(--r-m);padding:10px 12px;opacity:.55}
+.conq.tem{opacity:1}
+.conq .cTopo{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.conq .cTopo b{font-family:var(--titulo);font-size:17px;letter-spacing:.4px;font-weight:400}
+.cEstrelas{font-size:10px;color:var(--marca);letter-spacing:1px}
+.conq .cVal{font-family:var(--titulo);font-size:26px;letter-spacing:.5px;line-height:1.1}
+.conq .cVal small{font-family:var(--corpo);font-size:12px;color:var(--apagado)}
+.conq .cDesc{font-size:11.5px;color:var(--fraco);margin-bottom:6px}
+.conq .cBar{display:block;height:3px;background:var(--f3);border-radius:2px}
+.conq .cBar b{display:block;height:3px;background:var(--marca);border-radius:2px}
+
+/* ---- o fundo: a arte do último campeão que você jogou, bem apagada ---- */
+#fundoApp{position:fixed;inset:0;z-index:-1;background-size:cover;background-position:center 18%;opacity:0;transition:opacity .6s;pointer-events:none}
+#fundoApp.on{opacity:.13}
+#fundoApp::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,12,16,.2),var(--f0) 78%)}
+body.comFundo{background:transparent}
+body.comFundo main{background:transparent}

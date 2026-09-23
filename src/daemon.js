@@ -159,6 +159,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   };
   /* ---- situações gravadas: ver e avaliar (base do aprendizado) ---- */
   const pastaSituacoes = () => resolve(pastaBase(), 'dados', 'situacoes');
+
+  // ARAM, Arena, URF e afins não entram em conta nenhuma: CS por minuto, visão e
+  // participação não querem dizer a mesma coisa lá. A LISTA de partidas mostra tudo;
+  // quem analisa é que ignora. (o ABSOL tirou o ARAM do histórico pelo mesmo motivo)
+  const SO_SR = ' AND fila NOT IN (450,900,1300,1700,1710,1810,1820,1830,1840,1900,2300)';
   const lerJsonl = async (arquivo) => (await readFile(arquivo, 'utf8').catch(() => '')).split('\n').filter(Boolean).map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
   async function situacoesPartidas() {
     if (config.admin !== true) throw new Error('só pra admin');
@@ -1021,7 +1026,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
           const laner = deles.find((j) => j.role === estado.eu.role && estado.eu.role !== 'jungle');
           if (laner) {
             const r = db.prepare(`SELECT COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores r ON r.gameId = p.gameId AND r.campeao = ? AND r.role = p.minhaRole
-              JOIN jogadores eu ON eu.gameId = p.gameId AND eu.participantId = p.meuId AND eu.time <> r.time WHERE p.duracaoS >= 300`).get(laner.campeao);
+              JOIN jogadores eu ON eu.gameId = p.gameId AND eu.participantId = p.meuId AND eu.time <> r.time WHERE p.duracaoS >= 300${SO_SR}`).get(laner.campeao);
             if (r?.n >= 3) partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: estado.tempo, modulo: 'lane', prioridade: 1, id: 'retrospecto', serio: F`Contra ${laner.campeao} na sua rota você tem ${r.v} vitória${r.v === 1 ? '' : 's'} em ${r.n}${r.v / r.n <= 0.4 ? ' — confronto que te custa; joga pra empatar' : r.v / r.n >= 0.6 ? ' — confronto seu' : ''}.`, divertido: F`${r.v} de ${r.n} contra ${laner.campeao}.` }));
           }
         } catch { /* sem tags */ }
@@ -1343,7 +1348,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       partidaVivo.mortesZona = null;
       try {
         const role = { top: 'TOP', jungle: 'JUNGLE', mid: 'MID', adc: 'ADC', sup: 'SUPORTE' }[e.eu.role] ?? null;
-        const jogos = db.prepare(`SELECT gameId FROM partidas WHERE duracaoS >= 300${role ? ' AND minhaRole = ?' : ''} ORDER BY quando DESC LIMIT 60`).all(...(role ? [role] : []));
+        const jogos = db.prepare(`SELECT gameId FROM partidas WHERE duracaoS >= 300${SO_SR}${role ? ' AND minhaRole = ?' : ''} ORDER BY quando DESC LIMIT 60`).all(...(role ? [role] : []));
         if (jogos.length >= 10) {
           const ids = jogos.map((r) => r.gameId);
           const linhas = db.prepare(`SELECT zona, COUNT(*) n FROM achados WHERE tipo = 'morte' AND gameId IN (${ids.map(() => '?').join(',')}) GROUP BY zona`).all(...ids);
@@ -1731,7 +1736,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     if (hoje > new Date()) hoje.setDate(hoje.getDate() - 1);
     const desde = hoje.toISOString();
     const fc = nome ? " AND EXISTS (SELECT 1 FROM jogadores mc WHERE mc.gameId = p.gameId AND mc.participantId = p.meuId AND mc.nome = '" + String(nome).replace(/'/g, "''") + "')" : '';
-    const deHoje = db.prepare(`SELECT p.venci, p.quando, p.meuCampeao FROM partidas p WHERE p.duracaoS >= 300 AND p.quando >= ?${fc} ORDER BY p.quando DESC`).all(desde);
+    const deHoje = db.prepare(`SELECT p.venci, p.quando, p.meuCampeao FROM partidas p WHERE p.duracaoS >= 300${SO_SR} AND p.quando >= ?${fc} ORDER BY p.quando DESC`).all(desde);
     let seguidas = 0; for (const p of deHoje) { if (p.venci) break; seguidas++; }
     const curva = nome ? db.prepare('SELECT tier, rank, pdl, vitorias, derrotas, em FROM elo_hist WHERE conta = ? AND fila = ? ORDER BY em ASC').all(nome, 'RANKED_SOLO_5x5') : [];
     const pontos = (h) => (['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'].indexOf(h.tier)) * 400 + ({ IV: 0, III: 1, II: 2, I: 3 }[h.rank] ?? 0) * 100 + (h.pdl ?? 0);
@@ -1849,9 +1854,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       ondeGanha: (() => {
         try {
           const fc = o.conta ? ` AND EXISTS (SELECT 1 FROM jogadores mc WHERE mc.gameId = p.gameId AND mc.participantId = p.meuId AND mc.nome = '${String(o.conta).replace(/'/g, "''")}')` : '';
-          const lados = db.prepare(`SELECT j.time lado, COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId WHERE p.duracaoS >= 300${fc} GROUP BY j.time`).all();
-          const duracao = db.prepare(`SELECT CASE WHEN p.duracaoS < 1500 THEN 'curta' WHEN p.duracaoS < 1920 THEN 'media' ELSE 'longa' END faixa, COUNT(*) n, SUM(p.venci) v FROM partidas p WHERE p.duracaoS >= 300${fc} GROUP BY faixa`).all();
-          const fb = db.prepare(`SELECT (SELECT CASE WHEN a.time = eu.time THEN 'nosso' ELSE 'deles' END FROM eventos e JOIN jogadores a ON a.gameId = e.gameId AND a.participantId = e.autorId WHERE e.gameId = p.gameId AND e.tipo = 'CHAMPION_KILL' ORDER BY e.t LIMIT 1) fb, COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores eu ON eu.gameId = p.gameId AND eu.participantId = p.meuId WHERE p.duracaoS >= 300${fc} GROUP BY fb`).all();
+          const lados = db.prepare(`SELECT j.time lado, COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId WHERE p.duracaoS >= 300${SO_SR}${fc} GROUP BY j.time`).all();
+          const duracao = db.prepare(`SELECT CASE WHEN p.duracaoS < 1500 THEN 'curta' WHEN p.duracaoS < 1920 THEN 'media' ELSE 'longa' END faixa, COUNT(*) n, SUM(p.venci) v FROM partidas p WHERE p.duracaoS >= 300${SO_SR}${fc} GROUP BY faixa`).all();
+          const fb = db.prepare(`SELECT (SELECT CASE WHEN a.time = eu.time THEN 'nosso' ELSE 'deles' END FROM eventos e JOIN jogadores a ON a.gameId = e.gameId AND a.participantId = e.autorId WHERE e.gameId = p.gameId AND e.tipo = 'CHAMPION_KILL' ORDER BY e.t LIMIT 1) fb, COUNT(*) n, SUM(p.venci) v FROM partidas p JOIN jogadores eu ON eu.gameId = p.gameId AND eu.participantId = p.meuId WHERE p.duracaoS >= 300${SO_SR}${fc} GROUP BY fb`).all();
           const item = (rot, r) => r ? { rotulo: rot, n: r.n, v: r.v, taxa: r.n ? Math.round(100 * r.v / r.n) : null } : null;
           return {
             lados: [item('Lado azul', lados.find((l) => l.lado === 100)), item('Lado vermelho', lados.find((l) => l.lado === 200))].filter(Boolean),
@@ -1894,13 +1899,13 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       jogados: ids(`
         SELECT DISTINCT meu.championId id
         FROM partidas p JOIN jogadores meu ON meu.gameId = p.gameId AND meu.participantId = p.meuId
-        WHERE p.duracaoS >= 300${daConta}`),
+        WHERE p.duracaoS >= 300${SO_SR}${daConta}`),
       enfrentados: ids(`
         SELECT DISTINCT r.championId id
         FROM partidas p
         JOIN jogadores meu ON meu.gameId = p.gameId AND meu.participantId = p.meuId
         JOIN jogadores r ON r.gameId = p.gameId AND r.time <> meu.time AND r.role = p.minhaRole
-        WHERE p.duracaoS >= 300${daConta}`),
+        WHERE p.duracaoS >= 300${SO_SR}${daConta}`),
     };
   }
 

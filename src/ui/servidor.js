@@ -27,6 +27,11 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     ? ` AND EXISTS (SELECT 1 FROM jogadores mc WHERE mc.gameId = p.gameId AND mc.participantId = p.meuId AND mc.nome = '${String(conta).replace(/'/g, "''")}')`
     : '';
 
+  // ARAM, Arena, URF e afins não entram em conta nenhuma: CS por minuto, visão e
+  // participação não querem dizer a mesma coisa lá. A LISTA de partidas mostra tudo;
+  // quem analisa é que ignora. (o ABSOL tirou o ARAM do histórico pelo mesmo motivo)
+  const SO_SR = ' AND fila NOT IN (450,900,1300,1700,1710,1810,1820,1830,1840,1900,2300)';
+
   // A chave da Riot nunca sai pro painel: nenhuma tela precisa dela, e o
   // servidor é local mas a página tem iframe e fetch de sobra pra vazar.
   const semChave = (cfg) => {
@@ -44,30 +49,124 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     '/api/contas': () => db.prepare(`
       SELECT j.nome nome, COUNT(*) jogos, MAX(p.quando) ultima
       FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
-      WHERE p.duracaoS >= 300 GROUP BY j.nome ORDER BY jogos DESC`).all(),
+      WHERE p.duracaoS >= 300${SO_SR} GROUP BY j.nome ORDER BY jogos DESC`).all(),
 
     '/api/resumo': (q) => {
       const fc = filtroConta(q.get('conta'));
       const g = db.prepare(`
         SELECT COUNT(*) n, SUM(p.venci) v, SUM(p.duracaoS)/3600.0 horas,
                MIN(p.quando) de, MAX(p.quando) ate
-        FROM partidas p WHERE p.duracaoS >= 300${fc}`).get();
+        FROM partidas p WHERE p.duracaoS >= 300${SO_SR}${fc}`).get();
       const porRole = db.prepare(`
         SELECT p.minhaRole role, COUNT(*) n, SUM(p.venci) v FROM partidas p
-        WHERE p.duracaoS >= 300${fc} GROUP BY p.minhaRole ORDER BY n DESC`).all();
+        WHERE p.duracaoS >= 300${SO_SR}${fc} GROUP BY p.minhaRole ORDER BY n DESC`).all();
       const campeoes = db.prepare(`
         SELECT p.meuCampeao campeao, COUNT(*) n, SUM(p.venci) v,
           (SELECT j.championId FROM jogadores j
            WHERE j.gameId = p.gameId AND j.participantId = p.meuId) championId,
           (SELECT COUNT(*) FROM achados a JOIN partidas p2 ON p2.gameId = a.gameId
            WHERE p2.meuCampeao = p.meuCampeao AND a.gravidade = 3) graves
-        FROM partidas p WHERE p.duracaoS >= 300${fc}
+        FROM partidas p WHERE p.duracaoS >= 300${SO_SR}${fc}
         GROUP BY p.meuCampeao ORDER BY n DESC LIMIT 10`).all();
       return { geral: g, porRole, campeoes };
     },
 
     // Com quem você jogou (mesmo time) nas últimas N partidas: jogos e V-D com cada um; e contra quem mais jogou
     // Temporadas passadas (op.gg) + top X% estimado
+    /** O mês dia a dia: partidas, vitórias, PDL, KDA e CS/min de cada dia (hora local). */
+    '/api/calendario': (q) => {
+      const fc = filtroConta(q.get('conta'));
+      const mes = /^\d{4}-\d{2}$/.test(q.get('mes') ?? '') ? q.get('mes') : new Date().toISOString().slice(0, 7);
+      const linhas = db.prepare(`SELECT p.gameId, p.quando, p.fila, p.duracaoS, p.venci, p.meuCampeao, p.minhaRole,
+          j.kills k, j.deaths d, j.assists a, j.cs cs, j.nome conta, j.championId,
+          substr(datetime(p.quando,'localtime'),1,10) dia
+        FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
+        WHERE p.duracaoS >= 300${SO_SR}${fc} AND substr(datetime(p.quando,'localtime'),1,7) = ?
+        ORDER BY p.quando`).all(mes);
+      const dias = new Map();
+      for (const p of linhas) {
+        const r = dias.get(p.dia) ?? { dia: p.dia, n: 0, v: 0, k: 0, d: 0, a: 0, cs: 0, seg: 0, pdl: 0, pdlSabido: 0, camps: new Map() };
+        r.n++; r.v += p.venci; r.k += p.k; r.d += p.d; r.a += p.a; r.cs += p.cs; r.seg += p.duracaoS;
+        const x = pdlDaPartida(p); if (x != null) { r.pdl += x; r.pdlSabido++; }
+        r.camps.set(p.championId, (r.camps.get(p.championId) ?? 0) + 1);
+        dias.set(p.dia, r);
+      }
+      const meses = db.prepare(`SELECT DISTINCT substr(datetime(p.quando,'localtime'),1,7) mes FROM partidas p
+        WHERE p.duracaoS >= 300${SO_SR}${fc} ORDER BY mes DESC`).all().map((x) => x.mes);
+      return { mes, meses, dias: [...dias.values()].map((r) => ({ ...r, camps: [...r.camps].sort((x, y) => y[1] - x[1]).slice(0, 3).map(([id, n]) => ({ id, n })), minutos: Math.round(r.seg / 60) })) };
+    },
+
+    /**
+     * Nível, experiência e conquistas. Tudo sai do que já está no banco — nada de
+     * servidor, nada de conta. Experiência por partida jogada, um bônus por vitória
+     * e outro por partida sem morrer; o nível vai ficando mais caro.
+     */
+    '/api/conquistas': (q) => {
+      const fc = filtroConta(q.get('conta'));
+      const ps = db.prepare(`SELECT p.gameId, p.quando, p.duracaoS, p.venci, p.meuCampeao, p.meuId, p.fila,
+          j.kills k, j.deaths d, j.assists a, j.cs cs, j.visao visao, j.nome conta
+        FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
+        WHERE p.duracaoS >= 300${SO_SR}${fc} ORDER BY p.quando`).all();
+      if (!ps.length) return { vazio: true };
+
+      // multikills: as suas kills a menos de 10 s uma da outra
+      let pentas = 0, quadras = 0;
+      try {
+        const kills = db.prepare(`SELECT e.gameId, e.t FROM eventos e JOIN partidas p ON p.gameId = e.gameId AND e.autorId = p.meuId
+          WHERE e.tipo = 'CHAMPION_KILL' ORDER BY e.gameId, e.t`).all();
+        let jogo = null, ultimo = -1e9, seq = 1, melhor = 1;
+        const fecha = () => { if (melhor >= 5) pentas++; else if (melhor === 4) quadras++; };
+        for (const e of kills) {
+          if (e.gameId !== jogo) { if (jogo != null) fecha(); jogo = e.gameId; seq = 1; melhor = 1; ultimo = -1e9; }
+          seq = e.t - ultimo <= 10000 ? seq + 1 : 1; melhor = Math.max(melhor, seq); ultimo = e.t;
+        }
+        if (jogo != null) fecha();
+      } catch { /* sem eventos */ }
+
+      const soma = (f) => ps.reduce((s, p) => s + (f(p) ?? 0), 0);
+      const vitorias = soma((p) => p.venci);
+      const minutos = soma((p) => p.duracaoS) / 60;
+      const semMorrer = ps.filter((p) => p.d === 0).length;
+      const camps = new Map(); for (const p of ps) camps.set(p.meuCampeao, (camps.get(p.meuCampeao) ?? 0) + 1);
+      const maisJogado = [...camps].sort((a, b) => b[1] - a[1])[0] ?? ['—', 0];
+      // maior sequência de vitórias
+      let seqV = 0, melhorSeq = 0;
+      for (const p of ps) { seqV = p.venci ? seqV + 1 : 0; melhorSeq = Math.max(melhorSeq, seqV); }
+      const csm = minutos ? soma((p) => p.cs) / minutos : 0;
+      const madrugada = ps.filter((p) => { const h = new Date(Date.parse(p.quando) - 3 * 3600_000).getUTCHours(); return h >= 2 && h < 6; }).length;
+      const melhorPdlDia = (() => {
+        const porDia = new Map();
+        for (const p of ps) { const x = pdlDaPartida(p); if (x == null) continue; const dia = new Date(Date.parse(p.quando) - 3 * 3600_000).toISOString().slice(0, 10); porDia.set(dia, (porDia.get(dia) ?? 0) + x); }
+        return Math.max(0, ...porDia.values());
+      })();
+
+      const xp = Math.round(ps.length * 80 + vitorias * 70 + semMorrer * 40 + pentas * 400 + quadras * 150);
+      // cada nível custa 1000 + 250 por nível já feito
+      let nivel = 1, gasto = 0, custo = 1000;
+      while (xp - gasto >= custo) { gasto += custo; nivel++; custo = 1000 + (nivel - 1) * 250; }
+
+      const c = (chave, nome, desc, valor, metas) => {
+        const feitas = metas.filter((m) => valor >= m).length;
+        const proxima = metas.find((m) => valor < m) ?? null;
+        return { chave, nome, desc, valor, metas, nivel: feitas, proxima, pct: proxima ? Math.min(100, Math.round(100 * valor / proxima)) : 100 };
+      };
+      const conquistas = [
+        c('maratona', 'Maratona', 'partidas jogadas', ps.length, [50, 100, 250, 500, 1000]),
+        c('vencedor', 'Vencedor', 'vitórias', vitorias, [25, 100, 250, 500]),
+        c('sequencia', 'Embalado', 'maior sequência de vitórias', melhorSeq, [3, 5, 7, 10]),
+        c('elenco', 'Elenco', 'campeões diferentes', camps.size, [10, 25, 50, 80]),
+        c('otp', 'Um truque só', `partidas de ${maisJogado[0]}`, maisJogado[1], [20, 50, 100, 200]),
+        c('intocavel', 'Intocável', 'partidas sem morrer', semMorrer, [1, 5, 15, 40]),
+        c('penta', 'Penta', 'pentakills', pentas, [1, 3, 10]),
+        c('quadra', 'Quadra', 'quadrakills', quadras, [1, 5, 20]),
+        c('farmeiro', 'Farmeiro', 'CS por minuto na média', Math.round(csm * 10) / 10, [5, 6, 7, 8]),
+        c('coruja', 'Coruja', 'partidas entre 2h e 6h', madrugada, [10, 50, 150]),
+        c('dia-bom', 'Dia bom', 'melhor saldo de PDL num dia', melhorPdlDia, [20, 50, 100]),
+        c('veterano', 'Veterano', 'horas jogadas', Math.round(minutos / 60), [24, 100, 300, 600]),
+      ];
+      return { xp, nivel, faltaPro: custo - (xp - gasto), doNivel: xp - gasto, custo, conquistas, jogos: ps.length };
+    },
+
     // Estatísticas de campeão por rota (a página "Champions" do op.gg): taxa, pick, ban, KDA, tier e ranking.
     '/api/meta': async (q) => {
       try { const { metaPorPosicao } = await import('../dados/meta.js'); return await metaPorPosicao({ regiao: q.get('regiao') || 'br', tier: q.get('tier') || 'emerald_plus' }); }
@@ -85,7 +184,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         const fc = filtroConta(q.get('conta'));
         const desde = new Date(Date.now() - 200 * 86400_000).toISOString();
         const linhas = db.prepare(`SELECT p.meuCampeao nome, p.minhaRole role, COUNT(*) n, SUM(p.venci) v, MAX(p.quando) ultima
-          FROM partidas p WHERE p.duracaoS >= 300 AND p.quando >= ?${fc} GROUP BY p.meuCampeao, p.minhaRole`).all(desde);
+          FROM partidas p WHERE p.duracaoS >= 300${SO_SR} AND p.quando >= ?${fc} GROUP BY p.meuCampeao, p.minhaRole`).all(desde);
         if (!linhas.length) return { vazio: true, patch: d.patch };
         const POS = { ADC: 'ADC', BOT: 'ADC', SUPORTE: 'SUPPORT', SUP: 'SUPPORT', MID: 'MID', TOP: 'TOP', JUNGLE: 'JUNGLE' };
         const chave = (s) => String(s ?? '').replace(/[^a-z]/gi, '').toLowerCase();
@@ -135,7 +234,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     '/api/meu-campeao': (q) => {
       const nome = q.get('nome'); if (!nome) return { erro: 'campeão?' };
       const fc = filtroConta(q.get('conta'));
-      const ps = db.prepare(`SELECT p.gameId, p.quando, p.duracaoS, p.venci, p.minhaRole, p.meuId, j.kills, j.deaths, j.assists, j.cs, j.dano, j.visao FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId WHERE p.meuCampeao = ? AND p.duracaoS >= 300${fc} ORDER BY p.quando DESC`).all(nome);
+      const ps = db.prepare(`SELECT p.gameId, p.quando, p.duracaoS, p.venci, p.minhaRole, p.meuId, j.kills, j.deaths, j.assists, j.cs, j.dano, j.visao FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId WHERE p.meuCampeao = ? AND p.duracaoS >= 300${SO_SR}${fc} ORDER BY p.quando DESC`).all(nome);
       if (!ps.length) return { nome, jogos: 0 };
       const soma = (k) => ps.reduce((s, p) => s + (p[k] ?? 0), 0);
       const min = soma('duracaoS') / 60;
@@ -157,7 +256,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     '/api/companheiros': (q) => {
       const n = Math.max(5, Math.min(200, Number(q.get('n')) || 20));
       const fc = filtroConta(q.get('conta'));
-      const ids = db.prepare(`SELECT p.gameId, p.meuId, p.venci FROM partidas p WHERE p.duracaoS >= 300${fc} ORDER BY p.quando DESC LIMIT ?`).all(n);
+      const ids = db.prepare(`SELECT p.gameId, p.meuId, p.venci FROM partidas p WHERE p.duracaoS >= 300${SO_SR}${fc} ORDER BY p.quando DESC LIMIT ?`).all(n);
       const com = new Map(), contra = new Map();
       const sel = db.prepare('SELECT participantId, time, nome, tag, championId FROM jogadores WHERE gameId = ?');
       for (const p of ids) {
@@ -177,6 +276,36 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     // Evolução por split: winrate, KDA, cs/min, participação, erros graves.
     '/api/temporadas': (q) => resumoPorTemporada(partidas(q)),
   };
+  /**
+   * Quanto de PDL cada ranqueada rendeu. Não precisa de rota nova na Riot: o app já
+   * grava o elo de minuto em minuto em elo_hist, então o PDL da partida é a diferença
+   * entre a leitura de antes e a primeira leitura depois em que o contador de jogos
+   * andou exatamente 1. Se o app estava fechado na hora, fica pendente — inventar
+   * número aqui seria pior que não ter.
+   */
+  const TIER_P = ['IRON', 'BRONZE', 'SILVER', 'GOLD', 'PLATINUM', 'EMERALD', 'DIAMOND', 'MASTER', 'GRANDMASTER', 'CHALLENGER'];
+  const pontosElo = (h) => TIER_P.indexOf(h.tier) * 400 + ({ IV: 0, III: 1, II: 2, I: 3 }[h.rank] ?? 0) * 100 + (h.pdl ?? 0);
+  const FILA_ELO = { 420: 'RANKED_SOLO_5x5', 440: 'RANKED_FLEX_SR' };
+  const cachePdl = new Map();
+  function pdlDaPartida(p) {
+    if (cachePdl.has(p.gameId)) return cachePdl.get(p.gameId);
+    let saida = null;
+    const fila = FILA_ELO[p.fila];
+    if (fila && p.conta) {
+      try {
+        const fim = new Date(Date.parse(p.quando) + (p.duracaoS ?? 0) * 1000).toISOString();
+        const a = db.prepare('SELECT tier, rank, pdl, vitorias, derrotas, em FROM elo_hist WHERE conta = ? AND fila = ? AND em <= ? ORDER BY em DESC LIMIT 1').get(p.conta, fila, fim);
+        if (a) {
+          const jogosA = (a.vitorias ?? 0) + (a.derrotas ?? 0);
+          const b = db.prepare('SELECT tier, rank, pdl, vitorias, derrotas, em FROM elo_hist WHERE conta = ? AND fila = ? AND em > ? AND (vitorias + derrotas) > ? ORDER BY em ASC LIMIT 1').get(p.conta, fila, fim, jogosA);
+          if (b && (b.vitorias ?? 0) + (b.derrotas ?? 0) - jogosA === 1 && Date.parse(b.em) - Date.parse(fim) < 30 * 60_000) saida = pontosElo(b) - pontosElo(a);
+        }
+      } catch { /* banco antigo sem elo_hist */ }
+    }
+    cachePdl.set(p.gameId, saida);
+    return saida;
+  }
+
   const partidas = (q) => db.prepare(`
       SELECT p.gameId, p.quando, p.fila, p.duracaoS, p.meuCampeao, p.minhaRole, p.venci, p.meuId,
              (SELECT COUNT(*) FROM achados a WHERE a.gameId = p.gameId) achados,
@@ -203,7 +332,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
              (SELECT j.nome FROM jogadores j
               WHERE j.gameId = p.gameId AND j.participantId = p.meuId) conta
       FROM partidas p WHERE p.duracaoS >= 300${filtroConta(q.get('conta'))}
-      ORDER BY p.quando DESC`).all().map((p, i, arr) => { if (i === 0) { faltantesNaChamada = 0; try { elosLista = elosGuardados(db); } catch { elosLista = new Map(); } } return { ...p, temporada: temporadaDe(p.quando), eloMedio: elosLista.get(p.gameId) ?? null, ...extrasDaPartida(p) }; });
+      ORDER BY p.quando DESC`).all().map((p, i, arr) => { if (i === 0) { faltantesNaChamada = 0; try { elosLista = elosGuardados(db); } catch { elosLista = new Map(); } } return { ...p, temporada: temporadaDe(p.quando), eloMedio: elosLista.get(p.gameId) ?? null, pdl: pdlDaPartida(p), ...extrasDaPartida(p) }; });
   let elosLista = new Map();
   // pré-cálculo de fundo: 20 partidas por vez, sem travar o servidor
   setTimeout(function fundo() {
@@ -245,7 +374,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
   Object.assign(rotas, {
     '/api/padroes': (q) => {
       const fc = filtroConta(q.get('conta'));
-      const ids = `SELECT p.gameId FROM partidas p WHERE p.duracaoS >= 300${fc}`;
+      const ids = `SELECT p.gameId FROM partidas p WHERE p.duracaoS >= 300${SO_SR}${fc}`;
       return {
         tipos: db.prepare(`
           SELECT tipo, COUNT(*) n, COUNT(DISTINCT gameId) jogos FROM achados
@@ -258,7 +387,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
           SELECT CASE WHEN t < 600000 THEN '0-10' WHEN t < 1200000 THEN '10-20'
                       WHEN t < 1800000 THEN '20-30' ELSE '30+' END faixa, COUNT(*) n
           FROM achados WHERE tipo = 'morte' AND gameId IN (${ids}) GROUP BY faixa`).all(),
-        total: db.prepare(`SELECT COUNT(*) n FROM partidas p WHERE p.duracaoS >= 300${fc}`).get().n,
+        total: db.prepare(`SELECT COUNT(*) n FROM partidas p WHERE p.duracaoS >= 300${SO_SR}${fc}`).get().n,
       };
     },
   });
