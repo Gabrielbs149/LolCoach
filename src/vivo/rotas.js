@@ -16,6 +16,7 @@ export const ROTA = {
     atrasado: 'Farm é o gold garantido. Pega as waves seguras antes de procurar briga.',
     semBriga: 'farma e espera o erro deles',
     baseAcao: 'Volta assim que a wave estiver empurrada. Item na mão ganha troca; gold no bolso não faz nada.',
+    rivalNaBase: 'Empurra a wave: ele perde o que cair na torre.',
   },
   jungle: {
     recurso: 'campo',
@@ -24,6 +25,7 @@ export const ROTA = {
     atrasado: 'Farma o teu lado e o campo livre do lado deles. Campo que nasce e ninguém pega é gold que some.',
     semBriga: 'farma os campos e espera o erro deles',
     baseAcao: 'Volta no fim do clear. Item na mão ganha o próximo objetivo; gold no bolso não faz nada.',
+    rivalNaBase: 'Invade o lado dele agora: o campo é seu e ele está longe.',
   },
   mid: {
     recurso: 'farm',
@@ -32,6 +34,7 @@ export const ROTA = {
     atrasado: 'Farm é o gold garantido. Pega as waves seguras antes de procurar briga.',
     semBriga: 'farma e espera o erro deles',
     baseAcao: 'Volta assim que a wave estiver empurrada. Item na mão ganha troca; gold no bolso não faz nada.',
+    rivalNaBase: 'Empurra e sobe pro mapa: é o teu tempo livre.',
   },
   adc: {
     recurso: 'farm',
@@ -40,6 +43,7 @@ export const ROTA = {
     atrasado: 'Farm é o gold garantido. Pega as waves seguras antes de procurar briga.',
     semBriga: 'farma e espera o erro deles',
     baseAcao: 'Volta assim que a wave estiver empurrada. Item na mão ganha troca; gold no bolso não faz nada.',
+    rivalNaBase: 'Empurra com o suporte e pega o que der antes dele voltar.',
   },
   sup: {
     recurso: 'visão',
@@ -48,6 +52,7 @@ export const ROTA = {
     atrasado: 'Sua conta é visão, não CS. Ward no objetivo que vem e só anda com o adc junto.',
     semBriga: 'protege o carry, mantém a visão e espera o erro deles',
     baseAcao: 'Volta cedo: ward e item de suporte na mão ganham a próxima briga; gold no bolso não faz nada.',
+    rivalNaBase: 'Empurra com o adc e põe visão no rio enquanto ele volta.',
   },
 };
 

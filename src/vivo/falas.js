@@ -291,6 +291,32 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       }
     }
   }
+  /* ---- eles voltaram pra base ----
+     A API ao vivo não conta recall, mas conta os itens de todo mundo: item novo caro na
+     mão de um inimigo = ele está na loja, e loja é base. Serve pra saber que a rota ficou
+     livre agora. Não vale nos 90 primeiros segundos (todo mundo compra) nem logo depois
+     de morrer (compra ao renascer). */
+  if (tempo > 90) {
+    mem.valorDeles ??= new Map();
+    mem.mortoEm ??= new Map();
+    const naBase = [];
+    for (const j of inimigos) {
+      if (j.morto) mem.mortoEm.set(j.nome, tempo);
+      const valor = (j.itens ?? []).reduce((s, i) => s + (i.preco ?? 0), 0);
+      const antes = mem.valorDeles.get(j.nome);
+      mem.valorDeles.set(j.nome, valor);
+      if (antes == null || j.morto) continue;
+      if (valor - antes >= 400 && tempo - (mem.mortoEm.get(j.nome) ?? -999) > 15) naBase.push(j);
+    }
+    const marca = Math.floor(tempo / 20);
+    for (const j of naBase) {
+      if (j === jgDeles && minhaRole === 'jungle') dizer(`base-jg-${marca}`, 'mapa', F`${j.campeao} voltou pra base. A jungle deles está sua.`, F`${j.campeao} na base. Invade.`, 2);
+      else if (j === jgDeles) dizer(`base-jg-${marca}`, 'mapa', F`Jungler deles voltou pra base. Dá pra avançar agora.`, F`Jungler deles na base.`, 2);
+      else if (j.role === minhaRole) dizer(`base-rival-${marca}`, 'mapa', F`${j.campeao} voltou pra base. ${daRota(minhaRole).rivalNaBase}`, F`${j.campeao} na base. Empurra.`, 2);
+    }
+    if (naBase.length >= 2) dizer(`base-dois-${marca}`, 'mapa', F`${naBase.length} deles na base ao mesmo tempo. Objetivo de graça agora.`, F`${naBase.length} na base. Pega objetivo.`, 2);
+  }
+
   /* ---- leitura do jogo: a partida está ganha, parelha ou perdida — e o que fazer NESTA rota e NESTA fase ----
      O placar sozinho engana (3 kills atrás com 2 torres na frente é vantagem). A conta junta
      gold em item, torres e abates, e o conselho muda com o minuto: o que serve aos 10 não serve aos 30. */
