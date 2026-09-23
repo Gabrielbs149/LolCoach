@@ -910,13 +910,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
           X.buildDaPartida(estado.eu.campeao, role, { regiao: config.runas?.regiao ?? 'br' }),
           X.perfilDeDano(inimigos),
         ]);
-        partidaVivo.extras = { build, dano, mains: [] };
+        const DD = await import('./dados/ddragon.js');
+        const [bases, itensTab] = await Promise.all([DD.atributosDosCampeoes().catch(() => new Map()), DD.tabelaDeItens().catch(() => new Map())]);
+        partidaVivo.extras = { build, dano, mains: [], bases, itensTab };
         // Mains: só sua lane e o jungler, pra não gastar chave à toa.
         const { tabelaDeCampeoes } = await import('./features/champ-select.js');
         const tabela = await tabelaDeCampeoes(lcu).catch(() => null);
         const alvos = inimigos.filter((j) => j.role === role || j.role === 'jungle');
         partidaVivo.extras.mains = await X.mainsDosInimigos(config.riot, alvos, tabela).catch(() => []);
-      })().catch((erro) => { log(`extras da voz falharam: ${erro.message}`); partidaVivo.extras = { build: null, dano: null, mains: [] }; });
+      })().catch((erro) => { log(`extras da voz falharam: ${erro.message}`); partidaVivo.extras = { build: null, dano: null, mains: [], bases: null, itensTab: null }; });
     }
 
     // As fichas dependem de rede (op.gg, Data Dragon) e do banco: montam uma
@@ -1630,6 +1632,21 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     for (const f of falasDaSelecao({ rota, inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados, meuCampeao, sugestaoBan, runas, confrontos, junglerDeles, dano }, selecaoMem)) {
       selecaoMem.falas.push(prontaFala({ ...f, seq: ++seqFalas }));
     }
+    // Composição: o buraco do time, dito antes do jogo começar
+    let composicao = [];
+    try {
+      const { perfisDosCampeoes } = await import('./dados/ddragon.js');
+      const { avisosDeComposicao } = await import('./vivo/composicao.js');
+      const perfis = await perfisDosCampeoes().catch(() => new Map());
+      const nossosNomes = [...aliados.map((id) => nomeDe(id)), meuCampeaoAgora].filter(Boolean);
+      composicao = avisosDeComposicao({ nossos: [...new Set(nossosNomes)], deles: inimigos.map((id) => nomeDe(id)).filter(Boolean), perfis, minhaRole: { top: 'top', jungle: 'jungle', middle: 'mid', bottom: 'adc', utility: 'sup' }[rota] ?? rota });
+      for (const a of composicao) {
+        if (selecaoMem.ditas.has('comp-' + a.chave)) continue;
+        selecaoMem.ditas.add('comp-' + a.chave);
+        selecaoMem.falas.push(prontaFala({ seq: ++seqFalas, modulo: 'selecao', prioridade: 2, serio: F`${a.texto}`, divertido: F`${a.texto}` }));
+      }
+    } catch (e) { log(`composição falhou: ${e.message}`); }
+
     // Time deles completo: uma linha com o que importa (sem repetir na mesma seleção)
     if (intel?.completude === 1 && !selecaoMem.ditas.has('intel-time')) {
       selecaoMem.ditas.add('intel-time');
@@ -1640,7 +1657,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       fase: s.timer?.phase ?? '', rota, meuCampeao,
       inimigos: inimigos.map((id) => ({ id, nome: nomeDe(id) })), aliados: aliados.map((id) => ({ id, nome: nomeDe(id) })), intel,
       sugestao: selecaoCache.chave === chave && selecaoCache.sugestao ? { ...selecaoCache.sugestao, fala: selecaoCache.sugestao.fala ? prontaFala(selecaoCache.sugestao.fala) : null } : null,
-      sugestaoBan, falas: selecaoMem.falas.slice(-8),
+      sugestaoBan, composicao, falas: selecaoMem.falas.slice(-8),
     };
   }
 

@@ -110,6 +110,11 @@ export async function lerEstado() {
       vida: Math.round(stats.currentHealth ?? 0),
       vidaMax: Math.round(stats.maxHealth ?? 0),
       magias: { Q: eu0.abilities?.Q?.abilityLevel ?? 0, W: eu0.abilities?.W?.abilityLevel ?? 0, E: eu0.abilities?.E?.abilityLevel ?? 0, R: eu0.abilities?.R?.abilityLevel ?? 0 },
+      // os atributos exatos só existem pra você (a Riot não publica os dos outros)
+      atributos: { ad: stats.attackDamage ?? 0, ap: stats.abilityPower ?? 0, as: stats.attackSpeed ?? 0.65,
+        crit: stats.critChance ?? 0, armadura: stats.armor ?? 0, mr: stats.magicResist ?? 0,
+        penArm: stats.armorPenetrationFlat ?? 0, penArmPct: stats.armorPenetrationPercent ?? 1,
+        penMag: stats.magicPenetrationFlat ?? 0, penMagPct: stats.magicPenetrationPercent ?? 1 },
     },
     jogadores,
     eventos,

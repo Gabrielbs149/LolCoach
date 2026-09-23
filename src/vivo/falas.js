@@ -12,6 +12,8 @@ import { F } from './texto.js';
 import { nomeItem } from './itens-nomes.js';
 import { torreInfo } from './torres.js';
 import { daRota } from './rotas.js';
+import { ondaEm, temCanhao, proximoCanhao } from './ondas.js';
+import { ordemDeAlvos } from './troca.js';
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const ROLE_FALA = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'ADC', sup: 'suporte' };
@@ -291,6 +293,45 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       }
     }
   }
+  /* ---- em quem bater ----
+     A vida efetiva de cada inimigo (vida + armadura do nível e dos itens) contra o
+     SEU dano de ataque, que a API publica exato. O número absoluto não diz muito;
+     a ordem diz tudo — é o alvo do combo na briga. Sai quando a ordem muda de
+     verdade (item novo mudou quem é o mais mole), no máximo de 3 em 3 minutos. */
+  if (extras?.bases && eu.atributos && tempo > 480) {
+    const alvos = ordemDeAlvos({ eu, inimigos, bases: extras.bases, itensTab: extras.itensTab ?? new Map() });
+    if (alvos.length >= 3) {
+      const dePeso = alvos.filter((a) => a.role !== 'sup');
+      const mole = dePeso[0] ?? alvos[0], duro = alvos.at(-1);
+      const chaveAlvo = `${mole.campeao}|${duro.campeao}`;
+      if (mem.alvoChave !== chaveAlvo && tempo - (mem.alvoT ?? -999) > 180 && duro.segundos >= mole.segundos * 1.7) {
+        mem.alvoChave = chaveAlvo; mem.alvoT = tempo;
+        dizer(`alvo-${Math.floor(tempo / 60)}`, 'spikes',
+          F`Alvo mais mole: ${mole.campeao}. O ${duro.campeao} aguenta o dobro — na briga, não gasta o combo nele.`,
+          F`Bate no ${mole.campeao}. Ignora o ${duro.campeao}.`, 2);
+      }
+    }
+  }
+
+  /* ---- canhão na wave ----
+     O canhão vale quase três minions e decide se a wave empurra, se dá pra voltar
+     sem perder farm e se o congelamento aguenta. É relógio puro: a onda nasce em
+     1:05 e a cada 30 s; canhão a cada 3 ondas até os 15, a cada 2 até os 25.
+     Só na fase de rota e só pra quem tem wave — jungler não tem o que fazer com isso. */
+  if (minhaRole !== 'jungle' && tempo > 100 && tempo < 900) {
+    const onda = ondaEm(tempo);
+    if (onda > 0 && temCanhao(onda) && !mem.canhaoDito?.has(onda)) {
+      (mem.canhaoDito ??= new Set()).add(onda); mem.canhaoT = tempo;
+      dizer(`canhao-${onda}`, 'timers', F`Canhão nessa wave. Ela empurra sozinha.`, F`Canhão nessa wave.`, 1);
+    }
+    // sem canhão nas duas próximas e você com pouca vida: é agora que dá pra voltar
+    const prox = proximoCanhao(tempo);
+    if (prox && prox.faltam >= 55 && tempo - (mem.canhaoT ?? -999) > 25 && eu.vidaMax && eu.vida / eu.vidaMax < 0.45 && !mem.canhaoBase) {
+      mem.canhaoBase = true;
+      dizer('canhao-base', 'timers', F`Próximo canhão só em ${Math.round(prox.faltam / 30) * 30} segundos. Se for voltar, é agora.`, F`Sem canhão agora. Dá pra voltar.`, 1);
+    }
+  }
+
   /* ---- eles voltaram pra base ----
      A API ao vivo não conta recall, mas conta os itens de todo mundo: item novo caro na
      mão de um inimigo = ele está na loja, e loja é base. Serve pra saber que a rota ficou

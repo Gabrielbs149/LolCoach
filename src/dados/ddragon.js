@@ -66,6 +66,30 @@ export async function tabelaDeIds() {
 }
 
 /**
+ * Atributos base de cada campeão (vida, armadura, resistência mágica, dano de
+ * ataque e velocidade, com o ganho por nível). É o que permite calcular vida
+ * efetiva e dano sem adivinhar nada — o Data Dragon publica tudo isto.
+ * Map(nome | chave | id -> stats).
+ */
+export async function atributosDosCampeoes() {
+  if (cache.has('atributos')) return cache.get('atributos');
+  const patch = await patchAtual();
+  if (!patch) return new Map();
+  let bruto = await lerCache(resolve(pasta(), patch, 'lista.json'));
+  if (!bruto?.data) { await tabelaDeIds(); bruto = await lerCache(resolve(pasta(), patch, 'lista.json')); }
+  const mapa = new Map();
+  for (const c of Object.values(bruto?.data ?? {})) {
+    const s = c.stats ?? {};
+    const v = { hp: s.hp ?? 600, hpNv: s.hpperlevel ?? 90, armadura: s.armor ?? 30, armaduraNv: s.armorperlevel ?? 4,
+      mr: s.spellblock ?? 30, mrNv: s.spellblockperlevel ?? 1.3, ad: s.attackdamage ?? 60, adNv: s.attackdamageperlevel ?? 3,
+      as: s.attackspeed ?? 0.65, asNv: (s.attackspeedperlevel ?? 2) / 100 };
+    mapa.set(c.name, v); mapa.set(c.id, v); mapa.set(Number(c.key), v);
+  }
+  cache.set('atributos', mapa);
+  return mapa;
+}
+
+/**
  * Lista completa de campeões (id + nome em português), pra grade da tela de
  * configuração funcionar com o League fechado. O client continua sendo a fonte
  * preferida — ele conhece o campeão lançado hoje antes do Data Dragon.
@@ -332,7 +356,7 @@ export async function tabelaDeItens() {
   const mapa = new Map();
   for (const [id, it] of Object.entries(bruto?.data ?? {})) {
     mapa.set(Number(id), { nome: it.name, preco: it.gold?.total ?? 0, img: it.image?.full ?? `${id}.png`,
-      descricao: limpar(it.plaintext ?? '') });
+      descricao: limpar(it.plaintext ?? ''), atributos: it.stats ?? {} });
   }
   cache.set('itens', mapa);
   return mapa;
