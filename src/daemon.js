@@ -502,7 +502,18 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const notas = new Map(avs.map((a) => [`${a.t}|${a.chave}`, a.nota]));
     const ditas = [...sits.filter((s) => s.falada).map((s) => ({ t: s.t, chave: s.chave, texto: s.texto, tipo: s.tipo })), ...fls.filter((f) => f.id).map((f) => ({ t: f.t, chave: f.id, texto: f.serio, tipo: 'fala:' + f.modulo }))]
       .sort((a, b) => a.t - b.t).map((d) => ({ ...d, aval: notas.get(`${d.t}|${d.chave}`) ?? null }));
-    return { ditas, em: Date.parse(partida?.inicio ?? '') || Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
+    // Resumo falado: 15 segundos de voz enquanto a tela de vitória ainda está aberta.
+    const falado = (() => {
+      const partes = [];
+      if (mortes?.total != null) partes.push(`${mortes.total} morte${mortes.total === 1 ? '' : 's'} na partida${mortes.avisadas ? `, ${mortes.avisadas} delas avisadas` : ''}.`);
+      if (mortes?.padrao) partes.push(String(mortes.padrao).replace(/\s+/g, ' ').trim());
+      else if (mortes?.semWard >= 2) partes.push(`${mortes.semWard} sem ward no rio.`);
+      else if (mortes?.avancado >= 2) partes.push(`${mortes.avancado} com você avançado demais.`);
+      if (acs.length) partes.push(`Acertei ${acs.filter((a) => a.acertou).length} das ${acs.length} previsões.`);
+      if (!partes.length) return null;
+      return partes.slice(0, 3).join(' ') + ' A lição da partida está no app.';
+    })();
+    return { ditas, falado, em: Date.parse(partida?.inicio ?? '') || Date.now(), campeao: partida?.eu?.campeao ?? null, pasta: basename(base), gameId: partida?.gameId ?? null,
       situacoes: sits.length, faladas: sits.filter((s) => s.falada).length, previsoes: acs.length ? { total: acs.length, certas: acs.filter((a) => a.acertou).length } : null,
       mortes: mortes ? { total: mortes.total, avisadas: mortes.avisadas, semJg: mortes.semJg, avancado: mortes.avancado, semWard: mortes.semWard, padrao: mortes.padrao, lista: mortes.lista.map((m) => ({ n: m.n, t: m.t, por: m.por, onde: m.onde, licao: m.licao })) } : null };
   }

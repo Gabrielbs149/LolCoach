@@ -293,6 +293,26 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       }
     }
   }
+  /* ---- visão: o time inteiro contra o deles ----
+     A pontuação de visão de todo mundo vem na API ao vivo. Antes de um objetivo, a
+     diferença de visão diz quem vai enxergar a briga — e é o número que ninguém olha
+     no Tab. Só fala com diferença grande e uma vez a cada 6 minutos. */
+  if (tempo > 600) {
+    const soma = (l) => l.reduce((s, j) => s + (j.visao ?? 0), 0);
+    const nossa = soma(aliados), deles = soma(inimigos);
+    if (deles - nossa >= 25 && tempo - (mem.visaoT ?? -999) > 360) {
+      mem.visaoT = tempo;
+      dizer(`visao-${Math.floor(tempo / 60)}`, 'mapa',
+        F`Visão do time deles está ${Math.round(deles - nossa)} pontos na frente. O próximo objetivo eles enxergam e vocês não.`,
+        F`Eles estão com ${Math.round(deles - nossa)} de visão a mais. Ward antes do objetivo.`, 2);
+    } else if (nossa - deles >= 25 && tempo - (mem.visaoT ?? -999) > 360) {
+      mem.visaoT = tempo;
+      dizer(`visao-${Math.floor(tempo / 60)}`, 'mapa',
+        F`Vocês estão ${Math.round(nossa - deles)} pontos de visão na frente. Força o objetivo enquanto enxerga mais que eles.`,
+        F`${Math.round(nossa - deles)} de visão na frente. Força objetivo.`, 2);
+    }
+  }
+
   /* ---- em quem bater ----
      A vida efetiva de cada inimigo (vida + armadura do nível e dos itens) contra o
      SEU dano de ataque, que a API publica exato. O número absoluto não diz muito;

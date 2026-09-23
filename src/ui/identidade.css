@@ -487,3 +487,25 @@ body.comFundo main{background:transparent}
 /* o mapa de calor precisa parecer calor, não grade: borra as células e apaga o mapa */
 .mapaCalor img{opacity:.32}
 .mapaCalor i{filter:blur(7px)}
+
+/* ---- ranking da turma ---- */
+.rkTab{background:var(--f1);border-radius:var(--r-g);padding:6px 14px 12px;margin-bottom:22px}
+.rkL{display:grid;grid-template-columns:28px 30px minmax(0,1fr) 120px 74px 150px;align-items:center;gap:10px;padding:6px 2px;border-top:1px solid var(--borda);font-size:13.5px}
+.rkL:first-child{border-top:0}
+.rkL.eu{background:var(--marca-fundo);border-radius:var(--r-s)}
+.rkL>*{min-width:0}
+.rkL img{width:30px;height:30px;border-radius:50%;background:var(--f3)}
+.rkPos{font-family:var(--titulo);font-size:18px;letter-spacing:.5px;color:var(--apagado);text-align:right}
+.rkL.eu .rkPos{color:var(--marca)}
+.rkNome{display:flex;flex-direction:column;min-width:0}
+.rkNome b{font-family:var(--titulo);font-size:16px;letter-spacing:.4px;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rkNome small{font-size:10.5px;color:var(--apagado)}
+.rkElo{font-size:12.5px;color:var(--fraco);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rkPdl,.rkSem{font-size:12px;color:var(--apagado);text-align:right;white-space:nowrap}
+@media (max-width:900px){.rkL{grid-template-columns:24px 26px minmax(0,1fr) 100px}.rkPdl,.rkSem{display:none}}
+
+/* ---- compartilhar ---- */
+.acao.compartilhar{position:absolute;top:0;right:0;z-index:3}
+#detalhe{position:relative}
+#avisoFlutua{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--marca);color:#0a0c10;font-weight:700;font-size:13px;padding:9px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
+#avisoFlutua.on{opacity:1;transform:translateX(-50%) translateY(0)}

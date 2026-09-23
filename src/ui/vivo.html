@@ -232,6 +232,15 @@ h3{font-family:var(--titulo);letter-spacing:.6px;font-weight:400}
 .bench{text-align:center;margin-left:6px} .bench b{display:block;font-family:var(--titulo);font-size:22px;line-height:1;color:var(--fraco)} .bench span{font-size:8.5px;letter-spacing:.8px;text-transform:uppercase;color:var(--apagado)}
 .linha .valor{font-size:10.5px;color:var(--apagado);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 .previsao{text-align:center;margin-left:6px} .previsao b{display:block;font-family:var(--titulo);font-size:26px;line-height:1;letter-spacing:.5px} .previsao span{font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--apagado)} .previsao.v b{color:var(--vit)} .previsao.d b{color:var(--der)}
+
+/* ---- modo compacto: coluna estreita só com o que é aviso ---- */
+body.compacto{font-size:13px}
+body.compacto .voz .vol,body.compacto .voz .modo,body.compacto .voz .estado small{display:none}
+body.compacto .modulos{display:none}
+body.compacto .cartao,body.compacto .bloco,body.compacto .fichas,body.compacto .placar,body.compacto .build,body.compacto .intel{display:none}
+body.compacto #tudo{gap:4px}
+body.compacto .aviso,body.compacto .fala{padding:6px 10px;font-size:13.5px;line-height:1.4}
+body.compacto .mini.on{background:var(--marca,#3ad6c4);color:#0a0c10}
 </style>
 </head>
 <body>
@@ -243,6 +252,7 @@ h3{font-family:var(--titulo);letter-spacing:.6px;font-weight:400}
     <div class="modo"><button id="modoSerio" onclick="vozModo('serio')">Sério</button><button id="modoDiv" onclick="vozModo('divertido')">Divertido</button></div>
     <button class="mini" id="vozFiltros" onclick="vozFiltros()" title="o que a voz fala">Filtros ▾</button>
     <button class="mini" onclick="falar('Voz do LolCoach ligada.', true)" title="ouvir um teste">testar</button>
+    <button class="mini" id="btCompacto" onclick="alternarCompacto()" title="tira tudo que não é aviso — pra deixar num monitor do lado">Compacto</button>
   </div>
   <div class="modulos" id="vozModulos"></div>
 </div>
@@ -253,6 +263,21 @@ h3{font-family:var(--titulo);letter-spacing:.6px;font-weight:400}
 
 <script>
 const $ = (s) => document.querySelector(s);
+
+/**
+ * Modo compacto: a janela vira uma coluna estreita só com os avisos, pra ficar
+ * num segundo monitor sem ocupar espaço. Fica guardado neste PC.
+ */
+function aplicarCompacto(){
+  const on = localStorage.getItem('vivoCompacto') === '1';
+  document.body.classList.toggle('compacto', on);
+  const b = $('#btCompacto'); if (b) { b.textContent = on ? 'Normal' : 'Compacto'; b.classList.toggle('on', on); }
+}
+function alternarCompacto(){
+  localStorage.setItem('vivoCompacto', localStorage.getItem('vivoCompacto') === '1' ? '0' : '1');
+  aplicarCompacto();
+}
+document.addEventListener('DOMContentLoaded', aplicarCompacto);
 
 /* ------------------------------------------------------------- voz */
 /**

@@ -60,6 +60,8 @@ function falarWindows(texto, prioridade = 1) {
 }
 
 let ultimaSeq = 0, ultimaSugestao = '', primeiroTick = true, faladas = 0;
+// o resumo do fim não pode repetir a cada tick nem quando a janela reabre
+let ultimoResumoFalado = (() => { try { return Number(localStorage.getItem('resumoFalado')) || null; } catch { return null; } })();
 function falarNovas(falas) {
   for (const f of falas ?? []) {
     if (f.seq <= ultimaSeq) continue;
@@ -74,6 +76,13 @@ async function tick() {
   try {
     voz = lerVoz();
     const d = await fetch('/api/vivo').then((r) => r.json());
+    // Fim de partida: o resumo é falado uma vez, enquanto a tela de vitória ainda está aberta.
+    const fim = d.ultimaPartida;
+    if (!d.emJogo && fim?.falado && fim.gameId && fim.gameId !== ultimoResumoFalado && Date.now() - fim.em < 3 * 3600_000) {
+      ultimoResumoFalado = fim.gameId;
+      try { localStorage.setItem('resumoFalado', String(fim.gameId)); } catch {}
+      falar(fim.falado, 1);
+    }
     if (d.emJogo) falarNovas(d.falas);
     else if (d.selecao) {
       falarNovas(d.selecao.falas);

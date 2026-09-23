@@ -1033,6 +1033,7 @@ h2{letter-spacing:1px}
       <button class="acao" onclick="carregarAmigos(true)" title="pergunta de novo à Riot o elo e as partidas de todo mundo">Atualizar todos</button>
       <span class="salvo" id="amSalvo"></span>
     </div>
+    <div id="amRanking"></div>
     <div id="amAviso"></div>
     <div id="amBusca"></div>
     <div class="amGrade" id="amGrade"></div>
@@ -1735,6 +1736,7 @@ async function abrirMeuCampeao(nome, championId){
 const nomeDaTemporadaJs = (k) => ({ '2024-1': 'Split 1 · 2024', '2024-2': 'Split 2 · 2024', '2024-3': 'Split 3 · 2024', '2025-1': 'Split 1 · 2025', '2025-2': 'Split 2 · 2025', '2025-3': 'Split 3 · 2025', '2026-1': 'Split 1 · 2026', '2026-2': 'Split 2 · 2026', '2026-3': 'Split 3 · 2026', antes: 'Antes de 2024' })[k] ?? k;
 
 /* ======================================================== detalhe da partida */
+let detalheAtual = null;   // a partida aberta agora (o botão de compartilhar desenha a partir dela)
 async function abrirPartida(gameId){
   // Voltar leva pra onde a partida foi aberta: Perfil ou Partidas.
   origemDetalhe = abaAtual;
@@ -1743,6 +1745,7 @@ async function abrirPartida(gameId){
 
   let d;
   try { d = await pegar('/api/detalhe/' + gameId); } catch { d = null; }
+  detalheAtual = d && !d.erro ? d : null;
   if(!d || d.erro){
     $('#det').innerHTML = `<div class="vazio">não consegui montar a análise${d?.erro?`: ${esc(d.erro)}`:''}</div>`;
     return;
@@ -1777,6 +1780,9 @@ async function abrirPartida(gameId){
       <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}</span></div>`;
   const timeDe = (t) => d.jogadores.filter(j => j.time === t).sort((a, b) => a.id - b.id);
   const cab = `<div class="lj cab"><span></span><span>Campeão · jogador</span><span class="num">KDA</span><span class="num">CS</span><span class="num">Dano</span><span class="num">Nota</span></div>`;
+  // botão de compartilhar: vira uma imagem pra mandar no grupo
+  h.push(`<button class="acao compartilhar" onclick="compartilharPartida(${d.gameId})" title="gera uma imagem com o placar e a lição">Compartilhar</button>`);
+
   // 0. A lição: uma frase, a coisa mais cara da partida
   if (d.licao) h.push(`<div class="licaoP ${d.licao.chave === 'bom' || d.licao.chave === 'perfeito' ? 'boa' : ''}">
     <span class="rot">A LIÇÃO DESTA PARTIDA</span>
@@ -2402,6 +2408,37 @@ const pontosElo = (e) => !e ? 0 :
   + ({IV:0,III:1,II:2,I:3}[e.rank] ?? 0) * 100 + (e.pdl ?? 0);
 
 async function convidarAmigo(ev, nome, tag){ ev.stopPropagation(); const b = ev.currentTarget; b.disabled = true; b.textContent = 'convidando…'; try { const r = await fetch(`/api/amigos/convidar?nome=${encodeURIComponent(nome)}&tag=${encodeURIComponent(tag)}`, { method: 'POST' }).then(r => r.json()); b.textContent = r.erro ? r.erro : 'convidado ✓'; } catch(e) { b.textContent = e.message; } setTimeout(() => { b.textContent = 'Convidar'; b.disabled = false; }, 4000); }
+/**
+  * O ranking da turma: todo mundo que está na sua lista, em ordem de elo, com a
+  * semana de cada um. É a tabela que faz a galera abrir o app sem ter partida.
+  */
+const PONTOS_TIER = ['IRON','BRONZE','SILVER','GOLD','PLATINUM','EMERALD','DIAMOND','MASTER','GRANDMASTER','CHALLENGER'];
+function pontosDoElo(e){
+  if(!e?.tier) return -1;
+  const i = PONTOS_TIER.indexOf(String(e.tier).toUpperCase());
+  const div = ({ IV: 0, III: 1, II: 2, I: 3 })[e.rank] ?? 0;
+  return (i < 0 ? 0 : i) * 400 + div * 100 + (e.pdl ?? 0);
+}
+function desenharRankingAmigos(lista){
+  const el = $('#amRanking'); if(!el) return;
+  const linhas = (lista ?? []).map(p => {
+    const solo = eloSolo(p.perfil);
+    return { nome: p.nome, tag: p.tag, eu: !!p.eu, icone: p.perfil?.icone, championId: p.perfil?.recente?.championId ?? null,
+      elo: solo, pontos: pontosDoElo(solo), forma: p.forma ?? p.perfil?.forma ?? null };
+  }).filter(x => x.pontos >= 0).sort((a, b) => b.pontos - a.pontos);
+  if(linhas.length < 2){ el.innerHTML = ''; return; }
+  el.innerHTML = `<h2>Ranking da turma <small>quem está na sua lista, por elo</small></h2>
+    <div class="rkTab">${linhas.map((x, i) => `
+      <div class="rkL ${x.eu ? 'eu' : ''}">
+        <span class="rkPos">${i + 1}</span>
+        <img src="${x.icone != null ? '/iconeperfil/' + x.icone : ''}" alt="" loading="lazy">
+        <span class="rkNome"><b>${esc(x.nome)}</b><small>#${esc(x.tag ?? '')}</small></span>
+        <span class="rkElo">${esc(x.elo?.nome ?? 'sem elo')}</span>
+        <span class="num rkPdl">${x.elo?.pdl != null ? x.elo.pdl + ' PDL' : ''}</span>
+        <span class="num rkSem">${x.forma?.jogos ? `${x.forma.vitorias}V ${x.forma.jogos - x.forma.vitorias}D na semana` : ''}</span>
+      </div>`).join('')}</div>`;
+}
+
 function cartaoDeAmigo(p, { eu = false } = {}){
   const perfil = p.perfil, r = perfil?.recente, solo = eloSolo(perfil), chave = chaveAm(p);
   const taxa = r ? Math.round(r.taxa*100) : null;
@@ -2447,6 +2484,8 @@ function desenharAmigos(){
     : '<div class="vazio">ninguém ainda</div>';
 
   /* ---- detalhe de quem está aberto ---- */
+  desenharRankingAmigos(todos.map(p => ({ ...p, eu: p === eu })));
+
   const aberto = todos.find(p => p.tag && chaveAm(p) === amAberto && p.perfil);
   $('#amDetalhe').innerHTML = aberto ? detalheDeAmigo(aberto) : '';
 
@@ -3503,6 +3542,85 @@ async function verDia(dia){
   $('#calDia').innerHTML = `<h2>${dia.split('-').reverse().join('/')} <small>${d ? `${d.n} partidas · KDA ${kda} · ${csm} CS/min${d.pdlSabido ? ` · ${d.pdl > 0 ? '+' : ''}${d.pdl} PDL` : ''}` : ''}</small></h2>
     <div class="listaP">${ps.map(cartaoDePartida).join('') || '<div class="vazio">as partidas desse dia ainda não carregaram</div>'}</div>`;
   $('#calDia').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ======================================================== compartilhar a partida
+   Desenha um cartão (placar, nota e a lição) num canvas e copia pro clipboard —
+   ou baixa, se o navegador não deixar copiar imagem. Nada sai do PC: a imagem é
+   feita aqui e quem manda pro grupo é você. */
+async function compartilharPartida(gameId){
+  const d = detalheAtual; if(!d) return;
+  const L = 900, A = 470;
+  const c = document.createElement('canvas'); c.width = L * 2; c.height = A * 2;
+  const g = c.getContext('2d'); g.scale(2, 2);
+  const cor = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#3ad6c4';
+  g.fillStyle = '#0a0c10'; g.fillRect(0, 0, L, A);
+
+  // arte do campeão como fundo
+  await new Promise((ok) => {
+    const img = new Image();
+    img.onload = () => { g.globalAlpha = .22; g.drawImage(img, 0, -60, L, L * img.height / img.width); g.globalAlpha = 1; ok(); };
+    img.onerror = ok; img.src = '/arte/' + (d.eu?.championId ?? 0);
+  });
+  const grad = g.createLinearGradient(0, 0, 0, A);
+  grad.addColorStop(0, 'rgba(10,12,16,.55)'); grad.addColorStop(1, 'rgba(10,12,16,.97)');
+  g.fillStyle = grad; g.fillRect(0, 0, L, A);
+
+  const eu = d.eu ?? {};
+  const venceu = d.jogadores?.find(j => j.id === eu.id)?.time === d.vencedor || d.venci;
+  g.fillStyle = venceu ? cor('--vit') : cor('--der');
+  g.font = '700 15px Inter, sans-serif';
+  g.fillText(venceu ? 'VITÓRIA' : 'DERROTA', 36, 52);
+
+  g.fillStyle = '#eef2f6'; g.font = '400 46px "Bebas Neue", Impact, sans-serif';
+  g.fillText(`${eu.campeao ?? ''}`, 36, 100);
+  g.fillStyle = '#9aa8b8'; g.font = '400 15px Inter, sans-serif';
+  const meu = d.jogadores?.find(j => j.id === eu.id);
+  if (meu) g.fillText(`${meu.kills}/${meu.deaths}/${meu.assists}  ·  ${num(meu.cs)} CS  ·  ${d.eloMedio ?? ''}`, 36, 126);
+
+  if (d.nota?.nota != null) {
+    g.fillStyle = cor('--marca'); g.font = '400 64px "Bebas Neue", Impact, sans-serif';
+    g.textAlign = 'right'; g.fillText(d.nota.nota.toFixed(1), L - 36, 104);
+    g.fillStyle = '#6a7787'; g.font = '400 12px Inter, sans-serif'; g.fillText('NOTA', L - 36, 124);
+    g.textAlign = 'left';
+  }
+
+  if (d.licao) {
+    g.fillStyle = cor('--marca'); g.fillRect(36, 168, 3, 150);
+    g.fillStyle = cor('--marca'); g.font = '700 11px Inter, sans-serif';
+    g.fillText('A LIÇÃO DESTA PARTIDA', 54, 186);
+    g.fillStyle = '#eef2f6'; g.font = '400 30px "Bebas Neue", Impact, sans-serif';
+    g.fillText(String(d.licao.titulo).slice(0, 52), 54, 220);
+    g.fillStyle = '#d3dce6'; g.font = '400 15px Inter, sans-serif';
+    // quebra o texto em linhas de no máximo 92 caracteres
+    let linha = '', y = 250;
+    for (const palavra of String(d.licao.texto).split(' ')) {
+      const teste = linha ? linha + ' ' + palavra : palavra;
+      if (g.measureText(teste).width > L - 110) { g.fillText(linha, 54, y); y += 24; linha = palavra; if (y > 320) break; }
+      else linha = teste;
+    }
+    if (linha && y <= 320) g.fillText(linha, 54, y);
+  }
+
+  g.fillStyle = '#6a7787'; g.font = '400 12px Inter, sans-serif';
+  g.fillText('LolCoach', 36, A - 26);
+
+  c.toBlob(async (blob) => {
+    try {
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+      aviso('imagem copiada — cola no grupo');
+    } catch {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = `lolcoach-${gameId}.png`; a.click();
+      URL.revokeObjectURL(a.href);
+    }
+  }, 'image/png');
+}
+function aviso(texto){
+  let el = $('#avisoFlutua');
+  if(!el){ el = document.createElement('div'); el.id = 'avisoFlutua'; document.body.appendChild(el); }
+  el.textContent = texto; el.classList.add('on');
+  clearTimeout(aviso._t); aviso._t = setTimeout(() => el.classList.remove('on'), 2600);
 }
 
 /* ======================================================== você contra você */
