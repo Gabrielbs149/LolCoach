@@ -375,3 +375,7 @@ h2 small a{color:var(--marca);text-decoration:none}
 .rdN b{font-family:var(--titulo);font-size:19px;letter-spacing:.5px;font-weight:400}
 .rdN b.v{color:var(--vit)}
 .rdN span{display:block;font-size:10.5px;color:var(--fraco)}
+
+.pvGrade{margin-bottom:26px}
+.pvGrade .rdC.bom{border-left:3px solid var(--vit)}
+.pvGrade .rdC.ruim{border-left:3px solid var(--der)}

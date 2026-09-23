@@ -73,6 +73,52 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       try { const { metaPorPosicao } = await import('../dados/meta.js'); return await metaPorPosicao({ regiao: q.get('regiao') || 'br', tier: q.get('tier') || 'emerald_plus' }); }
       catch (e) { return { erro: e.message }; }
     },
+    /**
+     * O meta cruzado com o seu histórico: dos campeões que você joga, quais estão
+     * fortes agora, quais pioraram, e o que subiu na sua rota principal e você
+     * ainda não pegou. Sem isso a tabela de meta é igual pra todo mundo.
+     */
+    '/api/meta-voce': async (q) => {
+      try {
+        const { metaPorPosicao } = await import('../dados/meta.js');
+        const d = await metaPorPosicao({ regiao: q.get('regiao') || 'br', tier: q.get('tier') || 'emerald_plus' });
+        const fc = filtroConta(q.get('conta'));
+        const desde = new Date(Date.now() - 200 * 86400_000).toISOString();
+        const linhas = db.prepare(`SELECT p.meuCampeao nome, p.minhaRole role, COUNT(*) n, SUM(p.venci) v, MAX(p.quando) ultima
+          FROM partidas p WHERE p.duracaoS >= 300 AND p.quando >= ?${fc} GROUP BY p.meuCampeao, p.minhaRole`).all(desde);
+        if (!linhas.length) return { vazio: true, patch: d.patch };
+        const POS = { ADC: 'ADC', BOT: 'ADC', SUPORTE: 'SUPPORT', SUP: 'SUPPORT', MID: 'MID', TOP: 'TOP', JUNGLE: 'JUNGLE' };
+        const chave = (s) => String(s ?? '').replace(/[^a-z]/gi, '').toLowerCase();
+        // meta por rota indexado pela chave do campeão
+        const porRota = {};
+        for (const [pos, lista] of Object.entries(d.posicoes)) { porRota[pos] = new Map(); for (const c of lista) { porRota[pos].set(chave(c.chave ?? c.nome), c); porRota[pos].set(chave(c.nome), c); } }
+        // rota principal: a mais jogada nos últimos jogos
+        const porRotaMinha = {};
+        for (const l of linhas) { const p = POS[l.role]; if (!p) continue; porRotaMinha[p] = (porRotaMinha[p] ?? 0) + l.n; }
+        const principal = Object.entries(porRotaMinha).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'ADC';
+        const manda = [], cuidado = [], jogados = new Set();
+        for (const l of linhas) {
+          const pos = POS[l.role]; if (!pos) continue;
+          const m = porRota[pos]?.get(chave(l.nome)); if (!m) continue;
+          jogados.add(`${pos}:${chave(m.chave ?? m.nome)}`);
+          if (l.n < 3) continue;
+          const minha = Math.round(1000 * l.v / l.n) / 10;
+          const item = { id: m.id, nome: m.nome, posicao: pos, meus: { n: l.n, v: l.v, taxa: minha }, taxa: m.taxa, pick: m.pick, tier: m.tier, rank: m.rank, subiu: m.rankAntes && m.rank ? m.rankAntes - m.rank : 0 };
+          const forte = (m.tier <= 1 || m.taxa >= 51.5 || (item.subiu >= 5 && m.taxa >= 49.5)) && m.tier <= 3;
+          if (forte) manda.push(item);
+          else if ((m.tier >= 4 || m.taxa <= 48) && l.n >= 5) cuidado.push(item);
+        }
+        manda.sort((a, b) => (b.meus.taxa - 50) * Math.min(b.meus.n, 20) - (a.meus.taxa - 50) * Math.min(a.meus.n, 20));
+        cuidado.sort((a, b) => a.taxa - b.taxa);
+        // pra testar: o que subiu ou está nível 0/1 na sua rota principal e você não joga
+        const testar = (d.posicoes[principal] ?? [])
+          .filter((c) => !jogados.has(`${principal}:${chave(c.chave ?? c.nome)}`) && c.pick >= 1 && (c.tier === 0 || (c.rankAntes && c.rank && c.rankAntes - c.rank >= 5)))
+          .slice(0, 4)
+          .map((c) => ({ id: c.id, nome: c.nome, posicao: principal, taxa: c.taxa, pick: c.pick, tier: c.tier, rank: c.rank, subiu: c.rankAntes && c.rank ? c.rankAntes - c.rank : 0 }));
+        return { patch: d.patch, principal, manda: manda.slice(0, 5), cuidado: cuidado.slice(0, 4), testar };
+      } catch (e) { return { erro: e.message }; }
+    },
+
     // Quem está abusando: subindo no patch, o que o KR Mestre+ joga e aqui ninguém joga, e os coreanos.
     '/api/radar': async () => {
       try { const { radarDeAbuso } = await import('../dados/meta.js'); return await radarDeAbuso(); }
