@@ -291,7 +291,7 @@ export async function situacoesDasMortes(p, eu) {
       else { linhas.push(`Troca parelha (${nv}) perdida no ataque básico: ele bate mais que você nesse ponto do jogo.`); fazer.push('Sem vantagem de dano, a troca é com a wave a favor e o sup do lado — senão é farm.'); }
     }
     const pos = m.pos ? { x: Math.max(0, Math.min(1, m.pos.x / 14820)), y: Math.max(0, Math.min(1, 1 - m.pos.y / 14820)) } : null;
-    saida.push({ t, minuto: mmss(t), fase, onde, pos, linhas, fazer: [...new Set(fazer)].slice(0, 3) });
+    saida.push({ t, minuto: mmss(t), fase, onde, pos, algoz: algozes[0]?.j?.campeao ?? null, linhas, fazer: [...new Set(fazer)].slice(0, 3) });
   }
   // padrão da partida
   const padrao = [];

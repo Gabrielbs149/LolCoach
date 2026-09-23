@@ -1512,15 +1512,18 @@ async function carregarVisao(){
 }
 
 /** O dia de hoje (vira às 6h) e a curva de PDL da solo. */
+let sessaoParar = null;
 async function desenharHoje(){
   let s; try { s = await pegar(comConta('/api/sessao')); } catch { return; }
   const h = s.hoje, d = h.jogos - h.vitorias;
+  sessaoParar = s.parar ?? null;
   const saldo = h.saldoPdl;
   $('#hoje').innerHTML = `<div class="hoje">
     ${cartao('Hoje', h.jogos ? `<span class="${h.vitorias>d?'v':h.vitorias<d?'d':''}">${h.vitorias}V ${d}D</span>` : '—', h.jogos ? `${h.jogos} partidas` : 'nenhuma partida ainda')}
     ${cartao('PDL hoje', saldo == null ? '—' : `<span class="${saldo>0?'v':saldo<0?'d':''}">${saldo>0?'+':''}${saldo}</span>`, saldo == null ? 'solo/duo' : 'solo/duo')}
     ${cartao('Seguidas', h.seguidas ? `<span class="d">${h.seguidas} derrotas</span>` : (h.jogos ? '<span class="v">ok</span>' : '—'), h.seguidas >= 3 ? 'para por hoje' : '')}
-    ${h.seguidas >= 3 ? `<div class="tilt">${h.seguidas} derrotas seguidas — respira, volta amanhã. Tilt custa mais PDL que qualquer erro de jogo.</div>` : ''}
+    ${sessaoParar ? `<div class="tilt ${sessaoParar.nivel}"><b>${h.seguidas} derrota${h.seguidas > 1 ? 's' : ''} seguida${h.seguidas > 1 ? 's' : ''}</b> — ${esc(sessaoParar.texto)}</div>`
+      : h.seguidas >= 3 ? `<div class="tilt">${h.seguidas} derrotas seguidas — respira, volta amanhã. Tilt custa mais PDL que qualquer erro de jogo.</div>` : ''}
   </div>`;
   $('#curvaPdl').innerHTML = curvaPdl(s.curva);
 }
@@ -1765,6 +1768,13 @@ async function abrirPartida(gameId){
       <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}</span></div>`;
   const timeDe = (t) => d.jogadores.filter(j => j.time === t).sort((a, b) => a.id - b.id);
   const cab = `<div class="lj cab"><span></span><span>Campeão · jogador</span><span class="num">KDA</span><span class="num">CS</span><span class="num">Dano</span><span class="num">Nota</span></div>`;
+  // 0. A lição: uma frase, a coisa mais cara da partida
+  if (d.licao) h.push(`<div class="licaoP ${d.licao.chave === 'bom' || d.licao.chave === 'perfeito' ? 'boa' : ''}">
+    <span class="rot">A LIÇÃO DESTA PARTIDA</span>
+    <b>${esc(d.licao.titulo)}</b>
+    <p>${esc(d.licao.texto)}</p>
+    ${d.licao.quando ? `<small>nos minutos ${esc(d.licao.quando)}</small>` : ''}</div>`);
+
   // 1. Placar primeiro: os dois times lado a lado
   h.push(`<div class="placar2">
     <div class="timeP nosso"><div class="tit">Seu time${d.sorte?.aliados != null ? ` <small>nota média ${d.sorte.aliados.toFixed(1)}</small>` : ''}</div>${cab}${timeDe(d.eu.time).map(linhaP).join('')}</div>

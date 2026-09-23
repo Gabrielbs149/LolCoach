@@ -12,6 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { release as versaoDoWindows } from 'node:os';
 import * as Controle from './dados/controle.js';
+import { recadoDeSequencia } from './analise/parar.js';
+import { licaoDaPartida } from './analise/licao.js';
 
 /**
  * Liga tudo: aceitar fila, seleção de campeão, runas e coleta.
@@ -527,6 +529,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         const salvos = await coletarPendentes(lcu, db, { quantas: 20 });
         if (salvos.length) {
           for (const s of salvos) log(`coletada ${s.gameId}: ${s.campeao} ${s.role} ${s.venci ? 'V' : 'D'} — ${s.achados} achados (${s.graves} graves)`);
+          // Sequência ruim: avisa com o número DELE, não com conselho genérico.
+          try {
+            const s = sessao({});
+            if (s?.parar?.nivel === 'parar' && s.parar.seguidas !== ultimoAvisoParar) {
+              ultimoAvisoParar = s.parar.seguidas;
+              log(`sequência: ${s.parar.texto}`);
+              estado?.avisar?.('Hoje chega', s.parar.texto);
+            } else if (!s?.hoje?.seguidas) ultimoAvisoParar = 0;
+          } catch { /* sem sessão */ }
           // O elo mudou: relê agora, pra curva de PDL e o saldo do dia.
           setTimeout(() => perfil({ forcar: true }).catch(() => {}), 8_000);
           return salvos;
@@ -541,6 +552,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     return [];
   }
 
+  let ultimoAvisoParar = 0;
   let faseAnterior = null;
   let sala = { gameId: null, etag: null, vistos: new Set(), ultimaLeitura: 0 };   // flash compartilhado (partidas/<gameId>.json)
   /**
@@ -738,6 +750,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       resumo: d.resumo,
       prioridades: d.prioridades,
       confronto, lane, situacoes, acertos, eloMedio: eloMedio?.nome ?? null, nota: notas.get(eu.id) ?? null,
+      licao: (() => { try { return licaoDaPartida({ lane, situacoes, acertos, nota: notas.get(eu.id) ?? null, venci: p.vencedor === eu.time, minhaRole: eu.role }); } catch (e) { log(`lição falhou: ${e.message}`); return null; } })(),
       sorte: (() => { const m = (l) => l.length ? Math.round(10 * l.reduce((s, x) => s + x, 0) / l.length) / 10 : null; return { aliados: m(p.jogadores.filter((j) => j.time === eu.time && j.id !== eu.id).map((j) => notas.get(j.id)?.nota ?? 0)), inimigos: m(p.jogadores.filter((j) => j.time !== eu.time).map((j) => notas.get(j.id)?.nota ?? 0)) }; })(),
       // diferença de gold do time por minuto (positivo = seu time na frente) e minutos das suas mortes, pro gráfico
       // build da partida: compras agrupadas por volta à base (30 s), itens finais, runas e ordem de magias
@@ -1743,8 +1756,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     const primeiroHoje = curva.find((h) => h.em >= desde);
     const antesDeHoje = [...curva].reverse().find((h) => h.em < desde) ?? primeiroHoje;
     const ultimo = curva.at(-1);
+    let parar = null;
+    try { parar = recadoDeSequencia(db, { conta: nome, seguidas }); } catch { /* banco novo */ }
     return {
-      conta: nome, desde,
+      conta: nome, desde, parar,
       hoje: { jogos: deHoje.length, vitorias: deHoje.filter((p) => p.venci).length, seguidas,
         saldoPdl: antesDeHoje && ultimo ? pontos(ultimo) - pontos(antesDeHoje) : null },
       // só as leituras em que o PDL mudou (o resto é a mesma linha repetida a cada 10 min), últimos 30 dias

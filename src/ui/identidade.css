@@ -437,3 +437,17 @@ h2 small a{color:var(--marca);text-decoration:none}
 #fundoApp::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,12,16,.2),var(--f0) 78%)}
 body.comFundo{background:transparent}
 body.comFundo main{background:transparent}
+
+/* ---- "hoje chega": o aviso de sequência, com o número dele ---- */
+.tilt b{font-family:var(--titulo);font-size:15px;letter-spacing:.5px;font-weight:400}
+.tilt.aviso{background:#3a2a16;border-color:#5c4322;color:#f0b048}
+.tilt.parar{background:#3a1618;border-color:#5c2226;color:#f07a7a}
+
+/* ---- a lição da partida: a manchete da análise ---- */
+.licaoP{background:linear-gradient(90deg,rgba(58,214,196,.10),transparent 70%),var(--f1);border-left:3px solid var(--marca);border-radius:var(--r-g);padding:16px 20px;margin-bottom:22px}
+.licaoP .rot{font-size:10px;letter-spacing:1.6px;color:var(--marca)}
+.licaoP b{display:block;font-family:var(--titulo);font-size:26px;letter-spacing:.5px;font-weight:400;line-height:1.15;margin:4px 0 6px}
+.licaoP p{margin:0;font-size:14.5px;line-height:1.6;color:#d3dce6;max-width:78ch}
+.licaoP small{display:block;margin-top:6px;font-size:11.5px;color:var(--apagado)}
+.licaoP.boa{background:linear-gradient(90deg,rgba(62,207,142,.10),transparent 70%),var(--f1);border-left-color:var(--vit)}
+.licaoP.boa .rot{color:var(--vit)}
