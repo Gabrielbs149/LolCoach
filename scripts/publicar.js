@@ -75,6 +75,9 @@ if (existente.status === 404) {
 
 // trava: nenhum arquivo com erro de sintaxe sobe (scripts/conferir-sintaxe.mjs)
 { const c = spawnSync(process.execPath, ['scripts/conferir-sintaxe.mjs'], { stdio: 'inherit' }); if (c.status) process.exit(c.status); }
+// trava 2: os testes têm que passar. Sintaxe passa em código errado — o canhão na
+// onda errada e o suporte medido por CS passariam pelo --check sem reclamar.
+{ const c = spawnSync(process.execPath, ['--test', 'scripts/testes.mjs'], { stdio: 'inherit' }); if (c.status) { console.error('teste falhou — não publica'); process.exit(c.status); } }
 console.log(`publicando LolCoach v${pkg.version} em ${owner}/${repo}…`);
 const r = spawnSync('npx', ['electron-builder', '--win', 'nsis', '--publish', 'always'], {
   stdio: 'inherit', shell: true,

@@ -137,6 +137,36 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
     },
 
     /**
+     * ARAM e Arena têm conta separada. Ficam fora de toda análise de Summoner's Rift
+     * (CS por minuto e visão não querem dizer a mesma coisa lá), mas isso não é motivo
+     * pra sumirem: aqui vão os números que fazem sentido nesses modos.
+     */
+    '/api/outros-modos': (q) => {
+      const fc = filtroConta(q.get('conta'));
+      const MODOS = { 450: 'ARAM', 1700: 'Arena', 1710: 'Arena', 900: 'URF', 1300: 'Nexus Blitz', 1900: 'URF', 2300: 'Brawl' };
+      const linhas = db.prepare(`SELECT p.fila, p.gameId, p.quando, p.duracaoS, p.venci, p.meuCampeao, j.championId,
+          j.kills k, j.deaths d, j.assists a, j.dano dano
+        FROM partidas p JOIN jogadores j ON j.gameId = p.gameId AND j.participantId = p.meuId
+        WHERE p.duracaoS >= 300 AND p.fila IN (${Object.keys(MODOS).join(',')})${fc} ORDER BY p.quando DESC`).all();
+      if (!linhas.length) return { vazio: true };
+      const porModo = new Map();
+      for (const p of linhas) {
+        const nome = MODOS[p.fila] ?? 'Outro';
+        const r = porModo.get(nome) ?? { modo: nome, n: 0, v: 0, k: 0, d: 0, a: 0, dano: 0, seg: 0, camps: new Map() };
+        r.n++; r.v += p.venci; r.k += p.k; r.d += p.d; r.a += p.a; r.dano += p.dano ?? 0; r.seg += p.duracaoS;
+        r.camps.set(p.meuCampeao, (r.camps.get(p.meuCampeao) ?? 0) + 1);
+        porModo.set(nome, r);
+      }
+      return { modos: [...porModo.values()].map((r) => ({
+        modo: r.modo, jogos: r.n, vitorias: r.v, taxa: Math.round((1000 * r.v) / r.n) / 10,
+        kda: r.d ? Math.round((10 * (r.k + r.a)) / r.d) / 10 : null,
+        dpm: r.seg ? Math.round(r.dano / (r.seg / 60)) : null,
+        minutos: Math.round(r.seg / 60),
+        campeoes: [...r.camps].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([nome, n]) => ({ nome, n })),
+      })).sort((a, b) => b.jogos - a.jogos) };
+    },
+
+    /**
      * Onde você morre, juntando TODAS as partidas. Uma partida só não diz nada; 200
      * partidas mostram o arbusto em que você morre sempre. As posições vêm viradas
      * pro seu lado do mapa (quem joga no time vermelho tem tudo espelhado), então o

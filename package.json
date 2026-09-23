@@ -17,7 +17,7 @@
     "reprocessar": "node scripts/reprocessar.js",
     "portatil": "electron-builder --win portable",
     "publicar": "node scripts/publicar.js",
-    "test": "node scripts/testar-voz.mjs"
+    "test": "node --test scripts/testes.mjs"
   },
   "dependencies": {
     "electron-updater": "^6.8.9",

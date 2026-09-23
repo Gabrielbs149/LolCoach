@@ -621,6 +621,31 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       if (feitas) log(`voz aquecida: ${feitas} frase(s) novas em cache`);
     } finally { aquecendo = false; }
   }
+  /**
+   * Patch novo mexeu num campeão SEU: o cruzamento já existia na tela de Patch, mas
+   * quem está entrando na fila não abre a tela. Uma notificação por patch, e só dos
+   * campeões que ele joga de verdade (3+ partidas).
+   */
+  let patchAvisado = null;
+  async function avisarPatchDoPool() {
+    try {
+      const { listarAtualizacoes, lerAtualizacao, mudancasDele } = await import('./dados/patchnotes.js');
+      const lista = await listarAtualizacoes({ limite: 1 });
+      const nova = lista?.[0]; if (!nova?.slug || nova.slug === patchAvisado) return;
+      const meus = db.prepare(`SELECT meuCampeao nome, COUNT(*) n FROM partidas WHERE duracaoS >= 300 GROUP BY meuCampeao HAVING n >= 3`).all().map((r) => r.nome);
+      if (!meus.length) return;
+      const { elencoCompleto } = await import('./dados/ddragon.js');
+      const elenco = await elencoCompleto().catch(() => []);
+      const at = await lerAtualizacao(nova.slug, { elenco });
+      const mudou = mudancasDele(at, meus) ?? [];
+      patchAvisado = nova.slug;
+      if (!mudou.length) return;
+      const partes = mudou.slice(0, 3).map((m) => `${m.nome}${m.tipo ? ' (' + m.tipo + ')' : ''}`);
+      log(`patch ${nova.slug}: mexeu em ${partes.join(', ')}`);
+      estado?.avisar?.('O patch mexeu nos seus campeões', `${partes.join(', ')}${mudou.length > 3 ? ` e mais ${mudou.length - 3}` : ''}. Abre a aba Patch pra ver o que mudou.`);
+    } catch { /* sem rede ou sem notas */ }
+  }
+
   /** Os campeões já escolhidos na seleção + a lista toda de nomes (pra achar o nome dentro da frase). */
   async function campeoesDaSelecao() {
     const s = await lcu.get('/lol-champ-select/v1/session').catch(() => null);
@@ -638,7 +663,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     log(`fase: ${fase}`);
     // A janela ao vivo abre na seleção, nunca com o jogo rodando: mexer em
     // janela durante a partida rouba o foco e minimiza o jogo em tela cheia.
-    if (fase === 'ChampSelect') { aoSelecionar?.(); aquecerVoz().catch(() => {}); }
+    if (fase === 'ChampSelect') { aoSelecionar?.(); aquecerVoz().catch(() => {}); avisarPatchDoPool().catch(() => {}); }
     aoFase?.(fase);
     if (faseAnterior === 'EndOfGame' || (faseAnterior === 'InProgress' && fase === 'None')) coletar();
     // Acabou: resumo do que o olho viu e falou, pra conferir no registro.

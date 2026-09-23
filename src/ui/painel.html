@@ -894,6 +894,12 @@ h2{letter-spacing:1px}
 </head>
 <body>
   <div id="fundoApp" aria-hidden="true"></div>
+  <div id="buscaGlobal" hidden>
+    <div class="bgCaixa">
+      <input id="bgTexto" placeholder="campeão, jogador, tela…  (Esc pra fechar)" autocomplete="off">
+      <div id="bgLista"></div>
+    </div>
+  </div>
 
 <aside>
   <div class="marca">
@@ -1000,6 +1006,7 @@ h2{letter-spacing:1px}
 
   <section id="estat">
     <div id="evolucao"></div>
+    <div id="outrosModos"></div>
     <div id="mapaMortes"></div>
     <div class="titulo">Estatísticas</div>
     <div class="cartoes" id="eGeral"></div>
@@ -1163,6 +1170,13 @@ h2{letter-spacing:1px}
         <div class="txt"><b>Versão</b></div>
         <span class="sub" id="cfgVersao" style="color:var(--fraco);font-size:12.5px"></span>
         <button class="acao" onclick="atualizarAgora(this)">Atualizar agora</button>
+      </div>
+      <div class="linhaCfg">
+        <div class="txt"><b>Tema</b><small>claro pra quem usa o app de dia fora do jogo</small></div>
+        <select class="contaSel" id="cTema" style="margin:0;width:auto" onchange="trocarTema(this.value)">
+          <option value="escuro">Escuro</option>
+          <option value="claro">Claro</option>
+        </select>
       </div>
       <div class="linhaCfg">
         <div class="txt"><b>Fundo do app</b><small>a arte do campeão da sua última partida atrás de tudo, bem apagada — muda sozinha quando você joga</small></div>
@@ -1950,6 +1964,7 @@ function colunas(itens, {minimo = 1} = {}){
 
 async function carregarEstat(){
   carregarEvolucao().catch(() => {});
+  carregarOutrosModos().catch(() => {});
   carregarMapaMortes().catch(() => {});
   const e = await pegar(comConta('/api/estatisticas'));
   if(e.erro){ $('#eGeral').innerHTML = `<div class="vazio">${esc(e.erro)}</div>`; return; }
@@ -3475,6 +3490,15 @@ async function carregarRadar(){
 /* ======================================================== o fundo do app
    A arte do campeão da última partida atrás de tudo, bem apagada — muda sozinha
    quando você joga. Desliga em Configuração (fica guardado neste computador). */
+/** Claro ou escuro — fica guardado neste computador (não confundir com o tema do admin). */
+function aplicarModoTema(){
+  const t = localStorage.getItem('modoTema') === 'claro' ? 'claro' : 'escuro';
+  document.documentElement.dataset.tema = t;
+  const sel = $('#cTema'); if (sel) sel.value = t;
+}
+function trocarTema(v){ localStorage.setItem('modoTema', v); aplicarModoTema(); }
+document.addEventListener('DOMContentLoaded', aplicarModoTema);
+
 function aplicarFundo(championId){
   const sel = $('#cFundo'); if(sel) sel.value = localStorage.getItem('fundoApp') ?? 'auto';
   const el = $('#fundoApp'); if(!el) return;
@@ -3543,6 +3567,65 @@ async function verDia(dia){
     <div class="listaP">${ps.map(cartaoDePartida).join('') || '<div class="vazio">as partidas desse dia ainda não carregaram</div>'}</div>`;
   $('#calDia').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+
+/* ======================================================== busca global (Ctrl+K)
+   Um campo só pra chegar em qualquer lugar: campeão (abre a sua página dele),
+   jogador das suas partidas (abre a ficha), tela do app, e partida por campeão.
+   Tudo o que ele acha já está na memória — não pergunta nada pro servidor. */
+const BG_TELAS = [['visao','Perfil'],['calendario','Calendário'],['partidas','Partidas'],['estat','Estatísticas'],['amigos','Amigos'],['meta','Meta'],['builds','Builds'],['patch','Patch'],['config','Configuração']];
+let bgIndice = 0, bgItens = [];
+const bgChave = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+function abrirBusca(){
+  const el = $('#buscaGlobal'); if(!el) return;
+  el.hidden = false; $('#bgTexto').value = ''; bgBuscar('');
+  setTimeout(() => $('#bgTexto').focus(), 10);
+}
+function fecharBusca(){ const el = $('#buscaGlobal'); if(el) el.hidden = true; }
+
+function bgBuscar(texto){
+  const t = bgChave(texto).trim();
+  const itens = [];
+  for (const [aba, nome] of BG_TELAS) {
+    if (!t || bgChave(nome).includes(t)) itens.push({ tipo: 'Tela', rotulo: nome, acao: () => abrirAba(aba) });
+  }
+  if (t.length >= 2) {
+    const camps = [...new Set((todasPartidas ?? []).map(p => p.meuCampeao))].filter(n => bgChave(n).includes(t)).slice(0, 6);
+    for (const nome of camps) {
+      const id = (todasPartidas ?? []).find(p => p.meuCampeao === nome)?.championId ?? 0;
+      itens.push({ tipo: 'Seu campeão', rotulo: nome, icone: id, acao: () => abrirMeuCampeao(nome, id) });
+    }
+    const rivais = [...new Set((todasPartidas ?? []).map(p => p.rival).filter(Boolean))].filter(n => bgChave(n).includes(t)).slice(0, 4);
+    for (const nome of rivais) itens.push({ tipo: 'Rival', rotulo: nome, acao: () => { abrirAba('partidas'); $('#pBusca').value = nome; mostrando = POR_PAGINA; desenharPartidas(); } });
+    const amigos = (amDados?.amigos ?? []).filter(a => bgChave(a.nome).includes(t)).slice(0, 4);
+    for (const a of amigos) itens.push({ tipo: 'Amigo', rotulo: `${a.nome}#${a.tag ?? ''}`, acao: () => { abrirAba('amigos'); amAberto = chaveAm(a); desenharAmigos(); } });
+  }
+  bgItens = itens.slice(0, 12); bgIndice = 0; bgDesenhar();
+}
+function bgDesenhar(){
+  const el = $('#bgLista'); if(!el) return;
+  el.innerHTML = bgItens.length
+    ? bgItens.map((x, i) => `<div class="bgL ${i === bgIndice ? 'on' : ''}" onmouseenter="bgIndice=${i};bgDesenhar()" onclick="bgEscolher(${i})">
+        ${x.icone ? `<img src="/icone/${x.icone}" alt="">` : '<span class="bgP"></span>'}
+        <b>${esc(x.rotulo)}</b><small>${esc(x.tipo)}</small></div>`).join('')
+    : '<div class="bgVazio">nada com esse nome</div>';
+}
+function bgEscolher(i){
+  const x = bgItens[i ?? bgIndice]; if(!x) return;
+  fecharBusca(); x.acao();
+}
+document.addEventListener('keydown', (ev) => {
+  if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); abrirBusca(); return; }
+  if ($('#buscaGlobal')?.hidden !== false) return;
+  if (ev.key === 'Escape') { ev.preventDefault(); fecharBusca(); }
+  else if (ev.key === 'ArrowDown') { ev.preventDefault(); bgIndice = Math.min(bgItens.length - 1, bgIndice + 1); bgDesenhar(); }
+  else if (ev.key === 'ArrowUp') { ev.preventDefault(); bgIndice = Math.max(0, bgIndice - 1); bgDesenhar(); }
+  else if (ev.key === 'Enter') { ev.preventDefault(); bgEscolher(); }
+});
+document.addEventListener('DOMContentLoaded', () => {
+  $('#bgTexto')?.addEventListener('input', (e) => bgBuscar(e.target.value));
+  $('#buscaGlobal')?.addEventListener('click', (e) => { if (e.target.id === 'buscaGlobal') fecharBusca(); });
+});
 
 /* ======================================================== compartilhar a partida
    Desenha um cartão (placar, nota e a lição) num canvas e copia pro clipboard —
@@ -3635,6 +3718,23 @@ async function carregarEvolucao(){
         <div class="rot">${esc(x.rotulo)}</div>
         <div class="val">${x.agora}<small> de ${x.antes}</small></div>
         <div class="dif">${x.melhor === null ? 'igual' : `${x.pct > 0 ? '+' : ''}${x.pct}%`}</div>
+      </div>`).join('')}</div>`;
+}
+
+/* ======================================================== ARAM, Arena e afins
+   Esses modos ficam fora de toda análise de Summoner's Rift (CS por minuto e visão
+   não querem dizer a mesma coisa lá), mas isso não é motivo pra sumirem. */
+async function carregarOutrosModos(){
+  const el = $('#outrosModos'); if(!el) return;
+  let d; try { d = await pegar(comConta('/api/outros-modos')); } catch { d = null; }
+  if(!d || d.erro || d.vazio || !d.modos?.length){ el.innerHTML = ''; return; }
+  el.innerHTML = `<h2>Outros modos <small>ficam de fora das contas do Rift, mas não somem</small></h2>
+    <div class="modosGrade">${d.modos.map(m => `
+      <div class="modoC">
+        <div class="topo"><b>${esc(m.modo)}</b><span>${m.jogos} partida${m.jogos === 1 ? '' : 's'}</span></div>
+        <div class="nums"><span class="${m.taxa >= 55 ? 'v' : m.taxa <= 45 ? 'd' : ''}">${m.taxa}%</span>
+          <small>KDA ${m.kda ?? '—'} · ${num(m.dpm ?? 0)} dano/min · ${Math.round(m.minutos / 60)} h</small></div>
+        <div class="camps">${m.campeoes.map(c => `<span>${esc(c.nome)} <i>${c.n}</i></span>`).join('')}</div>
       </div>`).join('')}</div>`;
 }
 

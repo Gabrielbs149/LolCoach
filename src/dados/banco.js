@@ -76,6 +76,7 @@ CREATE TABLE IF NOT EXISTS marcadas (gameId INTEGER PRIMARY KEY, em TEXT);
 CREATE INDEX IF NOT EXISTS idx_frames_jogador ON frames (gameId, participantId);
 CREATE INDEX IF NOT EXISTS idx_eventos_tipo   ON eventos (tipo, gameId);
 CREATE INDEX IF NOT EXISTS idx_achados_tipo   ON achados (tipo);
+CREATE INDEX IF NOT EXISTS idx_partidas_quando ON partidas (quando DESC);
 `;
 
 export function abrirBanco(caminho = caminhoBanco()) {

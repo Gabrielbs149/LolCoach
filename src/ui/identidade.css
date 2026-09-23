@@ -509,3 +509,64 @@ body.comFundo main{background:transparent}
 #detalhe{position:relative}
 #avisoFlutua{position:fixed;left:50%;bottom:28px;transform:translateX(-50%) translateY(20px);background:var(--marca);color:#0a0c10;font-weight:700;font-size:13px;padding:9px 18px;border-radius:99px;opacity:0;pointer-events:none;transition:.25s;z-index:99}
 #avisoFlutua.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ---- busca global (Ctrl+K) ---- */
+#buscaGlobal{position:fixed;inset:0;background:rgba(6,8,11,.72);z-index:120;display:flex;align-items:flex-start;justify-content:center;padding-top:14vh}
+#buscaGlobal[hidden]{display:none}
+.bgCaixa{width:min(620px,92vw);background:var(--f1);border:1px solid var(--borda-forte);border-radius:var(--r-g);overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.6)}
+#bgTexto{width:100%;background:none;border:0;outline:0;color:var(--texto);font:16px var(--corpo);padding:16px 20px;border-bottom:1px solid var(--borda)}
+#bgLista{max-height:52vh;overflow:auto;padding:6px}
+.bgL{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:var(--r-s);cursor:pointer}
+.bgL.on{background:var(--marca-fundo)}
+.bgL img{width:24px;height:24px;border-radius:50%}
+.bgL .bgP{width:24px;height:24px;border-radius:var(--r-s);background:var(--f3)}
+.bgL b{font-weight:600;font-size:14px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bgL small{font-size:10.5px;letter-spacing:1px;color:var(--apagado)}
+.bgVazio{padding:16px 20px;color:var(--apagado);font-size:13px}
+
+/* ---- tema claro: mesma identidade, fundo invertido ---- */
+html[data-tema="claro"]{
+  --f0:#f4f6f8; --f1:#ffffff; --f2:#eef1f5; --f3:#e2e7ee;
+  --borda:#dde3ea; --borda-forte:#c8d1dc;
+  --texto:#161d26; --fraco:#4d5a68; --apagado:#7d8a99;
+  --marca:#11857a; --marca-escura:#0c6b62; --marca-fundo:rgba(17,133,122,.10);
+  --ouro:#11857a; --ouro-claro:#0c6b62; --ouro-escuro:#0a554e;
+  --vit:#18794e; --der:#c0392b; --g1:#11857a; --g2:#b7791f; --g3:#c0392b;
+}
+html[data-tema="claro"] body{background:var(--f0);color:var(--texto)}
+html[data-tema="claro"] #fundoApp{display:none}
+html[data-tema="claro"] .perfilHero::before{background:linear-gradient(90deg,rgba(255,255,255,.96) 0%,rgba(255,255,255,.75) 45%,rgba(255,255,255,.2) 100%)}
+html[data-tema="claro"] .licaoP p,html[data-tema="claro"] .confronto ul.dicas,html[data-tema="claro"] .difL p{color:#2b3644}
+
+/* ---- outros modos ---- */
+.modosGrade{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin-bottom:26px}
+.modoC{background:var(--f1);border-radius:var(--r-m);padding:12px 14px}
+.modoC .topo{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
+.modoC .topo b{font-family:var(--titulo);font-size:20px;letter-spacing:.5px;font-weight:400}
+.modoC .topo span{font-size:11px;color:var(--apagado)}
+.modoC .nums span{font-family:var(--titulo);font-size:30px;letter-spacing:.5px;line-height:1.1}
+.modoC .nums span.v{color:var(--vit)} .modoC .nums span.d{color:var(--der)}
+.modoC .nums small{display:block;font-size:11.5px;color:var(--fraco)}
+.modoC .camps{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.modoC .camps span{font-size:11px;background:var(--f3);border-radius:99px;padding:2px 8px;color:var(--fraco)}
+.modoC .camps i{font-style:normal;color:var(--apagado)}
+
+/* No claro, o que era cinza-claro de texto fica ilegível: escurece as variáveis e
+   os poucos tons cravados no estilo antigo do painel. */
+html[data-tema="claro"]{--fraco:#39495a; --apagado:#5e6d7d}
+html[data-tema="claro"] [style*="#b8c7d8"],
+html[data-tema="claro"] [style*="#a9b8c9"]{color:#39495a !important}
+html[data-tema="claro"] .dica,html[data-tema="claro"] .sub,html[data-tema="claro"] small{color:var(--fraco)}
+html[data-tema="claro"] aside{background:var(--f1);border-right-color:var(--borda)}
+html[data-tema="claro"] aside nav button{color:var(--fraco)}
+html[data-tema="claro"] aside nav button svg{stroke:var(--fraco)}
+html[data-tema="claro"] .cartao .val,html[data-tema="claro"] .elo .nome,html[data-tema="claro"] .titulo,html[data-tema="claro"] h2{color:var(--texto)}
+html[data-tema="claro"] .perfilHero .quem h3{color:var(--texto)}
+html[data-tema="claro"] .perfilHero{background-color:var(--f2)}
+html[data-tema="claro"] .cartaoP,html[data-tema="claro"] .confronto,html[data-tema="claro"] .prio,html[data-tema="claro"] .achado,
+html[data-tema="claro"] .amCartao,html[data-tema="claro"] .perfil,html[data-tema="claro"] .situ,html[data-tema="claro"] .falasCaixa,
+html[data-tema="claro"] .cfgBloco,html[data-tema="claro"] .bloco{background:var(--f1);color:var(--texto);box-shadow:0 1px 2px rgba(20,30,45,.06)}
+html[data-tema="claro"] .bgCaixa{box-shadow:0 20px 60px rgba(20,30,45,.18)}
+html[data-tema="claro"] #buscaGlobal{background:rgba(120,135,150,.45)}
+html[data-tema="claro"] .mapaCalor{background:var(--f2)}
+html[data-tema="claro"] .sorte .txt,html[data-tema="claro"] .pLane ul,html[data-tema="claro"] .ev ul{color:#2b3644}
