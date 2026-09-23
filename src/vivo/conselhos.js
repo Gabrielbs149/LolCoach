@@ -7,6 +7,8 @@
  * onde alguém está no mapa; isso fica pra análise depois da partida.
  */
 
+import { daRota } from './rotas.js';
+
 const mmss = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 // Tempos de renascimento. Depois da primeira morte do objetivo o cálculo é
@@ -35,6 +37,7 @@ export function montarConselhos(estado, perfil) {
   const inimigos = jogadores.filter((j) => j.time !== meuTime);
   const aliados = jogadores.filter((j) => j.time === meuTime);
   const fora = [];
+  const R = daRota(eu.role);
 
   /* ---------------------------------------------------------- objetivos */
   for (const [nome, tipoEvento, respawn, primeiro] of [
@@ -70,9 +73,8 @@ export function montarConselhos(estado, perfil) {
   }
 
   /* ------------------------------------------------------------ economia */
-  if (eu.ouro >= 1300 && !eu.morto) {
-    fora.push(item('recall', 2, `${eu.ouro} de gold parado`,
-      'Volta assim que a wave estiver empurrada. Item na mão ganha troca; gold no bolso não faz nada.'));
+  if (eu.ouro >= R.gastarEm && !eu.morto) {
+    fora.push(item('recall', 2, `${eu.ouro} de gold parado`, R.baseAcao));
   }
 
   /* -------------------------------------------------------- seu histórico */
@@ -91,17 +93,19 @@ export function montarConselhos(estado, perfil) {
     if (perfil.mortesEmDerrota && eu.mortes >= Math.round(perfil.mortesEmVitoria ?? 4)) {
       fora.push(item('mortes', eu.mortes >= perfil.mortesEmDerrota ? 3 : 2,
         `${eu.mortes} mortes`,
-        `Nas suas vitórias você morre ${perfil.mortesEmVitoria.toFixed(1)}x; nas derrotas ${perfil.mortesEmDerrota.toFixed(1)}x. Jogue os próximos minutos pra não morrer, mesmo que custe farm.`));
+        `Nas suas vitórias você morre ${perfil.mortesEmVitoria.toFixed(1)}x; nas derrotas ${perfil.mortesEmDerrota.toFixed(1)}x. Jogue os próximos minutos pra não morrer, mesmo que custe ${R.recurso}.`));
     }
   }
 
   /* --------------------------------------------------------------- lane */
   const rival = inimigos.find((j) => j.role && j.role === eu.role);
   if (rival && tempo > 300) {
-    const dif = eu.cs - rival.cs;
-    if (dif <= -20) {
-      fora.push(item('farm', 2, `${Math.abs(dif)} de farm atrás do ${rival.campeao}`,
-        'Farm é o ouro garantido. Pegue as waves seguras antes de procurar briga.'));
+    if (eu.role === 'sup') {
+      const dif = (eu.visao ?? 0) - (rival.visao ?? 0);
+      if (dif <= -8) fora.push(item('farm', 2, `${Math.abs(Math.round(dif))} de visão atrás do ${rival.campeao}`, R.atrasado));
+    } else {
+      const dif = eu.cs - rival.cs;
+      if (dif <= -20) fora.push(item('farm', 2, `${Math.abs(dif)} de farm atrás do ${rival.campeao}`, R.atrasado));
     }
   }
 
@@ -116,7 +120,7 @@ export function montarConselhos(estado, perfil) {
   if (mortos.length >= 2) {
     const maisTempo = Math.max(...mortos.map((j) => j.renasceEm));
     fora.push(item('janela-aberta', 3, `${mortos.length} inimigos mortos`,
-      `Você tem ~${Math.round(maisTempo)}s. Pegue objetivo ou torre agora — é a janela mais barata do jogo.`));
+      `Você tem ~${Math.round(maisTempo)}s. ${R.janela}`));
   }
 
   /* ----------------------------------------------------------- sobreviver */

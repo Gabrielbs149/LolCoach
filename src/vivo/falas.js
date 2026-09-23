@@ -11,6 +11,7 @@
 import { F } from './texto.js';
 import { nomeItem } from './itens-nomes.js';
 import { torreInfo } from './torres.js';
+import { daRota } from './rotas.js';
 
 const mmss = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const ROLE_FALA = { top: 'top', jungle: 'jungle', mid: 'mid', adc: 'ADC', sup: 'suporte' };
@@ -267,11 +268,44 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
         if (Math.abs(dif) >= 1500) dizer(`itens-${marco}`, 'economia', dif > 0 ? F`${rival.campeao} tem ${Math.round(dif / 100) * 100} de gold em item a mais que você. Não troca de igual pra igual.` : F`Você tem ${Math.round(-dif / 100) * 100} de gold em item a mais que ${rival.campeao}. A troca é sua.`, dif > 0 ? F`${rival.campeao} ${Math.round(dif / 100) * 100} na frente em item.` : F`${Math.round(-dif / 100) * 100} na frente do ${rival.campeao} em item.`, 1);
       }
       if (marco === 1200) {
-        const nossos = aliados.reduce((s, j) => s + valorDe(j), 0) + valorDe(eu), deles = inimigos.reduce((s, j) => s + valorDe(j), 0);
-        if (Math.abs(nossos - deles) >= 4000) dizer('itens-time', 'economia', nossos > deles ? F`Time ${Math.round((nossos - deles) / 1000)} mil de gold na frente em itens. Força objetivo, não fica esperando.` : F`Time ${Math.round((deles - nossos) / 1000)} mil de gold atrás em itens. Sem briga de 5: farma e espera erro deles.`, nossos > deles ? F`${Math.round((nossos - deles) / 1000)} mil na frente. Força.` : F`${Math.round((deles - nossos) / 1000)} mil atrás. Não briga.`, 2);
+        const nossos = aliados.reduce((s, j) => s + valorDe(j), 0), deles = inimigos.reduce((s, j) => s + valorDe(j), 0);
+        if (Math.abs(nossos - deles) >= 4000) dizer('itens-time', 'economia', nossos > deles ? F`Time ${Math.round((nossos - deles) / 1000)} mil de gold na frente em itens. Força objetivo, não fica esperando.` : F`Time ${Math.round((deles - nossos) / 1000)} mil de gold atrás em itens. Sem briga de 5: ${daRota(minhaRole).semBriga}.`, nossos > deles ? F`${Math.round((nossos - deles) / 1000)} mil na frente. Força.` : F`${Math.round((deles - nossos) / 1000)} mil atrás. Não briga.`, 2);
       }
     }
   }
+  /* ---- leitura do jogo: a partida está ganha, parelha ou perdida — e o que fazer NESTA rota e NESTA fase ----
+     O placar sozinho engana (3 kills atrás com 2 torres na frente é vantagem). A conta junta
+     gold em item, torres e abates, e o conselho muda com o minuto: o que serve aos 10 não serve aos 30. */
+  for (const marco of [600, 1080, 1560, 2040]) {
+    if (tempo >= marco && tempo < marco + 8) {
+      const nossosI = aliados.reduce((s, j) => s + valorDe(j), 0);
+      const delesI = inimigos.reduce((s, j) => s + valorDe(j), 0);
+      const nossosK = aliados.reduce((s, j) => s + (j.kills ?? 0), 0);
+      const delesK = inimigos.reduce((s, j) => s + (j.kills ?? 0), 0);
+      const peso = (nossosI - delesI) / 1000 + (minhasT - delasT) * 0.9 + (nossosK - delesK) * 0.25;
+      const rt = daRota(minhaRole);
+      const fase = tempo < 840 ? 0 : tempo < 1500 ? 1 : 2;
+      let serio, curto;
+      if (peso >= 2.5) {
+        serio = [F`Você está na frente. Mantém ${rt.recurso} e não arrisca à toa: quem está na frente não precisa de briga.`,
+          F`Na frente. Troca a vantagem por objetivo: dragão e torre, não caçada.`,
+          F`Na frente. Não dá abertura: briga só com visão e com o time junto.`][fase];
+        curto = F`Na frente. Não arrisca.`;
+      } else if (peso <= -2.5) {
+        serio = [F`Está atrás. Segura o jogo: ${rt.atrasado}`,
+          F`Está atrás. Não contesta objetivo de graça: pega o lado oposto e devolve em torre.`,
+          F`Está atrás. Espera o erro deles: com inimigo morto, aí sim vai pro objetivo.`][fase];
+        curto = F`Atrás. Espera a brecha.`;
+      } else {
+        serio = [F`Tá parelho. Não força luta sem visão: ${rt.semBriga}.`,
+          F`Tá parelho. Quem pegar o próximo objetivo abre o jogo: prepara visão antes.`,
+          F`Tá parelho. Um erro decide: não anda sozinho e não pega wave sem visão.`][fase];
+        curto = F`Parelho. Sem vacilo.`;
+      }
+      dizer(`leitura-${marco}`, 'economia', serio, curto, 1);
+    }
+  }
+
   /* ---- inibidor: volta em 5 min (aviso a 1 min e na volta) ---- */
   for (const ib of mem.inibs ?? []) {
     if (!ib.avisado && tempo >= ib.t + 240) { ib.avisado = true; dizer(`ib60-${ib.t}`, 'timers', ib.deles ? F('Inibidor deles volta em um minuto. Última onda de super minions.') : F('Inibidor nosso volta em um minuto. Segura mais um pouco.'), ib.deles ? F('Inibidor deles volta em um minuto.') : F('Inibidor nosso volta em um minuto.'), 1); }
