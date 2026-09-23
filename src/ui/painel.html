@@ -914,6 +914,8 @@ h2{letter-spacing:1px}
     <button data-aba="amigos" title="Amigos">
       <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2 20c0-3.5 3-6 7-6s7 2.5 7 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c3 0 5 2 5 5"/></svg><span class="nome">Amigos</span></button>
     <div class="grupo">Jogo</div>
+    <button data-aba="meta" title="Meta">
+      <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 5-8 4 5"/><path d="M3 21h18"/></svg><span class="nome">Meta</span></button>
     <button data-aba="builds" title="Builds">
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
     <button data-aba="patch" title="Patch">
@@ -1042,6 +1044,23 @@ h2{letter-spacing:1px}
       </div>
       <div id="bCorpo"><div class="vazio">escolha um campeão</div></div>
     </div>
+  </section>
+
+  <section id="meta">
+    <div class="titulo">Meta</div>
+    <div class="mtBarra">
+      <div class="mtRotas" id="mtRotas"></div>
+      <select class="contaSel" id="mtRegiao" onchange="carregarMeta(true)">
+        <option value="br">Brasil</option><option value="kr">Coreia</option><option value="euw">EUW</option><option value="na">NA</option><option value="global">Mundo</option>
+      </select>
+      <select class="contaSel" id="mtTier" onchange="carregarMeta(true)">
+        <option value="emerald_plus">Esmeralda+</option><option value="diamond_plus">Diamante+</option><option value="master_plus">Mestre+</option><option value="gold_plus">Ouro+</option><option value="all">Todos os elos</option>
+      </select>
+      <span class="mtPatch" id="mtPatch"></span>
+    </div>
+    <div id="mtCorpo"></div>
+    <h2>Quem tá abusando <small>o que subiu no patch e o que a Coreia já joga</small></h2>
+    <div id="mtRadar"></div>
   </section>
 
   <section id="patch">
@@ -1713,14 +1732,13 @@ async function abrirPartida(gameId){
   const L = d.lane, SIT = d.situacoes, B = d.build;
   const maxDano = Math.max(1, ...d.jogadores.map(x => x.dano));
   const linhaP = (j) => `<div class="lj ${j.id===d.eu.id?'eu':''}">${icone(j.championId)}
-      <span class="nomej"><b>${esc(j.campeao)}</b><small>${esc(j.nome)}</small></span>
-      <span class="eloJ">${j.elo ? esc(j.elo) : '…'}</span>
+      <span class="nomej"><b>${esc(j.campeao)}${j.mvp ? '<em class="seloN mvp">MVP</em>' : j.ace ? '<em class="seloN ace">ACE</em>' : ''}</b><small>${esc(j.nome)}${j.elo ? ' · <i>' + esc(j.elo) + '</i>' : ''}</small></span>
       <span class="num kdaP">${j.kills}/${j.deaths}/${j.assists}</span>
       <span class="num">${num(j.cs)}</span>
       <span class="num danoBarra"><i style="width:${Math.round(100 * j.dano / maxDano)}%"></i>${Math.round(j.dano / 1000)}k</span>
-      <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}${j.mvp ? '<em class="seloN mvp">MVP</em>' : j.ace ? '<em class="seloN ace">ACE</em>' : ''}</span></div>`;
+      <span class="num notaP">${j.nota != null ? j.nota.toFixed(1) : '—'}</span></div>`;
   const timeDe = (t) => d.jogadores.filter(j => j.time === t).sort((a, b) => a.id - b.id);
-  const cab = `<div class="lj cab"><span></span><span>Campeão</span><span>Elo</span><span class="num">KDA</span><span class="num">CS</span><span class="num">Dano</span><span class="num">Nota</span></div>`;
+  const cab = `<div class="lj cab"><span></span><span>Campeão · jogador</span><span class="num">KDA</span><span class="num">CS</span><span class="num">Dano</span><span class="num">Nota</span></div>`;
   // 1. Placar primeiro: os dois times lado a lado
   h.push(`<div class="placar2">
     <div class="timeP nosso"><div class="tit">Seu time${d.sorte?.aliados != null ? ` <small>nota média ${d.sorte.aliados.toFixed(1)}</small>` : ''}</div>${cab}${timeDe(d.eu.time).map(linhaP).join('')}</div>
@@ -3291,8 +3309,60 @@ async function tick(){
  * abertura do app atrasaria a única tela que a maioria quer ver.
  */
 async function carregarNovidades(){ try { const n = await pegar('/api/novidades'); const el = $('#novidades'); if (!el) return; el.innerHTML = n.itens?.length ? `<b>O que mudou</b> (últimas versões)<div style="max-height:220px;overflow:auto;margin-top:4px">${n.itens.map(i => `<div style="margin:3px 0"><b>${esc(i.versao)}</b> — ${esc(i.texto).slice(0, 400)}${i.texto.length > 400 ? '…' : ''}</div>`).join('')}</div>` : ''; } catch {} }
+/* ======================================================== Meta: estatísticas por rota + radar de abuso */
+const MT_ROTAS = [['TOP','Top'],['JUNGLE','Jungle'],['MID','Mid'],['ADC','ADC'],['SUPPORT','Suporte']];
+let mtRota = 'ADC', mtDados = null, mtRadarFeito = false;
+const mtTier = (t) => t === 0 ? '<span class="tierB t0">OP</span>' : `<span class="tierB t${t}">${t}</span>`;
+const mtVar = (c) => { if (!c.rank || !c.rankAntes) return ''; const d = c.rankAntes - c.rank; if (!d) return '<span class="mtIgual">—</span>'; return `<span class="${d > 0 ? 'mtSobe' : 'mtDesce'}">${d > 0 ? '▲' : '▼'}${Math.abs(d)}</span>`; };
+const mtMeus = () => new Set((todasPartidas ?? []).map(p => String(p.meuCampeao).replace(/[^a-z]/gi, '').toLowerCase()));
+
+function mtLinha(c, i, meus){
+  const meu = meus.has(String(c.nome).replace(/[^a-z]/gi, '').toLowerCase()) || (c.chave && meus.has(String(c.chave).replace(/[^a-z]/gi, '').toLowerCase()));
+  return `<div class="mtL ${meu ? 'meu' : ''}"><span class="mtPos">${c.rank ?? i + 1}</span>
+    <img src="/icone/${c.id}" alt="" loading="lazy">
+    <span class="mtNome">${esc(c.nome)}${meu ? '<i>seu</i>' : ''}</span>
+    <span class="num">${mtTier(c.tier)}</span>
+    <span class="num mtTaxa ${c.taxa >= 52 ? 'v' : c.taxa <= 48 ? 'd' : ''}">${c.taxa.toFixed(1)}%</span>
+    <span class="num">${c.pick.toFixed(1)}%</span>
+    <span class="num">${c.ban.toFixed(1)}%</span>
+    <span class="num">${c.kda.toFixed(2)}</span>
+    <span class="num">${mtVar(c)}</span></div>`;
+}
+
+async function carregarMeta(recarregar){
+  if (recarregar) mtDados = null;
+  const corpo = $('#mtCorpo');
+  if (!$('#mtRotas').innerHTML) $('#mtRotas').innerHTML = MT_ROTAS.map(([k, r]) => `<button class="mtR ${k === mtRota ? 'ativo' : ''}" data-rota="${k}" onclick="mtTrocar('${k}')">${r}</button>`).join('');
+  if (!mtDados) {
+    corpo.innerHTML = carregando('pegando as estatísticas do patch…');
+    try { mtDados = await pegar(`/api/meta?regiao=${$('#mtRegiao').value}&tier=${$('#mtTier').value}`); } catch (e) { mtDados = { erro: e.message }; }
+  }
+  if (mtDados?.erro || !mtDados?.posicoes) { corpo.innerHTML = `<div class="aviso">sem as estatísticas agora${mtDados?.erro ? ' (' + esc(mtDados.erro) + ')' : ''}</div>`; return; }
+  $('#mtPatch').textContent = `patch ${mtDados.patch ?? '?'}${mtDados.partidas ? ' · ' + (mtDados.partidas / 1e6).toFixed(1) + 'M partidas' : ''}`;
+  const lista = mtDados.posicoes[mtRota] ?? [], meus = mtMeus();
+  corpo.innerHTML = `<div class="mtTab"><div class="mtL cab"><span class="mtPos">#</span><span></span><span>Campeão</span><span class="num">Nível</span><span class="num">Vitória</span><span class="num">Pick</span><span class="num">Ban</span><span class="num">KDA</span><span class="num">Patch</span></div>
+    ${lista.map((c, i) => mtLinha(c, i, meus)).join('')}</div>
+    <div class="dica" style="margin-top:8px">Nível 0 (OP) é o que ganha jogo sozinho no elo escolhido. "Patch" é quantas posições o campeão subiu ou caiu desde a atualização passada.</div>`;
+  if (!mtRadarFeito) { mtRadarFeito = true; carregarRadar(); }
+}
+function mtTrocar(k){ mtRota = k; for (const b of document.querySelectorAll('#mtRotas .mtR')) b.classList.toggle('ativo', b.dataset.rota === k); carregarMeta(); }
+
+async function carregarRadar(){
+  const el = $('#mtRadar'); el.innerHTML = carregando('comparando o BR com a Coreia…');
+  let r; try { r = await pegar('/api/radar'); } catch (e) { r = { erro: e.message }; }
+  if (r?.erro || !r) { el.innerHTML = '<div class="aviso">o radar não respondeu agora</div>'; return; }
+  const rotaBr = { TOP: 'top', JUNGLE: 'jungle', MID: 'mid', ADC: 'adc', SUPPORT: 'sup' };
+  const card = (c, pe) => `<div class="rdC"><img src="/icone/${c.id}" alt=""><div class="rdT"><b>${esc(c.nome)}</b><span>${rotaBr[c.posicao] ?? c.posicao}</span></div><div class="rdN"><b class="${c.taxa >= 52 ? 'v' : ''}">${c.taxa.toFixed(1)}%</b><span>${pe}</span></div></div>`;
+  const bloco = (tit, sub, itens) => itens?.length ? `<div class="rdBloco"><div class="rot">${tit}</div><div class="rdSub">${sub}</div><div class="rdLista">${itens.join('')}</div></div>` : '';
+  el.innerHTML = `<div class="rdGrade">
+    ${bloco('SUBINDO AGORA', 'quem mais ganhou posições no BR Esmeralda+ neste patch', r.subindo.slice(0, 6).map(c => card(c, `subiu ${c.subiu} posições`)))}
+    ${bloco('A COREIA JÁ JOGA, AQUI NINGUÉM', 'Mestre+ da KR com vitória alta e pick quase zero no BR', r.escondidos.slice(0, 6).map(c => card(c, `pick KR ${c.pick.toFixed(1)}% · BR ${c.pickBr.toFixed(1)}%`)))}
+    ${bloco('O QUE OS COREANOS ESTÃO ABUSANDO', 'maior vitória por rota no Mestre+ da Coreia', r.coreanos.slice(0, 10).map(c => card(c, `pick ${c.pick.toFixed(1)}%`)))}
+  </div>`;
+}
+
 const CARREGADORES = {
-  estat: carregarEstat, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
+  estat: carregarEstat, meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
 };
 const jaCarregou = new Set();
 

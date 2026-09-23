@@ -68,6 +68,17 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
 
     // Com quem você jogou (mesmo time) nas últimas N partidas: jogos e V-D com cada um; e contra quem mais jogou
     // Temporadas passadas (op.gg) + top X% estimado
+    // Estatísticas de campeão por rota (a página "Champions" do op.gg): taxa, pick, ban, KDA, tier e ranking.
+    '/api/meta': async (q) => {
+      try { const { metaPorPosicao } = await import('../dados/meta.js'); return await metaPorPosicao({ regiao: q.get('regiao') || 'br', tier: q.get('tier') || 'emerald_plus' }); }
+      catch (e) { return { erro: e.message }; }
+    },
+    // Quem está abusando: subindo no patch, o que o KR Mestre+ joga e aqui ninguém joga, e os coreanos.
+    '/api/radar': async () => {
+      try { const { radarDeAbuso } = await import('../dados/meta.js'); return await radarDeAbuso(); }
+      catch (e) { return { erro: e.message }; }
+    },
+
     '/api/temporadas-elo': async (q) => {
       const nome = q.get('nome'), tag = q.get('tag');
       if (!nome || !tag) return { temporadas: [] };

@@ -324,3 +324,54 @@ h2 small a{color:var(--marca);text-decoration:none}
 .itemN{position:relative;display:inline-block}
 .itemN img{width:36px;height:36px;border-radius:var(--r-s);background:var(--f3)}
 .itemN small{position:absolute;right:-4px;bottom:-4px;background:var(--marca);color:#0a0c10;font-size:9px;font-weight:700;border-radius:99px;padding:0 5px}
+
+/* ---- placar da partida: 6 colunas, o elo desceu pra linha do nome — cabe nos dois times lado a lado ---- */
+.placar2{grid-template-columns:1fr 1fr;gap:16px}
+@media (max-width:1180px){.placar2{grid-template-columns:1fr}}
+.placar2 .timeP{padding:10px 12px 12px;min-width:0}
+.placar2 .lj{grid-template-columns:28px minmax(0,1fr) 62px 36px 52px 54px;gap:8px;padding:5px 4px;min-width:0}
+.placar2 .lj>*{min-width:0}
+.placar2 .lj img{width:28px;height:28px}
+.placar2 .lj .nomej b{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.placar2 .lj .nomej small{font-size:10.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.placar2 .lj .nomej small i{font-style:normal;color:var(--fraco)}
+.placar2 .lj.cab span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:9.5px}
+.placar2 .lj .kdaP{font-size:12.5px}
+.placar2 .lj .notaP{font-size:17px;white-space:nowrap}
+.placar2 .lj .nomej b em{font-family:var(--corpo);font-style:normal;font-size:7.5px;letter-spacing:.8px;padding:1px 4px;margin-left:6px;vertical-align:3px;line-height:1}
+
+/* ---- aba Meta: estatísticas de campeão por rota e o radar de abuso ---- */
+.mtBarra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.mtRotas{display:flex;gap:2px;background:var(--f1);border-radius:var(--r-m);padding:3px}
+.mtR{background:none;border:0;color:var(--fraco);font:600 13px var(--corpo);padding:6px 14px;border-radius:var(--r-s);cursor:pointer}
+.mtR:hover{color:var(--texto)}
+.mtR.ativo{background:var(--marca-fundo);color:var(--marca)}
+.mtBarra .contaSel{margin:0;width:auto}
+.mtPatch{margin-left:auto;font-size:11.5px;letter-spacing:.6px;color:var(--apagado)}
+.mtTab{background:var(--f1);border-radius:var(--r-g);padding:6px 14px 12px}
+.mtL{display:grid;grid-template-columns:34px 30px minmax(0,1fr) 54px 74px 66px 66px 58px 52px;align-items:center;gap:8px;padding:5px 2px;border-top:1px solid var(--borda);font-size:13.5px}
+.mtL>*{min-width:0}
+.mtL.cab{border:0;font-size:9.5px;letter-spacing:1.2px;color:var(--apagado)}
+.mtL.meu{background:var(--marca-fundo);border-radius:var(--r-s)}
+.mtL img{width:30px;height:30px;border-radius:50%}
+.mtPos{font-variant-numeric:tabular-nums;color:var(--apagado);text-align:right;font-size:12px}
+.mtNome{font-family:var(--titulo);font-size:17px;letter-spacing:.4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mtNome i{font-family:var(--corpo);font-style:normal;font-size:9px;letter-spacing:1px;color:var(--marca);margin-left:6px;vertical-align:2px}
+.mtL .num{text-align:right;font-variant-numeric:tabular-nums}
+.mtTaxa{font-weight:600} .mtTaxa.v{color:var(--vit)} .mtTaxa.d{color:var(--der)}
+.tierB{display:inline-block;min-width:22px;text-align:center;font:700 10.5px var(--corpo);border-radius:var(--r-s);padding:2px 5px;background:var(--f3);color:var(--fraco)}
+.tierB.t0{background:var(--marca);color:#0a0c10} .tierB.t1{background:rgba(58,214,196,.22);color:var(--marca)}
+.tierB.t2{background:rgba(240,176,72,.18);color:var(--g2)}
+.mtSobe{color:var(--vit);font-size:12px} .mtDesce{color:var(--der);font-size:12px} .mtIgual{color:var(--apagado)}
+.rdGrade{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:22px}
+.rdBloco .rot{font-size:10.5px;letter-spacing:1.4px;color:var(--apagado)}
+.rdSub{font-size:12px;color:var(--fraco);margin:2px 0 10px}
+.rdC{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:var(--r-m);background:var(--f1);margin-bottom:6px}
+.rdC img{width:34px;height:34px;border-radius:50%}
+.rdT{flex:1;min-width:0;display:flex;flex-direction:column}
+.rdT b{font-family:var(--titulo);font-size:17px;letter-spacing:.4px;font-weight:400;line-height:1.1}
+.rdT span{font-size:10.5px;letter-spacing:1px;color:var(--apagado);text-transform:uppercase}
+.rdN{text-align:right}
+.rdN b{font-family:var(--titulo);font-size:19px;letter-spacing:.5px;font-weight:400}
+.rdN b.v{color:var(--vit)}
+.rdN span{display:block;font-size:10.5px;color:var(--fraco)}
