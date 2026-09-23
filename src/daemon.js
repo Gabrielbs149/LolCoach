@@ -554,17 +554,56 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       const perigosas = new Set();
       for (const p of pastas) for (const f of await lerJsonl(resolve(pastaSituacoes(), p, 'falas.jsonl'))) if (f.serio) { cont.set(f.serio, (cont.get(f.serio) ?? 0) + 1); if ((f.prioridade ?? 1) >= 3) perigosas.add(f.serio); }
       const textos = [...cont].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 40).map(([t]) => t);
-      let feitas = 0;
-      for (const texto of textos) {
-        const fase = estado?.instantaneo?.().fase;
-        if (fase === 'InProgress' || fase === 'GameStart') break;
-        // p3 toca um degrau mais rápido (chave de cache diferente): aquece do jeito que vai tocar
-        try { await vozFalar({ texto, perigo: perigosas.has(texto) }); feitas++; } catch { break; }   // sem rede: para
-        await new Promise((r) => setTimeout(r, 1200));
+      let feitas = 0, parou = false;
+      // Gera uma lista de frases. Acerto de cache volta na hora — a espera de 1,2 s
+      // só vale quando a frase foi mesmo buscada na Microsoft.
+      const gerar = async (lista) => {
+        for (const { texto, perigo } of lista) {
+          const fase = estado?.instantaneo?.().fase;
+          if (fase === 'InProgress' || fase === 'GameStart') { parou = true; return; }
+          const t0 = Date.now();
+          // p3 toca um degrau mais rápido (chave de cache diferente): aquece do jeito que vai tocar
+          try { await vozFalar({ texto, perigo }); } catch { parou = true; return; }   // sem rede: para
+          if (Date.now() - t0 > 150) { feitas++; await new Promise((r) => setTimeout(r, 1200)); }
+        }
+      };
+      await gerar(textos.map((texto) => ({ texto, perigo: perigosas.has(texto) })));
+      // 2ª onda: as mesmas frases com os campeões DESTA partida. O cache só tem os
+      // campeões de ontem — "Nasus fechou Trindade" nunca está pronto quando toca.
+      if (!parou) {
+        const sel = await campeoesDaSelecao().catch(() => null);
+        if (sel?.nomes?.length) {
+          const MARCA = '\u0000';
+          const moldes = new Map();   // molde -> { n, perigo }
+          for (const [texto, n] of cont) {
+            const achado = sel.todos.find((nm) => nm.length >= 3 && texto.includes(nm));
+            if (!achado) continue;
+            const molde = texto.split(achado).join(MARCA);
+            const m = moldes.get(molde) ?? { n: 0, perigo: false };
+            m.n += n; m.perigo = m.perigo || perigosas.has(texto);
+            moldes.set(molde, m);
+          }
+          const lista = [];
+          for (const [molde, m] of [...moldes].sort((a, b) => b[1].n - a[1].n).slice(0, 4)) {
+            for (const nome of sel.nomes.slice(0, 6)) { const texto = molde.split(MARCA).join(nome); if (!cont.has(texto)) lista.push({ texto, perigo: m.perigo }); }
+          }
+          await gerar(lista.slice(0, 24));
+        }
       }
-      if (feitas) log(`voz aquecida: ${feitas} frase(s) em cache`);
+      if (feitas) log(`voz aquecida: ${feitas} frase(s) novas em cache`);
     } finally { aquecendo = false; }
   }
+  /** Os campeões já escolhidos na seleção + a lista toda de nomes (pra achar o nome dentro da frase). */
+  async function campeoesDaSelecao() {
+    const s = await lcu.get('/lol-champ-select/v1/session').catch(() => null);
+    if (!s) return null;
+    const { tabelaDeCampeoes } = await import('./features/champ-select.js');
+    const tabela = await tabelaDeCampeoes(lcu).catch(() => null);
+    if (!tabela?.porId) return null;
+    const ids = [...(s.theirTeam ?? []), ...(s.myTeam ?? [])].map((c) => c.championId || c.championPickIntent).filter((id) => id > 0);
+    return { nomes: [...new Set(ids.map((id) => tabela.porId.get(id)).filter(Boolean))], todos: [...tabela.porId.values()].filter(Boolean) };
+  }
+
   lcu.observar('/lol-gameflow/v1/gameflow-phase', (fase) => {
     if (fase === faseAnterior) return;
     estado?.set('fase', fase);
