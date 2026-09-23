@@ -2069,6 +2069,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       aoProgresso: (p) => { if (p.feitos % 25 === 0) log(`builds no LoL: ${p.feitos}/${p.total} campeões…`); },
     });
     log(`builds no LoL: ${r.campeoes} campeões, ${r.total ?? '?'} conjuntos no client (${r.preservados ?? 0} seus preservados), ${r.falhas} falhas`);
+    if (r.motivos?.length) log(`builds que falharam: ${r.motivos.slice(0, 6).join(' · ')}`);
     await writeFile(marcaBuilds(), JSON.stringify({ em: Date.now(), ...r }), 'utf8').catch(() => {});
     return r;
   });

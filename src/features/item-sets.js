@@ -109,6 +109,7 @@ export async function aplicarConjuntosDeTodos(lcu, { rolesDele = new Map(), apen
   const total = elenco.length;
   const conjuntos = [];
   let feitos = 0, falhas = 0, primeiraGravacao = true;
+  const motivos = [];   // que campeão falhou e por quê — sem isto o "10 falhas" do registro não dizia nada
   const gravar = async (lote) => {
     const r = await gravarConjuntos(lcu, lote, { limparNossos: primeiraGravacao });
     primeiraGravacao = false;
@@ -129,6 +130,7 @@ export async function aplicarConjuntosDeTodos(lcu, { rolesDele = new Map(), apen
         conjuntos.push(montarConjunto(build, c.id));
       } catch (erro) {
         falhas++;
+        if (motivos.length < 12) motivos.push(`${c.nome}${role ? ' (' + role + ')' : ''}: ${erro.message}`);
         // 429 = o op.gg pediu calma. Espera de verdade antes de seguir.
         if (/429/.test(erro.message)) await dormir(15_000);
       }
@@ -142,5 +144,5 @@ export async function aplicarConjuntosDeTodos(lcu, { rolesDele = new Map(), apen
   }
 
   const r = conjuntos.length ? await gravar(conjuntos) : { gravados: 0 };
-  return { campeoes: feitos, falhas, ...r };
+  return { campeoes: feitos, falhas, motivos, ...r };
 }

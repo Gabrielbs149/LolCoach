@@ -13,11 +13,16 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 export const ROLE_OPGG = {
   top: 'top', jungle: 'jungle', middle: 'mid', bottom: 'adc', utility: 'support',
   TOP: 'top', JUNGLE: 'jungle', MID: 'mid', ADC: 'adc', SUPORTE: 'support',
+  mid: 'mid', adc: 'adc', bot: 'adc', sup: 'support', suporte: 'support', support: 'support',
+  BOT: 'adc', SUP: 'support', SUPPORT: 'support', UTILITY: 'support', MIDDLE: 'mid', BOTTOM: 'adc',
 };
 
 // Campeões cujo slug no op.gg não sai direto do nome.
 const SLUG_ESPECIAL = {
   'Nunu & Willump': 'nunu',
+  'Nunu e Willump': 'nunu',
+  Bardo: 'bard',
+  Wukong: 'monkeyking',
   'Renata Glasc': 'renata',
   "Bel'Veth": 'belveth',
   'Dr. Mundo': 'drmundo',
