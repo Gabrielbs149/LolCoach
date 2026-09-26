@@ -2501,10 +2501,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
 }
 
 const ACOES_DO_PAINEL = [
-  'coletar', 'reprocessar', 'historico', 'detalhe', 'icone', 'iconePerfil',
+  'coletar', 'reprocessar', 'historico', 'detalhe', 'icone', 'iconePerfil', 'circulo',
   'vivo', 'arte', 'campeoes', 'lerConfig', 'salvarConfig',
   'perfil', 'estatisticas', 'sugestoes', 'patchLista', 'patchNota',
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
-  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
+  'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
 ];

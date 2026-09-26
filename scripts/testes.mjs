@@ -295,3 +295,23 @@ test('leitura do olho: só vira fala de rota com anel ou casamento alto', async 
   // gravação antiga, sem evidência guardada: continua valendo
   assert.equal(leituraForte({ ultimo: { x: 1, y: 1 } }), true);
 });
+
+/* ------------------------------------------- rota que o painel usa está liberada? */
+
+test('toda ação que o servidor chama está na lista do painel', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const srv = await readFile(new URL('../src/ui/servidor.js', import.meta.url), 'utf8');
+  const dae = await readFile(new URL('../src/daemon.js', import.meta.url), 'utf8');
+
+  // o que o servidor espera receber: acoes.X
+  const usadas = new Set([...srv.matchAll(/\bacoes\.([A-Za-z][A-Za-z0-9_]*)/g)].map((m) => m[1]));
+  // o que o daemon entrega: a lista ACOES_DO_PAINEL
+  const bloco = dae.match(/const ACOES_DO_PAINEL = \[([\s\S]*?)\];/);
+  assert.ok(bloco, 'não achei ACOES_DO_PAINEL no daemon');
+  const liberadas = new Set([...bloco[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
+  // ações que o main.js do Electron injeta por fora (não vêm do daemon)
+  const doElectron = new Set(['atualizar', 'backup', 'restaurar', 'diagnostico', 'tecla', 'overlayAjustar', 'overlayMover', 'overlayEstado']);
+
+  const faltando = [...usadas].filter((n) => !liberadas.has(n) && !doElectron.has(n)).sort();
+  assert.deepEqual(faltando, [], `o servidor chama acoes.${faltando.join(', acoes.')} mas o daemon não expõe — a rota vira 404 calado (foi o que aconteceu com 'circulo': o olho ficou usando o retrato quadrado como molde)`);
+});
