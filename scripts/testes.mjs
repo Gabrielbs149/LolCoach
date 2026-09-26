@@ -315,3 +315,52 @@ test('toda ação que o servidor chama está na lista do painel', async () => {
   const faltando = [...usadas].filter((n) => !liberadas.has(n) && !doElectron.has(n)).sort();
   assert.deepEqual(faltando, [], `o servidor chama acoes.${faltando.join(', acoes.')} mas o daemon não expõe — a rota vira 404 calado (foi o que aconteceu com 'circulo': o olho ficou usando o retrato quadrado como molde)`);
 });
+
+/* ------------------------------------------------- lugar com nome (camps e buffs) */
+
+test('lugar: camp e buff têm nome, e o lado vermelho é o espelho', async () => {
+  const { lugar } = await import('../src/vivo/olho.js');
+  // jogando de azul (time 100)
+  assert.equal(lugar(0.256, 0.469, 100).texto, 'no azul nosso');
+  assert.equal(lugar(0.526, 0.731, 100).texto, 'no red nosso');
+  assert.equal(lugar(0.47, 0.62, 100).texto, 'nos raptors nossos');   // plural concorda
+  assert.equal(lugar(0.53, 0.38, 100).texto, 'nos raptors deles');
+  // o mesmo ponto, jogando de vermelho: o que era "nosso" vira "deles"
+  assert.equal(lugar(0.256, 0.469, 200).texto, 'no azul deles');
+  assert.equal(lugar(0.53, 0.38, 200).texto, 'nos raptors nossos');
+});
+
+test('lugar: jungle sem camp em cima cita o camp mais perto, não o quadrante', async () => {
+  const { lugar } = await import('../src/vivo/olho.js');
+  const l = lugar(0.33, 0.52, 100);   // entre azul e lobos, do lado azul
+  assert.equal(l.lane, 'jungle');
+  assert.match(l.texto, /perto d/);
+  assert.ok(!/de cima|de baixo/.test(l.texto), `ainda é quadrante: ${l.texto}`);
+});
+
+test('fala do alvo: cala quando o mais frágil é o carry (o óbvio)', async () => {
+  const { falasNovas, novaMemoriaFalas } = await import('../src/vivo/falas.js');
+  const bases = new Map([
+    ['Ornn', { hp: 660, hpNv: 109, armadura: 33, armaduraNv: 5.2, mr: 32, mrNv: 2.05, ad: 69, adNv: 3.5, as: 0.6, asNv: 0.02 }],
+    ['Jinx', { hp: 630, hpNv: 100, armadura: 26, armaduraNv: 4.7, mr: 30, mrNv: 1.3, ad: 59, adNv: 3.1, as: 0.6, asNv: 0.01 }],
+    ['Vi', { hp: 655, hpNv: 105, armadura: 30, armaduraNv: 4.6, mr: 32, mrNv: 2.05, ad: 63, adNv: 3.5, as: 0.64, asNv: 0.02 }],
+    ['Syndra', { hp: 620, hpNv: 105, armadura: 25, armaduraNv: 4.3, mr: 30, mrNv: 1.3, ad: 54, adNv: 3, as: 0.62, asNv: 0.02 }],
+    ['Leona', { hp: 646, hpNv: 104, armadura: 42, armaduraNv: 4.8, mr: 32, mrNv: 2.05, ad: 60, adNv: 3, as: 0.62, asNv: 0.02 }],
+    ['Evelynn', { hp: 642, hpNv: 98, armadura: 27, armaduraNv: 4.2, mr: 30, mrNv: 1.3, ad: 61, adNv: 3.3, as: 0.66, asNv: 0.02 }],
+  ]);
+  const itensTab = new Map([[3742, { nome: 'Placa', preco: 2900, atributos: { FlatHPPoolMod: 300, FlatArmorMod: 45 } }]]);
+  const extras = { bases, itensTab, build: null, dano: null, mains: [] };
+  const jog = (time, role, campeao, nivel = 11, itens = []) => ({ nome: campeao, campeao, time, role, nivel, kills: 2, mortes: 2, assists: 2, cs: 150, visao: 10, morto: false, renasceEm: 0, spells: [], runas: {}, itens });
+  const meu = { ...jog(100, 'adc', 'Caitlyn'), souEu: true, ouro: 300, vida: 1500, vidaMax: 1600, magias: {},
+    atributos: { ad: 210, ap: 0, as: 1.05, crit: 0.5, penArm: 0, penArmPct: 1 } };
+  const nossos = ['top', 'jungle', 'mid', 'sup'].map((r) => jog(100, r, 'C' + r));
+  const roda = (deles) => {
+    const mem = novaMemoriaFalas(); const ditas = [];
+    for (let t = 470; t <= 700; t++) for (const f of falasNovas({ estado: { tempo: t, eu: meu, jogadores: [meu, ...nossos, ...deles], eventos: [] }, rastreio: null, objetivos: [], conselhos: [], extras }, mem)) if (f.id.startsWith('alvo-')) ditas.push(f);
+    return ditas;
+  };
+  // adc deles é o mais frágil: todo mundo já sabe, não fala
+  assert.equal(roda([jog(200, 'top', 'Ornn', 12, [{ id: 3742 }]), jog(200, 'jungle', 'Vi'), jog(200, 'mid', 'Syndra'), jog(200, 'adc', 'Jinx'), jog(200, 'sup', 'Leona')]).length, 0);
+  // jungler atrasado é o mais frágil: isso é notícia
+  assert.equal(roda([jog(200, 'top', 'Ornn', 14, [{ id: 3742 }]), jog(200, 'jungle', 'Evelynn', 8), jog(200, 'mid', 'Syndra', 14), jog(200, 'adc', 'Jinx', 14), jog(200, 'sup', 'Leona', 14)]).length, 1);
+});

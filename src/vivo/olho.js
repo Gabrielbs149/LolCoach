@@ -7,6 +7,29 @@
 
 import { F } from './texto.js';
 
+/**
+ * Camps e buffs com nome. "Na jungle de cima, lado deles" é quadrante, não lugar:
+ * ninguém fala assim. As coordenadas (0..1, y pra baixo, azul embaixo à esquerda)
+ * são as mesmas que situacoes.js já usa há tempo, e batem com o histórico — 10% das
+ * leituras caem a menos de 0,05 de um desses pontos.
+ */
+const CAMPS_AZUL = {
+  azul: { x: 0.256, y: 0.469, nome: 'azul' },
+  red: { x: 0.526, y: 0.731, nome: 'red' },
+  gromp: { x: 0.14, y: 0.43, nome: 'gromp' },
+  lobos: { x: 0.25, y: 0.58, nome: 'lobos' },
+  raptors: { x: 0.47, y: 0.62, nome: 'raptors' },
+  krugs: { x: 0.58, y: 0.80, nome: 'krugs' },
+};
+// o lado vermelho é o espelho exato
+const CAMPS = [
+  ...Object.values(CAMPS_AZUL).map((c) => ({ ...c, time: 100 })),
+  ...Object.values(CAMPS_AZUL).map((c) => ({ ...c, x: 1 - c.x, y: 1 - c.y, time: 200 })),
+];
+const RAIO_CAMP = 0.05;
+// "nos raptors" / "no gromp": plural só nos que são vários bichos
+const PLURAL = new Set(['lobos', 'raptors', 'krugs']);
+
 const BARAO = { x: 0.334, y: 0.302 };
 const DRAGAO = { x: 0.666, y: 0.703 };
 const BASE_AZUL = { x: 0.105, y: 0.90 };
@@ -27,12 +50,25 @@ export function lugar(x, y, meuTime = 100) {
   if (dist(p, BASE_VERMELHA) < 0.13) return { chave: `base-${azul ? 'deles' : 'nosso'}`, texto: `na base ${azul ? 'deles' : 'nossa'}`, lane: 'base', lado: azul ? 'deles' : 'nosso' };
   if (dist(p, BARAO) < 0.06) return { chave: 'barao', texto: 'no barão', lane: 'barao', lado };
   if (dist(p, DRAGAO) < 0.06) return { chave: 'dragao', texto: 'no dragão', lane: 'dragao', lado };
+  // camp com nome tem prioridade: é o lugar que a pessoa enxerga no minimapa
+  for (const c of CAMPS) {
+    if (dist(p, c) > RAIO_CAMP) continue;
+    const dele = (c.time === 100) === azul ? 'nosso' : 'deles';
+    return { chave: `camp-${c.nome}-${dele}`, texto: `${PLURAL.has(c.nome) ? 'nos' : 'no'} ${c.nome} ${dele === 'deles' ? 'deles' : PLURAL.has(c.nome) ? 'nossos' : 'nosso'}`, lane: 'jungle', lado: dele, camp: c.nome };
+  }
   if (Math.abs(x + y - 1) < 0.07 && x > 0.2 && x < 0.8) return { chave: `mid-${lado}`, texto: `no mid, ${ladoTxt}`, lane: 'mid', lado };
   if (Math.abs(x - y) < 0.055 && x > 0.25 && x < 0.75) {
     return { chave: cima ? 'rio-barao' : 'rio-dragao', texto: cima ? 'no rio do barão' : 'no rio do dragão', lane: 'rio', lado };
   }
   if (x < 0.17 || y < 0.17) return { chave: `top-${lado}`, texto: `no top, ${ladoTxt}`, lane: 'top', lado };
   if (x > 0.83 || y > 0.83) return { chave: `bot-${lado}`, texto: `no bot, ${ladoTxt}`, lane: 'bot', lado };
+  let maisPerto = null, dMenor = 0.15;
+  for (const c of CAMPS) { const d = dist(p, c); if (d < dMenor) { dMenor = d; maisPerto = c; } }
+  if (maisPerto) {
+    const dele = (maisPerto.time === 100) === azul ? 'nosso' : 'deles';
+    return { chave: `jg-perto-${maisPerto.nome}-${dele}`, lane: 'jungle', lado: dele, camp: maisPerto.nome,
+      texto: `na jungle ${dele === 'nosso' ? 'nossa' : 'deles'}, perto ${PLURAL.has(maisPerto.nome) ? 'dos' : 'do'} ${maisPerto.nome}` };
+  }
   return { chave: `jg-${cima ? 'cima' : 'baixo'}-${lado}`, texto: `na jungle de ${cima ? 'cima' : 'baixo'}, ${ladoTxt}`, lane: 'jungle', lado };
 }
 

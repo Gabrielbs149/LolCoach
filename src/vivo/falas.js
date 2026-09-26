@@ -324,11 +324,20 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
       const dePeso = alvos.filter((a) => a.role !== 'sup');
       const mole = dePeso[0] ?? alvos[0], duro = alvos.at(-1);
       const chaveAlvo = `${mole.campeao}|${duro.campeao}`;
-      if (mem.alvoChave !== chaveAlvo && tempo - (mem.alvoT ?? -999) > 180 && duro.segundos >= mole.segundos * 1.7) {
+      // "o mais mole é o adc deles" é o que todo mundo já sabe — dizer isso toda partida
+      // é ruído. A fala só vale quando o alvo NÃO é o óbvio (um top ou jungler virou o
+      // mais frágil, ou o adc deles comprou defesa e saiu do topo da lista) ou quando a
+      // ordem MUDA no meio do jogo, que aí é notícia.
+      const obvio = mole.role === 'adc' || mole.role === 'mid';
+      const jaFalou = mem.alvoChave != null;
+      const mudou = jaFalou && mem.alvoChave !== chaveAlvo;
+      if ((!obvio || mudou) && mem.alvoChave !== chaveAlvo && tempo - (mem.alvoT ?? -999) > 180 && duro.segundos >= mole.segundos * 1.7) {
         mem.alvoChave = chaveAlvo; mem.alvoT = tempo;
         dizer(`alvo-${Math.floor(tempo / 60)}`, 'spikes',
-          F`Alvo mais mole: ${mole.campeao}. O ${duro.campeao} aguenta o dobro — na briga, não gasta o combo nele.`,
-          F`Bate no ${mole.campeao}. Ignora o ${duro.campeao}.`, 2);
+          mudou
+            ? F`Mudou o alvo: agora o mais frágil é o ${mole.campeao}. O ${duro.campeao} aguenta o dobro.`
+            : F`Alvo mais mole é o ${mole.campeao}, não o carry. O ${duro.campeao} aguenta o dobro — não gasta o combo nele.`,
+          mudou ? F`Agora o alvo é o ${mole.campeao}.` : F`Bate no ${mole.campeao}. Ignora o ${duro.campeao}.`, 2);
       }
     }
   }
