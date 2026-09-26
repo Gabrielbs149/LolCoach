@@ -1148,7 +1148,17 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   // Ícone de campeão sempre tem anel (vermelho deles, azul nosso, teal o meu). Dragão, Barão, camps e a
   // loja não têm — e eram lidos como Pantheon/Diana/Pyke (centenas de vezes por partida). Sem anel: 0,88+.
   const anelCerto = !melhor ? false : chave === 'eu' ? melhor.anelTeal >= 0.4 : chave.startsWith('ali-') ? melhor.anelAzul : melhor.anelVermelho;
-  const perto = melhor && seguindo && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 40;
+  /**
+   * Quem já é seguido ganhava desconto pra sempre: bastava 0,66 perto do último ponto,
+   * sem precisar do anel. Uma pedra da jungle que casa 0,66 vira o campeão e o rastro
+   * se renova sozinho — medido no histórico dele: 18% das leituras erradas eram ponto
+   * PARADO, mediana de 295 s travado e um caso de 1795 s (a partida inteira).
+   * Agora o desconto vale só por 4 s depois da última vez que o anel apareceu de
+   * verdade, e um ponto parado há mais de 25 s tem que se provar de novo do zero.
+   */
+  const anelRecente = rastro && agora - (rastro.anelEm ?? 0) < 4000;
+  const travado = rastro && rastro.paradoDesde != null && agora - rastro.paradoDesde > 25000;
+  const perto = melhor && seguindo && anelRecente && !travado && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 40;
   // quem já estava sendo seguido pode perder o anel por um instante (ícones se sobrepondo): só o novo exige anel
   // anel pela metade (ícone colado em outro: Milio grudado em mim, Kai'Sa na Nami) com 0,82+ passa
   const anelParcial = !!melhor && (chave === 'eu' ? melhor.anelTeal : chave.startsWith('ali-') ? melhor.fracAzul : melhor.fracVermelho) >= 0.25;
@@ -1159,8 +1169,13 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
     // velocidade suavizada (metade nova, metade antiga), limitada a 0,08 px/ms (~1 ícone por 300 ms — mais que isso é pulo/TP)
     let vx = 0, vy = 0;
     if (rastro && agora - rastro.em > 80 && agora - rastro.em < 1500) { const dt = agora - rastro.em; vx = Math.max(-0.08, Math.min(0.08, (melhor.x - rastro.x) / dt)); vy = Math.max(-0.08, Math.min(0.08, (melhor.y - rastro.y) / dt)); vx = 0.5 * vx + 0.5 * (rastro.vx ?? 0); vy = 0.5 * vy + 0.5 * (rastro.vy ?? 0); }
-    rastros.set(chave, { x: melhor.x, y: melhor.y, em: agora, vx, vy });
-    return { x: (melhor.x + t.d / 2) / s, y: (melhor.y + t.d / 2) / s, score: Math.round(melhor.score * 100) / 100, crua: melhor.crua, cor: melhor.anelCor, teal: melhor.anelTeal };
+    const parado = rastro && Math.hypot(melhor.x - rastro.x, melhor.y - rastro.y) < 2;
+    rastros.set(chave, { x: melhor.x, y: melhor.y, em: agora, vx, vy,
+      anelEm: anelCerto ? agora : (rastro?.anelEm ?? 0),
+      paradoDesde: parado ? (rastro.paradoDesde ?? agora) : null });
+    return { x: (melhor.x + t.d / 2) / s, y: (melhor.y + t.d / 2) / s, score: Math.round(melhor.score * 100) / 100, crua: melhor.crua, cor: melhor.anelCor, teal: melhor.anelTeal,
+      // evidência da leitura, pra dar pra medir depois no histórico: tinha anel? veio do rastro?
+      anel: !!anelCerto, seguido: !!perto };
   }
   if (rastro && agora - rastro.em > 2000) rastros.delete(chave);
   return null;

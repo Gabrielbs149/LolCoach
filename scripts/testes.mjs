@@ -279,3 +279,19 @@ test('falas: a leitura do jogo muda com a rota', () => {
   assert.notEqual(frases.adc, frases.sup);
   assert.match(frases.sup, /visão|carry/);
 });
+
+/* ------------------------------------------------------- evidência da leitura */
+
+test('leitura do olho: só vira fala de rota com anel ou casamento alto', async () => {
+  const { leituraForte } = await import('../src/vivo/situacoes.js');
+  assert.equal(leituraForte(null), false);
+  assert.equal(leituraForte({}), false);
+  // anel colorido: terreno não tem, então basta
+  assert.equal(leituraForte({ ultimo: { anel: true, score: 0.7 } }), true);
+  // sem anel e casamento fraco (o caso do fantasma travado): não fala
+  assert.equal(leituraForte({ ultimo: { anel: false, score: 0.7 } }), false);
+  // sem anel mas casamento alto: fala
+  assert.equal(leituraForte({ ultimo: { anel: false, score: 0.9 } }), true);
+  // gravação antiga, sem evidência guardada: continua valendo
+  assert.equal(leituraForte({ ultimo: { x: 1, y: 1 } }), true);
+});

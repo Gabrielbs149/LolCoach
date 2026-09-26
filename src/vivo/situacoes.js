@@ -45,8 +45,22 @@ function ficha(mundo, j) {
   f.role = j.role; f.morto = !!j.morto; f.nivel = j.nivel; f.kills = j.kills; f.mortes = j.mortes;
   return f;
 }
+/**
+ * Falar em que rota alguém está é a fala que ele confere na hora — e errar nela
+ * queima o app inteiro. Medido contra os frames da Riot: 14% das leituras "vi agora"
+ * estavam longe da verdade. Então a fala de rota só sai com evidência forte: o anel
+ * colorido do ícone (terreno não tem anel) ou um casamento alto de verdade.
+ * Leitura antiga, gravada antes de guardarmos a evidência, continua valendo.
+ */
+export function leituraForte(f) {
+  const u = f?.ultimo; if (!u) return false;
+  if (u.anel === true) return true;
+  if (u.anel == null && u.score == null) return true;   // gravação antiga, sem evidência guardada
+  return (u.score ?? 0) >= 0.82;
+}
+
 function verVisto(f, v, t) {
-  const p = { t, x: v.x, y: v.y };
+  const p = { t, x: v.x, y: v.y, score: v.score ?? null, anel: v.anel ?? null, seguido: v.seguido ?? null };
   const antes = f.ultimo;
   // Pulo grande em pouco tempo: pode ser TP ou um ícone parecido no lugar errado.
   // Só aceita se a leitura seguinte confirmar o novo lugar.
@@ -132,6 +146,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     return s;
   };
   const lugarTxt = (p) => lugar(p.x, p.y, meuTime).texto;
+
   // Distância até a lane (mapa normalizado): bot corre pela borda de baixo e pela direita, top pela
   // esquerda e por cima, mid é a diagonal. Medido na partida de 17/09: "indo pro bot" dito com o cara
   // a 0,36 de distância (na jungle dele, limpando raptor) errou 9 de 11; de perto (rio, ≤ 0,3) acertou.
@@ -184,7 +199,7 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       }
       // indo pra uma lane
       const alvo = laneAlvo(jg);
-      if (alvo && !(minhaPos && seg(dist(jg.ultimo, minhaPos)) <= 12)) situ(`jg-indo-${alvo.lane}`, { tipo: 'jungler', prioridade: alvo.lane === minhaLane ? 3 : 2, modulo: 'jungler', serio: F`Jungler deles indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Recua' : ''}.`, divertido: F`Jungler deles rumo ao ${alvo.lane}${alvo.lane === minhaLane ? '. É com você, sai' : ''}.`, cooldown: 40, dados: { lane: alvo.lane } });
+      if (alvo && leituraForte(jg) && !(minhaPos && seg(dist(jg.ultimo, minhaPos)) <= 12)) situ(`jg-indo-${alvo.lane}`, { tipo: 'jungler', prioridade: alvo.lane === minhaLane ? 3 : 2, modulo: 'jungler', serio: F`Jungler deles indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Recua' : ''}.`, divertido: F`Jungler deles rumo ao ${alvo.lane}${alvo.lane === minhaLane ? '. É com você, sai' : ''}.`, cooldown: 40, dados: { lane: alvo.lane } });
       // objetivo / nossa jungle / base / lado livre
       for (const o of objetivos) if ((o.vivo || o.em <= 45) && dist(jg.ultimo, pitDe(o.nome)) < 0.09) situ(`jg-obj-${o.nome}`, { tipo: 'objetivo', prioridade: 3, modulo: 'timers', serio: F`Jungler deles no ${o.nome}.`, cooldown: 40 });
       if (l.lane === 'jungle' && l.lado === 'nosso') situ('jg-nossa-jungle', { tipo: 'jungler', prioridade: 2, modulo: 'jungler', serio: F`Jungler deles ${l.texto}. Camps em risco.`, cooldown: 45 });
@@ -254,12 +269,12 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       const l = f.regiao;
       // TP
       const temTp = (estado.jogadores.find((x) => x.nome === f.nome)?.spells ?? []).some((sp) => /teleport/i.test(sp));
-      if (f.tp === t && temTp && ['top', 'mid', 'bot'].includes(l.lane)) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: l.lane === minhaLane ? 3 : 1, modulo: 'mapa', serio: F`${f.campeao} deu TP pro ${l.lane}.`, cooldown: 60, dados: { lane: l.lane } });
-      else if (f.tp === t) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: 0, modulo: 'mapa', serio: F`${f.campeao} apareceu ${l.texto} de repente.`, cooldown: 60 });
+      if (f.tp === t && temTp && ['top', 'mid', 'bot'].includes(l.lane) && leituraForte(f)) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: l.lane === minhaLane ? 3 : 1, modulo: 'mapa', serio: F`${f.campeao} deu TP pro ${l.lane}.`, cooldown: 60, dados: { lane: l.lane } });
+      else if (f.tp === t && leituraForte(f)) situ(`tp-${f.nome}`, { tipo: 'roam', prioridade: 0, modulo: 'mapa', serio: F`${f.campeao} apareceu ${l.texto} de repente.`, cooldown: 60 });
       // roam em andamento: laner fora da lane dele indo pra outra
       const alvo = laneAlvo(f);
       const foraDaLane = f.hist.filter((q) => t - q.t <= 3).every((q) => lugar(q.x, q.y, meuTime).lane !== laneDele);
-      if (laneDele && laneDele !== 'jungle' && alvo && alvo.lane !== laneDele && foraDaLane) situ(`roam-${f.nome}-${alvo.lane}`, { tipo: 'roam', prioridade: alvo.lane === minhaLane ? 3 : 0, modulo: 'mapa', serio: F`${f.campeao} (${laneDele}) indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Cuidado' : ''}.`, divertido: F`${f.campeao} largou o ${laneDele} e vai pro ${alvo.lane}${alvo.lane === minhaLane ? '. Presente pra você' : ''}.`, cooldown: 30, dados: { de: laneDele, para: alvo.lane } });
+      if (laneDele && laneDele !== 'jungle' && alvo && alvo.lane !== laneDele && foraDaLane && leituraForte(f)) situ(`roam-${f.nome}-${alvo.lane}`, { tipo: 'roam', prioridade: alvo.lane === minhaLane ? 3 : 0, modulo: 'mapa', serio: F`${f.campeao} (${laneDele}) indo pro ${alvo.lane}${alvo.lane === minhaLane ? '. Cuidado' : ''}.`, divertido: F`${f.campeao} largou o ${laneDele} e vai pro ${alvo.lane}${alvo.lane === minhaLane ? '. Presente pra você' : ''}.`, cooldown: 30, dados: { de: laneDele, para: alvo.lane } });
       // chegou no seu lado / perto de você
       if (minhaPos && laneDele !== minhaLane) {
         const s = seg(dist(f.ultimo, minhaPos));
@@ -505,7 +520,9 @@ export function instantaneo(mundo, estado) {
     t,
     waves: mundo.wavesBruto ?? null,
     wards: mundo.wards ? { nossas: mundo.wards.nossas.map((w) => [w.x, w.y, w.tipo]), deles: mundo.wards.deles.map((w) => [w.x, w.y]) } : null,
-    campeoes: [...mundo.campeoes.values()].map((f) => ({ c: f.campeao, time: f.time, role: f.role, morto: !!f.morto, x: f.ultimo?.x ?? null, y: f.ultimo?.y ?? null, ha: f.ultimo ? Math.round((t - f.ultimo.t) * 10) / 10 : null, regiao: f.regiao?.chave ?? null })),
+    campeoes: [...mundo.campeoes.values()].map((f) => ({ c: f.campeao, time: f.time, role: f.role, morto: !!f.morto, x: f.ultimo?.x ?? null, y: f.ultimo?.y ?? null, ha: f.ultimo ? Math.round((t - f.ultimo.t) * 10) / 10 : null, regiao: f.regiao?.chave ?? null,
+      // como o olho chegou nessa posição (pra conferir a qualidade da leitura depois)
+      score: f.ultimo?.score ?? null, anel: f.ultimo?.anel ?? null, seguido: f.ultimo?.seguido ?? null })),
     // ninguém deles visto a menos de 15 s de mim nos últimos 10 s (pra 'reseta agora'); null = não sei onde estou
     livrePerto: (() => { const fe = estado.eu ? mundo.campeoes.get(estado.eu.nome) : null; const eu = fe?.ultimo && t - fe.ultimo.t < 5 ? fe.ultimo : null; if (!eu) return null; return ![...mundo.campeoes.values()].some((f) => f.time !== estado.eu.time && f.ultimo && t - f.ultimo.t < 10 && seg(dist(f.ultimo, eu)) <= 15); })(),
   };
