@@ -282,16 +282,15 @@ test('falas: a leitura do jogo muda com a rota', () => {
 
 /* ------------------------------------------------------- evidência da leitura */
 
-test('leitura do olho: só vira fala de rota com anel ou casamento alto', async () => {
+test('leitura do olho: fala de rota só com casamento alto (corte medido, não chutado)', async () => {
   const { leituraForte } = await import('../src/vivo/situacoes.js');
   assert.equal(leituraForte(null), false);
   assert.equal(leituraForte({}), false);
-  // anel colorido: terreno não tem, então basta
-  assert.equal(leituraForte({ ultimo: { anel: true, score: 0.7 } }), true);
-  // sem anel e casamento fraco (o caso do fantasma travado): não fala
-  assert.equal(leituraForte({ ultimo: { anel: false, score: 0.7 } }), false);
-  // sem anel mas casamento alto: fala
-  assert.equal(leituraForte({ ultimo: { anel: false, score: 0.9 } }), true);
+  // o corte é 0,90: abaixo disso o erro medido passa de 35%
+  assert.equal(leituraForte({ ultimo: { score: 0.89 } }), false);
+  assert.equal(leituraForte({ ultimo: { score: 0.9 } }), true);
+  // o anel NÃO vale mais de atalho: deu 75% de erro nas leituras em que apareceu
+  assert.equal(leituraForte({ ultimo: { anel: true, score: 0.7 } }), false);
   // gravação antiga, sem evidência guardada: continua valendo
   assert.equal(leituraForte({ ultimo: { x: 1, y: 1 } }), true);
 });
@@ -363,4 +362,14 @@ test('fala do alvo: cala quando o mais frágil é o carry (o óbvio)', async () 
   assert.equal(roda([jog(200, 'top', 'Ornn', 12, [{ id: 3742 }]), jog(200, 'jungle', 'Vi'), jog(200, 'mid', 'Syndra'), jog(200, 'adc', 'Jinx'), jog(200, 'sup', 'Leona')]).length, 0);
   // jungler atrasado é o mais frágil: isso é notícia
   assert.equal(roda([jog(200, 'top', 'Ornn', 14, [{ id: 3742 }]), jog(200, 'jungle', 'Evelynn', 8), jog(200, 'mid', 'Syndra', 14), jog(200, 'adc', 'Jinx', 14), jog(200, 'sup', 'Leona', 14)]).length, 1);
+});
+
+test('lugar: torre tem nome, e o lado é o de quem joga', async () => {
+  const { lugar } = await import('../src/vivo/olho.js');
+  assert.equal(lugar(0.709, 0.931, 100).texto, 'na torre de fora do bot nossa');
+  assert.equal(lugar(0.709, 0.931, 200).texto, 'na torre de fora do bot deles');
+  assert.equal(lugar(0.066, 0.295, 100).texto, 'na torre de fora do top nossa');
+  assert.equal(lugar(0.604, 0.426, 100).texto, 'na torre de fora do mid deles');
+  // longe de qualquer torre continua sendo a rota
+  assert.match(lugar(0.80, 0.90, 100).texto, /^no bot/);
 });

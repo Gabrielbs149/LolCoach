@@ -47,16 +47,21 @@ function ficha(mundo, j) {
 }
 /**
  * Falar em que rota alguém está é a fala que ele confere na hora — e errar nela
- * queima o app inteiro. Medido contra os frames da Riot: 14% das leituras "vi agora"
- * estavam longe da verdade. Então a fala de rota só sai com evidência forte: o anel
- * colorido do ícone (terreno não tem anel) ou um casamento alto de verdade.
+ * queima o app inteiro. O corte aqui NÃO é chute: com a evidência gravada (nota do
+ * casamento) cruzada com os frames da Riot, em 555 leituras conferidas:
+ *
+ *    nota 0,70–0,80 → 57% erradas      nota 0,80–0,85 → 38% erradas
+ *    nota 0,85–0,90 → 57% erradas      nota 0,90+     → 18% erradas
+ *
+ * E o anel, que eu tinha posto como atalho de confiança, se mostrou o contrário:
+ * 75% de erro nas 32 leituras em que ele apareceu. Saiu da conta. Com nota ≥ 0,90
+ * passa metade das leituras com 18% de erro, contra 69% passando com 27% antes.
  * Leitura antiga, gravada antes de guardarmos a evidência, continua valendo.
  */
 export function leituraForte(f) {
   const u = f?.ultimo; if (!u) return false;
-  if (u.anel === true) return true;
-  if (u.anel == null && u.score == null) return true;   // gravação antiga, sem evidência guardada
-  return (u.score ?? 0) >= 0.82;
+  if (u.score == null) return true;   // gravação antiga, sem evidência guardada
+  return u.score >= 0.9;
 }
 
 function verVisto(f, v, t) {

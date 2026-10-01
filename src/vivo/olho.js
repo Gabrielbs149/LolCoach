@@ -27,6 +27,34 @@ const CAMPS = [
   ...Object.values(CAMPS_AZUL).map((c) => ({ ...c, x: 1 - c.x, y: 1 - c.y, time: 200 })),
 ];
 const RAIO_CAMP = 0.05;
+
+/**
+ * Torres com nome. "No bot, lado deles" cobre metade da rota; "na torre de fora do
+ * bot deles" é um ponto. As coordenadas NÃO são chutadas: são a média das quedas de
+ * torre do próprio histórico (11.416 eventos BUILDING_KILL, 50+ por torre), que a
+ * Riot grava com posição.
+ */
+const TORRES = [
+  { x: 0.289, y: 0.915, tipo: 'da base', rota: 'bot', time: 100 },
+  { x: 0.467, y: 0.900, tipo: 'do meio', rota: 'bot', time: 100 },
+  { x: 0.709, y: 0.931, tipo: 'de fora', rota: 'bot', time: 100 },
+  { x: 0.919, y: 0.287, tipo: 'da base', rota: 'bot', time: 200 },
+  { x: 0.899, y: 0.445, tipo: 'do meio', rota: 'bot', time: 200 },
+  { x: 0.936, y: 0.696, tipo: 'de fora', rota: 'bot', time: 200 },
+  { x: 0.246, y: 0.751, tipo: 'da base', rota: 'mid', time: 100 },
+  { x: 0.340, y: 0.675, tipo: 'do meio', rota: 'mid', time: 100 },
+  { x: 0.394, y: 0.569, tipo: 'de fora', rota: 'mid', time: 100 },
+  { x: 0.751, y: 0.244, tipo: 'da base', rota: 'mid', time: 200 },
+  { x: 0.659, y: 0.318, tipo: 'do meio', rota: 'mid', time: 200 },
+  { x: 0.604, y: 0.426, tipo: 'de fora', rota: 'mid', time: 200 },
+  { x: 0.079, y: 0.711, tipo: 'da base', rota: 'top', time: 100 },
+  { x: 0.102, y: 0.548, tipo: 'do meio', rota: 'top', time: 100 },
+  { x: 0.066, y: 0.295, tipo: 'de fora', rota: 'top', time: 100 },
+  { x: 0.707, y: 0.079, tipo: 'da base', rota: 'top', time: 200 },
+  { x: 0.536, y: 0.095, tipo: 'do meio', rota: 'top', time: 200 },
+  { x: 0.291, y: 0.064, tipo: 'de fora', rota: 'top', time: 200 },
+];
+const RAIO_TORRE = 0.045;
 // "nos raptors" / "no gromp": plural só nos que são vários bichos
 const PLURAL = new Set(['lobos', 'raptors', 'krugs']);
 
@@ -55,6 +83,12 @@ export function lugar(x, y, meuTime = 100) {
     if (dist(p, c) > RAIO_CAMP) continue;
     const dele = (c.time === 100) === azul ? 'nosso' : 'deles';
     return { chave: `camp-${c.nome}-${dele}`, texto: `${PLURAL.has(c.nome) ? 'nos' : 'no'} ${c.nome} ${dele === 'deles' ? 'deles' : PLURAL.has(c.nome) ? 'nossos' : 'nosso'}`, lane: 'jungle', lado: dele, camp: c.nome };
+  }
+  for (const t of TORRES) {
+    if (dist(p, t) > RAIO_TORRE) continue;
+    const dela = (t.time === 100) === azul ? 'nossa' : 'deles';
+    return { chave: `torre-${t.rota}-${t.tipo.replace(/\s/g, '')}-${dela}`, lane: t.rota, lado: dela === 'nossa' ? 'nosso' : 'deles', torre: t.tipo,
+      texto: `na torre ${t.tipo} do ${t.rota} ${dela === 'nossa' ? 'nossa' : 'deles'}` };
   }
   if (Math.abs(x + y - 1) < 0.07 && x > 0.2 && x < 0.8) return { chave: `mid-${lado}`, texto: `no mid, ${ladoTxt}`, lane: 'mid', lado };
   if (Math.abs(x - y) < 0.055 && x > 0.25 && x < 0.75) {

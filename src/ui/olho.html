@@ -32,13 +32,17 @@ const Q = new URLSearchParams(location.search);
 const TESTE = Q.get('teste') === '1';
 const SO_TELA = Q.get('tela') === '1';
 const FINGIR = Q.get('fingir') === '1';   // captura de verdade, inimigos de mentira (teste com ?tela=1 aberto)
+const BANCO = Q.get('banco') === '1';    // bancada de teste: ?banco=1 e window.__olho.foto(url, meta)
 const AMOSTRA = Q.get('amostra');         // ?amostra=/caminho/0425.png — roda a leitura numa foto gravada (e o .json do lado dá quem está na partida)
 // Ritmo: 4 leituras por segundo dão conta (o ícone anda 0,7%/s; flash é pego no par de quadros seguidos).
 // ?leve=1 (modo leve, pra PC fraco): 2 por segundo, captura a 5 fps, sem placar, um ícone por quadro no mapa todo.
 const LEVE = Q.get('leve') === '1';
 const INTERVALO = LEVE ? 500 : 250;    // ms entre leituras
 const N = 48;                          // grade da calibração do minimapa
-const LIMIAR_MAPA = 0.42, LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.76, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.74, MARGEM = 0.04;
+const LIMIAR_MAPA = 0.42;
+let LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.76, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.74, MARGEM = 0.04;
+// quanto o casamento precisa valer quando o anel colorido não aparece (nenhum / pela metade)
+let SEM_ANEL = 0.88, SEM_ANEL_PARCIAL = 0.82;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
 let cegoDesde = 0, cegoAvisado = 0, fracoDesde = 0;
 /**
@@ -115,7 +119,7 @@ const video = document.getElementById('v');
 const tela = document.getElementById('tela');
 let W = 0, H = 0, fonte = null;          // fonte: o que desenhar (video ou canvas de teste)
 async function abrirCaptura() {
-  if (TESTE) { fonte = telaFalsa(1920, 1080); W = 1920; H = 1080; return; }
+  if (TESTE || BANCO) { fonte = telaFalsa(1920, 1080); W = 1920; H = 1080; return; }
   if (AMOSTRA) {
     // a foto do minimapa colada no canto de uma tela 1920×1080 (onde o jogo desenha o minimapa)
     const img = new Image(); img.src = AMOSTRA; await new Promise((ok, erro) => { img.onload = ok; img.onerror = erro; });
@@ -381,7 +385,9 @@ async function iconeDe(nome) {
   if (!id) return null;
   const skin = skinDe.get(semAcento(nome)) ?? 0, forma = formaDe(nome);
   const k = `${id}@${skin}@${forma}`;
-  if (!icones.has(k)) icones.set(k, carregar(`/icone/${id}`).catch(() => carregar(`/circulo/${id}/${skin}${forma ? '/' + forma : ''}`).catch(() => null)));
+  const redondo = `/circulo/${id}/${skin}${forma ? '/' + forma : ''}`, quadrado = `/icone/${id}`;
+  const [primeiro, reserva] = (typeof window !== 'undefined' && window.__molde === 'redondo') ? [redondo, quadrado] : [quadrado, redondo];
+  if (!icones.has(k)) icones.set(k, carregar(primeiro).catch(() => carregar(reserva).catch(() => null)));
   return icones.get(k);
 }
 /** Template do ícone com diâmetro d: meia resolução em cinza (busca) e cheia em cor (confirmação). */
@@ -1162,7 +1168,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   // quem já estava sendo seguido pode perder o anel por um instante (ícones se sobrepondo): só o novo exige anel
   // anel pela metade (ícone colado em outro: Milio grudado em mim, Kai'Sa na Nami) com 0,82+ passa
   const anelParcial = !!melhor && (chave === 'eu' ? melhor.anelTeal : chave.startsWith('ali-') ? melhor.fracAzul : melhor.fracVermelho) >= 0.25;
-  if (melhor && !perto && !anelCerto && melhor.crua < (anelParcial ? 0.82 : 0.88)) melhor = null;
+  if (melhor && !perto && !anelCerto && melhor.crua < (anelParcial ? SEM_ANEL_PARCIAL : SEM_ANEL)) melhor = null;
   // dentro da fonte a água é azul e a loja parece ícone: ali só entra com 0,85+ (Pantheon 'na fonte' 270 vezes numa partida)
   if (melhor && naFonte((melhor.x + tw) / s, (melhor.y + tw) / s, chave === 'eu' || chave.startsWith('ali-') ? meuTime : (meuTime === 100 ? 200 : 100)) && melhor.crua < 0.85) melhor = null;
   if (melhor && melhor.score >= (perto ? LIMIAR_SEGUIDO : LIMIAR_NOVO)) {
@@ -1181,6 +1187,7 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
   return null;
 }
 function enviar(dados) {
+  if (BANCO) { window.__ultimoQuadro = dados; return; }
   const agora = Date.now();
   if (dados.pulos?.length || dados.placar) { ultimoEnvio = null; }   // pulo de flash / placar nunca podem ser engolidos pela dedupe
   const chave = JSON.stringify([dados.calib?.s, dados.escala?.d, dados.wards && [dados.wards.nossas.length, dados.wards.deles.length, dados.wards.nossas.map((w) => Math.round(w.x * 50 + w.y * 5000))], dados.waves && Object.values(dados.waves).map((w) => Math.round((w.frente ?? -1) * 20)), dados.vistos.map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), (dados.aliados ?? []).map((v) => [v.campeao, Math.round(v.x * 50), Math.round(v.y * 50)]), dados.eu && [Math.round(dados.eu.x * 50), Math.round(dados.eu.y * 50)]]);
@@ -1246,6 +1253,45 @@ async function desenharFalsa(t) {
     inimigos = (meta.jogadores ?? []).filter((j) => j.time !== meuTime).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     aliados = (meta.jogadores ?? []).filter((j) => j.time === meuTime && j.campeao !== meuCampeao).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
     log(`amostra: eu ${meuCampeao}, ${inimigos.length} inimigos, ${aliados.length} aliados`);
+  } else if (BANCO) {
+    /**
+     * Uma foto por chamada: monta a tela falsa com o minimapa gravado, diz quem está
+     * na partida (o .json que o app salvou junto) e roda UM quadro do olho de verdade.
+     * Cada foto é independente — os rastros são zerados, senão um quadro contamina o
+     * seguinte e a medição vira mentira.
+     */
+    window.__olho = {
+      async foto(url, meta) {
+        const img = new Image(); img.src = url;
+        await new Promise((ok, erro) => { img.onload = ok; img.onerror = erro; });
+        const c = telaFalsa(1920, 1080); const x = c.getContext('2d');
+        x.fillStyle = '#000'; x.fillRect(0, 0, 1920, 1080);
+        x.drawImage(img, 1920 - img.width - 16, 1080 - img.height - 16);
+        fonte = c; W = 1920; H = 1080;
+        meuCampeao = meta.eu;
+        meuTime = (meta.jogadores ?? []).find((j) => j.campeao === meta.eu)?.time ?? 100;
+        skinDe.clear();
+        for (const j of meta.jogadores ?? []) if (j.campeao) skinDe.set(semAcento(j.campeao), Number(j.skin) || 0);
+        inimigos = (meta.jogadores ?? []).filter((j) => j.time !== meuTime).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
+        aliados = (meta.jogadores ?? []).filter((j) => j.time === meuTime && j.campeao !== meuCampeao).map((j) => ({ campeao: j.campeao, morto: !!j.morto, role: j.role }));
+        rastros.clear(); ultimaVez.clear();
+        window.__ultimoQuadro = null;
+        await quadro();
+        return window.__ultimoQuadro;
+      },
+      // qual molde usar: 'quadrado' (padrão) ou 'redondo'
+      usarMolde(qual) { window.__molde = qual; icones.clear(); templates.clear(); },
+      // girar os limiares pra medir o que cada um custa em acerto e em ruído
+      limiares(v = {}) {
+        if (v.novo != null) LIMIAR_NOVO = v.novo;
+        if (v.meio != null) LIMIAR_MEIO = v.meio;
+        if (v.mancha != null) LIMIAR_MANCHA = v.mancha;
+        if (v.semAnel != null) SEM_ANEL = v.semAnel;
+        if (v.semAnelParcial != null) SEM_ANEL_PARCIAL = v.semAnelParcial;
+        return { LIMIAR_NOVO, LIMIAR_MEIO, LIMIAR_MANCHA, SEM_ANEL, SEM_ANEL_PARCIAL };
+      },
+    };
+    log('bancada pronta: window.__olho.foto(url, meta)');
   } else if (!FINGIR) { await lerPartida(); setInterval(lerPartida, 2000); }
   // Ritmo adaptável: quadro pesado (muitos ícones) → espera mais, pra não roubar CPU do jogo.
   let intervalo = INTERVALO;
@@ -1256,7 +1302,7 @@ async function desenharFalsa(t) {
     intervalo = gasto > 80 ? Math.min(LEVE ? 900 : 500, intervalo + 40) : gasto < 35 ? Math.max(INTERVALO, intervalo - 10) : intervalo;
     setTimeout(laco, Math.max(20, intervalo - gasto));
   };
-  laco();
+  if (!BANCO) laco();
 })().catch((erro) => { log('falhou: ' + erro.message); if (!TESTE) fetch('/api/olho', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ erro: erro.message, t: Date.now() }) }).catch(() => {}); });
 </script>
 </body>
