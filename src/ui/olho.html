@@ -43,6 +43,10 @@ const LIMIAR_MAPA = 0.42;
 let LIMIAR_MEIO = 0.45, LIMIAR_NOVO = 0.76, LIMIAR_SEGUIDO = 0.66, LIMIAR_EU = 0.8, LIMIAR_MANCHA = 0.74, MARGEM = 0.04;
 // quanto o casamento precisa valer quando o anel colorido não aparece (nenhum / pela metade)
 let SEM_ANEL = 0.88, SEM_ANEL_PARCIAL = 0.82;
+let CAND_EU = 8, CAND_OUTROS = 3;
+// o anel vale quanto na nota, e a partir de que fração de pixels ele conta como anel.
+// Pra mim o bônus é 0,15 e eu sou achado em 85%; pros outros é 0,08 e são 35%.
+let BONUS_ANEL = 0.08, FRACAO_ANEL = 0.35;
 let ultimoDiag = 0, ultimaFoto = 0, fotos = 0; const melhoresDoQuadro = new Map();
 let cegoDesde = 0, cegoAvisado = 0, fracoDesde = 0;
 /**
@@ -378,6 +382,7 @@ let porNome = new Map();                 // nome normalizado -> id
 const icones = new Map();                // id -> Image
 const templates = new Map();             // `${nome}@${skin}@${forma}@${d}` -> template
 const skinDe = new Map();                // campeão -> skin (do Live Client); o ícone do minimapa é o da skin
+let tempoJogo = null;                    // relógio do jogo (s): a foto guardada em cima do minuto tem verdade da Riot pra comparar
 let kaynForma = '';                      // '', 'ass' (Assassino Sombrio) ou 'slay' (Rhaast): o Kayn muda de ícone quando transforma
 const formaDe = (nome) => (semAcento(nome) === 'kayn' ? kaynForma : '');
 async function iconeDe(nome) {
@@ -858,8 +863,8 @@ function confirmar(rgba, s, tpl, x, y) {
   const topo = pixAnel.slice(0, Math.max(1, Math.floor(pixAnel.length / 3)));
   melhor.anelCor = topo.length ? [0, 1, 2].map((i) => topo.reduce((acc, p) => acc + p[i], 0) / topo.length) : null;
   melhor.fracVermelho = anel(vermelho, FIXA.inimigo); melhor.fracAzul = anel(azul, FIXA.aliado); melhor.anelTeal = anel(teal, FIXA.eu);
-  melhor.anelVermelho = melhor.fracVermelho >= 0.35;
-  melhor.anelAzul = melhor.fracAzul >= 0.35;
+  melhor.anelVermelho = melhor.fracVermelho >= FRACAO_ANEL;
+  melhor.anelAzul = melhor.fracAzul >= FRACAO_ANEL;
   return melhor;
 }
 
@@ -877,6 +882,7 @@ async function lerPartida() {
     meuCampeao = d.estado?.eu?.campeao ?? null; meuTime = d.estado?.eu?.time ?? 100;
     for (const j of d.estado?.jogadores ?? []) if (j.campeao) skinDe.set(semAcento(j.campeao), Number(j.skin) || 0);
     const kayn = (d.estado?.jogadores ?? []).find((j) => semAcento(j.campeao) === 'kayn');
+    tempoJogo = d.estado?.tempo ?? null;
     if (kayn && (d.estado?.tempo ?? 0) >= 360) {
       const visto = Math.max(ultimaVez.get('Kayn') ?? 0, ultimaVez.get('ali-Kayn') ?? 0);
       if (performance.now() - visto > 20000) { const ORDEM = ['', 'ass', 'slay']; kaynForma = ORDEM[(ORDEM.indexOf(kaynForma) + 1) % ORDEM.length]; }
@@ -1076,9 +1082,11 @@ async function quadro() {
       log(`vistos ${limpos.length}/${inimigos.filter((j) => !j.morto).length} · aliados ${vistosAli.length}/${aliados.length} · eu ${eu ? (eu.fonte === 'camera' ? 'câmera' : eu.fonte === 'camera-solta' ? 'câmera solta' : 'ícone') : 'não'} (câmera travada ${camTravada.n ? Math.round(100 * camTravada.ok / camTravada.n) + '%' : '?'}) · manchas ${vermelhos.length}+${azuis.length} · melhor: ${[...melhoresDoQuadro].map(([k, v]) => `${k} ${v}`).join(', ') || '-'}`);
       melhoresDoQuadro.clear();
     }
-    if (!TESTE && !AMOSTRA && agora - ultimaFoto > 30000 && fotos < 40) {
+    const noMinuto = tempoJogo != null && Math.abs((tempoJogo % 60) - 30) >= 28.5;   // a menos de 1,5 s de um minuto cheio
+    const podeFoto = tempoJogo == null ? agora - ultimaFoto > 30000 : (noMinuto && agora - ultimaFoto > 25000) || agora - ultimaFoto > 110000;
+    if (!TESTE && !AMOSTRA && !BANCO && podeFoto && fotos < 40) {
       ultimaFoto = agora; fotos++;
-      const meta = { t: agora, s, d, inimigos: inimigos.map((j) => j.campeao), eu: meuCampeao, vistos: limpos, manchas: vermelhos };
+      const meta = { t: agora, tempo: tempoJogo, s, d, inimigos: inimigos.map((j) => j.campeao), eu: meuCampeao, vistos: limpos, manchas: vermelhos };
       tela.toBlob((blob) => { if (blob) fetch('/api/olho/foto?meta=' + encodeURIComponent(JSON.stringify(meta)), { method: 'POST', body: blob }).catch(() => {}); }, 'image/png');
     }
   } catch (erro) { log('erro: ' + erro.message); }
@@ -1139,14 +1147,14 @@ function procurar(m, rgba, s, t, chave, agora, podeCheia, manchas = []) {
       cand = cand.concat(buscar(m, t, { x0: cx - r, y0: cy - r, x1: cx + r, y1: cy + r }, 1));
     }
   }
-  if (podeCheia) cand = cand.concat(buscar(m, t, null, chave === 'eu' ? 8 : 3, 1));   // eu: mais candidatos (seta/linha por cima derruba a nota em meia-resolução)
+  if (podeCheia) cand = cand.concat(buscar(m, t, null, chave === 'eu' ? CAND_EU : CAND_OUTROS, 1));   // eu: mais candidatos (seta/linha por cima derruba a nota em meia-resolução)
   // confirma em cor todos os candidatos razoáveis e fica com o melhor
   let melhor = null;
   for (const c of cand) {
     if (c.score < LIMIAR_MEIO) continue;
     const ok = confirmar(rgba, s, t, c.x * 2, c.y * 2);
     ok.crua = ok.cheio ?? ok.score;   // as regras "sem anel só com 0,88" usam o NCC cheio, não o aparado
-    if (ok.anelVermelho) ok.score += 0.08;
+    if (ok.anelVermelho) ok.score += BONUS_ANEL;
     if (chave === 'eu' && ok.anelTeal >= 0.4) ok.score += 0.15;   // anel teal = sou eu mesmo com seta/linha por cima
     if (!melhor || ok.score > melhor.score) melhor = ok;
   }
@@ -1281,6 +1289,14 @@ async function desenharFalsa(t) {
       },
       // qual molde usar: 'quadrado' (padrão) ou 'redondo'
       usarMolde(qual) { window.__molde = qual; icones.clear(); templates.clear(); },
+      // volta ao estado de instalação: sem cor aprendida, sem rastro, sem molde em cache
+      zerar() {
+        // reinicia em vez de apagar: corPronta() lê cores[k].n direto e a chave tem que existir
+        for (const k of ['inimigo', 'aliado', 'eu']) cores[k] = { r: 0, g: 0, b: 0, n: 0 };
+        try { localStorage.removeItem('olho.cores'); } catch {}
+        rastros.clear(); ultimaVez.clear(); icones.clear(); templates.clear();
+        // a escala do ícone NÃO entra aqui: sem ela o olho não acha nada e a medição zera
+      },
       // girar os limiares pra medir o que cada um custa em acerto e em ruído
       limiares(v = {}) {
         if (v.novo != null) LIMIAR_NOVO = v.novo;
@@ -1288,7 +1304,11 @@ async function desenharFalsa(t) {
         if (v.mancha != null) LIMIAR_MANCHA = v.mancha;
         if (v.semAnel != null) SEM_ANEL = v.semAnel;
         if (v.semAnelParcial != null) SEM_ANEL_PARCIAL = v.semAnelParcial;
-        return { LIMIAR_NOVO, LIMIAR_MEIO, LIMIAR_MANCHA, SEM_ANEL, SEM_ANEL_PARCIAL };
+        if (v.candOutros != null) CAND_OUTROS = v.candOutros;
+        if (v.candEu != null) CAND_EU = v.candEu;
+        if (v.bonusAnel != null) BONUS_ANEL = v.bonusAnel;
+        if (v.fracaoAnel != null) FRACAO_ANEL = v.fracaoAnel;
+        return { LIMIAR_NOVO, LIMIAR_MEIO, LIMIAR_MANCHA, SEM_ANEL, SEM_ANEL_PARCIAL, CAND_EU, CAND_OUTROS, BONUS_ANEL, FRACAO_ANEL };
       },
     };
     log('bancada pronta: window.__olho.foto(url, meta)');
