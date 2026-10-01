@@ -381,7 +381,7 @@ async function iconeDe(nome) {
   if (!id) return null;
   const skin = skinDe.get(semAcento(nome)) ?? 0, forma = formaDe(nome);
   const k = `${id}@${skin}@${forma}`;
-  if (!icones.has(k)) icones.set(k, carregar(`/circulo/${id}/${skin}${forma ? '/' + forma : ''}`).catch(() => carregar(`/icone/${id}`).catch(() => null)));
+  if (!icones.has(k)) icones.set(k, carregar(`/icone/${id}`).catch(() => carregar(`/circulo/${id}/${skin}${forma ? '/' + forma : ''}`).catch(() => null)));
   return icones.get(k);
 }
 /** Template do ícone com diâmetro d: meia resolução em cinza (busca) e cheia em cor (confirmação). */
