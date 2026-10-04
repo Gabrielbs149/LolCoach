@@ -1418,9 +1418,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     Cb.decidir(situacoes, { t: e.tempo, minhaLane: LANE_DE[e.eu.role] ?? null, minhaRole: e.eu.role, morto: !!e.eu.morto, notas: partidaVivo.notas, evidencias: partidaVivo.evidencias ?? null, silenciadas: partidaVivo.silenciadas }, partidaVivo.memCerebro);
     for (const sit of situacoes) {
       if (sit.falar && !cabeFala(sit.prioridade, e.tempo)) sit.falar = false;   // teto geral de falas/min
-      const pronta = prontaFala({ modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });
+      // `chave` vai junto: é a identidade da situação em falas.jsonl (sem ela a fala grava com id nulo)
+      const pronta = prontaFala({ chave: sit.chave, modulo: sit.modulo, prioridade: sit.prioridade, serio: sit.serio, divertido: sit.divertido, seq: sit.falar ? ++seqFalas : 0, t: e.tempo });
       gravar('situacoes.jsonl', { t: Math.round(e.tempo * 10) / 10, chave: sit.chave, tipo: sit.tipo, prioridade: sit.prioridade, nota: sit.nota, modulo: sit.modulo, falada: sit.falar, texto: pronta.serio, dados: sit.dados,
-        contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
+        contexto: { kills: e.eu.kills, mortes: e.eu.mortes, ouro: e.eu.ouro, nivel: e.eu.nivel, vida: e.eu?.vidaMax ? Math.round(100 * e.eu.vida / e.eu.vidaMax) : null, eu: dados.eu ?? null } });
       if (sit.falar) partidaVivo.falas.push(pronta);
       const cs = (partidaVivo.contSitu ??= { total: 0, faladas: 0, leituras: 0, porTipo: new Map() });
       cs.total++; if (sit.falar) cs.faladas++; cs.porTipo.set(sit.tipo, (cs.porTipo.get(sit.tipo) ?? 0) + 1);

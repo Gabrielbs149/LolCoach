@@ -425,6 +425,13 @@ test('falas.jsonl grava o id da situacao (chave), nao so o id dos modulos', asyn
   // e o `situ` do situacoes.js tem mesmo que produzir `chave`
   const sit = await readFile(new URL('../src/vivo/situacoes.js', import.meta.url), 'utf8');
   assert.match(sit, /const s = \{ chave,/, 'situ() parou de guardar a identidade em `chave` -- a gravacao acima quebra junto');
+
+  // e o caminho que transforma situacao em fala tem que PASSAR a chave adiante --
+  // na 2.28.212 so a gravacao foi corrigida e o objeto chegava la sem chave nenhuma,
+  // entao o id continuou nulo.
+  const monta = dae.split(/\r?\n/).find((l) => l.includes('const pronta = prontaFala({'));
+  assert.ok(monta, 'nao achei onde a situacao vira fala');
+  assert.match(monta, /chave: sit\.chave/, 'prontaFala precisa receber sit.chave, senao a gravacao nao tem o que gravar');
 });
 
 /* ------------------------------------------- modulo mapa: a janela de fala e 5 s */
@@ -441,4 +448,23 @@ test('aviso "X a N segundos": fala ate 5 s, so registra de 6 a 8', async () => {
   // O de 6 a 8 s continua entrando como prioridade 0 (gravado, nao falado) pra nao perder o dado.
   assert.match(linha, /prioridade: s <= 5 \? 3 : 0/, 'a janela de FALA do aviso de aproximacao tem que ser 5 s; de 6 a 8 fica so no registro');
   assert.match(linha, /if \(s <= 8 && chegando\)/, 'a janela de REGISTRO tem que continuar em 8 s -- e o dado pra medir a proxima mudanca');
+});
+
+/* ------------------------------------------- a vida gravada em cada situacao */
+
+test('contexto da situacao: a vida sai preenchida (guarda e conta no mesmo nivel)', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const dae = await readFile(new URL('../src/daemon.js', import.meta.url), 'utf8');
+  const linha = dae.split('\n').find((l) => l.includes('contexto: { kills:'));
+  assert.ok(linha, 'nao achei a linha que monta o contexto da situacao');
+
+  // O bug: a guarda olhava `e.vidaMax` (nao existe) e a conta usava `e.eu.vidaMax`.
+  // Resultado: vida nula em 100% das situacoes gravadas -- nenhum gate por vida podia
+  // ser medido. vidaMax mora em `eu`, nunca na raiz do estado.
+  assert.ok(!/[^.]\be\.vidaMax\b/.test(linha), 'a guarda da vida esta lendo e.vidaMax, que nao existe -- vidaMax mora em e.eu');
+  assert.match(linha, /vida: e\.eu\?\.vidaMax \? Math\.round\(100 \* e\.eu\.vida \/ e\.eu\.vidaMax\)/, 'guarda e conta da vida tem que ler o mesmo campo');
+
+  // e a gravacao do estado tem que continuar salvando vidaMax, senao nao ha o que dividir
+  const estado = dae.split(/\r?\n/).find((l) => l.includes("'estado.jsonl'") && l.includes('appendFile'));
+  assert.match(estado ?? '', /vidaMax: estado\.eu\.vidaMax/, 'estado.jsonl parou de gravar vidaMax');
 });
