@@ -426,3 +426,19 @@ test('falas.jsonl grava o id da situacao (chave), nao so o id dos modulos', asyn
   const sit = await readFile(new URL('../src/vivo/situacoes.js', import.meta.url), 'utf8');
   assert.match(sit, /const s = \{ chave,/, 'situ() parou de guardar a identidade em `chave` -- a gravacao acima quebra junto');
 });
+
+/* ------------------------------------------- modulo mapa: a janela de fala e 5 s */
+
+test('aviso "X a N segundos": fala ate 5 s, so registra de 6 a 8', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../src/vivo/situacoes.js', import.meta.url), 'utf8');
+  const linha = src.split('\n').find((l) => l.includes('`perto-${f.nome}`'));
+  assert.ok(linha, 'nao achei o gatilho perto-<campeao>');
+
+  // Medido em 138 avisos desses nas partidas gravadas:
+  //   janela de 8 s -> 138 falas, 22 mortes pegas, 16% de acerto
+  //   janela de 5 s ->  63 falas, 17 mortes pegas, 27% de acerto, antecedencia 11,2 -> 9,9 s
+  // O de 6 a 8 s continua entrando como prioridade 0 (gravado, nao falado) pra nao perder o dado.
+  assert.match(linha, /prioridade: s <= 5 \? 3 : 0/, 'a janela de FALA do aviso de aproximacao tem que ser 5 s; de 6 a 8 fica so no registro');
+  assert.match(linha, /if \(s <= 8 && chegando\)/, 'a janela de REGISTRO tem que continuar em 8 s -- e o dado pra medir a proxima mudanca');
+});

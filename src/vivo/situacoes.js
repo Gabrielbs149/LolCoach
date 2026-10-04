@@ -284,8 +284,11 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       if (minhaPos && laneDele !== minhaLane) {
         const s = seg(dist(f.ultimo, minhaPos));
         const vf = velocidade(f, t), chegando = vf ? dist({ x: f.ultimo.x + vf.vx * 3, y: f.ultimo.y + vf.vy * 3 }, minhaPos) < dist(f.ultimo, minhaPos) - 0.01 : false;
-        // tentei calar esse aviso debaixo da torre: em 127 avisos o filtro cortou 17% do barulho e perdeu 3 das 19 mortes, com o acerto parado em 15%. A torre não diz nada aqui — não repetir
-        if (s <= 8 && chegando) situ(`perto-${f.nome}`, { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: F`${f.campeao} a ${s} segundos, ${l.texto}.`, cooldown: 30, dados: { s } });
+        // Janela de fala: 5 s, não 8. Medido em 138 avisos desses: com 8 s o aviso vira morte em 16% das
+        // vezes; com 5 s, em 27%, cortando 54% da fala e perdendo só 5 das 22 mortes — e a antecedência cai
+        // de 11,2 s pra 9,9 s, ou seja, não atrasa nada. De 6 a 8 s continua gravado (prioridade 0) pra não
+        // perder o dado. Também tentei filtrar por torre: não deu nada (17% menos barulho, mesmo acerto).
+        if (s <= 8 && chegando) situ(`perto-${f.nome}`, { tipo: 'perigo', prioridade: s <= 5 ? 3 : 0, modulo: 'mapa', serio: F`${f.campeao} a ${s} segundos, ${l.texto}.`, cooldown: 30, dados: { s } });
       }
       // na base → lane dele livre
       // seu oponente na base: com a sua wave já na torre dele é a hora do roam/ward (não tem o que empurrar); senão, empurra
