@@ -568,3 +568,33 @@ test('timers de objetivo calam quando o jogo ja esta na base', () => {
   // torre do nexus caida: nenhum timer de pit importa
   assert.deepEqual(rodarCom([{ id: 2, tipo: 'TurretKilled', t: 1700, autor: meu, torre: 'Turret_TChaos_L1_P4' }]), [], 'com a torre do nexus caida nenhum timer de objetivo sai');
 });
+
+/* ------------------------------------------- a tela ao vivo so existe durante a partida */
+
+test('tela ao vivo: abre no jogo, fecha depois, e nunca rouba foco pela troca de fase', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const main = await readFile(new URL('../electron/main.js', import.meta.url), 'utf8');
+
+  // Ela abria na SELECAO e nada nunca a fechava -- ficava aberta o tempo todo.
+  const sel = main.split(/\r?\n/).find((l) => l.includes('aoSelecionar:'));
+  assert.ok(sel, 'nao achei o gancho da selecao de campeao');
+  assert.ok(!/abrirVivo/.test(sel), 'a tela ao vivo nao pode mais abrir na selecao de campeao');
+
+  // o bloco da troca de fase: pego do aoFase ate o fim do handler
+  const i = main.indexOf('aoFase: (fase) =>');
+  assert.ok(i > 0, 'nao achei o aoFase');
+  const bloco = main.slice(i, main.indexOf('\n      },', i));
+  assert.match(bloco, /fase === 'InProgress' \|\| fase === 'GameStart'\) abrirVivo\(\{ focar: false \}\)/, 'a tela ao vivo tem que abrir quando o jogo comeca');
+  assert.match(bloco, /fecharVivo\(\)/, 'alguma coisa tem que fechar a tela ao vivo');
+
+  // REGRA DE OURO: com o jogo rodando o app nao chama show()/focus() em janela normal --
+  // show() ATIVA a janela, o Windows tira o foco do jogo e o LoL em tela cheia minimiza.
+  // Toda abertura vinda da troca de fase tem que ser showInactive, ou seja focar: false.
+  for (const m of bloco.matchAll(/abrirVivo\(([^)]*)\)/g)) {
+    assert.match(m[1], /focar:\s*false/, `abrirVivo sem "focar: false" dentro do aoFase: "${m[0]}" -- isso minimiza o LoL dele`);
+  }
+  assert.ok(!/janelaVivo\.(show|focus)\(\)/.test(bloco), 'nada de show()/focus() direto na janela ao vivo dentro do aoFase');
+
+  // e o fecharVivo tem que existir de verdade
+  assert.match(main, /function fecharVivo\(\)/, 'fecharVivo nao existe');
+});

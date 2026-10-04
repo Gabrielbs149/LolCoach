@@ -265,9 +265,9 @@ function segundaTela() {
 function abrirVivo({ focar = true } = {}) {
   const tela = segundaTela();
   if (janelaVivo && !janelaVivo.isDestroyed()) {
-    if (tela) posicionarNaTela(janelaVivo, tela);
-    if (focar) { janelaVivo.show(); janelaVivo.focus(); }
-    else if (!janelaVivo.isVisible()) janelaVivo.showInactive();
+    // já aberta: não reposiciona (ele pode ter movido) nem mexe se a partida está rodando
+    if (focar) { if (tela) posicionarNaTela(janelaVivo, tela); janelaVivo.show(); janelaVivo.focus(); }
+    else if (!janelaVivo.isVisible()) { if (tela) posicionarNaTela(janelaVivo, tela); janelaVivo.showInactive(); }
     return;
   }
   janelaVivo = new BrowserWindow({
@@ -286,6 +286,10 @@ function abrirVivo({ focar = true } = {}) {
     if (focar) janelaVivo.show(); else janelaVivo.showInactive();
   });
   janelaVivo.on('closed', () => { janelaVivo = null; });
+}
+function fecharVivo() {
+  if (janelaVivo && !janelaVivo.isDestroyed()) janelaVivo.close();
+  janelaVivo = null;
 }
 function posicionarNaTela(j, tela) {
   const a = tela.workArea;
@@ -527,7 +531,7 @@ app.whenReady().then(async () => {
   try {
     daemon = await iniciarDaemon({
       estado,
-      aoSelecionar: () => { abrirVoz(); abrirVivo({ focar: false }); },
+      aoSelecionar: () => { abrirVoz(); },
       aoConfig: (cfg) => registrarAtalhos(cfg),
       aoFase: (fase) => {
         const antes = faseAtual;
@@ -540,6 +544,13 @@ app.whenReady().then(async () => {
         else if (fase === 'EndOfGame') setTimeout(() => { if (faseAtual === 'EndOfGame' || faseAtual === 'None' || faseAtual === 'Lobby') fecharVoz(); }, 25_000);   // dá tempo do "avalia as falas"
         if (fase === 'InProgress' || fase === 'GameStart') { abrirOverlay(); abrirOlho(); }
         else if (antes === 'InProgress' || antes === 'GameStart') { fecharOverlay(); fecharOlho(); }
+        // Tela ao vivo: abre quando o JOGO começa. Antes abria na seleção de campeão e nada nunca a fechava,
+        // então ela ficava aberta o tempo todo, inclusive com ele fora de partida. Continua valendo a regra de
+        // ouro: nunca show()/focus() com o jogo rodando — só showInactive, que não tira o foco do LoL.
+        if (fase === 'InProgress' || fase === 'GameStart') abrirVivo({ focar: false });
+        else if (['Lobby', 'Matchmaking'].includes(fase)) fecharVivo();
+        // depois da partida ela fica mais um minuto: é onde ele dá joinha nas falas ("Acabou. Avalia as falas…")
+        else if (fase === 'EndOfGame' || fase === 'None') setTimeout(() => { if (!['InProgress', 'GameStart', 'ChampSelect'].includes(faseAtual)) fecharVivo(); }, 60_000);
         // Acabou uma partida: boa hora pra procurar (e instalar) atualização.
         if (antes === 'InProgress' && fase !== 'InProgress' && app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
       },
