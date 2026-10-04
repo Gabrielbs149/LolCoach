@@ -526,3 +526,45 @@ test('cerebro: prioridade 1 fala quando sobra espaco, e cala quando nao sobra', 
   const r = decidir(umaP1(), { ...ctx, silenciadas: new Set(['jg-nasce']) }, calado);
   assert.equal(r[0].falar, false, 'situacao silenciada pelas avaliacoes nao pode voltar pela folga');
 });
+
+/* ------------------------------------------- o conselho tem que acompanhar o jogo */
+
+test('ace: o alvo muda conforme o jogo, nao e sempre Barao', () => {
+  const objetivos = [{ nome: 'Barão', em: -10, vivo: true, quando: 'no mapa' }];
+  const ace = (eventos) => {
+    const e = mundo(1500, 'adc');
+    e.eventos = [...eventos, { id: 999, tipo: 'Ace', t: 1500, autor: e.eu.nome, assistentes: [] }];
+    const out = falasNovas({ estado: e, rastreio: null, objetivos, conselhos: [], extras: null }, novaMemoriaFalas());
+    const f = out.find((q) => String(q.id).startsWith('ace-'));
+    return f ? render(f.serio) : null;
+  };
+  const meu = mundo(1500, 'adc').eu.nome;
+  const torreDeles = (p) => ({ id: p, tipo: 'TurretKilled', t: 900 + p, autor: meu, torre: `Turret_TChaos_L1_P${p}` });
+
+  // jogo aberto, Barao vivo: continua valendo
+  assert.match(ace([]), /Bar[ãa]o/, 'sem nada tomado, Barao e a jogada');
+  // base deles aberta: nao manda mais sair do jogo ganho pra buscar buff
+  const comInib = ace([{ id: 50, tipo: 'InhibKilled', t: 1400, autor: meu, assistentes: [] }]);
+  assert.ok(!/Bar[ãa]o ou torre/.test(comInib), `com inibidor caido nao pode ser o conselho antigo: "${comInib}"`);
+  // torre do nexus no chao: so existe uma jogada
+  const noNexus = ace([torreDeles(4), { id: 50, tipo: 'InhibKilled', t: 1400, autor: meu, assistentes: [] }]);
+  assert.match(noNexus, /nexus/i, `com a torre do nexus caida o conselho tem que ser o nexus: "${noNexus}"`);
+});
+
+test('timers de objetivo calam quando o jogo ja esta na base', () => {
+  const objetivos = [{ nome: 'Dragão', em: 30, vivo: false, quando: 'em 0:30' }, { nome: 'Barão', em: 30, vivo: false, quando: 'em 0:30' }];
+  const rodarCom = (eventos) => {
+    const e = mundo(1800, 'adc');
+    e.eventos = eventos;
+    return falasNovas({ estado: e, rastreio: null, objetivos, conselhos: [], extras: null }, novaMemoriaFalas()).filter((f) => String(f.id).startsWith('t30-')).map((f) => render(f.serio));
+  };
+  const meu = mundo(1800, 'adc').eu.nome;
+
+  // jogo normal: os dois timers saem
+  assert.equal(rodarCom([]).length, 2, 'sem base aberta os dois timers saem');
+  // inibidor caido: Dragao nao decide mais nada, Barao ainda decide
+  const comInib = rodarCom([{ id: 1, tipo: 'InhibKilled', t: 1700, autor: meu, assistentes: [] }]);
+  assert.deepEqual(comInib.map((s) => /Barão/.test(s)), [true], `com inibidor caido so o Barao fica: ${JSON.stringify(comInib)}`);
+  // torre do nexus caida: nenhum timer de pit importa
+  assert.deepEqual(rodarCom([{ id: 2, tipo: 'TurretKilled', t: 1700, autor: meu, torre: 'Turret_TChaos_L1_P4' }]), [], 'com a torre do nexus caida nenhum timer de objetivo sai');
+});

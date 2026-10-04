@@ -73,11 +73,47 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
   // Cada evento é lido UMA vez (por id): reler mudaria contadores como 'te matou N vezes'.
   const novo = (e) => { const k = e.id ?? `${e.tipo}-${e.t}`; if (mem.vistos.has(k)) return false; mem.vistos.add(k); return true; };
 
+  /**
+   * Em que pé o jogo está pelas ESTRUTURAS. Serve pra calar conselho que não cabe mais: com a base
+   * aberta o jogo se decide lá, não no pit. Medido em 86 partidas gravadas: 147 falas de timer de
+   * objetivo saíram depois do primeiro inibidor cair e 37 com a torre do nexus já no chão — incluindo
+   * "Trinta segundos pro Barão" aos 40:36, com o nexus aberto.
+   */
+  const camadaDe = (q) => torreInfo(q.torre)?.camada ?? null;
+  const quedas = (eventos ?? []).filter((q) => q.tipo === 'TurretKilled' && q.torre);
+  const delas = quedas.filter((q) => { const ti = torreInfo(q.torre); return ti ? ti.time !== eu.time : ehAliado(q.autor); });
+  const estruturas = {
+    nexusAberto: quedas.some((q) => camadaDe(q) === 'nexus'),                                            // torre do nexus caiu, de qualquer lado
+    baseAberta: (eventos ?? []).some((q) => q.tipo === 'InhibKilled'),                                   // inibidor caiu, de qualquer lado
+    inibsDeles: (eventos ?? []).filter((q) => q.tipo === 'InhibKilled' && ehAliado(q.autor)).length,
+    camadasDelas: new Set(delas.map(camadaDe).filter(Boolean)),
+  };
+
+  /**
+   * O que fazer com um ace nosso. Antes era sempre "Barão ou torre agora", inclusive com a base
+   * deles aberta e o nexus na mão — mandar buscar um buff que não dá tempo de usar. Agora olha
+   * onde o jogo está: quanto mais fundo a gente já chegou, menos o Barão importa.
+   */
+  const alvoDoAce = () => {
+    const { inibsDeles: inibs, camadasDelas: camadas } = estruturas;
+    if (camadas.has('nexus')) return 'Termina o nexus.';
+    if (inibs >= 2 || (inibs >= 1 && camadas.has('inib'))) return 'Fecha o jogo na base deles.';
+    if (inibs >= 1) return 'Vai no inibidor aberto.';
+    const vivo = (n) => (objetivos ?? []).some((o) => o.nome === n && o.vivo);
+    if (vivo('Ancião')) return 'Ancião agora.';
+    if (vivo('Barão')) return camadas.has('inib') ? 'Barão e fecha.' : 'Barão ou torre agora.';
+    return camadas.has('inib') ? 'Pressiona a base deles.' : 'Pega torre agora.';
+  };
+
   /* ---- começo ---- */
   if (minhaRole !== 'jungle' && tempo >= 190 && tempo < 200 && jgDeles) dizer('jg-primeiro', 'jungler', F`Três minutos. ${jgDeles.campeao} termina o clear agora. Ward no rio.`, F`Três minutos: ${jgDeles.campeao} acabou o clear. Ward no rio.`, 2);
 
   /* ---- timers ---- */
   for (const o of objetivos ?? []) {
+    // Torre do nexus no chão: acabou o tempo de pit, o jogo é na base. Nenhum timer importa.
+    if (estruturas.nexusAberto) break;
+    // Inibidor caído: Dragão/Arauto/Vastilarvas não decidem mais nada. Barão e Ancião ainda decidem.
+    if (estruturas.baseAberta && !['Barão', 'Ancião'].includes(o.nome)) continue;
     const chave = `${o.nome}-${Math.round((tempo + o.em) / 60)}`;
     if (o.em > 55 && o.em <= 62) {
       if (olho && ['Dragão', 'Barão', 'Ancião', 'Arauto'].includes(o.nome)) { /* o quadro do olho fala esse */ }
@@ -128,7 +164,10 @@ export function falasNovas({ estado, rastreio, objetivos, conselhos, extras, olh
     if (e.tipo === 'Ace') {
       // No Ace a API manda o TIME (ORDER/CHAOS), não um jogador.
       const aceNosso = e.autor === 'ORDER' ? eu.time === 100 : e.autor === 'CHAOS' ? eu.time === 200 : ehAliado(e.autor);
-      dizer(`ace-${e.id}`, 'kills', aceNosso ? F('Ace. Barão ou torre agora.') : F('Levamos ace. Defende a base.'), aceNosso ? F('Ace. Vai pro Barão.') : F('Levamos ace. Segura a base.'), 3);
+      // O que fazer com um ace depende de ONDE o jogo está. Dizer "vai pro Barão" com a base deles
+      // aberta é mandar sair do jogo ganho pra buscar um buff que não vai dar tempo de usar.
+      const alvo = aceNosso ? alvoDoAce() : null;
+      dizer(`ace-${e.id}`, 'kills', aceNosso ? F`Ace. ${alvo}` : F('Levamos ace. Defende a base.'), aceNosso ? F`Ace. ${alvo}` : F('Levamos ace. Segura a base.'), 3);
     }
 
     if (e.tipo === 'DragonKill') {

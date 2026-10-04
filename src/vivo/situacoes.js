@@ -343,7 +343,9 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       // Um minuto antes: o quadro do objetivo numa frase (jungler deles, quantos deles perto, seu jungler).
       if (!o.vivo && o.em > 50 && o.em <= 62 && ['Dragão', 'Barão', 'Ancião', 'Arauto'].includes(o.nome)) {
         const partes = [];
-        if (jg) partes.push(visivel(jg, t) ? `jungler deles ${lugarTxt(jg.ultimo)}` : jg.morto ? 'jungler deles morto' : jg.ultimo ? `jungler deles sumido há ${Math.round(vistoHa(jg, t))} segundos` : 'jungler deles não visto');
+        // o "há N segundos" só informa enquanto for um número que cabe na cabeça: saiu "sumido há 918 segundos"
+        // (15 min) numa partida real, que não é informação, é o olho tendo perdido o cara faz tempo
+        if (jg) partes.push(visivel(jg, t) ? `jungler deles ${lugarTxt(jg.ultimo)}` : jg.morto ? 'jungler deles morto' : jg.ultimo && vistoHa(jg, t) <= 120 ? `jungler deles sumido há ${Math.round(vistoHa(jg, t))} segundos` : 'sem saber do jungler deles');
         const pertoPit = vis.filter((f) => dist(f.ultimo, pit) < 0.2).length;
         const nossosPit = [...alVis, ...(minhaPos ? [fEu] : [])].filter((f) => f.ultimo && dist(f.ultimo, pit) < 0.2).length;
         if (pertoPit) partes.push(`${pertoPit} deles perto do pit${nossosPit ? `, ${nossosPit} nosso${nossosPit > 1 ? 's' : ''}` : ''}`);
