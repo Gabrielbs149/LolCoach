@@ -373,3 +373,37 @@ test('lugar: torre tem nome, e o lado é o de quem joga', async () => {
   // longe de qualquer torre continua sendo a rota
   assert.match(lugar(0.80, 0.90, 100).texto, /^no bot/);
 });
+
+/* ------------------------------------------- aviso de morte iminente: a ordem vem na frente */
+
+test('aviso de perigo em cima: a ordem vem na frente e a frase cabe no tempo', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../src/vivo/situacoes.js', import.meta.url), 'utf8');
+
+  // Medido no historico: a antecedencia mediana do aviso e 3,8 s e a voz fala ~14
+  // caracteres por segundo. So 54% das frases terminavam antes da morte; so a ordem
+  // curta terminaria em 91%. Por isso o verbo vem primeiro: mesmo cortada, ele ouviu
+  // o que fazer. Vale so pros avisos de inimigo em cima de voce -- objetivo e timer
+  // tem 30 s de folga e podem ser longos.
+  const IDS = ['vida-baixa-vindo', 'perigo-perto', 'jg-em-cima', 'dive', 'invade-cedo', 'perto-'];
+  const ORDEM = /^(Sai|Recua|Corre|Volta|Foge|Cuidado)\b/;
+  const CPS = 14;
+
+  const achadas = [];
+  for (const linha of src.split('\n')) {
+    if (!/prioridade: 3\b/.test(linha)) continue;
+    if (!IDS.some((id) => linha.includes(`'${id}`) || linha.includes(`\`${id}`))) continue;
+    for (const m of linha.matchAll(/\bF`([^`]*)`/g)) achadas.push(m[1]);
+    for (const m of linha.matchAll(/\bF\('([^']*)'\)/g)) achadas.push(m[1]);
+  }
+  assert.ok(achadas.length >= 8, `achei so ${achadas.length} frases de perigo em cima -- o teste parou de enxergar as falas`);
+
+  for (const f of achadas) {
+    // a frase "X a N segundos, no top" e informativa (o inimigo ainda esta longe): nao exige ordem
+    const informativa = /^\$\{[^}]*\} a \$\{s\} segundos/.test(f) || /^Jungler a \$\{s\} segundos/.test(f);
+    const primeira = f.split(/[!.,]/)[0].trim();
+    if (!informativa) assert.match(primeira, ORDEM, `"${f}" nao comeca com a ordem -- se a morte cortar a fala ele nao ouviu o que fazer`);
+    const chars = f.replace(/\$\{[^}]*\}/g, 'Caitlyn').length;
+    assert.ok(chars / CPS <= 3.6, `"${f}" leva ${(chars / CPS).toFixed(1)} s de voz; a antecedencia mediana e 3,8 s`);
+  }
+});
