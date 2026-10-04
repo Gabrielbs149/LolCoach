@@ -407,3 +407,22 @@ test('aviso de perigo em cima: a ordem vem na frente e a frase cabe no tempo', a
     assert.ok(chars / CPS <= 3.6, `"${f}" leva ${(chars / CPS).toFixed(1)} s de voz; a antecedencia mediana e 3,8 s`);
   }
 });
+
+/* ------------------------------------------- a fala gravada precisa levar a identidade dela */
+
+test('falas.jsonl grava o id da situacao (chave), nao so o id dos modulos', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const dae = await readFile(new URL('../src/daemon.js', import.meta.url), 'utf8');
+
+  // As situacoes do minimapa (situacoes.js) guardam o identificador em `chave`; os
+  // modulos de API (timers, kills, economia) em `id`. A gravacao lia so `id`, entao
+  // 80% das falas de uma partida saiam com id nulo -- sem isso so da pra analisar por
+  // regex no texto, e foi assim que uma analise misturou canhao com aviso de perigo.
+  const linha = dae.split('\n').find((l) => l.includes("'falas.jsonl'") && l.includes('appendFile'));
+  assert.ok(linha, 'nao achei a linha que grava falas.jsonl');
+  assert.match(linha, /id:\s*pronta\.id\s*\?\?\s*pronta\.chave/, 'a gravacao de falas.jsonl precisa cair em pronta.chave quando nao tem pronta.id');
+
+  // e o `situ` do situacoes.js tem mesmo que produzir `chave`
+  const sit = await readFile(new URL('../src/vivo/situacoes.js', import.meta.url), 'utf8');
+  assert.match(sit, /const s = \{ chave,/, 'situ() parou de guardar a identidade em `chave` -- a gravacao acima quebra junto');
+});

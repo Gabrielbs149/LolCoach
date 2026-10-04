@@ -883,7 +883,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     personalizarFalas(config.voz?.falas ?? {});
     const pronta = { ...f, serio: renderFala(f.serio), divertido: renderFala(f.divertido ?? f.serio) };
     // Tudo que a voz diz fica gravado junto com as situações: material pra aprender o que vale falar.
-    if (partidaVivo?.pastaSitu && pronta.seq) appendFile(resolve(partidaVivo.pastaSitu, 'falas.jsonl'), JSON.stringify({ t: Math.round((pronta.t ?? 0) * 10) / 10, id: pronta.id ?? null, modulo: pronta.modulo, prioridade: pronta.prioridade, serio: pronta.serio, divertido: pronta.divertido }) + '\n').catch(() => {});
+    // o id: as situações do minimapa guardam em `chave`, os outros módulos em `id`. Sem os dois, 80% das falas
+    // gravadas saíam sem identidade e só dava pra analisar por regex no texto (foi assim que uma análise misturou
+    // "Canhão… empurra sozinha" com aviso de perigo).
+    if (partidaVivo?.pastaSitu && pronta.seq) appendFile(resolve(partidaVivo.pastaSitu, 'falas.jsonl'), JSON.stringify({ t: Math.round((pronta.t ?? 0) * 10) / 10, id: pronta.id ?? pronta.chave ?? null, modulo: pronta.modulo, prioridade: pronta.prioridade, serio: pronta.serio, divertido: pronta.divertido }) + '\n').catch(() => {});
     return pronta;
   };
   let ultimoRetrato = 0;
