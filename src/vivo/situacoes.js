@@ -422,6 +422,9 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       mundo.wards[lado] = lista.filter((q) => t - q.t < 90);
     }
     // ward deles revelada: registro (e pro jungler/sup, que limpam)
+    // ATENÇÃO: hoje isso nunca roda. O olho devolve `deles: []` de propósito (olho.html, função wards):
+    // ward vermelha no minimapa não dá pra separar de minion/torre/ping sem amostra confirmada. Em 96
+    // partidas: 127.205 wards vistas, todas "nossas", nenhuma "deles". Só volta a valer se o olho aprender a achá-las.
     for (const w of mundo.wards.deles) if (w.desde === t) { const l = lugar(w.x, w.y, meuTime); situ(`ward-deles-${l.chave}`, { tipo: 'visao', prioridade: ['jungle', 'bot'].includes(minhaLane) && l.lado === 'nosso' ? 1 : 0, modulo: 'mapa', serio: F`Ward deles ${l.texto}.`, cooldown: 120, dados: { x: w.x, y: w.y } }); }
   }
   /* ============================================ 3b. waves (minions) */

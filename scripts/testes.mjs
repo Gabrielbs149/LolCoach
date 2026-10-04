@@ -497,3 +497,32 @@ test('dive: nao depende de ver o jungler, e substitui o aviso generico', async (
   assert.match(cond, /filter\(\(f\) => naTorreDe\(f\.ultimo, meuTime\)\)/, 'precisa exigir que ELES entrem na sua torre -- so estar perto de voce e wave empurrando, nao dive');
   assert.match(cond, /t >= 150/, 'antes de 2:30 e invade, nao dive');
 });
+
+/* ------------------------------------------- prioridade 1 precisa ter como sair */
+
+test('cerebro: prioridade 1 fala quando sobra espaco, e cala quando nao sobra', async () => {
+  const { decidir, novaMemoriaCerebro } = await import('../src/vivo/cerebro.js');
+  const ctx = { t: 600, minhaLane: 'bot', minhaRole: 'adc', morto: false };
+  const umaP1 = () => [{ chave: 'jg-nasce', tipo: 'jungler', prioridade: 1, dados: {} }];
+
+  // Com o app quieto (nenhuma fala no ultimo minuto) ela tem que sair. Antes disso o corte
+  // era nota >= 2 e a prioridade 1 comeca em 1,0: jg-nasce, jg-lado-livre, aliado-sozinho e
+  // agrupados dispararam 618 vezes em 96 partidas sem nunca ser falados.
+  const quieto = novaMemoriaCerebro();
+  assert.equal(decidir(umaP1(), ctx, quieto)[0].falar, true, 'com o app quieto a prioridade 1 tem que falar');
+
+  // Com o app falando muito ela tem que calar -- a folga e justamente o que a limita.
+  const cheio = novaMemoriaCerebro();
+  cheio.faladasEm = [560, 570, 580, 590];
+  cheio.ultimaFalaEm = 590;
+  assert.equal(decidir(umaP1(), ctx, cheio)[0].falar, false, 'com 4 falas no ultimo minuto a prioridade 1 nao pode entrar');
+
+  // prioridade 0 continua so no registro, com folga ou sem
+  const zero = novaMemoriaCerebro();
+  assert.equal(decidir([{ chave: 'wave-bot-nosso', tipo: 'wave', prioridade: 0, dados: {} }], ctx, zero)[0].falar, false, 'prioridade 0 e so registro');
+
+  // e o silenciamento por avaliacao continua valendo mesmo com folga
+  const calado = novaMemoriaCerebro();
+  const r = decidir(umaP1(), { ...ctx, silenciadas: new Set(['jg-nasce']) }, calado);
+  assert.equal(r[0].falar, false, 'situacao silenciada pelas avaliacoes nao pode voltar pela folga');
+});

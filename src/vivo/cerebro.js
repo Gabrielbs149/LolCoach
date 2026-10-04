@@ -52,7 +52,13 @@ export function decidir(situacoes, ctx, mem) {
   const saida = [];
   for (const s of situacoes.sort((a, b) => b.nota - a.nota)) {
     const urgente = s.prioridade >= 3 && s.nota >= 3;
-    let falar = s.nota >= 2;
+    // Prioridade 1 era inalcançável: o corte é nota >= 2 e ela começa em 1,0, chegando lá só quando é
+    // sobre a sua lane. Resultado medido em 96 partidas: jg-nasce (300×), jg-lado-livre (246×),
+    // aliado-sozinho (63×) e agrupados (9×) dispararam 618 vezes sem NUNCA sair pela voz. Agora ela fala
+    // quando sobra espaço — no máximo 2 falas no último minuto. Medido: soma 2,2 falas por partida
+    // (o app fala ~135), e não encosta no pico, porque com o app falando muito a folga não existe.
+    const folga = mem.faladasEm.length <= 2;
+    let falar = s.nota >= 2 || (folga && s.prioridade >= 1 && s.nota >= 1);
     if (!urgente && falar && (t - mem.ultimaFalaEm < gapMin || mem.faladasEm.length >= orcamento)) falar = false;
     s.falar = falar;
     if (falar) { mem.ultimaFalaEm = t; mem.faladasEm.push(t); mem.ultimaPorTipo.set(baseChave(s.chave), t); }
