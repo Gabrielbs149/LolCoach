@@ -598,3 +598,55 @@ test('tela ao vivo: abre no jogo, fecha depois, e nunca rouba foco pela troca de
   // e o fecharVivo tem que existir de verdade
   assert.match(main, /function fecharVivo\(\)/, 'fecharVivo nao existe');
 });
+
+/* ------------------------------------------- fala repetida sai sem a explicacao */
+
+test('repetida: corta a explicacao, nunca a ordem nem o numero', async () => {
+  const { encurtarRepetida } = await import('../src/vivo/texto.js');
+
+  // Medido em 13 partidas: 33% das falas de uma partida sao repeticao da mesma coisa.
+  // A campea e "Canhao nessa wave. Ela empurra sozinha." -- 6,8 vezes por partida, ate 8.
+  assert.equal(encurtarRepetida('Canhão nessa wave. Ela empurra sozinha.'), 'Canhão nessa wave.');
+  assert.equal(encurtarRepetida('Jungler deles voltou pra base. Dá pra avançar agora.'), 'Jungler deles voltou pra base.');
+  assert.equal(encurtarRepetida('Seu jungler sem flash por {1}. Gank sem flash: só com a lane na torre.'), 'Seu jungler sem flash por {1}.');
+
+  // a ORDEM nunca cai: e o que ele tem que fazer
+  assert.equal(encurtarRepetida('Vida baixa e gold sobrando. Base.'), 'Vida baixa e gold sobrando. Base.');
+  assert.equal(encurtarRepetida('Barão nosso. Empurra as três lanes.'), 'Barão nosso. Empurra as três lanes.');
+  assert.equal(encurtarRepetida('Eles no Barão. Solta o que está fazendo.'), 'Eles no Barão. Solta o que está fazendo.');
+
+  // frase com numero nunca cai: e o dado que mudou desde a ultima vez
+  assert.equal(encurtarRepetida('Jungler deles morreu. {1} segundos livres.'), 'Jungler deles morreu. {1} segundos livres.');
+
+  // se sobrar quase nada, fica tudo ("Ace." sozinho nao diz nada)
+  assert.equal(encurtarRepetida('Ace. Barão ou torre agora.'), 'Ace. Barão ou torre agora.');
+
+  // frase de uma sentenca so passa direto
+  assert.equal(encurtarRepetida('Trinta segundos pro Dragão.'), 'Trinta segundos pro Dragão.');
+  assert.equal(encurtarRepetida('Sai! {1} em cima.'), 'Sai! {1} em cima.');
+});
+
+test('repetida: a estreia sai inteira, a 2a vez sai curta', async () => {
+  const { render, personalizar, encurtarRepetida, temPersonalizacao } = await import('../src/vivo/texto.js');
+  personalizar({});
+  const modelo = 'Canhão nessa wave. Ela empurra sozinha.';
+  const fala = { modelo, valores: [] };
+
+  // o mesmo controle que o daemon faz: a decisao e uma so por fala
+  const ditos = new Set();
+  const falar = () => {
+    const repetida = ditos.has(modelo);
+    if (!repetida) ditos.add(modelo);
+    const t = repetida && !temPersonalizacao(modelo) ? { ...fala, modelo: encurtarRepetida(modelo) } : fala;
+    return render(t);
+  };
+  assert.equal(falar(), 'Canhão nessa wave. Ela empurra sozinha.', 'a primeira vez sai inteira');
+  assert.equal(falar(), 'Canhão nessa wave.', 'a segunda ja sai sem a explicacao');
+  assert.equal(falar(), 'Canhão nessa wave.', 'e segue curta');
+
+  // frase que ELE personalizou nao se mexe
+  personalizar({ [modelo]: 'Canhão. Olha a wave.' });
+  assert.equal(temPersonalizacao(modelo), true);
+  assert.equal(render(fala), 'Canhão. Olha a wave.', 'a personalizada dele manda');
+  personalizar({});
+});

@@ -29,6 +29,35 @@ export function render(f) {
   return modelo.replace(/\{(\d+)\}/g, (m, n) => { const v = f.valores[Number(n) - 1]; return v == null ? '' : String(v); }).replace(/\b1 (segundo|minuto|kill|jogo|vitória|derrota|morte)s\b/g, '1 $1').replace(/\b1 vezes\b/g, '1 vez');
 }
 
+/** Ele mexeu nessa frase? Então ninguém encurta ela por conta própria. */
+export function temPersonalizacao(modelo) {
+  return Object.hasOwn(personalizadas, modelo) && String(personalizadas[modelo]).trim() !== '';
+}
+
+// começo de frase que é ORDEM: isso nunca se corta, é o que ele tem que fazer
+const ORDEM = /^\s*(Sai|Recua|Corre|Volta|Foge|Cuidado|Base|Empurra|Pega|Termina|Fecha|Vai|Junta|Solta|Prepara|Ward|Sobe|Força|Segura|Defende|Limpa|Pressiona|Compra|Guarda|Espera|Marca|Avisa|Não|Nunca)\b/i;
+const MINIMO = 15;   // se o que sobrar for menor que isso, não vale a pena: fica a frase inteira
+
+/**
+ * A mesma frase dita de novo vira papel de parede. Medido em 13 partidas: 33% de tudo que o
+ * app fala é repetição da mesma coisa na mesma partida — "Canhão nessa wave. Ela empurra
+ * sozinha." sai 6,8 vezes por partida, até 8.
+ *
+ * Da segunda vez em diante corta as frases que são só EXPLICAÇÃO. Fica de fora do corte:
+ *  - a primeira frase (é o fato);
+ *  - qualquer frase com {n} (ali está o dado que mudou: "Jungler deles morreu. 45 segundos livres.");
+ *  - qualquer frase que seja uma ordem ("Vida baixa e gold sobrando. Base." — "Base." é o que ele faz).
+ * Se sobrar pouca coisa ("Ace." de "Ace. Barão ou torre agora."), devolve a frase inteira.
+ */
+export function encurtarRepetida(modelo) {
+  const partes = String(modelo).match(/[^.!?]+[.!?]*\s*/g);
+  if (!partes || partes.length < 2) return modelo;
+  const fica = partes.filter((p, i) => i === 0 || /\{\d+\}/.test(p) || ORDEM.test(p));
+  if (fica.length === partes.length) return modelo;
+  const curto = fica.join('').trim();
+  return curto.length >= MINIMO ? curto : modelo;
+}
+
 /* --------------------------------------------------------- catálogo */
 const MODULOS = new Set(['timers', 'flash', 'kills', 'jungler', 'spikes', 'economia', 'lane', 'mapa', 'selecao']);
 

@@ -7,7 +7,7 @@ import { coletarPendentes } from './dados/coletor.js';
 import { readFile, writeFile, mkdir, readdir, rm, appendFile } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
 import { resolve, basename } from 'node:path';
-import { F, render as renderFala, personalizar as personalizarFalas } from './vivo/texto.js';
+import { F, render as renderFala, personalizar as personalizarFalas, encurtarRepetida, temPersonalizacao } from './vivo/texto.js';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { release as versaoDoWindows } from 'node:os';
@@ -881,7 +881,21 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   };
   const prontaFala = (f) => {
     personalizarFalas(config.voz?.falas ?? {});
-    const pronta = { ...f, serio: renderFala(f.serio), divertido: renderFala(f.divertido ?? f.serio) };
+    // Da 2a vez em diante, a mesma frase sai sem a explicacao: 33% de tudo que o app diz numa partida
+    // e repeticao da mesma coisa ("Canhao nessa wave. Ela empurra sozinha." sai 6,8 vezes, ate 8).
+    // O corte preserva a ordem e qualquer frase com numero -- so cai o que ele ja ouviu e nao mudou.
+    // Frase que ELE personalizou nao se mexe.
+    // a decisao e UMA por fala (pelo modelo serio) e vale pros dois textos: decidir duas vezes
+    // fazia o 'divertido' sair ja cortado na estreia, quando ele e a mesma frase do 'serio'.
+    const repetida = (() => {
+      const t = f.serio;
+      if (!t || typeof t === 'string' || !f.seq || !partidaVivo) return false;
+      partidaVivo.modelosDitos ??= new Set();
+      if (!partidaVivo.modelosDitos.has(t.modelo)) { partidaVivo.modelosDitos.add(t.modelo); return false; }
+      return true;
+    })();
+    const curta = (t) => (repetida && t && typeof t !== 'string' && !temPersonalizacao(t.modelo) ? { ...t, modelo: encurtarRepetida(t.modelo) } : t);
+    const pronta = { ...f, serio: renderFala(curta(f.serio)), divertido: renderFala(curta(f.divertido ?? f.serio)) };
     // Tudo que a voz diz fica gravado junto com as situações: material pra aprender o que vale falar.
     // o id: as situações do minimapa guardam em `chave`, os outros módulos em `id`. Sem os dois, 80% das falas
     // gravadas saíam sem identidade e só dava pra analisar por regex no texto (foi assim que uma análise misturou
