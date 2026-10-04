@@ -10,7 +10,7 @@
  * (1.0) leva ~40 s. Distância vira segundos com isso.
  */
 import { F } from './texto.js';
-import { lugar } from './olho.js';
+import { lugar, naTorreDe } from './olho.js';
 
 const SEG_POR_MAPA = 40;                 // 1.0 de distância ≈ 40 s andando
 const seg = (d) => Math.round(d * SEG_POR_MAPA);
@@ -225,7 +225,10 @@ export function processar(mundo, leitura, estado, objetivos = []) {
       if (minhaPos && ladoNosso(minhaPos)) {
         const juntos = fIni.filter((f) => f !== jg && visivel(f, t) && dist(f.ultimo, minhaPos) < 0.1);
         // antes dos 2:30 não é dive, é invade/cheese de nível 1 (saiu "Dive vindo" a 1:40 com o jungler no leash)
-        if (juntos.length && dist(jg.ultimo, minhaPos) < 0.12) situ(t < 150 ? 'invade-cedo' : 'dive', { tipo: 'perigo', prioridade: 3, modulo: 'jungler', serio: t < 150 ? F`Recua pra torre! Jungler e ${juntos[0].campeao} em cima.` : F`Sai da torre! Dive com ${juntos[0].campeao}.`, divertido: t < 150 ? F`Recua pra torre! Jungler e ${juntos[0].campeao} em cima, cedo.` : F`Sai da torre! Jungler e ${juntos[0].campeao} querem te visitar.`, cooldown: t < 150 ? 60 : 30 });
+        // só o invade de nível 1 mora aqui. O aviso de dive saiu deste bloco: exigir ver o jungler deles colado
+        // em você fez ele disparar 0 vezes em 13 partidas — nas 15 mortes debaixo da própria torre o jungler não
+        // estava visível em nenhuma. O dive agora é decidido lá embaixo, pelos inimigos dentro da sua torre.
+        if (juntos.length && t < 150 && dist(jg.ultimo, minhaPos) < 0.12) situ('invade-cedo', { tipo: 'perigo', prioridade: 3, modulo: 'jungler', serio: F`Recua pra torre! Jungler e ${juntos[0].campeao} em cima.`, divertido: F`Recua pra torre! Jungler e ${juntos[0].campeao} em cima, cedo.`, cooldown: 60 });
       }
       jg.sumidoDito = 0;
     } else if (jg.ultimo && !jg.morto) {
@@ -446,7 +449,13 @@ export function processar(mundo, leitura, estado, objetivos = []) {
     const esperado = (f) => minhaLane && minhaLane !== 'jungle' && LANE_DE[f.role] === minhaLane && minhaRegiao.lane === minhaLane;   // oponente de lane, na lane
     const perto = pertoTodos.length >= 3 ? pertoTodos : pertoTodos.filter((f) => !esperado(f));
     const escalou = (mundo.perigoN ?? 0) >= 2 && perto.length > mundo.perigoN && t - (mundo.perigoEm ?? -99) >= 10;   // 2→3, 3→4: fala de novo mesmo dentro do cooldown (mas não 4 s depois da anterior)
-    if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) situ(escalou ? 'perigo-perto-mais' : 'perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: perto.length === 2 ? F`Sai! ${perto[0].campeao} e ${perto[1].campeao} em cima.` : perto.length >= 3 ? F`Sai! ${perto.length} deles em cima.` : F`Sai! ${perto[0].campeao} e ${pertoTodos.find((f) => f !== perto[0]).campeao} em cima.`, divertido: F`Sai! ${pertoTodos.length} deles vindo te buscar.`, cooldown: 45, dados: { quem: pertoTodos.map((f) => f.campeao) } });   // 2: diz quem (é o que decide se dá pra lutar); 3+: só o número
+    // DIVE: 2+ deles dentro do alcance da SUA torre. Não soma fala nenhuma — é subconjunto do aviso de baixo,
+    // e troca a ordem dele. Debaixo da torre o instinto é ficar, e com dois em cima a torre não segura; "Sai!"
+    // sozinho não diz isso. Medido: 16 casos em 13 partidas (~1,2 por partida), 2 das 14 mortes por dive.
+    const dentroDaMinhaTorre = t >= 150 && naTorreDe(minhaPos, meuTime) ? pertoTodos.filter((f) => naTorreDe(f.ultimo, meuTime)) : [];
+    const temDive = dentroDaMinhaTorre.length >= 2;
+    if (temDive) situ('dive', { tipo: 'perigo', prioridade: 3, modulo: 'jungler', serio: F`Sai da torre! ${dentroDaMinhaTorre[0].campeao} e ${dentroDaMinhaTorre[1].campeao} em cima.`, divertido: F`Sai da torre! ${dentroDaMinhaTorre[0].campeao} e ${dentroDaMinhaTorre[1].campeao} te acharam.`, cooldown: 30, dados: { quem: dentroDaMinhaTorre.map((f) => f.campeao) } });
+    if (!temDive && (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2))) situ(escalou ? 'perigo-perto-mais' : 'perigo-perto', { tipo: 'perigo', prioridade: 3, modulo: 'mapa', serio: perto.length === 2 ? F`Sai! ${perto[0].campeao} e ${perto[1].campeao} em cima.` : perto.length >= 3 ? F`Sai! ${perto.length} deles em cima.` : F`Sai! ${perto[0].campeao} e ${pertoTodos.find((f) => f !== perto[0]).campeao} em cima.`, divertido: F`Sai! ${pertoTodos.length} deles vindo te buscar.`, cooldown: 45, dados: { quem: pertoTodos.map((f) => f.campeao) } });   // 2: diz quem (é o que decide se dá pra lutar); 3+: só o número
     const vidaPct = eu.vidaMax ? eu.vida / eu.vidaMax : 1;
     if (perto.length >= 2 || (perto.length === 1 && pertoTodos.length >= 2)) mundo.perigoEm = t;
     mundo.perigoN = perto.length;

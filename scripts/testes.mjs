@@ -468,3 +468,32 @@ test('contexto da situacao: a vida sai preenchida (guarda e conta no mesmo nivel
   const estado = dae.split(/\r?\n/).find((l) => l.includes("'estado.jsonl'") && l.includes('appendFile'));
   assert.match(estado ?? '', /vidaMax: estado\.eu\.vidaMax/, 'estado.jsonl parou de gravar vidaMax');
 });
+
+/* ------------------------------------------- dive: 2+ dentro da sua torre, sem exigir o jungler */
+
+test('dive: nao depende de ver o jungler, e substitui o aviso generico', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const src = await readFile(new URL('../src/vivo/situacoes.js', import.meta.url), 'utf8');
+  const linhas = src.split(/\r?\n/);
+
+  // O gatilho antigo exigia o jungler deles visivel colado em voce. Medido nas 13
+  // partidas gravadas: disparou 0 vezes, e nas 15 mortes debaixo da propria torre o
+  // jungler nao estava visivel em NENHUMA (a aquisicao a frio do olho e 27%).
+  const dive = linhas.find((l) => l.includes("situ('dive'"));
+  assert.ok(dive, 'nao achei o gatilho do dive');
+  assert.ok(!/jg\b/.test(dive), 'o dive voltou a depender do jungler -- foi isso que o deixou morto');
+  assert.match(dive, /dentroDaMinhaTorre\[0\]\.campeao/, 'o dive tem que nomear quem entrou na torre');
+
+  // e tem que SUBSTITUIR o aviso generico, nao somar: a condicao do dive e subconjunto
+  // da dele, entao disparar os dois seria falar duas vezes o mesmo perigo.
+  const generico = linhas.find((l) => l.includes("'perigo-perto-mais' : 'perigo-perto'"));
+  assert.ok(generico, 'nao achei o aviso generico de 2+ inimigos');
+  assert.match(generico, /if \(!temDive &&/, 'o aviso generico tem que calar quando o dive dispara');
+
+  // a condicao do dive: os inimigos DENTRO do alcance da torre, nao so perto de voce
+  const cond = linhas.find((l) => l.includes('const dentroDaMinhaTorre'));
+  assert.ok(cond, 'nao achei a condicao do dive');
+  assert.match(cond, /naTorreDe\(minhaPos, meuTime\)/, 'precisa exigir que VOCE esteja na sua torre');
+  assert.match(cond, /filter\(\(f\) => naTorreDe\(f\.ultimo, meuTime\)\)/, 'precisa exigir que ELES entrem na sua torre -- so estar perto de voce e wave empurrando, nao dive');
+  assert.match(cond, /t >= 150/, 'antes de 2:30 e invade, nao dive');
+});

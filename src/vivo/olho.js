@@ -65,6 +65,16 @@ const BASE_VERMELHA = { x: 0.897, y: 0.106 };
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
 
 /** Lugar do mapa com nome, relativo ao meu time (100 = azul, embaixo à esquerda). */
+/**
+ * Dentro do alcance de uma torre do time `time`. Serve pra reconhecer dive: não basta
+ * o inimigo estar perto de você, ele tem que ter ENTRADO na sua torre. O raio saiu da
+ * medição das 14 mortes debaixo da própria torre nas partidas gravadas.
+ */
+export function naTorreDe(pos, time, raio = 0.075) {
+  if (!pos || pos.x == null) return false;
+  return TORRES.some((t) => t.time === time && Math.hypot(pos.x - t.x, pos.y - t.y) < raio);
+}
+
 export function lugar(x, y, meuTime = 100) {
   // O rio (x = y) separa o lado azul (embaixo à esquerda) do vermelho; o mid
   // (x + y = 1) separa a metade de cima (top) da de baixo (bot).
