@@ -1276,7 +1276,7 @@ h2{letter-spacing:1px}
           <div class="lnRot">Habilidade</div>
           <div class="lnHabs" id="lnHabs"></div>
         </div>
-        <button class="acao lnBuscarBt" id="lnBuscar">Procurar lineups</button>
+        <button class="acao lnBuscarBt" id="lnBuscar" title="busca de novo, ignorando o que está salvo">Atualizar lineups</button>
         <div class="lnBloco">
           <div class="lnRot">Fora do app</div>
           <div class="lnForaCx">
@@ -4042,6 +4042,8 @@ async function carregarLineups(){
   } catch {}
   lnDesenharLados(); lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
   await carregarMinhasLineups();
+  // lembrou mapa e agente da última vez? já mostra, sem ele pedir
+  if (lnMapaAtual && lnAgenteAtual) lnProcurar();
 }
 
 /* ---------------------------------------------------------------- barra lateral */
@@ -4073,7 +4075,7 @@ function lnDesenharHabs(){
     + habs.map(h => `<button class="lnHab ${lnHabAtual === h.busca ? 'on' : ''}" onclick="lnEscolherHab('${esc(h.busca)}')" title="${esc(h.nome)}">
         ${h.icone ? `<img src="${esc(h.icone)}" alt="">` : ''}<span>${esc(h.nome)}</span></button>`).join('');
 }
-function lnEscolherHab(v){ lnHabAtual = v; lnDesenharHabs(); lnLinks(); }
+function lnEscolherHab(v){ lnHabAtual = v; lnDesenharHabs(); lnLinks(); lnProcurarLogo(); }
 
 /* ---------------------------------------------------------------- seletores em grade */
 
@@ -4097,7 +4099,7 @@ function lnAbrirSeletor(qual){
 function lnFecharSeletor(){ $('#lnModal').hidden = true; $('#lnModal').innerHTML = ''; }
 function lnEscolherNoSeletor(qual, nome){
   if (qual === 'mapa') lnMapaAtual = nome; else { lnAgenteAtual = nome; lnDesenharHabs(); }
-  lnFecharSeletor(); lnDesenharCartoes(); lnLinks();
+  lnFecharSeletor(); lnDesenharCartoes(); lnLinks(); lnProcurarLogo();
 }
 
 function lnEscolha(){
@@ -4117,14 +4119,28 @@ async function lnLinks(){
 
 /* ---------------------------------------------------------------- busca e mapa */
 
-async function lnProcurar(){
+/**
+ * Procurar é automático: escolheu mapa e agente, aparece. O resultado fica guardado em
+ * disco, então da segunda vez em diante sai na hora (0,00 s contra ~4 s de rede) e o
+ * "procurando" só aparece se demorar mais de 400 ms — senão pisca à toa.
+ */
+let lnPedido = 0, lnEspera = null;
+function lnProcurarLogo(){
+  clearTimeout(lnEspera);
+  lnEspera = setTimeout(() => lnProcurar(), 180);
+}
+
+async function lnProcurar(forcar){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
-  $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = ''; $('#lnResultados').innerHTML = '';
-  $('#lnMapaCx').innerHTML = carregando('procurando as lineups…');
+  const meu = ++lnPedido;
+  const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
   let r;
-  try { r = await pegar('/api/val/buscar?' + new URLSearchParams(e)); }
+  try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...e, forcar: '1' } : e)); }
   catch { r = { lineups: [], aviso: 'a busca não respondeu' }; }
+  clearTimeout(lento);
+  if (meu !== lnPedido) return;           // ele já trocou de agente: esse resultado é velho
+  $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = ''; $('#lnResultados').innerHTML = '';
 
   lnAchadas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnCallouts = r.callouts ?? []; lnPinoAtivo = null;
   if (!lnAchadas.length) {
@@ -4331,11 +4347,11 @@ async function lnApagar(id){
   await carregarMinhasLineups();
 }
 
-$('#lnBuscar').onclick = lnProcurar;
+$('#lnBuscar').onclick = () => lnProcurar(true);
 $('#lnFiltroMapa').onchange = lnDesenharMinhas;
 $('#lnSoPulo').onchange = lnDesenharMinhas;
 for (const b of document.querySelectorAll('#lnLados button')) {
-  b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); };
+  b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); lnProcurarLogo(); };
 }
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#lnModal').hidden) lnFecharSeletor(); });
 

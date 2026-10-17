@@ -2513,7 +2513,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
      * é só catálogo oficial (valorant-api.com), busca de vídeo e o que ele salvou em disco.
      * Nada lê o processo do Valorant nem desenha por cima dele. */
     valCatalogo: (p = {}) => Lineups.catalogo({ forcar: p.forcar === true }),
-    valBuscar: (p = {}) => Lineups.buscarLineups({ ...p, chaveYoutube: config.youtube?.chave || null }),
+    valBuscar: (p = {}) => Lineups.lineupsDe({ ...p, chaveYoutube: config.youtube?.chave || null }),
     valSalvas: () => Lineups.salvas(),
     valSalvar: (p = {}) => Lineups.salvar(p),
     valApagar: (p = {}) => Lineups.apagar(String(p.id ?? '')),

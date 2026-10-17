@@ -21,8 +21,10 @@ import { pastaBase } from '../caminhos.js';
 const pasta = () => resolve(pastaBase(), 'dados', 'valorant');
 const arqCatalogo = () => resolve(pasta(), 'catalogo.json');
 const arqSalvas = () => resolve(pasta(), 'lineups.json');
+const arqBusca = (chave) => resolve(pasta(), 'buscas', `${chave}.json`);
 
 const garantirPasta = () => mkdir(pasta(), { recursive: true }).catch(() => {});
+const garantirBuscas = () => mkdir(resolve(pasta(), 'buscas'), { recursive: true }).catch(() => {});
 const lerJson = async (caminho, reserva) => { try { return JSON.parse(await readFile(caminho, 'utf8')); } catch { return reserva; } };
 const gravarJson = async (caminho, v) => { await garantirPasta(); await writeFile(caminho, JSON.stringify(v, null, 2), 'utf8'); };
 
@@ -220,10 +222,25 @@ export function habilidadeDaLineup(nome, habilidades = []) {
  */
 const INVIDIOUS = [
   'https://invidious.f5.si',
-  'https://inv.in.projectsegfau.lt',
-  'https://invidious.privacyredirect.com',
+  'https://invidious.nerdvpn.de',
   'https://yewtu.be',
+  'https://invidious.jing.rocks',
 ];
+const ESPERAR = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * As instâncias são comunitárias e balançam: a mesma que acabou de responder a busca
+ * devolve 500 no pedido seguinte e 200 no outro. Então cada uma leva duas tentativas antes
+ * da gente desistir dela — desistir na primeira deixava a aba vazia com a rede inteira de pé.
+ */
+async function tentarJson(url, ms = 12000, vezes = 2) {
+  let ultimo = null;
+  for (let i = 0; i < vezes; i++) {
+    try { return await buscarJson(url, ms); }
+    catch (e) { ultimo = e; if (i + 1 < vezes) await ESPERAR(500 + i * 500); }
+  }
+  throw ultimo ?? new Error('sem resposta');
+}
 const MIN_SEG = 25;        // menos que isso não é lineup, é corte
 const MAX_SEG = 3600;
 
@@ -281,7 +298,7 @@ export async function buscar({ mapa, agente, habilidade, lado, chaveYoutube = nu
   const erros = [];
   for (const base of INVIDIOUS) {
     try {
-      const d = await buscarJson(`${base}/api/v1/search?q=${encodeURIComponent(termo)}&type=video`, 12000);
+      const d = await tentarJson(`${base}/api/v1/search?q=${encodeURIComponent(termo)}&type=video`, 12000);
       if (!Array.isArray(d)) throw new Error('resposta fora do formato');
       const videos = d.map(normalizarInvidious)
         .filter((v) => v.id && v.segundos >= MIN_SEG && v.segundos <= MAX_SEG);
@@ -398,12 +415,18 @@ export function lerStoryboard(vtt) {
 }
 
 const storyboardDoVideo = async (base, id) => {
-  try {
-    const corta = AbortSignal.timeout(12000);
-    const r = await fetch(`${base}/api/v1/storyboards/${encodeURIComponent(id)}?width=320&height=180`, { signal: corta });
-    if (!r.ok) return [];
-    return lerStoryboard(await r.text());
-  } catch { return []; }
+  for (const b of ordemAPartirDe(base)) {
+    try {
+      const corta = AbortSignal.timeout(12000);
+      const r = await fetch(`${b}/api/v1/storyboards/${encodeURIComponent(id)}?width=320&height=180`, { signal: corta });
+      if (!r.ok) continue;
+      const txt = await r.text();
+      if (!txt.startsWith('WEBVTT')) continue;          // instância desligada devolve 200 com aviso em texto
+      const t = lerStoryboard(txt);
+      if (t.length) return t;
+    } catch { /* tenta a próxima */ }
+  }
+  return [];
 };
 
 /** Os quadros que mostram ESTA lineup: começo, meio e fim do pedaço dela. */
@@ -421,30 +444,92 @@ export function quadrosDaLineup(tiras, de, ate) {
   return fora;
 }
 
+/**
+ * Os capítulos de um vídeo. Tenta a instância que respondeu a busca e, se ela recusar,
+ * as outras: são servidores comunitários que limitam por uso, e quando a de plantão começa
+ * a negar os detalhes a aba vinha vazia mesmo tendo achado os vídeos.
+ */
+const ordemAPartirDe = (base) => [base, ...INVIDIOUS.filter((x) => x !== base)];
+
 const detalhesDoVideo = async (base, id) => {
-  const d = await buscarJson(`${base}/api/v1/videos/${encodeURIComponent(id)}`, 12000);
-  return capitulosDaDescricao(d?.description);
+  for (const b of ordemAPartirDe(base)) {
+    try {
+      const d = await tentarJson(`${b}/api/v1/videos/${encodeURIComponent(id)}`, 12000);
+      const caps = capitulosDaDescricao(d?.description);
+      if (caps.length) return caps;
+      if (d?.description != null) return caps;   // respondeu e o vídeo não tem capítulo mesmo
+    } catch { /* essa recusou: tenta a próxima */ }
+  }
+  return [];
 };
 
 /**
  * Busca e já abre em lineups individuais. `videos` continua vindo, pros que não têm
  * capítulo — mas o que a aba mostra é `lineups`.
  */
+/**
+ * Busca inteira guardada em disco. Procurar leva uns 25 s (busca + descrição e storyboard de
+ * 6 vídeos) e lineup de um mapa não muda de semana pra semana — então da segunda vez em
+ * diante sai na hora, do disco, e só revalida quando fica velho.
+ */
+const VALIDADE_BUSCA = 14 * 24 * 60 * 60 * 1000;
+const FORMATO_BUSCA = 1;
+const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
+  .map((x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).join('__');
+
+/** O que já está em disco pra essa combinação, ou null. */
+export async function buscaGuardada(p = {}) {
+  if (!buscavel(p)) return null;
+  const g = await lerJson(arqBusca(chaveDaBusca(p)), null);
+  if (g?.formato !== FORMATO_BUSCA || !g.lineups?.length) return null;
+  return { ...g, doDisco: true, velho: Date.now() - (g.em ?? 0) > VALIDADE_BUSCA };
+}
+
+async function guardarBusca(p, r) {
+  if (!r?.lineups?.length) return;
+  try {
+    await garantirBuscas();
+    await writeFile(arqBusca(chaveDaBusca(p)), JSON.stringify({ ...r, em: Date.now(), formato: FORMATO_BUSCA }), 'utf8');
+  } catch { /* disco cheio: a busca continua valendo em memória */ }
+}
+
+/** Com cache: instantâneo quando já foi buscado. `forcar` ignora o disco. */
+export async function lineupsDe(p = {}) {
+  if (!p.forcar) {
+    const g = await buscaGuardada(p);
+    if (g && !g.velho) return g;
+  }
+  const r = await buscarLineups(p);
+  await guardarBusca(p, r);
+  // deu ruim agora mas tem coisa velha guardada? melhor velho que vazio
+  if (!r.lineups?.length) {
+    const g = await buscaGuardada(p);
+    if (g) return { ...g, aviso: 'não consegui atualizar agora; mostrando o que já estava salvo' };
+  }
+  return r;
+}
+
 export async function buscarLineups(p = {}) {
   const r = await buscar(p);
   if (!r.videos?.length || !r.fonte || r.fonte === 'youtube') return { ...r, lineups: [] };
   const base = INVIDIOUS.find((b) => new URL(b).host === r.fonte) ?? INVIDIOUS[0];
 
-  // só os primeiros: cada um é uma chamada, e os de cima são os que têm capítulo
+  // Só os primeiros: cada um é uma chamada, e os de cima são os que têm capítulo.
+  // De 3 em 3: a instância é comunitária e passa a recusar quando a gente dispara 12 pedidos
+  // de uma vez (foi o que aconteceu ao buscar capítulo e quadro em paralelo pros 6 vídeos).
   const candidatos = r.videos.slice(0, 6);
-  const porVideo = await Promise.all(candidatos.map(async (v) => {
-    try {
-      const caps = await detalhesDoVideo(base, v.id);
-      // só vale puxar os quadros de quem tem capítulo
-      const tiras = caps.length ? await storyboardDoVideo(base, v.id) : [];
-      return { v, caps, tiras };
-    } catch { return { v, caps: [], tiras: [] }; }
-  }));
+  const porVideo = [];
+  for (let i = 0; i < candidatos.length; i += 3) {
+    const lote = await Promise.all(candidatos.slice(i, i + 3).map(async (v) => {
+      try {
+        const [caps, tiras] = await Promise.all([detalhesDoVideo(base, v.id), storyboardDoVideo(base, v.id)]);
+        return { v, caps, tiras: caps.length ? tiras : [] };
+      } catch { return { v, caps: [], tiras: [] }; }
+    }));
+    porVideo.push(...lote);
+    // já deu capítulo que chegue: não precisa incomodar a instância com o resto
+    if (porVideo.reduce((n, x) => n + x.caps.length, 0) >= 40) break;
+  }
 
   // o ponto no mapa sai daqui, não do navegador: a tela só desenha o pino
   const cat = await catalogo().catch(() => null);
