@@ -50,15 +50,25 @@ export async function catalogo({ forcar = false } = {}) {
   try {
     // em pt-BR pra mostrar, em en-US pra buscar: vídeo de lineup é quase todo em inglês,
     // e procurar por "Nuvem Venenosa" acha muito menos que por "Poison Cloud".
-    const [m, a, aEn] = await Promise.all([
+    const [m, a, aEn, mEn] = await Promise.all([
       buscarJson('https://valorant-api.com/v1/maps?language=pt-BR'),
       buscarJson('https://valorant-api.com/v1/agents?isPlayableCharacter=true&language=pt-BR'),
       buscarJson('https://valorant-api.com/v1/agents?isPlayableCharacter=true&language=en-US').catch(() => ({ data: [] })),
+      buscarJson('https://valorant-api.com/v1/maps?language=en-US').catch(() => ({ data: [] })),
     ]);
     const emIngles = new Map((aEn.data ?? []).map((x) => [x.uuid, x]));
+    // callout em INGLÊS: ele é casado contra nome de capítulo de vídeo, que é em inglês.
+    // Com os de pt-BR, "A Lobby" nunca casava com "A Saguão" e 93 de 96 lineups caíam no
+    // palpite pelo site. O nome do mapa na tela segue em pt-BR.
+    const mapaEn = new Map((mEn.data ?? []).map((x) => [x.uuid, x]));
     const mapas = (m.data ?? [])
       .filter((x) => x.displayName && x.tacticalDescription)    // só mapa de partida: tira Campo de Treino e afins
-      .map((x) => ({ nome: x.displayName, icone: x.listViewIcon ?? x.splash ?? null, planta: x.displayIcon ?? null }))
+      .map((x) => ({
+        nome: x.displayName,
+        icone: x.listViewIcon ?? x.splash ?? null,
+        planta: x.displayIcon ?? null,
+        callouts: pontosDoMapa(mapaEn.get(x.uuid) ?? x),
+      }))
       .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
     const agentes = (a.data ?? [])
       .map((x) => {
@@ -82,6 +92,64 @@ export async function catalogo({ forcar = false } = {}) {
     if (guardado?.mapas?.length) return { ...guardado, aviso: 'catálogo antigo: não consegui atualizar agora' };
     return { em: 0, mapas: [], agentes: [], aviso: `não consegui buscar mapas e agentes: ${e.message}` };
   }
+}
+
+/* ------------------------------------------------------- pontos do mapa */
+
+/**
+ * Os callouts do mapa ("A Lobby", "B Teleporter", "Top Mid") com a posição deles na
+ * planta oficial, em 0..1. A Riot entrega a posição em coordenada de mundo e os fatores
+ * de conversão junto; o x e o y entram TROCADOS na planta, que é como o jogo guarda.
+ * É isso que deixa a lineup virar um pino no mapa em vez de uma linha numa lista.
+ */
+export function pontosDoMapa(mapa) {
+  const { xMultiplier: xm, yMultiplier: ym, xScalarToAdd: xa, yScalarToAdd: ya } = mapa ?? {};
+  if (![xm, ym, xa, ya].every((n) => typeof n === 'number')) return [];
+  const fora = [];
+  for (const c of mapa.callouts ?? []) {
+    const l = c.location; if (!l) continue;
+    const x = l.y * xm + xa, y = l.x * ym + ya;
+    if (!(x >= -0.1 && x <= 1.1 && y >= -0.1 && y <= 1.1)) continue;
+    const grande = String(c.superRegionName ?? '').trim();
+    const regiao = String(c.regionName ?? '').trim();
+    if (!regiao) continue;
+    fora.push({
+      nome: grande && grande !== regiao ? `${grande} ${regiao}` : regiao,
+      regiao, grande,
+      site: ['A', 'B', 'C'].includes(grande) ? grande : /mid/i.test(grande) || /mid/i.test(regiao) ? 'Mid' : null,
+      x: Math.round(x * 1000) / 1000,
+      y: Math.round(y * 1000) / 1000,
+    });
+  }
+  return fora;
+}
+
+const semAcento = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/**
+ * De que ponto do mapa fala o nome da lineup. Casa o nome do capítulo contra os callouts
+ * do mapa, do mais específico pro menos: "B default from B Teleporter" acha "B Teleporter"
+ * antes de "Teleporter", senão uma lineup do B cairia no teleporter do A.
+ */
+export function pontoDaLineup(nome, callouts = [], site = null) {
+  const t = ` ${semAcento(nome).replace(/[^a-z0-9]+/g, ' ')} `;
+  const contem = (alvo) => t.includes(` ${semAcento(alvo).replace(/[^a-z0-9]+/g, ' ').trim()} `);
+  // 1. nome completo do callout ("A Lobby") — o mais específico
+  const completos = callouts.filter((c) => c.nome !== c.regiao && contem(c.nome))
+    .sort((a, b) => b.nome.length - a.nome.length);
+  if (completos.length) return completos[0];
+  // 2. só a região ("Lobby"), mas dentro do site que a lineup já disse ser
+  const soRegiao = callouts.filter((c) => contem(c.regiao)).sort((a, b) => b.regiao.length - a.regiao.length);
+  const noSite = site ? soRegiao.find((c) => c.site === site) : null;
+  if (noSite) return noSite;
+  if (soRegiao.length === 1) return soRegiao[0];
+  // 3. nada de específico: o centro do site, se a gente souber qual é
+  if (site) {
+    const doSite = callouts.filter((c) => c.site === site);
+    const alvo = doSite.find((c) => /site/i.test(c.regiao)) ?? doSite[0];
+    if (alvo) return { ...alvo, aproximado: true };
+  }
+  return null;
 }
 
 /* ------------------------------------------------------------------ busca */
@@ -180,6 +248,8 @@ export async function buscar({ mapa, agente, habilidade, lado, chaveYoutube = nu
 const MARCADOR = /^[\s\-–—•*]*\(?((?:\d{1,2}:)?\d{1,2}:\d{2})\)?\s*[-–—:)|.]*\s*(.{3,80}?)\s*$/;
 const PULA = /\bjump(?:\s*|-)?throw\b|\bjump\b|\brun\s*(?:and\s*)?throw\b|\bpulo\b|\bpulando\b/i;
 const SO_INTRO = /^(intro|introduction|in[ií]cio|outro|like|subscribe|inscreva|timestamps?|cap[ií]tulos?)\b/i;
+// capítulo que não é lineup: agradecimento, pedido de inscrição, encerramento
+const NAO_E_LINEUP = /\bthanks?\s+(?:for|you)\b|\bsubscribe\b|\bsub\s+to\b|\bdiscord\b|\boutro\b|\bconclus|\bobrigad/i;
 
 const emSegundos = (t) => {
   const p = String(t).split(':').map(Number);
@@ -209,7 +279,7 @@ export function capitulosDaDescricao(descricao) {
     if (!m) continue;
     const segundo = emSegundos(m[1]);
     const nome = m[2].replace(/\s{2,}/g, ' ').trim();
-    if (segundo == null || !nome || SO_INTRO.test(nome)) continue;
+    if (segundo == null || !nome || SO_INTRO.test(nome) || NAO_E_LINEUP.test(nome)) continue;
     if (segundo === 0) continue;   // o capítulo do 0:00 é a abertura ("New Viper Lineups Ascent 2023")
     // `pula` é true, false ou null: null = o vídeo não disse. Não dá pra afirmar "sem pulo"
     // só porque o nome do capítulo não falou — ele mesmo marca quando salva.
@@ -240,18 +310,26 @@ export async function buscarLineups(p = {}) {
     try { return { v, caps: await detalhesDoVideo(base, v.id) }; } catch { return { v, caps: [] }; }
   }));
 
+  // o ponto no mapa sai daqui, não do navegador: a tela só desenha o pino
+  const cat = await catalogo().catch(() => null);
+  const callouts = cat?.mapas?.find((x) => x.nome === p.mapa)?.callouts ?? [];
+
   const lineups = [];
   for (const { v, caps } of porVideo) {
     for (const c of caps) {
+      const ponto = pontoDaLineup(c.nome, callouts, c.site);
       lineups.push({
         video: v.id, titulo: v.titulo, canal: v.canal,
         capa: v.capa, segundo: c.segundo, nome: c.nome, site: c.site, pula: c.pula,
+        ponto: ponto ? { nome: ponto.nome, x: ponto.x, y: ponto.y, aproximado: ponto.aproximado === true } : null,
       });
     }
   }
   const comCapitulo = porVideo.filter((x) => x.caps.length).length;
+  const mapa = cat?.mapas?.find((x) => x.nome === p.mapa) ?? null;
   return {
     ...r, lineups,
+    planta: mapa?.planta ?? null,
     semCapitulo: !lineups.length,
     resumo: lineups.length ? `${lineups.length} lineups de ${comCapitulo} vídeo${comCapitulo > 1 ? 's' : ''}` : null,
   };
@@ -296,6 +374,7 @@ export async function salvar(entrada = {}) {
     mapa: limpar(entrada.mapa, 40),
     agente: limpar(entrada.agente, 40),
     habilidade: limpar(entrada.habilidade, 60),
+    ponto: limpar(entrada.ponto, 60),          // o callout onde a lineup é jogada ("A Lobby")
     lado: ['atacando', 'defendendo'].includes(entrada.lado) ? entrada.lado : null,
     pula: entrada.pula === true ? true : entrada.pula === false ? false : null,   // null = ninguém disse ainda
     nota: limpar(entrada.nota, 300),

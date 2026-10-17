@@ -914,6 +914,47 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnFiltros button.acao.on{border-color:var(--ouro);color:var(--ouro-claro)}
 .lnFiltros button.acao b{color:var(--apagado);font-weight:600;margin-left:4px}
 
+/* ---------------------------------------------------- lineups: HUD de mapa */
+.lnHud{display:grid;grid-template-columns:230px 1fr;gap:var(--e2);align-items:start}
+@media (max-width:900px){.lnHud{grid-template-columns:1fr}}
+.lnLado{display:flex;flex-direction:column;gap:var(--e2)}
+.lnBloco{display:flex;flex-direction:column;gap:6px}
+.lnRot{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--apagado)}
+.lnCartao{position:relative;height:74px;border:1px solid var(--borda);border-radius:var(--r2);
+  overflow:hidden;background:var(--f3);display:flex;align-items:flex-end}
+.lnCartao img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85}
+.lnCartao.lnCartaoAg img{object-fit:contain;object-position:right bottom}
+.lnCartao span{position:relative;padding:6px 8px;font-size:12.5px;color:#fff;font-weight:600;
+  text-shadow:0 1px 4px #000c;display:flex;flex-direction:column}
+.lnCartao span small{font-weight:400;font-size:10.5px;opacity:.8}
+.lnVazioCartao{color:var(--apagado);font-weight:400;text-shadow:none}
+.lnLados{display:flex;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden}
+.lnLados button{flex:1;background:var(--f1);border:0;color:var(--fraco);padding:7px 0;
+  font-size:12px;cursor:pointer;font-family:inherit}
+.lnLados button.on{background:var(--f3);color:var(--ouro-claro)}
+.lnHabs{display:flex;flex-wrap:wrap;gap:5px}
+.lnHab{display:flex;align-items:center;gap:5px;background:var(--f1);border:1px solid var(--borda);
+  border-radius:var(--r1);color:var(--fraco);padding:4px 7px;font-size:11px;cursor:pointer;font-family:inherit}
+.lnHab.on{border-color:var(--ouro);color:var(--ouro-claro)}
+.lnHab img{width:15px;height:15px;object-fit:contain}
+.lnBuscarBt{width:100%;justify-content:center}
+.lnForaCx{display:flex;gap:6px}
+.lnFora{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;flex:1}
+.lnPalco{display:flex;flex-direction:column;gap:var(--e2);min-width:0}
+.lnMapa{position:relative;width:100%;max-width:760px;margin:0 auto;aspect-ratio:1/1;
+  background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2)}
+.lnMapa img{width:100%;height:100%;object-fit:contain;display:block;opacity:.92}
+.lnPino{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;
+  border:2px solid var(--ouro);background:#0b1016e6;color:var(--ouro-claro);cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  padding:0;transition:transform .1s}
+.lnPino:hover{transform:translate(-50%,-50%) scale(1.18);z-index:3}
+.lnPino.on{background:var(--ouro);color:#0b1016;z-index:4}
+.lnPino.aprox{border-style:dashed;opacity:.8}
+.lnPinoNome{position:absolute;top:30px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-size:10px;font-weight:600;color:#fff;text-shadow:0 1px 4px #000,0 0 3px #000;pointer-events:none;opacity:0}
+.lnPino:hover .lnPinoNome,.lnPino.on .lnPinoNome{opacity:1}
+
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
    contorno e o mesmo brilho no topo, linha que responde ao mouse, botão que
@@ -1165,23 +1206,43 @@ h2{letter-spacing:1px}
 
   <section id="lineups">
     <div class="titulo">Lineups <small>Valorant</small></div>
+    <div class="lnHud">
+      <aside class="lnLado">
+        <div class="lnBloco">
+          <div class="lnRot">Mapa</div>
+          <div class="lnCartao" id="lnCartaoMapa"></div>
+          <select class="contaSel" id="lnMapa"></select>
+        </div>
+        <div class="lnLados" id="lnLados">
+          <button class="on" data-lado="atacando">Atacante</button>
+          <button data-lado="defendendo">Defensor</button>
+        </div>
+        <div class="lnBloco">
+          <div class="lnRot">Agente</div>
+          <div class="lnCartao lnCartaoAg" id="lnCartaoAgente"></div>
+          <select class="contaSel" id="lnAgente"></select>
+        </div>
+        <div class="lnBloco" id="lnBlocoHab">
+          <div class="lnRot">Habilidade</div>
+          <div class="lnHabs" id="lnHabs"></div>
+        </div>
+        <button class="acao lnBuscarBt" id="lnBuscar">Procurar lineups</button>
+        <div class="lnBloco">
+          <div class="lnRot">Fora do app</div>
+          <div class="lnForaCx">
+            <a class="acao lnFora" id="lnYoutube" target="_blank" rel="noreferrer">YouTube</a>
+            <a class="acao lnFora" id="lnStrats" target="_blank" rel="noreferrer">strats.gg</a>
+          </div>
+        </div>
+      </aside>
 
-    <div class="lnFiltros">
-      <select class="contaSel" id="lnMapa"></select>
-      <select class="contaSel" id="lnAgente"></select>
-      <select class="contaSel" id="lnHab"></select>
-      <select class="contaSel" id="lnLado">
-        <option value="">os dois lados</option><option value="atacando">atacando</option><option value="defendendo">defendendo</option>
-      </select>
-      <button class="acao" id="lnBuscar">Procurar lineups</button>
-      <a class="acao lnFora" id="lnYoutube" target="_blank" rel="noreferrer">YouTube</a>
-      <a class="acao lnFora" id="lnStrats" target="_blank" rel="noreferrer">strats.gg</a>
+      <div class="lnPalco">
+        <div id="lnAviso"></div>
+        <div class="lnMapaCx" id="lnMapaCx"></div>
+        <div id="lnPlayer"></div>
+        <div id="lnResultados"></div>
+      </div>
     </div>
-
-    <div id="lnAviso"></div>
-    <div id="lnPlayer"></div>
-    <div class="lnFiltros" id="lnSites" hidden></div>
-    <div id="lnResultados"></div>
 
     <h2>As suas <small id="lnQuantas"></small></h2>
     <div class="lnFiltros lnFiltrosMinhas">
@@ -3893,51 +3954,76 @@ async function carregarConquistas(){
 
 
 /* ============================================================ Lineups (Valorant)
- * Não existe base aberta de lineup — elas vivem em vídeo de criador. Então a aba
- * ACHA o vídeo (mapa + agente + habilidade), ele salva os que serviram com o minuto
- * certo e a marcação de pulo, e revê quando quiser. O vídeo roda no player oficial
- * do YouTube: nada é copiado e o criador leva a view.
+ * Não existe base aberta de lineup — elas vivem em vídeo de criador. A aba acha o vídeo,
+ * lê os capítulos da descrição ("00:07 A Default FAST Molly (A Lobby)") e vira cada um
+ * num PINO no mapa: o callout do nome é casado com os callouts oficiais do mapa, que a
+ * Riot publica com coordenada. Clicar no pino abre as lineups daquele ponto; clicar numa
+ * abre o vídeo no segundo exato, no player oficial do YouTube.
  *
- * Nada aqui encosta no Valorant. Sem leitura de memória e sem desenhar por cima do
- * jogo — o Vanguard é anticheat de kernel e trata sobreposição como trapaça. */
-let lnCatalogo = null, lnMinhasLista = [];
+ * Nada aqui encosta no Valorant. Sem leitura de memória e sem desenhar por cima do jogo —
+ * o Vanguard é anticheat de kernel e trata sobreposição como trapaça. */
+let lnCatalogo = null, lnMinhasLista = [], lnAchadas = [], lnPlanta = null;
+let lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
-const lnSegundos = (txt) => { const m = String(txt || '').trim().match(/^(\d+):([0-5]?\d)$/); return m ? (+m[1]) * 60 + (+m[2]) : Math.max(0, parseInt(txt, 10) || 0); };
+
+/** Pulo tem TRÊS estados: o vídeo disse que pula, disse que não, ou não disse nada. */
+const lnPulo = (v) => v === true ? '<span class="lnTag pulo">PULA</span>'
+  : v === false ? '<span class="lnTag">sem pulo</span>'
+  : '<span class="lnTag lnSei">não diz</span>';
 
 async function carregarLineups(){
-  $('#lnResultados').innerHTML = '';
   $('#lnAviso').innerHTML = carregando('buscando mapas e agentes…');
   try { lnCatalogo = await pegar('/api/val/catalogo'); }
   catch { $('#lnAviso').innerHTML = `<div class="vazio">não consegui carregar o catálogo do Valorant</div>`; return; }
 
-  const op = (v, t, sel) => `<option value="${esc(v)}" ${sel ? 'selected' : ''}>${esc(t)}</option>`;
+  const op = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;
   $('#lnMapa').innerHTML = op('', 'escolha o mapa') + lnCatalogo.mapas.map(m => op(m.nome, m.nome)).join('');
-  $('#lnAgente').innerHTML = op('', 'escolha o agente') + lnCatalogo.agentes.map(a => op(a.nome, `${a.nome} · ${a.funcao ?? ''}`.trim())).join('');
+  $('#lnAgente').innerHTML = op('', 'escolha o agente') + lnCatalogo.agentes.map(a => op(a.nome, a.nome)).join('');
   $('#lnFiltroMapa').innerHTML = op('', 'todos os mapas') + lnCatalogo.mapas.map(m => op(m.nome, m.nome)).join('');
   $('#lnAviso').innerHTML = lnCatalogo.aviso ? `<div class="vazio">${esc(lnCatalogo.aviso)}</div>` : '';
-  lnHabilidades();
 
   // o que ele escolheu da última vez: na hora de jogar ninguém quer remontar o filtro
   try {
     const g = JSON.parse(localStorage.getItem('lineups') || '{}');
     if (g.mapa) $('#lnMapa').value = g.mapa;
-    if (g.agente) { $('#lnAgente').value = g.agente; lnHabilidades(); if (g.habilidade) $('#lnHab').value = g.habilidade; }
-    if (g.lado) $('#lnLado').value = g.lado;
+    if (g.agente) $('#lnAgente').value = g.agente;
+    if (g.lado) lnLadoAtual = g.lado;
   } catch {}
-  lnLinks();
+  lnDesenharLados(); lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
   await carregarMinhasLineups();
 }
 
-/** As habilidades mudam com o agente. O value guarda o nome em inglês: é o que acha vídeo. */
-function lnHabilidades(){
-  const a = lnCatalogo?.agentes.find(x => x.nome === $('#lnAgente').value);
-  $('#lnHab').innerHTML = `<option value="">qualquer habilidade</option>`
-    + (a?.habilidades ?? []).map(h => `<option value="${esc(h.busca)}">${esc(h.nome)}</option>`).join('');
-  $('#lnHab').disabled = !a;
+/* ---------------------------------------------------------------- barra lateral */
+
+function lnDesenharLados(){
+  for (const b of document.querySelectorAll('#lnLados button')) b.classList.toggle('on', b.dataset.lado === lnLadoAtual);
 }
 
+function lnDesenharCartoes(){
+  const m = lnCatalogo?.mapas.find(x => x.nome === $('#lnMapa').value);
+  $('#lnCartaoMapa').innerHTML = m?.icone
+    ? `<img src="${esc(m.icone)}" alt=""><span>${esc(m.nome)}</span>`
+    : `<span class="lnVazioCartao">escolha o mapa</span>`;
+  const a = lnCatalogo?.agentes.find(x => x.nome === $('#lnAgente').value);
+  $('#lnCartaoAgente').innerHTML = a?.icone
+    ? `<img src="${esc(a.icone)}" alt=""><span>${esc(a.nome)}<small>${esc(a.funcao ?? '')}</small></span>`
+    : `<span class="lnVazioCartao">escolha o agente</span>`;
+}
+
+/** As habilidades viram botões com o ícone — é como ele pensa ("a molly da Viper"). */
+function lnDesenharHabs(){
+  const a = lnCatalogo?.agentes.find(x => x.nome === $('#lnAgente').value);
+  const habs = a?.habilidades ?? [];
+  $('#lnBlocoHab').hidden = !habs.length;
+  if (!habs.some(h => h.busca === lnHabAtual)) lnHabAtual = '';
+  $('#lnHabs').innerHTML = `<button class="lnHab ${lnHabAtual === '' ? 'on' : ''}" onclick="lnEscolherHab('')">todas</button>`
+    + habs.map(h => `<button class="lnHab ${lnHabAtual === h.busca ? 'on' : ''}" onclick="lnEscolherHab('${esc(h.busca)}')" title="${esc(h.nome)}">
+        ${h.icone ? `<img src="${esc(h.icone)}" alt="">` : ''}<span>${esc(h.nome)}</span></button>`).join('');
+}
+function lnEscolherHab(v){ lnHabAtual = v; lnDesenharHabs(); lnLinks(); }
+
 function lnEscolha(){
-  return { mapa: $('#lnMapa').value, agente: $('#lnAgente').value, habilidade: $('#lnHab').value, lado: $('#lnLado').value };
+  return { mapa: $('#lnMapa').value, agente: $('#lnAgente').value, habilidade: lnHabAtual, lado: lnLadoAtual };
 }
 
 /** Os links de fora acompanham o filtro, pra ele consultar a biblioteca dos outros sem sair daqui. */
@@ -3951,51 +4037,70 @@ async function lnLinks(){
   } catch {}
 }
 
-let lnAchadas = [], lnSiteAtivo = '';
-
-/** Pulo tem TRÊS estados: o vídeo disse que pula, disse que não, ou não disse nada. */
-const lnPulo = (v) => v === true ? '<span class="lnTag pulo">PULA</span>'
-  : v === false ? '<span class="lnTag">sem pulo</span>'
-  : '<span class="lnTag lnSei">não diz</span>';
+/* ---------------------------------------------------------------- busca e mapa */
 
 async function lnProcurar(){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
-  $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = ''; $('#lnSites').hidden = true;
-  $('#lnResultados').innerHTML = carregando('procurando as lineups…');
+  $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = ''; $('#lnResultados').innerHTML = '';
+  $('#lnMapaCx').innerHTML = carregando('procurando as lineups…');
   let r;
   try { r = await pegar('/api/val/buscar?' + new URLSearchParams(e)); }
   catch { r = { lineups: [], aviso: 'a busca não respondeu' }; }
 
-  lnAchadas = r.lineups ?? [];
+  lnAchadas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnPinoAtivo = null;
   if (!lnAchadas.length) {
-    $('#lnResultados').innerHTML = '';
+    $('#lnMapaCx').innerHTML = '';
     const porque = r.semCapitulo
-      ? 'achei vídeos, mas nenhum tem a lista de lineups na descrição — abre no YouTube ali em cima'
+      ? 'achei vídeos, mas nenhum tem a lista de lineups na descrição — abre no YouTube ali do lado'
       : (r.aviso || r.erro || 'nada encontrado');
     $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>`;
     return;
   }
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · cada uma abre no segundo exato</div>`;
-  lnSiteAtivo = '';
-  lnDesenharSites();
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica num ponto do mapa</div>`;
+  lnDesenharMapa();
   lnDesenharAchadas();
 }
 
-/** Filtro por site: é o que ele pensa na hora ("preciso de uma pro B"). */
-function lnDesenharSites(){
-  const contas = lnAchadas.reduce((a, l) => { const k = l.site ?? '?'; a[k] = (a[k] || 0) + 1; return a; }, {});
-  const ordem = ['A', 'B', 'C', 'Mid', '?'].filter(k => contas[k]);
-  if (ordem.length < 2) { $('#lnSites').hidden = true; return; }
-  $('#lnSites').hidden = false;
-  $('#lnSites').innerHTML = [['', 'todos', lnAchadas.length], ...ordem.map(k => [k, k === '?' ? 'sem site' : k, contas[k]])]
-    .map(([v, t, n]) => `<button class="acao ${lnSiteAtivo === v ? 'on' : ''}" onclick="lnFiltrarSite('${v}')">${esc(t)} <b>${n}</b></button>`).join('');
+/** Lineups agrupadas por ponto: cada pino traz quantas tem ali. */
+function lnPinos(){
+  const por = new Map();
+  for (const l of lnAchadas) {
+    if (!l.ponto) continue;
+    const k = l.ponto.nome;
+    if (!por.has(k)) por.set(k, { nome: k, x: l.ponto.x, y: l.ponto.y, aproximado: l.ponto.aproximado, lista: [] });
+    const p = por.get(k); p.lista.push(l);
+    if (!l.ponto.aproximado) p.aproximado = false;
+  }
+  return [...por.values()].sort((a, b) => b.lista.length - a.lista.length);
 }
-function lnFiltrarSite(v){ lnSiteAtivo = v; lnDesenharSites(); lnDesenharAchadas(); }
+
+function lnDesenharMapa(){
+  if (!lnPlanta) { $('#lnMapaCx').innerHTML = ''; return; }
+  const pinos = lnPinos();
+  $('#lnMapaCx').innerHTML = `
+    <div class="lnMapa">
+      <img src="${esc(lnPlanta)}" alt="planta do mapa">
+      ${pinos.map((p, i) => `
+        <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
+          style="left:${(p.x * 100).toFixed(2)}%;top:${(p.y * 100).toFixed(2)}%"
+          title="${esc(p.nome)}${p.aproximado ? ' (posição aproximada)' : ''}" onclick="lnClicarPino('${esc(p.nome)}')">
+          <b>${p.lista.length}</b><span class="lnPinoNome">${esc(p.nome)}</span>
+        </button>`).join('')}
+    </div>`;
+}
+
+function lnClicarPino(nome){
+  lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
+  lnDesenharMapa(); lnDesenharAchadas();
+}
 
 function lnDesenharAchadas(){
-  const lista = lnSiteAtivo ? lnAchadas.filter(l => (l.site ?? '?') === lnSiteAtivo) : lnAchadas;
-  $('#lnResultados').innerHTML = `<div class="lnLista">${lista.map((l, i) => `
+  const lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
+  const titulo = lnPinoAtivo
+    ? `<div class="lnResumo">${lista.length} em <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
+    : '';
+  $('#lnResultados').innerHTML = titulo + `<div class="lnLista">${lista.map(l => `
     <div class="lnLinha" onclick="lnVer(${lnAchadas.indexOf(l)})">
       <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
       <span class="lnNome">${esc(l.nome)}</span>
@@ -4005,7 +4110,9 @@ function lnDesenharAchadas(){
     </div>`).join('')}</div>`;
 }
 
-/** Um player só, no topo: clicou numa lineup, ela toca ali no segundo certo. */
+/* ---------------------------------------------------------------- player */
+
+/** Um player só: clicou numa lineup, ela toca ali no segundo certo. */
 function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
   $('#lnPlayer').innerHTML = `
@@ -4014,7 +4121,10 @@ function lnVer(i){
         allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
       <div class="lnTocandoLado">
         <div class="lnTocandoNome">${esc(l.nome)}</div>
-        <div class="lnTocandoPe">${l.site ? `<span class="lnTag">site ${esc(l.site)}</span>` : ''}${lnPulo(l.pula)}</div>
+        <div class="lnTocandoPe">
+          ${l.ponto ? `<span class="lnTag">${esc(l.ponto.nome)}${l.ponto.aproximado ? ' (aprox)' : ''}</span>` : ''}
+          ${lnPulo(l.pula)}
+        </div>
         <div class="lnCanal">${esc(l.canal)} · ${lnMMSS(l.segundo)}</div>
         <div class="lnSalvarCx">
           <span>pula?</span>
@@ -4031,12 +4141,12 @@ function lnVer(i){
 async function lnSalvarAtual(botao, i){
   const l = lnAchadas[i]; if (!l) return;
   const sel = botao.parentElement.querySelector('.lnPulaSel').value;
+  const hab = lnCatalogo?.agentes.find(a => a.nome === $('#lnAgente').value)?.habilidades.find(h => h.busca === lnHabAtual);
   const corpo = {
     video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo,
     mapa: $('#lnMapa').value, agente: $('#lnAgente').value,
-    // só o nome da habilidade de verdade: sem isso gravava o rótulo "qualquer habilidade"
-    habilidade: $('#lnHab').value ? ($('#lnHab').selectedOptions[0]?.textContent?.trim() || '') : '',
-    lado: $('#lnLado').value || null,
+    habilidade: hab?.nome ?? '', lado: lnLadoAtual,
+    ponto: l.ponto?.nome ?? '',
     pula: sel === 'sim' ? true : sel === 'nao' ? false : null,
   };
   botao.disabled = true; botao.textContent = 'salvando…';
@@ -4047,6 +4157,8 @@ async function lnSalvarAtual(botao, i){
     await carregarMinhasLineups();
   } catch (err) { botao.disabled = false; botao.textContent = 'Salvar na minha lista'; alert('não deu pra salvar: ' + err.message); }
 }
+
+/* ---------------------------------------------------------------- as dele */
 
 async function carregarMinhasLineups(){
   try { lnMinhasLista = await pegar('/api/val/salvas'); } catch { lnMinhasLista = []; }
@@ -4063,10 +4175,10 @@ function lnDesenharMinhas(){
   }
   $('#lnMinhas').innerHTML = `<div class="lnLista">${lista.map(x => `
     <div class="lnLinha" onclick="lnVerSalva('${esc(x.id)}')">
-      <span class="lnSite s${esc(x.site ?? 'x')}">${esc(x.agente.slice(0, 3))}</span>
+      <span class="lnSite sx">${esc(x.agente.slice(0, 3))}</span>
       <span class="lnNome">${esc(x.titulo)}</span>
       ${lnPulo(x.pula)}
-      <span class="lnCanal">${esc(x.mapa)}${x.habilidade ? ' · ' + esc(x.habilidade) : ''}</span>
+      <span class="lnCanal">${esc(x.mapa)}${x.ponto ? ' · ' + esc(x.ponto) : ''}${x.habilidade ? ' · ' + esc(x.habilidade) : ''}</span>
       <span class="lnQuando">${lnMMSS(x.segundo)}</span>
       <button class="acao" onclick="event.stopPropagation();lnApagar('${esc(x.id)}')">Apagar</button>
     </div>`).join('')}</div>`;
@@ -4074,7 +4186,7 @@ function lnDesenharMinhas(){
 
 function lnVerSalva(id){
   const x = lnMinhasLista.find(v => v.id === id); if (!x) return;
-  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, site: null, pula: x.pula }];
+  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, site: null, pula: x.pula, ponto: x.ponto ? { nome: x.ponto, aproximado: false } : null }];
   lnVer(0);
 }
 
@@ -4085,13 +4197,14 @@ async function lnApagar(id){
   await carregarMinhasLineups();
 }
 
-$('#lnAgente').onchange = () => { lnHabilidades(); lnLinks(); };
-$('#lnMapa').onchange = lnLinks;
-$('#lnHab').onchange = lnLinks;
-$('#lnLado').onchange = lnLinks;
+$('#lnMapa').onchange = () => { lnDesenharCartoes(); lnLinks(); };
+$('#lnAgente').onchange = () => { lnDesenharCartoes(); lnDesenharHabs(); lnLinks(); };
 $('#lnBuscar').onclick = lnProcurar;
 $('#lnFiltroMapa').onchange = lnDesenharMinhas;
 $('#lnSoPulo').onchange = lnDesenharMinhas;
+for (const b of document.querySelectorAll('#lnLados button')) {
+  b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); };
+}
 
 const CARREGADORES = {
   estat: carregarEstat, calendario: () => carregarCalendario(), meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
