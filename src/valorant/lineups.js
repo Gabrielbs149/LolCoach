@@ -290,6 +290,78 @@ export function capitulosDaDescricao(descricao) {
   return subindo.length >= 3 ? subindo : [];
 }
 
+/**
+ * Os quadros do vídeo, de graça e sem baixar nada: o YouTube publica um "storyboard" —
+ * folhas de sprite com um quadro a cada ~5 s, que é o que aparece quando você arrasta a
+ * barra do player. Cada lineup pega os quadros do pedaço dela, e assim dá pra ver a tela
+ * do jogo sem abrir vídeo nenhum — que era a reclamação: "não dá pra ver 1 por 1".
+ *
+ * O sprite vem apontando pra instância do Invidious, que serve HTML no lugar da imagem;
+ * trocando o host pelo CDN do YouTube a imagem vem certa (testado: 66 KB de webp).
+ */
+const VTT_TEMPO = /^(\d{2}):(\d{2}):(\d{2})\.(\d{3})\s+-->\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})/;
+
+/**
+ * O recorte vira linha/coluna na folha. Assim a tela pode mostrar o quadro em QUALQUER
+ * tamanho usando porcentagem (background-size/position), sem depender da largura em pixel
+ * do cartão — a fonte só tem 318x180 e encolher no CSS jogaria resolução fora.
+ */
+function grelhar(tiras) {
+  const porFolha = new Map();
+  for (const t of tiras) {
+    t.col = Math.round(t.x / (t.w + 2));          // o passo é a largura do quadro + 2 px de borda
+    t.lin = Math.round(t.y / t.h);
+    const f = porFolha.get(t.url) ?? { cols: 0, lins: 0 };
+    f.cols = Math.max(f.cols, t.col + 1); f.lins = Math.max(f.lins, t.lin + 1);
+    porFolha.set(t.url, f);
+  }
+  for (const t of tiras) { const f = porFolha.get(t.url); t.cols = f.cols; t.lins = f.lins; }
+  return tiras;
+}
+
+export function lerStoryboard(vtt) {
+  const linhas = String(vtt ?? '').split(/\r?\n/);
+  const fora = [];
+  for (let i = 0; i < linhas.length; i++) {
+    const m = linhas[i].match(VTT_TEMPO);
+    if (!m) continue;
+    const de = (+m[1]) * 3600 + (+m[2]) * 60 + (+m[3]) + (+m[4]) / 1000;
+    const ate = (+m[5]) * 3600 + (+m[6]) * 60 + (+m[7]) + (+m[8]) / 1000;
+    const alvo = (linhas[i + 1] ?? '').trim();
+    if (!alvo.startsWith('http')) continue;
+    const [endereco, corte] = alvo.split('#xywh=');
+    if (!corte) continue;
+    const [x, y, w, h] = corte.split(',').map(Number);
+    if ([x, y, w, h].some((n) => !Number.isFinite(n))) continue;
+    fora.push({ de, ate, url: endereco.replace(/^https?:\/\/[^/]+\/sb\/i\//, 'https://i.ytimg.com/sb/'), x, y, w, h });
+  }
+  return grelhar(fora);
+}
+
+const storyboardDoVideo = async (base, id) => {
+  try {
+    const corta = AbortSignal.timeout(12000);
+    const r = await fetch(`${base}/api/v1/storyboards/${encodeURIComponent(id)}?width=320&height=180`, { signal: corta });
+    if (!r.ok) return [];
+    return lerStoryboard(await r.text());
+  } catch { return []; }
+};
+
+/** Os quadros que mostram ESTA lineup: começo, meio e fim do pedaço dela. */
+export function quadrosDaLineup(tiras, de, ate) {
+  if (!tiras.length) return [];
+  const fim = Number.isFinite(ate) && ate > de ? Math.min(ate, de + 40) : de + 12;
+  const momentos = [0.12, 0.5, 0.85].map((f) => de + (fim - de) * f);
+  const vistos = new Set(), fora = [];
+  for (const t of momentos) {
+    const q = tiras.find((x) => t >= x.de && t < x.ate) ?? tiras[tiras.length - 1];
+    const chave = `${q.url}|${q.x}|${q.y}`;
+    if (vistos.has(chave)) continue;
+    vistos.add(chave); fora.push(q);
+  }
+  return fora;
+}
+
 const detalhesDoVideo = async (base, id) => {
   const d = await buscarJson(`${base}/api/v1/videos/${encodeURIComponent(id)}`, 12000);
   return capitulosDaDescricao(d?.description);
@@ -307,7 +379,12 @@ export async function buscarLineups(p = {}) {
   // só os primeiros: cada um é uma chamada, e os de cima são os que têm capítulo
   const candidatos = r.videos.slice(0, 6);
   const porVideo = await Promise.all(candidatos.map(async (v) => {
-    try { return { v, caps: await detalhesDoVideo(base, v.id) }; } catch { return { v, caps: [] }; }
+    try {
+      const caps = await detalhesDoVideo(base, v.id);
+      // só vale puxar os quadros de quem tem capítulo
+      const tiras = caps.length ? await storyboardDoVideo(base, v.id) : [];
+      return { v, caps, tiras };
+    } catch { return { v, caps: [], tiras: [] }; }
   }));
 
   // o ponto no mapa sai daqui, não do navegador: a tela só desenha o pino
@@ -315,12 +392,16 @@ export async function buscarLineups(p = {}) {
   const callouts = cat?.mapas?.find((x) => x.nome === p.mapa)?.callouts ?? [];
 
   const lineups = [];
-  for (const { v, caps } of porVideo) {
-    for (const c of caps) {
+  for (const { v, caps, tiras } of porVideo) {
+    for (let i = 0; i < caps.length; i++) {
+      const c = caps[i];
       const ponto = pontoDaLineup(c.nome, callouts, c.site);
+      // o fim da lineup é o começo da próxima: assim o player toca SÓ o clipe dela
+      const fim = caps[i + 1]?.segundo ?? (v.segundos || c.segundo + 25);
       lineups.push({
         video: v.id, titulo: v.titulo, canal: v.canal,
-        capa: v.capa, segundo: c.segundo, nome: c.nome, site: c.site, pula: c.pula,
+        capa: v.capa, segundo: c.segundo, fim, nome: c.nome, site: c.site, pula: c.pula,
+        quadros: quadrosDaLineup(tiras ?? [], c.segundo, fim),
         ponto: ponto ? { nome: ponto.nome, x: ponto.x, y: ponto.y, aproximado: ponto.aproximado === true } : null,
       });
     }
@@ -371,6 +452,7 @@ export async function salvar(entrada = {}) {
     canal: limpar(entrada.canal, 100),
     capa: limpar(entrada.capa, 400),
     segundo: Math.max(0, Math.round(Number(entrada.segundo) || 0)),   // onde a lineup começa
+    fim: Math.max(0, Math.round(Number(entrada.fim) || 0)) || null,   // e onde acaba, pra tocar só o clipe
     mapa: limpar(entrada.mapa, 40),
     agente: limpar(entrada.agente, 40),
     habilidade: limpar(entrada.habilidade, 60),

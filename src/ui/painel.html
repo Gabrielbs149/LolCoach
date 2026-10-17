@@ -955,6 +955,22 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   font-size:10px;font-weight:600;color:#fff;text-shadow:0 1px 4px #000,0 0 3px #000;pointer-events:none;opacity:0}
 .lnPino:hover .lnPinoNome,.lnPino.on .lnPinoNome{opacity:1}
 
+.lnGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:var(--e2)}
+.lnCard{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);cursor:pointer}
+.lnCard:hover{border-color:var(--ouro)}
+.lnTira{position:relative;background:#000;aspect-ratio:318/180;overflow:hidden}
+.lnTira i{position:absolute;inset:0;background-repeat:no-repeat;opacity:0;transition:opacity .15s}
+.lnTira i.on{opacity:1}
+.lnQn{position:absolute;right:5px;bottom:5px;background:#000a;color:#fff;font-size:9.5px;
+  padding:1px 5px;border-radius:3px;font-weight:600;opacity:0;transition:opacity .15s}
+.lnCard:hover .lnQn{opacity:1}
+.lnSemTira img{width:100%;height:100%;object-fit:cover;display:block}
+.lnCardCorpo{padding:7px 9px 9px;display:flex;flex-direction:column;gap:5px}
+.lnCardCorpo .lnNome{font-size:12.5px;line-height:1.3;color:var(--forte);white-space:normal}
+.lnCardPe{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lnCardPe .lnSite{flex:0 0 26px}
+.lnCardPe .lnQuando{margin-left:auto;flex:0 0 auto}
+
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
    contorno e o mesmo brilho no topo, linha que responde ao mouse, botão que
@@ -4095,18 +4111,54 @@ function lnClicarPino(nome){
   lnDesenharMapa(); lnDesenharAchadas();
 }
 
+/** A tira de quadros: os frames do próprio vídeo naquele pedaço, pra ele VER a lineup sem abrir. */
+function lnTira(l){
+  if (!l.quadros?.length) return `<div class="lnTira lnSemTira"><img loading="lazy" src="${esc(l.capa)}" alt=""></div>`;
+  const q = l.quadros;
+  const pedaco = (x) => {
+    // posicao em PORCENTAGEM: assim o quadro escala com o cartao. A fonte so tem 318x180,
+    // mostrar encolhido em pixel fixo seria jogar resolucao fora.
+    const px = x.cols > 1 ? (x.col / (x.cols - 1)) * 100 : 0;
+    const py = x.lins > 1 ? (x.lin / (x.lins - 1)) * 100 : 0;
+    return `background-image:url('${esc(x.url)}');background-size:${x.cols * 100}% ${x.lins * 100}%;`
+      + `background-position:${px.toFixed(3)}% ${py.toFixed(3)}%`;
+  };
+  return `<div class="lnTira">
+    ${q.map((x, i) => `<i class="${i === Math.floor(q.length / 2) ? 'on' : ''}" style="${pedaco(x)}"></i>`).join('')}
+    ${q.length > 1 ? `<b class="lnQn">${q.length} quadros</b>` : ''}
+  </div>`;
+}
+
+/** Passa os quadros enquanto o mouse esta em cima; sem timer parado quando nao precisa. */
+function lnPassarQuadros(tira, ligar){
+  if (!tira) return;
+  clearInterval(tira._t);
+  const qs = [...tira.querySelectorAll('i')];
+  if (!qs.length) return;
+  const meio = Math.floor(qs.length / 2);
+  if (!ligar || qs.length < 2) { qs.forEach((x, i) => x.classList.toggle('on', i === meio)); return; }
+  let i = Math.max(0, qs.findIndex(x => x.classList.contains('on')));
+  tira._t = setInterval(() => { qs[i].classList.remove('on'); i = (i + 1) % qs.length; qs[i].classList.add('on'); }, 700);
+}
+
 function lnDesenharAchadas(){
   const lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
   const titulo = lnPinoAtivo
     ? `<div class="lnResumo">${lista.length} em <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
     : '';
-  $('#lnResultados').innerHTML = titulo + `<div class="lnLista">${lista.map(l => `
-    <div class="lnLinha" onclick="lnVer(${lnAchadas.indexOf(l)})">
-      <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
-      <span class="lnNome">${esc(l.nome)}</span>
-      ${lnPulo(l.pula)}
-      <span class="lnCanal">${esc(l.canal)}</span>
-      <span class="lnQuando">${lnMMSS(l.segundo)}</span>
+  $('#lnResultados').innerHTML = titulo + `<div class="lnGrade">${lista.map(l => `
+    <div class="lnCard" onclick="lnVer(${lnAchadas.indexOf(l)})"
+      onmouseenter="lnPassarQuadros(this.querySelector('.lnTira'),true)"
+      onmouseleave="lnPassarQuadros(this.querySelector('.lnTira'),false)">
+      ${lnTira(l)}
+      <div class="lnCardCorpo">
+        <div class="lnNome">${esc(l.nome)}</div>
+        <div class="lnCardPe">
+          <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
+          ${lnPulo(l.pula)}
+          <span class="lnQuando">${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</span>
+        </div>
+      </div>
     </div>`).join('')}</div>`;
 }
 
@@ -4117,7 +4169,7 @@ function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
   $('#lnPlayer').innerHTML = `
     <div class="lnTocando">
-      <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(l.video)}?start=${l.segundo}&autoplay=1&rel=0"
+      <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(l.video)}?start=${l.segundo}${l.fim ? `&end=${l.fim}` : ''}&autoplay=1&rel=0"
         allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
       <div class="lnTocandoLado">
         <div class="lnTocandoNome">${esc(l.nome)}</div>
@@ -4143,7 +4195,7 @@ async function lnSalvarAtual(botao, i){
   const sel = botao.parentElement.querySelector('.lnPulaSel').value;
   const hab = lnCatalogo?.agentes.find(a => a.nome === $('#lnAgente').value)?.habilidades.find(h => h.busca === lnHabAtual);
   const corpo = {
-    video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo,
+    video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
     mapa: $('#lnMapa').value, agente: $('#lnAgente').value,
     habilidade: hab?.nome ?? '', lado: lnLadoAtual,
     ponto: l.ponto?.nome ?? '',
@@ -4186,7 +4238,7 @@ function lnDesenharMinhas(){
 
 function lnVerSalva(id){
   const x = lnMinhasLista.find(v => v.id === id); if (!x) return;
-  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, site: null, pula: x.pula, ponto: x.ponto ? { nome: x.ponto, aproximado: false } : null }];
+  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, fim: x.fim ?? null, site: null, pula: x.pula, ponto: x.ponto ? { nome: x.ponto, aproximado: false } : null }];
   lnVer(0);
 }
 
