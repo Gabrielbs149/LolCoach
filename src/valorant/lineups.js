@@ -44,7 +44,7 @@ const VALIDADE_CATALOGO = 7 * 24 * 60 * 60 * 1000;   // o jogo muda de patch, ma
  * aconteceu quando os callouts entraram — o mapa abria sem nenhum pino porque o catálogo
  * em disco tinha só nome/ícone/planta e a validade por idade não notava a diferença.
  */
-const FORMATO_CATALOGO = 2;
+const FORMATO_CATALOGO = 3;
 
 /**
  * Mapas e agentes oficiais, do valorant-api.com (público, sem chave, atualizado por patch).
@@ -74,6 +74,7 @@ export async function catalogo({ forcar = false } = {}) {
       .map((x) => ({
         nome: x.displayName,
         icone: x.listViewIcon ?? x.splash ?? null,
+        arte: x.splash ?? x.listViewIcon ?? null,      // a arte grande, pro seletor em grade
         planta: x.displayIcon ?? null,
         callouts: pontosDoMapa(mapaEn.get(x.uuid) ?? x),
       }))
@@ -156,6 +157,56 @@ export function pontoDaLineup(nome, callouts = [], site = null) {
     const doSite = callouts.filter((c) => c.site === site);
     const alvo = doSite.find((c) => /site/i.test(c.regiao)) ?? doSite[0];
     if (alvo) return { ...alvo, aproximado: true };
+  }
+  return null;
+}
+
+/* --------------------------------------------------- qual habilidade é */
+
+/**
+ * Apelido que o pessoal usa no título do capítulo → pedaço do nome oficial da habilidade.
+ * Ninguém escreve "Incendiary" no vídeo, escreve "molly". Só os apelidos que aparecem de
+ * verdade; o que não casar fica sem ícone, que é melhor que mostrar o ícone errado.
+ */
+const APELIDOS = [
+  [/\bmolly\b|\bmolli?es\b|\bmolotov\b|\bincend/i, ['incendiary', 'snake bite', 'frag', 'hot hands', 'blaze', 'molly']],
+  [/\bsmoke?s?\b|\bfuma\b/i, ['sky smoke', 'poison cloud', 'dark cover', 'cove', 'nebula', 'smoke', 'orb']],
+  [/\bwall\b|\bparede\b/i, ['toxic screen', 'barrier', 'cascade', 'wall']],
+  [/\bflash\b|\bflashes\b/i, ['flashpoint', 'blaze', 'curveball', 'paranoia', 'flash', 'blindside', 'dizzy']],
+  [/\bstun\b|\bconcuss/i, ['fault line', 'aftershock', 'concussion', 'stun', 'seize']],
+  [/\bdart\b|\brecon\b|\bscan\b/i, ['recon bolt', 'owl drone', 'trailblazer', 'prowler', 'recon']],
+  [/\bshock\b/i, ['shock bolt']],
+  [/\bult\b|\bultimate\b/i, []],   // o ult é tratado pelo slot, não pelo nome
+];
+
+const semAcentoMin = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+/**
+ * Qual habilidade a lineup usa, pelo nome do capítulo. Devolve a habilidade do agente ou
+ * null — ícone errado no pino confunde mais do que pino sem ícone.
+ */
+export function habilidadeDaLineup(nome, habilidades = []) {
+  if (!habilidades.length) return null;
+  const t = ` ${semAcentoMin(nome).replace(/[^a-z0-9]+/g, ' ')} `;
+  // 1. o nome oficial (pt-BR ou en-US) aparece no título
+  for (const h of habilidades) {
+    for (const alvo of [h.busca, h.nome]) {
+      const limpo = semAcentoMin(alvo).replace(/[^a-z0-9]+/g, ' ').trim();
+      if (limpo.length >= 4 && t.includes(` ${limpo} `)) return h;
+    }
+  }
+  // 2. "ult" / "ultimate" → a habilidade do slot de ultimate
+  if (/\bult\b|\bultimate\b/i.test(nome)) {
+    const u = habilidades.find((h) => h.slot === 'Ultimate');
+    if (u) return u;
+  }
+  // 3. apelido ("molly", "smoke", "wall"…)
+  for (const [apelido, pistas] of APELIDOS) {
+    if (!apelido.test(nome)) continue;
+    for (const pista of pistas) {
+      const h = habilidades.find((x) => semAcentoMin(x.busca).includes(pista) || semAcentoMin(x.nome).includes(pista));
+      if (h) return h;
+    }
   }
   return null;
 }
@@ -398,18 +449,27 @@ export async function buscarLineups(p = {}) {
   // o ponto no mapa sai daqui, não do navegador: a tela só desenha o pino
   const cat = await catalogo().catch(() => null);
   const callouts = cat?.mapas?.find((x) => x.nome === p.mapa)?.callouts ?? [];
+  const habs = cat?.agentes?.find((x) => x.nome === p.agente)?.habilidades ?? [];
 
   const lineups = [];
   for (const { v, caps, tiras } of porVideo) {
     for (let i = 0; i < caps.length; i++) {
       const c = caps[i];
       const ponto = pontoDaLineup(c.nome, callouts, c.site);
+      // de onde sai a habilidade, na ordem: o nome do capítulo; o título do vídeo (quase sempre
+      // é lá que está, porque o vídeo inteiro é sobre uma só — "Brimstone Molly Lineups"); e por
+      // fim a que ele filtrou, que é o que ele pediu. Só 2 de 111 casavam só pelo capítulo.
+      const hab = habilidadeDaLineup(c.nome, habs)
+        ?? habilidadeDaLineup(v.titulo, habs)
+        ?? (p.habilidade ? habs.find((x) => x.busca === p.habilidade) : null)
+        ?? null;
       // o fim da lineup é o começo da próxima: assim o player toca SÓ o clipe dela
       const fim = caps[i + 1]?.segundo ?? (v.segundos || c.segundo + 25);
       lineups.push({
         video: v.id, titulo: v.titulo, canal: v.canal,
         capa: v.capa, segundo: c.segundo, fim, nome: c.nome, site: c.site, pula: c.pula,
         quadros: quadrosDaLineup(tiras ?? [], c.segundo, fim),
+        habilidade: hab ? { nome: hab.nome, icone: hab.icone } : null,
         ponto: ponto ? { nome: ponto.nome, x: ponto.x, y: ponto.y, aproximado: ponto.aproximado === true } : null,
       });
     }
@@ -419,6 +479,7 @@ export async function buscarLineups(p = {}) {
   return {
     ...r, lineups,
     planta: mapa?.planta ?? null,
+    callouts: mapa?.callouts ?? [],
     semCapitulo: !lineups.length,
     resumo: lineups.length ? `${lineups.length} lineups de ${comCapitulo} vídeo${comCapitulo > 1 ? 's' : ''}` : null,
   };

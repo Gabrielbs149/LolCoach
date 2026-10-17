@@ -921,7 +921,12 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnBloco{display:flex;flex-direction:column;gap:6px}
 .lnRot{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--apagado)}
 .lnCartao{position:relative;height:74px;border:1px solid var(--borda);border-radius:var(--r2);
-  overflow:hidden;background:var(--f3);display:flex;align-items:flex-end}
+  overflow:hidden;background:var(--f3);display:flex;align-items:flex-end;width:100%;padding:0;
+  cursor:pointer;font-family:inherit;text-align:left}
+.lnCartao:hover{border-color:var(--ouro)}
+.lnTrocar{position:absolute;right:6px;top:6px;font-style:normal;font-size:10px;background:#000a;
+  color:#fff;padding:2px 6px;border-radius:4px;opacity:0;transition:opacity .12s}
+.lnCartao:hover .lnTrocar{opacity:1}
 .lnCartao img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85}
 .lnCartao.lnCartaoAg img{object-fit:contain;object-position:right bottom}
 .lnCartao span{position:relative;padding:6px 8px;font-size:12.5px;color:#fff;font-weight:600;
@@ -932,6 +937,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnLados button{flex:1;background:var(--f1);border:0;color:var(--fraco);padding:7px 0;
   font-size:12px;cursor:pointer;font-family:inherit}
 .lnLados button.on{background:var(--f3);color:var(--ouro-claro)}
+.lnLados button[data-lado="atacando"].on{background:#7d1f2acc;color:#ffd9dd}
+.lnLados button[data-lado="defendendo"].on{background:#15493fcc;color:#c9f4e8}
 .lnHabs{display:flex;flex-wrap:wrap;gap:5px}
 .lnHab{display:flex;align-items:center;gap:5px;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r1);color:var(--fraco);padding:4px 7px;font-size:11px;cursor:pointer;font-family:inherit}
@@ -944,10 +951,15 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnMapa{position:relative;width:100%;max-width:760px;margin:0 auto;aspect-ratio:1/1;
   background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2)}
 .lnMapa img{width:100%;height:100%;object-fit:contain;display:block;opacity:.92}
-.lnPino{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;
+.lnPino{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;
   border:2px solid var(--ouro);background:#0b1016e6;color:var(--ouro-claro);cursor:pointer;
   font-family:inherit;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
   padding:0;transition:transform .1s}
+.lnPino img{width:20px;height:20px;object-fit:contain;filter:brightness(1.4)}
+.lnPinoN{position:absolute;right:-5px;top:-5px;font-style:normal;font-size:10px;line-height:1;
+  background:var(--ouro);color:#0b1016;border-radius:6px;padding:2px 4px;font-weight:700}
+.lnCallout{position:absolute;transform:translate(-50%,-50%);font-size:9.5px;color:#cfd6e4;
+  text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;white-space:nowrap;opacity:.75}
 .lnPino:hover{transform:translate(-50%,-50%) scale(1.18);z-index:3}
 .lnPino.on{background:var(--ouro);color:#0b1016;z-index:4}
 .lnPino.aprox{border-style:dashed;opacity:.8}
@@ -970,6 +982,30 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnCardPe{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .lnCardPe .lnSite{flex:0 0 26px}
 .lnCardPe .lnQuando{margin-left:auto;flex:0 0 auto}
+
+.lnModal{position:fixed;inset:0;background:#040710cc;backdrop-filter:blur(3px);z-index:60;
+  display:flex;align-items:center;justify-content:center;padding:var(--e2)}
+.lnModalCx{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2);
+  width:min(760px,96vw);max-height:86vh;display:flex;flex-direction:column;overflow:hidden}
+.lnModalTopo{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
+  border-bottom:1px solid var(--borda);color:var(--forte);font-size:13px}
+.lnX{background:none;border:0;color:var(--fraco);font-size:15px;cursor:pointer;font-family:inherit;padding:0 4px}
+.lnX:hover{color:var(--forte)}
+.lnModalGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px;
+  padding:12px;overflow:auto}
+.lnModalGrade.ag{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
+.lnOpcao{position:relative;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;
+  background:var(--f3);cursor:pointer;padding:0;font-family:inherit;aspect-ratio:16/10}
+.lnModalGrade.ag .lnOpcao{aspect-ratio:1/1}
+.lnOpcao img{width:100%;height:100%;object-fit:cover;display:block;opacity:.9}
+.lnModalGrade.ag .lnOpcao img{object-fit:contain;background:#11161f}
+.lnOpcao span{position:absolute;left:0;right:0;bottom:0;padding:4px 6px;font-size:11.5px;color:#fff;
+  font-weight:600;text-align:left;background:linear-gradient(transparent,#000c)}
+.lnOpcao:hover{border-color:var(--ouro)}
+.lnOpcao.on{border-color:var(--ouro);box-shadow:0 0 0 1px var(--ouro) inset}
+.lnCheck2{position:absolute;right:5px;top:4px;font-style:normal;color:var(--ouro-claro);font-size:13px;
+  text-shadow:0 1px 3px #000}
+.lnHabMini{width:15px;height:15px;object-fit:contain;vertical-align:-3px;margin-right:4px;filter:brightness(1.3)}
 
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
@@ -1226,8 +1262,7 @@ h2{letter-spacing:1px}
       <aside class="lnLado">
         <div class="lnBloco">
           <div class="lnRot">Mapa</div>
-          <div class="lnCartao" id="lnCartaoMapa"></div>
-          <select class="contaSel" id="lnMapa"></select>
+          <button class="lnCartao" id="lnCartaoMapa" onclick="lnAbrirSeletor('mapa')"></button>
         </div>
         <div class="lnLados" id="lnLados">
           <button class="on" data-lado="atacando">Atacante</button>
@@ -1235,8 +1270,7 @@ h2{letter-spacing:1px}
         </div>
         <div class="lnBloco">
           <div class="lnRot">Agente</div>
-          <div class="lnCartao lnCartaoAg" id="lnCartaoAgente"></div>
-          <select class="contaSel" id="lnAgente"></select>
+          <button class="lnCartao lnCartaoAg" id="lnCartaoAgente" onclick="lnAbrirSeletor('agente')"></button>
         </div>
         <div class="lnBloco" id="lnBlocoHab">
           <div class="lnRot">Habilidade</div>
@@ -1266,6 +1300,8 @@ h2{letter-spacing:1px}
       <label class="lnCheck"><input type="checkbox" id="lnSoPulo"> só as que precisam pular</label>
     </div>
     <div id="lnMinhas"></div>
+
+    <div class="lnModal" id="lnModal" hidden onclick="if(event.target===this)lnFecharSeletor()"></div>
   </section>
 
   <section id="admin">
@@ -3972,14 +4008,14 @@ async function carregarConquistas(){
 /* ============================================================ Lineups (Valorant)
  * Não existe base aberta de lineup — elas vivem em vídeo de criador. A aba acha o vídeo,
  * lê os capítulos da descrição ("00:07 A Default FAST Molly (A Lobby)") e vira cada um
- * num PINO no mapa: o callout do nome é casado com os callouts oficiais do mapa, que a
- * Riot publica com coordenada. Clicar no pino abre as lineups daquele ponto; clicar numa
- * abre o vídeo no segundo exato, no player oficial do YouTube.
+ * num PINO no mapa: o callout do nome é casado com os callouts oficiais, que a Riot
+ * publica com coordenada. O pino leva o ícone da habilidade quando dá pra saber qual é.
+ * Clicar no pino filtra; clicar na lineup toca só o clipe dela, no segundo exato.
  *
  * Nada aqui encosta no Valorant. Sem leitura de memória e sem desenhar por cima do jogo —
  * o Vanguard é anticheat de kernel e trata sobreposição como trapaça. */
-let lnCatalogo = null, lnMinhasLista = [], lnAchadas = [], lnPlanta = null;
-let lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
+let lnCatalogo = null, lnMinhasLista = [], lnAchadas = [], lnPlanta = null, lnCallouts = [];
+let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 /** Pulo tem TRÊS estados: o vídeo disse que pula, disse que não, ou não disse nada. */
@@ -3992,18 +4028,17 @@ async function carregarLineups(){
   try { lnCatalogo = await pegar('/api/val/catalogo'); }
   catch { $('#lnAviso').innerHTML = `<div class="vazio">não consegui carregar o catálogo do Valorant</div>`; return; }
 
-  const op = (v, t) => `<option value="${esc(v)}">${esc(t)}</option>`;
-  $('#lnMapa').innerHTML = op('', 'escolha o mapa') + lnCatalogo.mapas.map(m => op(m.nome, m.nome)).join('');
-  $('#lnAgente').innerHTML = op('', 'escolha o agente') + lnCatalogo.agentes.map(a => op(a.nome, a.nome)).join('');
-  $('#lnFiltroMapa').innerHTML = op('', 'todos os mapas') + lnCatalogo.mapas.map(m => op(m.nome, m.nome)).join('');
+  $('#lnFiltroMapa').innerHTML = `<option value="">todos os mapas</option>`
+    + lnCatalogo.mapas.map(m => `<option value="${esc(m.nome)}">${esc(m.nome)}</option>`).join('');
   $('#lnAviso').innerHTML = lnCatalogo.aviso ? `<div class="vazio">${esc(lnCatalogo.aviso)}</div>` : '';
 
   // o que ele escolheu da última vez: na hora de jogar ninguém quer remontar o filtro
   try {
     const g = JSON.parse(localStorage.getItem('lineups') || '{}');
-    if (g.mapa) $('#lnMapa').value = g.mapa;
-    if (g.agente) $('#lnAgente').value = g.agente;
+    if (lnCatalogo.mapas.some(m => m.nome === g.mapa)) lnMapaAtual = g.mapa;
+    if (lnCatalogo.agentes.some(a => a.nome === g.agente)) lnAgenteAtual = g.agente;
     if (g.lado) lnLadoAtual = g.lado;
+    if (g.habilidade) lnHabAtual = g.habilidade;
   } catch {}
   lnDesenharLados(); lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
   await carregarMinhasLineups();
@@ -4015,21 +4050,23 @@ function lnDesenharLados(){
   for (const b of document.querySelectorAll('#lnLados button')) b.classList.toggle('on', b.dataset.lado === lnLadoAtual);
 }
 
+const lnMapaDe = () => lnCatalogo?.mapas.find(x => x.nome === lnMapaAtual) ?? null;
+const lnAgenteDe = () => lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual) ?? null;
+
 function lnDesenharCartoes(){
-  const m = lnCatalogo?.mapas.find(x => x.nome === $('#lnMapa').value);
-  $('#lnCartaoMapa').innerHTML = m?.icone
-    ? `<img src="${esc(m.icone)}" alt=""><span>${esc(m.nome)}</span>`
-    : `<span class="lnVazioCartao">escolha o mapa</span>`;
-  const a = lnCatalogo?.agentes.find(x => x.nome === $('#lnAgente').value);
-  $('#lnCartaoAgente').innerHTML = a?.icone
-    ? `<img src="${esc(a.icone)}" alt=""><span>${esc(a.nome)}<small>${esc(a.funcao ?? '')}</small></span>`
-    : `<span class="lnVazioCartao">escolha o agente</span>`;
+  const m = lnMapaDe();
+  $('#lnCartaoMapa').innerHTML = m
+    ? `<img src="${esc(m.arte ?? m.icone)}" alt=""><span>${esc(m.nome)}</span><i class="lnTrocar">trocar</i>`
+    : `<span class="lnVazioCartao">escolher mapa</span>`;
+  const a = lnAgenteDe();
+  $('#lnCartaoAgente').innerHTML = a
+    ? `<img src="${esc(a.icone)}" alt=""><span>${esc(a.nome)}<small>${esc(a.funcao ?? '')}</small></span><i class="lnTrocar">trocar</i>`
+    : `<span class="lnVazioCartao">escolher agente</span>`;
 }
 
 /** As habilidades viram botões com o ícone — é como ele pensa ("a molly da Viper"). */
 function lnDesenharHabs(){
-  const a = lnCatalogo?.agentes.find(x => x.nome === $('#lnAgente').value);
-  const habs = a?.habilidades ?? [];
+  const habs = lnAgenteDe()?.habilidades ?? [];
   $('#lnBlocoHab').hidden = !habs.length;
   if (!habs.some(h => h.busca === lnHabAtual)) lnHabAtual = '';
   $('#lnHabs').innerHTML = `<button class="lnHab ${lnHabAtual === '' ? 'on' : ''}" onclick="lnEscolherHab('')">todas</button>`
@@ -4038,8 +4075,33 @@ function lnDesenharHabs(){
 }
 function lnEscolherHab(v){ lnHabAtual = v; lnDesenharHabs(); lnLinks(); }
 
+/* ---------------------------------------------------------------- seletores em grade */
+
+/** Escolher mapa e agente pela arte, não por lista: é assim que ele reconhece na hora. */
+function lnAbrirSeletor(qual){
+  const m = $('#lnModal');
+  const itens = qual === 'mapa'
+    ? lnCatalogo.mapas.map(x => ({ nome: x.nome, arte: x.arte ?? x.icone, on: x.nome === lnMapaAtual }))
+    : lnCatalogo.agentes.map(x => ({ nome: x.nome, arte: x.icone, on: x.nome === lnAgenteAtual, pe: x.funcao }));
+  m.innerHTML = `<div class="lnModalCx">
+    <div class="lnModalTopo"><b>${qual === 'mapa' ? 'Escolher mapa' : 'Escolher agente'}</b>
+      <button class="lnX" onclick="lnFecharSeletor()">✕</button></div>
+    <div class="lnModalGrade ${qual === 'agente' ? 'ag' : ''}">
+      ${itens.map(x => `<button class="lnOpcao ${x.on ? 'on' : ''}" onclick="lnEscolherNoSeletor('${qual}','${esc(x.nome)}')">
+        <img loading="lazy" src="${esc(x.arte)}" alt="">
+        <span>${esc(x.nome)}</span>${x.on ? '<i class="lnCheck2">✓</i>' : ''}
+      </button>`).join('')}
+    </div></div>`;
+  m.hidden = false;
+}
+function lnFecharSeletor(){ $('#lnModal').hidden = true; $('#lnModal').innerHTML = ''; }
+function lnEscolherNoSeletor(qual, nome){
+  if (qual === 'mapa') lnMapaAtual = nome; else { lnAgenteAtual = nome; lnDesenharHabs(); }
+  lnFecharSeletor(); lnDesenharCartoes(); lnLinks();
+}
+
 function lnEscolha(){
-  return { mapa: $('#lnMapa').value, agente: $('#lnAgente').value, habilidade: lnHabAtual, lado: lnLadoAtual };
+  return { mapa: lnMapaAtual, agente: lnAgenteAtual, habilidade: lnHabAtual, lado: lnLadoAtual };
 }
 
 /** Os links de fora acompanham o filtro, pra ele consultar a biblioteca dos outros sem sair daqui. */
@@ -4064,7 +4126,7 @@ async function lnProcurar(){
   try { r = await pegar('/api/val/buscar?' + new URLSearchParams(e)); }
   catch { r = { lineups: [], aviso: 'a busca não respondeu' }; }
 
-  lnAchadas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnPinoAtivo = null;
+  lnAchadas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnCallouts = r.callouts ?? []; lnPinoAtivo = null;
   if (!lnAchadas.length) {
     $('#lnMapaCx').innerHTML = '';
     const porque = r.semCapitulo
@@ -4078,7 +4140,7 @@ async function lnProcurar(){
   lnDesenharAchadas();
 }
 
-/** Lineups agrupadas por ponto: cada pino traz quantas tem ali. */
+/** Lineups agrupadas por ponto: cada pino traz quantas tem ali e o ícone da habilidade. */
 function lnPinos(){
   const por = new Map();
   for (const l of lnAchadas) {
@@ -4087,6 +4149,12 @@ function lnPinos(){
     if (!por.has(k)) por.set(k, { nome: k, x: l.ponto.x, y: l.ponto.y, aproximado: l.ponto.aproximado, lista: [] });
     const p = por.get(k); p.lista.push(l);
     if (!l.ponto.aproximado) p.aproximado = false;
+  }
+  // o ícone do pino é o da habilidade mais comum ali
+  for (const p of por.values()) {
+    const cont = new Map();
+    for (const l of p.lista) if (l.habilidade?.icone) cont.set(l.habilidade.icone, (cont.get(l.habilidade.icone) ?? 0) + 1);
+    p.icone = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   }
   return [...por.values()].sort((a, b) => b.lista.length - a.lista.length);
 }
@@ -4099,14 +4167,19 @@ function lnDesenharMapa(){
     $('#lnMapaCx').innerHTML = `<div class="vazio">as lineups vieram sem ponto no mapa — a lista está logo abaixo</div>`;
     return;
   }
+  // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
+  const nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
   $('#lnMapaCx').innerHTML = `
     <div class="lnMapa">
       <img src="${esc(lnPlanta)}" alt="planta do mapa">
-      ${pinos.map((p, i) => `
+      ${nomes.map(c => `<span class="lnCallout" style="left:${(c.x * 100).toFixed(2)}%;top:${(c.y * 100).toFixed(2)}%">${esc(c.nome)}</span>`).join('')}
+      ${pinos.map(p => `
         <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
           style="left:${(p.x * 100).toFixed(2)}%;top:${(p.y * 100).toFixed(2)}%"
           title="${esc(p.nome)}${p.aproximado ? ' (posição aproximada)' : ''}" onclick="lnClicarPino('${esc(p.nome)}')">
-          <b>${p.lista.length}</b><span class="lnPinoNome">${esc(p.nome)}</span>
+          ${p.icone ? `<img src="${esc(p.icone)}" alt="">` : `<b>${p.lista.length}</b>`}
+          ${p.icone ? `<i class="lnPinoN">${p.lista.length}</i>` : ''}
+          <span class="lnPinoNome">${esc(p.nome)}</span>
         </button>`).join('')}
     </div>`;
 }
@@ -4116,13 +4189,15 @@ function lnClicarPino(nome){
   lnDesenharMapa(); lnDesenharAchadas();
 }
 
-/** A tira de quadros: os frames do próprio vídeo naquele pedaço, pra ele VER a lineup sem abrir. */
+/**
+ * Os quadros do próprio vídeo naquele pedaço: é a tela do jogo, pra ele VER a lineup sem
+ * abrir nada. A posição do recorte vai em PORCENTAGEM pra escalar com o cartão — a fonte
+ * só tem 318x180 e prender em pixel jogaria resolução fora.
+ */
 function lnTira(l){
   if (!l.quadros?.length) return `<div class="lnTira lnSemTira"><img loading="lazy" src="${esc(l.capa)}" alt=""></div>`;
   const q = l.quadros;
   const pedaco = (x) => {
-    // posicao em PORCENTAGEM: assim o quadro escala com o cartao. A fonte so tem 318x180,
-    // mostrar encolhido em pixel fixo seria jogar resolucao fora.
     const px = x.cols > 1 ? (x.col / (x.cols - 1)) * 100 : 0;
     const py = x.lins > 1 ? (x.lin / (x.lins - 1)) * 100 : 0;
     return `background-image:url('${esc(x.url)}');background-size:${x.cols * 100}% ${x.lins * 100}%;`
@@ -4134,7 +4209,7 @@ function lnTira(l){
   </div>`;
 }
 
-/** Passa os quadros enquanto o mouse esta em cima; sem timer parado quando nao precisa. */
+/** Passa os quadros enquanto o mouse está em cima; sem timer parado quando não precisa. */
 function lnPassarQuadros(tira, ligar){
   if (!tira) return;
   clearInterval(tira._t);
@@ -4157,7 +4232,7 @@ function lnDesenharAchadas(){
       onmouseleave="lnPassarQuadros(this.querySelector('.lnTira'),false)">
       ${lnTira(l)}
       <div class="lnCardCorpo">
-        <div class="lnNome">${esc(l.nome)}</div>
+        <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="" title="${esc(l.habilidade.nome)}">` : ''}${esc(l.nome)}</div>
         <div class="lnCardPe">
           <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
           ${lnPulo(l.pula)}
@@ -4169,7 +4244,7 @@ function lnDesenharAchadas(){
 
 /* ---------------------------------------------------------------- player */
 
-/** Um player só: clicou numa lineup, ela toca ali no segundo certo. */
+/** Um player só: clicou numa lineup, ela toca ali — do começo ao fim DELA, não o vídeo todo. */
 function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
   $('#lnPlayer').innerHTML = `
@@ -4177,12 +4252,13 @@ function lnVer(i){
       <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(l.video)}?start=${l.segundo}${l.fim ? `&end=${l.fim}` : ''}&autoplay=1&rel=0"
         allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
       <div class="lnTocandoLado">
-        <div class="lnTocandoNome">${esc(l.nome)}</div>
+        <div class="lnTocandoNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
         <div class="lnTocandoPe">
           ${l.ponto ? `<span class="lnTag">${esc(l.ponto.nome)}${l.ponto.aproximado ? ' (aprox)' : ''}</span>` : ''}
+          ${l.habilidade ? `<span class="lnTag">${esc(l.habilidade.nome)}</span>` : ''}
           ${lnPulo(l.pula)}
         </div>
-        <div class="lnCanal">${esc(l.canal)} · ${lnMMSS(l.segundo)}</div>
+        <div class="lnCanal">${esc(l.canal)} · ${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</div>
         <div class="lnSalvarCx">
           <span>pula?</span>
           <select class="contaSel lnPulaSel">
@@ -4198,11 +4274,10 @@ function lnVer(i){
 async function lnSalvarAtual(botao, i){
   const l = lnAchadas[i]; if (!l) return;
   const sel = botao.parentElement.querySelector('.lnPulaSel').value;
-  const hab = lnCatalogo?.agentes.find(a => a.nome === $('#lnAgente').value)?.habilidades.find(h => h.busca === lnHabAtual);
   const corpo = {
     video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
-    mapa: $('#lnMapa').value, agente: $('#lnAgente').value,
-    habilidade: hab?.nome ?? '', lado: lnLadoAtual,
+    mapa: lnMapaAtual, agente: lnAgenteAtual,
+    habilidade: l.habilidade?.nome ?? '', lado: lnLadoAtual,
     ponto: l.ponto?.nome ?? '',
     pula: sel === 'sim' ? true : sel === 'nao' ? false : null,
   };
@@ -4243,7 +4318,9 @@ function lnDesenharMinhas(){
 
 function lnVerSalva(id){
   const x = lnMinhasLista.find(v => v.id === id); if (!x) return;
-  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, fim: x.fim ?? null, site: null, pula: x.pula, ponto: x.ponto ? { nome: x.ponto, aproximado: false } : null }];
+  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, fim: x.fim ?? null,
+    site: null, pula: x.pula, habilidade: x.habilidade ? { nome: x.habilidade, icone: null } : null,
+    ponto: x.ponto ? { nome: x.ponto, aproximado: false } : null }];
   lnVer(0);
 }
 
@@ -4254,14 +4331,13 @@ async function lnApagar(id){
   await carregarMinhasLineups();
 }
 
-$('#lnMapa').onchange = () => { lnDesenharCartoes(); lnLinks(); };
-$('#lnAgente').onchange = () => { lnDesenharCartoes(); lnDesenharHabs(); lnLinks(); };
 $('#lnBuscar').onclick = lnProcurar;
 $('#lnFiltroMapa').onchange = lnDesenharMinhas;
 $('#lnSoPulo').onchange = lnDesenharMinhas;
 for (const b of document.querySelectorAll('#lnLados button')) {
   b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); };
 }
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#lnModal').hidden) lnFecharSeletor(); });
 
 const CARREGADORES = {
   estat: carregarEstat, calendario: () => carregarCalendario(), meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
