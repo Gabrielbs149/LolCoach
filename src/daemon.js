@@ -14,6 +14,7 @@ import { release as versaoDoWindows } from 'node:os';
 import * as Controle from './dados/controle.js';
 import { recadoDeSequencia } from './analise/parar.js';
 import { licaoDaPartida } from './analise/licao.js';
+import * as Lineups from './valorant/lineups.js';
 
 /**
  * Liga tudo: aceitar fila, seleção de campeão, runas e coleta.
@@ -2506,6 +2507,22 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       }
     },
     ocupado: () => ocupado,
+
+    /* ---------------------------------------------- lineups de Valorant
+     * Fica no mesmo app porque é a mesma pessoa jogando, mas não encosta em nada do LoL:
+     * é só catálogo oficial (valorant-api.com), busca de vídeo e o que ele salvou em disco.
+     * Nada lê o processo do Valorant nem desenha por cima dele. */
+    valCatalogo: (p = {}) => Lineups.catalogo({ forcar: p.forcar === true }),
+    valBuscar: (p = {}) => Lineups.buscarLineups({ ...p, chaveYoutube: config.youtube?.chave || null }),
+    valSalvas: () => Lineups.salvas(),
+    valSalvar: (p = {}) => Lineups.salvar(p),
+    valApagar: (p = {}) => Lineups.apagar(String(p.id ?? '')),
+    valLinks: (p = {}) => ({
+      youtube: Lineups.linkYoutube(Lineups.termoDaBusca(p)),
+      strats: Lineups.linkStrats(p),
+      termo: Lineups.termoDaBusca(p),
+    }),
+
     fechar() { try { db.close(); } catch {} lcu.fechar(); },
   };
 
@@ -2525,4 +2542,5 @@ const ACOES_DO_PAINEL = [
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
+  'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks',
 ];

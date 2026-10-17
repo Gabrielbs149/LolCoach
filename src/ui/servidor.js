@@ -782,6 +782,16 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         return enviar(200, 'application/json', JSON.stringify(await acoes.atualizar()));
       }
 
+      // POST: salvar e apagar lineup
+      for (const [caminho, nome] of [['/api/val/salvar', 'valSalvar'], ['/api/val/apagar', 'valApagar']]) {
+        if (req.method !== 'POST' || url.pathname !== caminho || !acoes[nome]) continue;
+        const pedacos = []; for await (const p of req) pedacos.push(p);
+        try {
+          const corpo = JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}');
+          return enviar(200, 'application/json', JSON.stringify(await acoes[nome](corpo)));
+        } catch (erro) { return enviar(400, 'application/json', JSON.stringify({ erro: erro.message })); }
+      }
+
       if (req.method === 'POST') {
         const nome = url.pathname.replace('/api/', '');
         const acao = acoes[nome];
@@ -922,6 +932,23 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       }
       if (url.pathname === '/api/campeoes' && acoes.campeoes) {
         return enviar(200, 'application/json', JSON.stringify(await acoes.campeoes()));
+      }
+
+      /* --------------------------------------------- lineups de Valorant */
+      // GET: catálogo (mapas/agentes), busca de vídeo, as salvas e os links de fora.
+      // Tudo devolve JSON e nenhuma derruba a aba: sem internet, a busca volta com aviso
+      // e as salvas continuam vindo do disco.
+      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks']]) {
+        if (url.pathname !== caminho || !acoes[nome]) continue;
+        const p = {
+          forcar: url.searchParams.get('forcar') === '1',
+          mapa: url.searchParams.get('mapa') || '',
+          agente: url.searchParams.get('agente') || '',
+          habilidade: url.searchParams.get('habilidade') || '',
+          lado: url.searchParams.get('lado') || null,
+        };
+        try { return enviar(200, 'application/json', JSON.stringify(await acoes[nome](p))); }
+        catch (erro) { return enviar(503, 'application/json', JSON.stringify({ erro: erro.message })); }
       }
 
       // Rotas que dependem de rede respondem erro em JSON em vez de derrubar a

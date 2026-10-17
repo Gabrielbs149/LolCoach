@@ -870,6 +870,50 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   border-top-color:var(--ouro);border-radius:50%;animation:gira .8s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
 
+/* ---------------------------------------------------- lineups (Valorant) */
+.lnFiltros{display:flex;gap:var(--e1);margin-bottom:var(--e2);flex-wrap:wrap;align-items:center}
+.lnFiltrosMinhas{margin-top:var(--e1)}
+.lnCheck{display:flex;align-items:center;gap:6px;color:var(--fraco);font-size:12px;cursor:pointer}
+.lnFora{text-decoration:none;display:inline-flex;align-items:center}
+.lnGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:var(--e2)}
+.lnCard{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);
+  display:flex;flex-direction:column}
+.lnCard .capa{position:relative;aspect-ratio:16/9;background:var(--f3);cursor:pointer}
+.lnCard .capa img{width:100%;height:100%;object-fit:cover;display:block}
+.lnCard .dur{position:absolute;right:6px;bottom:6px;background:#000c;color:#fff;font-size:10.5px;
+  padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums}
+.lnCard .corpo{padding:8px 10px 10px;display:flex;flex-direction:column;gap:5px;flex:1}
+.lnCard .tit{font-size:12.5px;line-height:1.35;color:var(--forte)}
+.lnCard .canal{font-size:11px;color:var(--apagado)}
+.lnCard .pe{display:flex;gap:6px;align-items:center;margin-top:auto;flex-wrap:wrap}
+.lnTag{font-size:10.5px;border:1px solid var(--borda);border-radius:4px;padding:1px 6px;color:var(--fraco)}
+.lnTag.pulo{border-color:var(--ouro);color:var(--ouro-claro)}
+.lnCard video,.lnCard iframe{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
+.lnMin{font-variant-numeric:tabular-nums;width:62px;text-align:center}
+.lnSalvarCx{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--fraco)}
+
+.lnResumo{color:var(--fraco);font-size:12px;margin-bottom:var(--e1)}
+.lnLista{display:flex;flex-direction:column;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden}
+.lnLinha{display:flex;align-items:center;gap:10px;padding:7px 10px;cursor:pointer;
+  border-top:1px solid var(--borda);font-size:12.5px}
+.lnLinha:first-child{border-top:0}
+.lnLinha:hover{background:var(--f3)}
+.lnSite{flex:0 0 30px;text-align:center;font-weight:700;font-size:11px;border-radius:4px;
+  padding:2px 0;background:var(--f3);color:var(--fraco)}
+.lnSite.sA{color:#ff6b6b}.lnSite.sB{color:#4dabf7}.lnSite.sC{color:#9775fa}.lnSite.sMid{color:#ffd43b}
+.lnNome{flex:1;min-width:0;color:var(--forte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnCanal{flex:0 0 auto;color:var(--apagado);font-size:11px;max-width:200px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.lnQuando{flex:0 0 44px;text-align:right;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
+.lnTag.lnSei{color:var(--apagado);border-style:dashed}
+.lnTocando{display:flex;gap:var(--e2);margin-bottom:var(--e2);flex-wrap:wrap}
+.lnTocando iframe{flex:1 1 440px;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;min-width:300px}
+.lnTocandoLado{flex:1 1 220px;display:flex;flex-direction:column;gap:7px;justify-content:center}
+.lnTocandoNome{font-size:15px;color:var(--forte);line-height:1.3}
+.lnTocandoPe{display:flex;gap:6px;flex-wrap:wrap}
+.lnFiltros button.acao.on{border-color:var(--ouro);color:var(--ouro-claro)}
+.lnFiltros button.acao b{color:var(--apagado);font-weight:600;margin-left:4px}
+
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
    contorno e o mesmo brilho no topo, linha que responde ao mouse, botão que
@@ -929,6 +973,9 @@ h2{letter-spacing:1px}
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
     <button data-aba="patch" title="Patch">
       <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
+    <div class="grupo">Valorant</div>
+    <button data-aba="lineups" title="Lineups">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg><span class="nome">Lineups</span></button>
     <div class="grupo">App</div>
     <button data-aba="admin" title="Admin" id="navAdmin" hidden>
       <svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="nome">Admin</span></button>
@@ -1114,6 +1161,34 @@ h2{letter-spacing:1px}
 
   <section id="detalhe">
     <div id="det"></div>
+  </section>
+
+  <section id="lineups">
+    <div class="titulo">Lineups <small>Valorant</small></div>
+
+    <div class="lnFiltros">
+      <select class="contaSel" id="lnMapa"></select>
+      <select class="contaSel" id="lnAgente"></select>
+      <select class="contaSel" id="lnHab"></select>
+      <select class="contaSel" id="lnLado">
+        <option value="">os dois lados</option><option value="atacando">atacando</option><option value="defendendo">defendendo</option>
+      </select>
+      <button class="acao" id="lnBuscar">Procurar lineups</button>
+      <a class="acao lnFora" id="lnYoutube" target="_blank" rel="noreferrer">YouTube</a>
+      <a class="acao lnFora" id="lnStrats" target="_blank" rel="noreferrer">strats.gg</a>
+    </div>
+
+    <div id="lnAviso"></div>
+    <div id="lnPlayer"></div>
+    <div class="lnFiltros" id="lnSites" hidden></div>
+    <div id="lnResultados"></div>
+
+    <h2>As suas <small id="lnQuantas"></small></h2>
+    <div class="lnFiltros lnFiltrosMinhas">
+      <select class="contaSel" id="lnFiltroMapa"><option value="">todos os mapas</option></select>
+      <label class="lnCheck"><input type="checkbox" id="lnSoPulo"> só as que precisam pular</label>
+    </div>
+    <div id="lnMinhas"></div>
   </section>
 
   <section id="admin">
@@ -3816,8 +3891,211 @@ async function carregarConquistas(){
       </div>`).join('')}</div>`;
 }
 
+
+/* ============================================================ Lineups (Valorant)
+ * Não existe base aberta de lineup — elas vivem em vídeo de criador. Então a aba
+ * ACHA o vídeo (mapa + agente + habilidade), ele salva os que serviram com o minuto
+ * certo e a marcação de pulo, e revê quando quiser. O vídeo roda no player oficial
+ * do YouTube: nada é copiado e o criador leva a view.
+ *
+ * Nada aqui encosta no Valorant. Sem leitura de memória e sem desenhar por cima do
+ * jogo — o Vanguard é anticheat de kernel e trata sobreposição como trapaça. */
+let lnCatalogo = null, lnMinhasLista = [];
+const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
+const lnSegundos = (txt) => { const m = String(txt || '').trim().match(/^(\d+):([0-5]?\d)$/); return m ? (+m[1]) * 60 + (+m[2]) : Math.max(0, parseInt(txt, 10) || 0); };
+
+async function carregarLineups(){
+  $('#lnResultados').innerHTML = '';
+  $('#lnAviso').innerHTML = carregando('buscando mapas e agentes…');
+  try { lnCatalogo = await pegar('/api/val/catalogo'); }
+  catch { $('#lnAviso').innerHTML = `<div class="vazio">não consegui carregar o catálogo do Valorant</div>`; return; }
+
+  const op = (v, t, sel) => `<option value="${esc(v)}" ${sel ? 'selected' : ''}>${esc(t)}</option>`;
+  $('#lnMapa').innerHTML = op('', 'escolha o mapa') + lnCatalogo.mapas.map(m => op(m.nome, m.nome)).join('');
+  $('#lnAgente').innerHTML = op('', 'escolha o agente') + lnCatalogo.agentes.map(a => op(a.nome, `${a.nome} · ${a.funcao ?? ''}`.trim())).join('');
+  $('#lnFiltroMapa').innerHTML = op('', 'todos os mapas') + lnCatalogo.mapas.map(m => op(m.nome, m.nome)).join('');
+  $('#lnAviso').innerHTML = lnCatalogo.aviso ? `<div class="vazio">${esc(lnCatalogo.aviso)}</div>` : '';
+  lnHabilidades();
+
+  // o que ele escolheu da última vez: na hora de jogar ninguém quer remontar o filtro
+  try {
+    const g = JSON.parse(localStorage.getItem('lineups') || '{}');
+    if (g.mapa) $('#lnMapa').value = g.mapa;
+    if (g.agente) { $('#lnAgente').value = g.agente; lnHabilidades(); if (g.habilidade) $('#lnHab').value = g.habilidade; }
+    if (g.lado) $('#lnLado').value = g.lado;
+  } catch {}
+  lnLinks();
+  await carregarMinhasLineups();
+}
+
+/** As habilidades mudam com o agente. O value guarda o nome em inglês: é o que acha vídeo. */
+function lnHabilidades(){
+  const a = lnCatalogo?.agentes.find(x => x.nome === $('#lnAgente').value);
+  $('#lnHab').innerHTML = `<option value="">qualquer habilidade</option>`
+    + (a?.habilidades ?? []).map(h => `<option value="${esc(h.busca)}">${esc(h.nome)}</option>`).join('');
+  $('#lnHab').disabled = !a;
+}
+
+function lnEscolha(){
+  return { mapa: $('#lnMapa').value, agente: $('#lnAgente').value, habilidade: $('#lnHab').value, lado: $('#lnLado').value };
+}
+
+/** Os links de fora acompanham o filtro, pra ele consultar a biblioteca dos outros sem sair daqui. */
+async function lnLinks(){
+  const e = lnEscolha();
+  try { localStorage.setItem('lineups', JSON.stringify(e)); } catch {}
+  try {
+    const q = new URLSearchParams(Object.fromEntries(Object.entries(e).filter(([, v]) => v)));
+    const l = await pegar('/api/val/links?' + q);
+    $('#lnYoutube').href = l.youtube; $('#lnStrats').href = l.strats;
+  } catch {}
+}
+
+let lnAchadas = [], lnSiteAtivo = '';
+
+/** Pulo tem TRÊS estados: o vídeo disse que pula, disse que não, ou não disse nada. */
+const lnPulo = (v) => v === true ? '<span class="lnTag pulo">PULA</span>'
+  : v === false ? '<span class="lnTag">sem pulo</span>'
+  : '<span class="lnTag lnSei">não diz</span>';
+
+async function lnProcurar(){
+  const e = lnEscolha();
+  if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
+  $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = ''; $('#lnSites').hidden = true;
+  $('#lnResultados').innerHTML = carregando('procurando as lineups…');
+  let r;
+  try { r = await pegar('/api/val/buscar?' + new URLSearchParams(e)); }
+  catch { r = { lineups: [], aviso: 'a busca não respondeu' }; }
+
+  lnAchadas = r.lineups ?? [];
+  if (!lnAchadas.length) {
+    $('#lnResultados').innerHTML = '';
+    const porque = r.semCapitulo
+      ? 'achei vídeos, mas nenhum tem a lista de lineups na descrição — abre no YouTube ali em cima'
+      : (r.aviso || r.erro || 'nada encontrado');
+    $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>`;
+    return;
+  }
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · cada uma abre no segundo exato</div>`;
+  lnSiteAtivo = '';
+  lnDesenharSites();
+  lnDesenharAchadas();
+}
+
+/** Filtro por site: é o que ele pensa na hora ("preciso de uma pro B"). */
+function lnDesenharSites(){
+  const contas = lnAchadas.reduce((a, l) => { const k = l.site ?? '?'; a[k] = (a[k] || 0) + 1; return a; }, {});
+  const ordem = ['A', 'B', 'C', 'Mid', '?'].filter(k => contas[k]);
+  if (ordem.length < 2) { $('#lnSites').hidden = true; return; }
+  $('#lnSites').hidden = false;
+  $('#lnSites').innerHTML = [['', 'todos', lnAchadas.length], ...ordem.map(k => [k, k === '?' ? 'sem site' : k, contas[k]])]
+    .map(([v, t, n]) => `<button class="acao ${lnSiteAtivo === v ? 'on' : ''}" onclick="lnFiltrarSite('${v}')">${esc(t)} <b>${n}</b></button>`).join('');
+}
+function lnFiltrarSite(v){ lnSiteAtivo = v; lnDesenharSites(); lnDesenharAchadas(); }
+
+function lnDesenharAchadas(){
+  const lista = lnSiteAtivo ? lnAchadas.filter(l => (l.site ?? '?') === lnSiteAtivo) : lnAchadas;
+  $('#lnResultados').innerHTML = `<div class="lnLista">${lista.map((l, i) => `
+    <div class="lnLinha" onclick="lnVer(${lnAchadas.indexOf(l)})">
+      <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
+      <span class="lnNome">${esc(l.nome)}</span>
+      ${lnPulo(l.pula)}
+      <span class="lnCanal">${esc(l.canal)}</span>
+      <span class="lnQuando">${lnMMSS(l.segundo)}</span>
+    </div>`).join('')}</div>`;
+}
+
+/** Um player só, no topo: clicou numa lineup, ela toca ali no segundo certo. */
+function lnVer(i){
+  const l = lnAchadas[i]; if (!l) return;
+  $('#lnPlayer').innerHTML = `
+    <div class="lnTocando">
+      <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(l.video)}?start=${l.segundo}&autoplay=1&rel=0"
+        allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+      <div class="lnTocandoLado">
+        <div class="lnTocandoNome">${esc(l.nome)}</div>
+        <div class="lnTocandoPe">${l.site ? `<span class="lnTag">site ${esc(l.site)}</span>` : ''}${lnPulo(l.pula)}</div>
+        <div class="lnCanal">${esc(l.canal)} · ${lnMMSS(l.segundo)}</div>
+        <div class="lnSalvarCx">
+          <span>pula?</span>
+          <select class="contaSel lnPulaSel">
+            <option value="">não sei</option><option value="sim" ${l.pula === true ? 'selected' : ''}>sim</option><option value="nao">não</option>
+          </select>
+          <button class="acao" onclick="lnSalvarAtual(this, ${i})">Salvar na minha lista</button>
+        </div>
+      </div>
+    </div>`;
+  $('#lnPlayer').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+async function lnSalvarAtual(botao, i){
+  const l = lnAchadas[i]; if (!l) return;
+  const sel = botao.parentElement.querySelector('.lnPulaSel').value;
+  const corpo = {
+    video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo,
+    mapa: $('#lnMapa').value, agente: $('#lnAgente').value,
+    // só o nome da habilidade de verdade: sem isso gravava o rótulo "qualquer habilidade"
+    habilidade: $('#lnHab').value ? ($('#lnHab').selectedOptions[0]?.textContent?.trim() || '') : '',
+    lado: $('#lnLado').value || null,
+    pula: sel === 'sim' ? true : sel === 'nao' ? false : null,
+  };
+  botao.disabled = true; botao.textContent = 'salvando…';
+  try {
+    const r = await fetch('/api/val/salvar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }).then(x => x.json());
+    if (r.erro) throw new Error(r.erro);
+    botao.textContent = 'salva ✓';
+    await carregarMinhasLineups();
+  } catch (err) { botao.disabled = false; botao.textContent = 'Salvar na minha lista'; alert('não deu pra salvar: ' + err.message); }
+}
+
+async function carregarMinhasLineups(){
+  try { lnMinhasLista = await pegar('/api/val/salvas'); } catch { lnMinhasLista = []; }
+  lnDesenharMinhas();
+}
+
+function lnDesenharMinhas(){
+  const mapa = $('#lnFiltroMapa').value, soPulo = $('#lnSoPulo').checked;
+  const lista = lnMinhasLista.filter(x => (!mapa || x.mapa === mapa) && (!soPulo || x.pula === true));
+  $('#lnQuantas').textContent = lnMinhasLista.length ? `${lista.length} de ${lnMinhasLista.length}` : '';
+  if (!lista.length) {
+    $('#lnMinhas').innerHTML = `<div class="vazio">${lnMinhasLista.length ? 'nenhuma com esse filtro' : 'nenhuma salva ainda — procura ali em cima e salva as que servirem'}</div>`;
+    return;
+  }
+  $('#lnMinhas').innerHTML = `<div class="lnLista">${lista.map(x => `
+    <div class="lnLinha" onclick="lnVerSalva('${esc(x.id)}')">
+      <span class="lnSite s${esc(x.site ?? 'x')}">${esc(x.agente.slice(0, 3))}</span>
+      <span class="lnNome">${esc(x.titulo)}</span>
+      ${lnPulo(x.pula)}
+      <span class="lnCanal">${esc(x.mapa)}${x.habilidade ? ' · ' + esc(x.habilidade) : ''}</span>
+      <span class="lnQuando">${lnMMSS(x.segundo)}</span>
+      <button class="acao" onclick="event.stopPropagation();lnApagar('${esc(x.id)}')">Apagar</button>
+    </div>`).join('')}</div>`;
+}
+
+function lnVerSalva(id){
+  const x = lnMinhasLista.find(v => v.id === id); if (!x) return;
+  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, site: null, pula: x.pula }];
+  lnVer(0);
+}
+
+async function lnApagar(id){
+  const x = lnMinhasLista.find(v => v.id === id);
+  if (!confirm(`Apagar "${x?.titulo ?? 'essa lineup'}"?`)) return;
+  try { await fetch('/api/val/apagar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) }); } catch {}
+  await carregarMinhasLineups();
+}
+
+$('#lnAgente').onchange = () => { lnHabilidades(); lnLinks(); };
+$('#lnMapa').onchange = lnLinks;
+$('#lnHab').onchange = lnLinks;
+$('#lnLado').onchange = lnLinks;
+$('#lnBuscar').onclick = lnProcurar;
+$('#lnFiltroMapa').onchange = lnDesenharMinhas;
+$('#lnSoPulo').onchange = lnDesenharMinhas;
+
 const CARREGADORES = {
   estat: carregarEstat, calendario: () => carregarCalendario(), meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
+  lineups: carregarLineups,
 };
 const jaCarregou = new Set();
 
