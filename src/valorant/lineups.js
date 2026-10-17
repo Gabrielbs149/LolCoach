@@ -38,6 +38,13 @@ const buscarJson = async (url, ms = 12000) => {
 /** Habilidade que faz sentido ter lineup: as que você joga longe. O resto é corpo a corpo. */
 const SLOT_UTIL = new Set(['Ability1', 'Ability2', 'Grenade', 'Ultimate']);
 const VALIDADE_CATALOGO = 7 * 24 * 60 * 60 * 1000;   // o jogo muda de patch, mas não toda hora
+/**
+ * Versão do FORMATO do catálogo guardado. Sobe sempre que o que a gente guarda muda de
+ * forma. Sem isso, quem já tinha cache antigo ficava com ele por 7 dias: foi o que
+ * aconteceu quando os callouts entraram — o mapa abria sem nenhum pino porque o catálogo
+ * em disco tinha só nome/ícone/planta e a validade por idade não notava a diferença.
+ */
+const FORMATO_CATALOGO = 2;
 
 /**
  * Mapas e agentes oficiais, do valorant-api.com (público, sem chave, atualizado por patch).
@@ -45,7 +52,8 @@ const VALIDADE_CATALOGO = 7 * 24 * 60 * 60 * 1000;   // o jogo muda de patch, ma
  */
 export async function catalogo({ forcar = false } = {}) {
   const guardado = await lerJson(arqCatalogo(), null);
-  if (!forcar && guardado?.em && Date.now() - guardado.em < VALIDADE_CATALOGO && guardado.mapas?.length) return guardado;
+  const serve = guardado?.formato === FORMATO_CATALOGO && guardado.mapas?.length;
+  if (!forcar && serve && guardado.em && Date.now() - guardado.em < VALIDADE_CATALOGO) return guardado;
 
   try {
     // em pt-BR pra mostrar, em en-US pra buscar: vídeo de lineup é quase todo em inglês,
@@ -84,12 +92,12 @@ export async function catalogo({ forcar = false } = {}) {
       })
       .sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'));
     if (!mapas.length || !agentes.length) throw new Error('catálogo veio vazio');
-    const novo = { em: Date.now(), mapas, agentes };
+    const novo = { em: Date.now(), formato: FORMATO_CATALOGO, mapas, agentes };
     await gravarJson(arqCatalogo(), novo);
     return novo;
   } catch (e) {
     // sem internet: vale mais o catálogo velho do que uma aba quebrada
-    if (guardado?.mapas?.length) return { ...guardado, aviso: 'catálogo antigo: não consegui atualizar agora' };
+    if (serve) return { ...guardado, aviso: 'catálogo antigo: não consegui atualizar agora' };
     return { em: 0, mapas: [], agentes: [], aviso: `não consegui buscar mapas e agentes: ${e.message}` };
   }
 }

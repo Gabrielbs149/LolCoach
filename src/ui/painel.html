@@ -4094,6 +4094,11 @@ function lnPinos(){
 function lnDesenharMapa(){
   if (!lnPlanta) { $('#lnMapaCx').innerHTML = ''; return; }
   const pinos = lnPinos();
+  // mapa sem pino nenhum confunde mais do que ajuda: diz o porquê em vez de mostrar vazio
+  if (!pinos.length) {
+    $('#lnMapaCx').innerHTML = `<div class="vazio">as lineups vieram sem ponto no mapa — a lista está logo abaixo</div>`;
+    return;
+  }
   $('#lnMapaCx').innerHTML = `
     <div class="lnMapa">
       <img src="${esc(lnPlanta)}" alt="planta do mapa">
