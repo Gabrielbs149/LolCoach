@@ -306,7 +306,7 @@ const normalizarYoutube = (v) => ({
  * Procura vídeo de lineup. Devolve `{ termo, videos, fonte, aviso }` — nunca estoura:
  * aba sem resultado com um aviso é melhor que aba quebrada.
  */
-export async function buscar({ mapa, agente, habilidade, lado, chaveYoutube = null } = {}) {
+export async function buscar({ mapa, agente, habilidade, lado, chaveYoutube = null, duracao = null } = {}) {
   const termo = termoDaBusca({ mapa, agente, habilidade, lado });
   if (!termo || termo === 'lineup') return { termo, videos: [], fonte: null, aviso: 'escolha pelo menos o agente e o mapa' };
 
@@ -314,7 +314,12 @@ export async function buscar({ mapa, agente, habilidade, lado, chaveYoutube = nu
   if (chaveYoutube) {
     try {
       const u = new URL('https://www.googleapis.com/youtube/v3/search');
-      u.search = new URLSearchParams({ part: 'snippet', type: 'video', maxResults: '20', q: termo, key: chaveYoutube });
+      const campos = { part: 'snippet', type: 'video', maxResults: '20', q: termo, key: chaveYoutube };
+      // `medium` = de 4 a 20 min, que é onde vivem as compilações com capítulo. Sem esse filtro
+      // a oficial trazia só Shorts de uma lineup só, sem capítulo nenhum, e a busca de
+      // Bind+Brimstone voltava 0 (enquanto o Invidious trazia as compilações).
+      if (duracao) campos.videoDuration = duracao;
+      u.search = new URLSearchParams(campos);
       const d = await buscarJson(u.toString());
       const videos = (d.items ?? []).map(normalizarYoutube).filter((v) => v.id);
       if (videos.length) return { termo, videos, fonte: 'youtube' };
@@ -576,8 +581,16 @@ export async function lineupsDe(p = {}) {
 }
 
 export async function buscarLineups(p = {}) {
-  const r = await buscar(p);
-  if (!r.videos?.length || !r.fonte || r.fonte === 'youtube') return { ...r, lineups: [] };
+  // com chave, primeiro as compilações (4-20 min); se nenhuma tiver capítulo, repete sem filtro
+  let r = await buscar(p.chaveYoutube && !p.semMedium ? { ...p, duracao: 'medium' } : p);
+  let semFiltro = false;
+  if (!r.videos?.length && p.chaveYoutube) { r = await buscar(p); semFiltro = true; }
+  if (p.semMedium) semFiltro = true;
+  if (!r.videos?.length) return { ...r, lineups: [] };
+  // `fonte: 'youtube'` quer dizer que a BUSCA veio da API oficial. Isso costumava abortar
+  // aqui, de quando esse caminho ainda não sabia ler capítulo — com a chave posta, a busca
+  // voltava 0 lineups em 0,4 s. Hoje a oficial lê descrição, então segue em frente; só o
+  // storyboard (que a oficial não tem) é que continua saindo do Invidious.
   const base = INVIDIOUS.find((b) => new URL(b).host === r.fonte) ?? INVIDIOUS[0];
 
   // Só os primeiros: cada um é uma chamada, e os de cima são os que têm capítulo.
@@ -640,6 +653,12 @@ export async function buscarLineups(p = {}) {
       });
     }
   }
+  // nenhum dos vídeos de 4-20 min tinha capítulo? vale tentar o resto antes de desistir
+  if (!lineups.length && p.chaveYoutube && !semFiltro) {
+    const solto = await buscarLineups({ ...p, semMedium: true });
+    if (solto.lineups?.length) return solto;
+  }
+
   const comCapitulo = porVideo.filter((x) => x.caps.length).length;
   const mapa = cat?.mapas?.find((x) => x.nome === p.mapa) ?? null;
   return {
