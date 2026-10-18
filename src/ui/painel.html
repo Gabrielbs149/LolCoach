@@ -1030,6 +1030,31 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnDeAte i{font-style:normal;color:var(--ouro)}
 .lnDeAte small{color:var(--apagado)}
 
+.lnVistas{display:flex;gap:0;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;
+  align-self:flex-start}
+.lnVistas button{background:var(--f1);border:0;color:var(--fraco);padding:6px 14px;font-size:12px;
+  cursor:pointer;font-family:inherit}
+.lnVistas button.on{background:var(--f3);color:var(--ouro-claro)}
+.lnPixels{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:var(--e2)}
+.lnPx{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1)}
+.lnPx.alto{border-color:var(--ouro)}
+.lnPxImg{position:relative;aspect-ratio:16/9;background:#000;overflow:hidden}
+.lnPxImg i{position:absolute;inset:0;background-repeat:no-repeat}
+.lnPxImg img{width:100%;height:100%;object-fit:cover;display:block}
+.lnPxAlto{position:absolute;inset:0}
+.lnPxAlto iframe{width:100%;height:100%;border:0;display:block}
+/* a cruz do meio: e onde a mira fica na tela do jogo */
+.lnPxMira{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);
+  pointer-events:none;opacity:.55}
+.lnPxMira::before,.lnPxMira::after{content:"";position:absolute;background:#6cf3c4;box-shadow:0 0 2px #000}
+.lnPxMira::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-50%)}
+.lnPxMira::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-50%)}
+.lnPxPe{padding:7px 9px 9px;display:flex;flex-direction:column;gap:6px}
+.lnPxPe .lnNome{font-size:12.5px;color:var(--forte);white-space:normal;line-height:1.3}
+.lnPxBotoes{display:flex;gap:5px;align-items:center}
+.lnPxBotoes .acao{padding:2px 8px;font-size:11.5px}
+.lnPxSeg{font-size:11px;color:var(--apagado);font-variant-numeric:tabular-nums;min-width:36px;text-align:center}
+
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
    contorno e o mesmo brilho no topo, linha que responde ao mouse, botão que
@@ -1310,6 +1335,10 @@ h2{letter-spacing:1px}
       </aside>
 
       <div class="lnPalco">
+        <div class="lnVistas" id="lnVistas" hidden>
+          <button class="on" data-vista="mapa" onclick="lnTrocarVista('mapa')">Mapa</button>
+          <button data-vista="pixel" onclick="lnTrocarVista('pixel')">Pontos de mira</button>
+        </div>
         <div id="lnAviso"></div>
         <div class="lnMapaCx" id="lnMapaCx"></div>
         <div id="lnPlayer"></div>
@@ -4157,6 +4186,7 @@ async function lnProcurar(forcar){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
   const meu = ++lnPedido;
+  lnSoltarAltos();
   const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
   let r;
   try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...e, forcar: '1' } : e)); }
@@ -4174,9 +4204,9 @@ async function lnProcurar(forcar){
     $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>`;
     return;
   }
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica num ponto do mapa</div>`;
-  lnDesenharMapa();
-  lnDesenharAchadas();
+  $('#lnVistas').hidden = false;
+  if (lnVista === 'pixel') { $('#lnMapaCx').innerHTML = ''; lnDesenharPixels(); }
+  else { $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica num ponto do mapa</div>`; lnDesenharMapa(); lnDesenharAchadas(); }
 }
 
 /** Lineups agrupadas por ponto: cada pino traz quantas tem ali e o ícone da habilidade. */
@@ -4225,7 +4255,8 @@ function lnDesenharMapa(){
 
 function lnClicarPino(nome){
   lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
-  lnDesenharMapa(); lnDesenharAchadas();
+  lnDesenharMapa();
+  if (lnVista === 'pixel') { lnSoltarAltos(); lnDesenharPixels(); } else lnDesenharAchadas();
 }
 
 /**
@@ -4279,6 +4310,131 @@ function lnDesenharAchadas(){
         </div>
       </div>
     </div>`).join('')}</div>`;
+}
+
+/* ---------------------------------------------------------------- a tela do pixel
+ * Uma tela só com o ponto de mira de cada lineup. O quadro do storyboard (320x180) serve
+ * pra reconhecer, mas não pra ler pixel — então o que está na frente dos olhos vira um
+ * player PAUSADO no segundo da mira, que é imagem de verdade em alta. Só os visíveis
+ * ficam montados (no máximo 6): 40 players vivos travariam a máquina.
+ *
+ * Qual é o segundo da mira: ~70% do clipe. Antes disso ele ainda está andando pro lugar,
+ * depois já soltou. Dá pra acertar na mão com os botões, e isso fica salvo com a lineup. */
+let lnVista = 'mapa';
+const LN_VIVOS = 6;
+const lnAltos = new Map();          // índice da lineup -> player montado
+let lnObs = null;
+
+/** O segundo em que a mira aparece. Se ele ajustou, manda o ajuste dele. */
+function lnSegundoDaMira(l){
+  if (Number.isFinite(l.mira)) return l.mira;
+  const fim = l.fim ?? (l.segundo + 12);
+  return Math.max(l.segundo, Math.min(fim - 0.6, l.segundo + (fim - l.segundo) * 0.7));
+}
+
+function lnTrocarVista(v){
+  lnVista = v;
+  for (const b of document.querySelectorAll('#lnVistas button')) b.classList.toggle('on', b.dataset.vista === v);
+  lnSoltarAltos();
+  if (v === 'mapa') { lnDesenharMapa(); lnDesenharAchadas(); }
+  else { $('#lnMapaCx').innerHTML = ''; lnDesenharPixels(); }
+}
+
+function lnSoltarAltos(){
+  for (const [, p] of lnAltos) { try { p.destroy?.(); } catch {} }
+  lnAltos.clear();
+  lnObs?.disconnect(); lnObs = null;
+}
+
+function lnDesenharPixels(){
+  const lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
+  const topo = lnPinoAtivo
+    ? `<div class="lnResumo">${lista.length} em <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
+    : `<div class="lnResumo">${lista.length} pontos de mira · o que está na tela carrega em alta</div>`;
+  $('#lnResultados').innerHTML = topo + `<div class="lnPixels">${lista.map(l => {
+    const i = lnAchadas.indexOf(l);
+    return `<div class="lnPx" data-i="${i}">
+      <div class="lnPxImg">${lnQuadroDaMira(l)}<div class="lnPxAlto" id="lnPxAlto${i}"></div>
+        <span class="lnPxMira"></span></div>
+      <div class="lnPxPe">
+        <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
+        <div class="lnPxBotoes">
+          <button class="acao" onclick="event.stopPropagation();lnMira(${i},-0.3)" title="um tiquinho antes">−</button>
+          <span class="lnPxSeg" id="lnPxSeg${i}">${lnMMSS(Math.round(lnSegundoDaMira(l)))}</span>
+          <button class="acao" onclick="event.stopPropagation();lnMira(${i},0.3)" title="um tiquinho depois">+</button>
+          <button class="acao" onclick="event.stopPropagation();lnVer(${i})" title="abre o clipe inteiro">clipe</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('')}</div>`;
+  lnObservarPixels();
+}
+
+/** O quadro do storyboard mais perto da mira: aparece na hora, enquanto o alto não monta. */
+function lnQuadroDaMira(l){
+  if (!l.quadros?.length) return `<img loading="lazy" src="${esc(l.capa)}" alt="">`;
+  const q = l.quadros[Math.min(l.quadros.length - 1, Math.round((l.quadros.length - 1) * 0.7))];
+  const px = q.cols > 1 ? (q.col / (q.cols - 1)) * 100 : 0;
+  const py = q.lins > 1 ? (q.lin / (q.lins - 1)) * 100 : 0;
+  return `<i style="background-image:url('${esc(q.url)}');background-size:${q.cols * 100}% ${q.lins * 100}%;background-position:${px.toFixed(3)}% ${py.toFixed(3)}%"></i>`;
+}
+
+/** Monta o player em alta só pro que está na tela, e desmonta o que saiu. */
+function lnObservarPixels(){
+  lnObs?.disconnect();
+  lnObs = new IntersectionObserver((entradas) => {
+    for (const e of entradas) {
+      const i = Number(e.target.dataset.i);
+      if (e.isIntersecting) lnMontarAlto(i);
+      else lnDesmontarAlto(i);
+    }
+  }, { rootMargin: '150px' });
+  for (const el of document.querySelectorAll('.lnPx')) lnObs.observe(el);
+}
+
+async function lnMontarAlto(i){
+  if (lnAltos.has(i) || lnVista !== 'pixel') return;
+  const l = lnAchadas[i]; if (!l) return;
+  // mais velho sai pra o novo entrar: player de vídeo é caro
+  while (lnAltos.size >= LN_VIVOS) lnDesmontarAlto(lnAltos.keys().next().value);
+  lnAltos.set(i, null);                               // segura o lugar enquanto a API carrega
+  await lnApiYT();
+  if (!lnAltos.has(i) || lnVista !== 'pixel') return;
+  const alvo = document.getElementById('lnPxAlto' + i);
+  if (!alvo) { lnAltos.delete(i); return; }
+  const p = new YT.Player(alvo, {
+    videoId: l.video,
+    playerVars: { start: Math.round(lnSegundoDaMira(l)), autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
+    events: {
+      onReady: (e) => {
+        e.target.setPlaybackQuality?.('hd1080');
+        e.target.seekTo(lnSegundoDaMira(l), true);
+        // um instante tocando pro quadro aparecer, e para: é uma FOTO, não um vídeo
+        setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 420);
+      },
+      onStateChange: (e) => { if (e.data === YT.PlayerState.PLAYING) setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 320); },
+    },
+  });
+  lnAltos.set(i, p);
+  document.querySelector(`.lnPx[data-i="${i}"]`)?.classList.add('alto');
+}
+
+function lnDesmontarAlto(i){
+  const p = lnAltos.get(i);
+  if (p) { try { p.destroy(); } catch {} }
+  lnAltos.delete(i);
+  const el = document.querySelector(`.lnPx[data-i="${i}"]`);
+  if (el) { el.classList.remove('alto'); const a = el.querySelector('.lnPxAlto'); if (a) a.innerHTML = ''; }
+}
+
+/** Ajusta o segundo da mira e remonta esse quadro. Fica salvo junto quando ele salvar. */
+function lnMira(i, d){
+  const l = lnAchadas[i]; if (!l) return;
+  const fim = l.fim ?? (l.segundo + 12);
+  l.mira = Math.max(l.segundo, Math.min(fim - 0.4, lnSegundoDaMira(l) + d));
+  const s = document.getElementById('lnPxSeg' + i);
+  if (s) s.textContent = lnMMSS(Math.round(l.mira));
+  lnDesmontarAlto(i); lnMontarAlto(i);
 }
 
 /* ---------------------------------------------------------------- o clipe e o mapa
@@ -4397,7 +4553,7 @@ async function lnSalvarAtual(botao, i){
     video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
     mapa: lnMapaAtual, agente: lnAgenteAtual,
     habilidade: l.habilidade?.nome ?? '', lado: lnLadoAtual,
-    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '',
+    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '', mira: Math.round(lnSegundoDaMira(l)),
     pula: sel === 'sim' ? true : sel === 'nao' ? false : null,
   };
   botao.disabled = true; botao.textContent = 'salvando…';
@@ -4444,7 +4600,7 @@ function lnVerSalva(id){
   lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, fim: x.fim ?? null,
     site: null, pula: x.pula, habilidade: x.habilidade ? { nome: x.habilidade, icone: null } : null,
     ponto: achar(x.ponto) ?? (x.ponto ? { nome: x.ponto, x: 0.5, y: 0.5, aproximado: true } : null),
-    posicao: achar(x.posicao) }];
+    posicao: achar(x.posicao), mira: Number.isFinite(x.mira) ? x.mira : undefined }];
   lnVer(0);
 }
 

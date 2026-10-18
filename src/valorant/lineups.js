@@ -633,6 +633,7 @@ export async function salvar(entrada = {}) {
     habilidade: limpar(entrada.habilidade, 60),
     ponto: limpar(entrada.ponto, 60),          // onde a lineup CAI ("A Lobby")
     posicao: limpar(entrada.posicao, 60),      // de onde se joga, quando dá pra saber
+    mira: Number.isFinite(Number(entrada.mira)) ? Math.max(0, Math.round(Number(entrada.mira))) : null,   // o segundo em que a mira aparece
     lado: ['atacando', 'defendendo'].includes(entrada.lado) ? entrada.lado : null,
     pula: entrada.pula === true ? true : entrada.pula === false ? false : null,   // null = ninguém disse ainda
     nota: limpar(entrada.nota, 300),
