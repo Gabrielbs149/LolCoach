@@ -1016,8 +1016,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnDetalhe{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(230px,.8fr);gap:16px;
   margin-bottom:18px;align-items:start}
 @media (max-width:980px){.lnDetalhe{grid-template-columns:1fr}}
-.lnVideoCx{display:flex;flex-direction:column;gap:6px;min-width:0}
-.lnVideoCx #lnYT,.lnVideoCx iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;display:block}
+.lnVideoCx{position:relative;min-width:0;overflow:hidden;border-radius:var(--r2);background:#000;
+  aspect-ratio:16/9}
+.lnVideoCx #lnYT{width:100%;height:100%}
+.lnVideoCx iframe{border:0;display:block}
 .lnLadoDetalhe{display:flex;flex-direction:column;gap:7px;min-width:0}
 .lnMini{position:relative;width:100%;aspect-ratio:1/1;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r2);overflow:hidden}
@@ -1056,8 +1058,9 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   font-size:11px;color:var(--ouro-claro)}
 .lnTagP{font-size:10.5px;border:1px solid var(--borda);border-radius:4px;padding:1px 6px;color:var(--fraco)}
 .lnAltoCx{width:min(1180px,97vw)}
-.lnAltoVideo{position:relative;background:#000}
-.lnAltoVideo #lnAltoYT,.lnAltoVideo iframe{width:100%;aspect-ratio:16/9;border:0;display:block}
+.lnAltoVideo{position:relative;background:#000;overflow:hidden;aspect-ratio:16/9}
+.lnAltoVideo #lnAltoYT{width:100%;height:100%}
+.lnAltoVideo iframe{border:0;display:block}
 .lnPxMira.grande{width:34px;height:34px;opacity:.7}
 .lnAltoPe{display:flex;gap:6px;align-items:center;padding:9px 12px;border-top:1px solid var(--borda)}
 .lnAltoPe .acao{padding:3px 9px;font-size:11.5px}
@@ -4524,7 +4527,7 @@ async function lnVerAlto(i){
     videoId: l.video,
     playerVars: { start: seg, autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
     events: {
-      onReady: (e) => { lnForcarAlta(e.target); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 500); },
+      onReady: (e) => { lnForcarAlta(e.target); lnVigiarTamanho($('.lnAltoVideo')); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 500); },
       onStateChange: (e) => { if (e.data === YT.PlayerState.PLAYING) { lnForcarAlta(e.target); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 400); } },
     },
   });
@@ -4548,15 +4551,41 @@ function lnFecharAlto(){
 let lnPlayer = null, lnClipe = null, lnVigia = null;
 
 /**
- * Pede a maior qualidade que o vídeo tiver. O YouTube decide sozinho e pode ignorar — não
- * existe jeito de OBRIGAR — mas pedir no início e a cada vez que volta a tocar é o que dá
- * pra fazer, porque ele costuma cair pra qualidade baixa quando o clipe reinicia.
+ * COMO SE CONSEGUE 1080p DE VERDADE.
+ *
+ * `setPlaybackQuality` não serve: o YouTube aposentou faz tempo e hoje ignora. O que ele
+ * olha pra decidir a qualidade é o TAMANHO DO PLAYER. Player de 600 px ganha 480p por mais
+ * que a gente peça 1080.
+ *
+ * Então o iframe é criado com 1920x1080 de verdade e encolhido no olho com `scale`. O
+ * YouTube vê um player grande e manda o stream grande; a gente mostra do tamanho que cabe.
+ * A imagem fica nítida porque o vídeo chega em 1080 e só é desenhado menor.
  */
+const LN_LARGURA_ALTA = 1920, LN_ALTURA_ALTA = 1080;
+
+function lnEncaixar(cx){
+  const quadro = cx?.querySelector('iframe'); if (!quadro) return;
+  const largura = cx.clientWidth || cx.getBoundingClientRect().width;
+  if (!largura) return;
+  const k = largura / LN_LARGURA_ALTA;
+  quadro.style.width = LN_LARGURA_ALTA + 'px';
+  quadro.style.height = LN_ALTURA_ALTA + 'px';
+  quadro.style.transformOrigin = 'top left';
+  quadro.style.transform = `scale(${k})`;
+  cx.style.height = Math.round(LN_ALTURA_ALTA * k) + 'px';
+}
+
+/** Mantém o encaixe quando a janela muda de tamanho. */
+function lnVigiarTamanho(cx){
+  cx._ro?.disconnect();
+  cx._ro = new ResizeObserver(() => lnEncaixar(cx));
+  cx._ro.observe(cx);
+  lnEncaixar(cx);
+}
+
 function lnForcarAlta(p){
-  try {
-    p.setPlaybackQualityRange?.('hd1080', 'hd2160');
-    p.setPlaybackQuality?.('hd1080');
-  } catch {}
+  // continua pedindo: não custa nada e em vídeo antigo ainda pega
+  try { p.setPlaybackQualityRange?.('hd1080', 'hd2160'); p.setPlaybackQuality?.('hd1080'); } catch {}
 }
 
 /** Carrega a API do YouTube uma vez só. */
@@ -4631,10 +4660,10 @@ async function lnMontarPlayer(l){
     videoId: l.video,
     playerVars: { start: l.segundo, end: l.fim ?? undefined, autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1, vq: 'hd1080' },
     events: {
-      onReady: (e) => { lnForcarAlta(e.target); e.target.playVideo(); },
+      onReady: (e) => { lnForcarAlta(e.target); lnVigiarTamanho($('.lnVideoCx')); e.target.playVideo(); },
       // o laço é nosso: o `end` do YouTube só PARA, e pra estudar lineup a gente quer repetir
       onStateChange: (e) => {
-        if (e.data === YT.PlayerState.PLAYING) lnForcarAlta(e.target);   // o player baixa a qualidade sozinho ao recomeçar
+        if (e.data === YT.PlayerState.PLAYING) { lnForcarAlta(e.target); lnEncaixar($('.lnVideoCx')); }
         if (e.data === YT.PlayerState.ENDED) lnDoComeco();
       },
     },
