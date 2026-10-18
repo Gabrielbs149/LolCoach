@@ -1007,6 +1007,29 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   text-shadow:0 1px 3px #000}
 .lnHabMini{width:15px;height:15px;object-fit:contain;vertical-align:-3px;margin-right:4px;filter:brightness(1.3)}
 
+.lnDetalhe{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,.9fr);gap:var(--e2);
+  margin-bottom:var(--e2);align-items:start}
+@media (max-width:980px){.lnDetalhe{grid-template-columns:1fr}}
+.lnVideoCx{display:flex;flex-direction:column;gap:6px;min-width:0}
+.lnVideoCx #lnYT,.lnVideoCx iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;display:block}
+.lnControles{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.lnControles .acao{padding:3px 8px;font-size:11.5px}
+.lnRelogio{margin-left:auto;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
+.lnLadoDetalhe{display:flex;flex-direction:column;gap:7px;min-width:0}
+.lnMini{position:relative;width:100%;aspect-ratio:1/1;background:var(--f1);border:1px solid var(--borda);
+  border-radius:var(--r2);overflow:hidden}
+.lnMini img{width:100%;height:100%;object-fit:contain;display:block;opacity:.9}
+.lnLinha{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.lnLinha line{stroke:var(--ouro);stroke-width:.7;stroke-dasharray:2.2 1.6;vector-effect:non-scaling-stroke}
+.lnDe,.lnCai{position:absolute;transform:translate(-50%,-50%);border-radius:50%}
+.lnDe{width:14px;height:14px;background:#d9e2f1;border:2px solid #0b1016;box-shadow:0 0 0 2px #d9e2f1aa}
+.lnCai{width:13px;height:13px;background:var(--ouro);border:2px solid #0b1016;box-shadow:0 0 0 3px #d9a23a55}
+.lnCai.aprox{background:transparent;border:2px dashed var(--ouro);box-shadow:none}
+.lnDeAte{font-size:11.5px;color:var(--fraco)}
+.lnDeAte b{color:var(--forte);font-weight:600}
+.lnDeAte i{font-style:normal;color:var(--ouro)}
+.lnDeAte small{color:var(--apagado)}
+
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
    contorno e o mesmo brilho no topo, linha que responde ao mouse, botão que
@@ -4258,33 +4281,113 @@ function lnDesenharAchadas(){
     </div>`).join('')}</div>`;
 }
 
-/* ---------------------------------------------------------------- player */
+/* ---------------------------------------------------------------- o clipe e o mapa
+ * Clicou numa lineup: o clipe toca em LAÇO (só o pedaço dela) e o mapa fica do lado
+ * mostrando de onde se joga e onde cai. O player é o do YouTube pela API oficial, porque
+ * é ele que tem a imagem em alta — o quadro do cartão é storyboard de 320x180 e nunca vai
+ * dar pra ler mira. Com os botões de -0,2 s / +0,2 s dá pra parar no quadro exato. */
+let lnPlayer = null, lnClipe = null, lnVigia = null;
 
-/** Um player só: clicou numa lineup, ela toca ali — do começo ao fim DELA, não o vídeo todo. */
+/** Carrega a API do YouTube uma vez só. */
+function lnApiYT(){
+  if (window.YT?.Player) return Promise.resolve();
+  if (!lnApiYT._p) lnApiYT._p = new Promise((ok) => {
+    const antes = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => { antes?.(); ok(); };
+    const t = document.createElement('script');
+    t.src = 'https://www.youtube.com/iframe_api';
+    document.head.appendChild(t);
+  });
+  return lnApiYT._p;
+}
+
+/** O mapa do lado: de onde se joga (agente) até onde cai (bolinha). */
+function lnMapinha(l){
+  if (!lnPlanta || !l.ponto) return '<div class="vazio">sem ponto no mapa</div>';
+  const a = l.posicao, b = l.ponto;
+  return `<div class="lnMini">
+    <img src="${esc(lnPlanta)}" alt="">
+    ${a ? `<svg class="lnLinha" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1="${a.x * 100}" y1="${a.y * 100}" x2="${b.x * 100}" y2="${b.y * 100}" />
+          </svg>` : ''}
+    ${a ? `<span class="lnDe" style="left:${(a.x * 100).toFixed(2)}%;top:${(a.y * 100).toFixed(2)}%" title="de onde você joga: ${esc(a.nome)}"></span>` : ''}
+    <span class="lnCai ${b.aproximado ? 'aprox' : ''}" style="left:${(b.x * 100).toFixed(2)}%;top:${(b.y * 100).toFixed(2)}%" title="onde cai: ${esc(b.nome)}"></span>
+  </div>
+  <div class="lnDeAte">${a ? `<b>${esc(a.nome)}</b> <i>→</i> ` : ''}<b>${esc(b.nome)}</b>${b.aproximado ? ' <small>(ponto aproximado)</small>' : ''}</div>`;
+}
+
 function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
+  lnClipe = l;
   $('#lnPlayer').innerHTML = `
-    <div class="lnTocando">
-      <iframe src="https://www.youtube-nocookie.com/embed/${encodeURIComponent(l.video)}?start=${l.segundo}${l.fim ? `&end=${l.fim}` : ''}&autoplay=1&rel=0"
-        allow="accelerometer; autoplay; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-      <div class="lnTocandoLado">
+    <div class="lnDetalhe">
+      <div class="lnVideoCx">
+        <div id="lnYT"></div>
+        <div class="lnControles">
+          <button class="acao" onclick="lnPasso(-1)" title="volta 1 segundo">−1s</button>
+          <button class="acao" onclick="lnPasso(-0.2)" title="volta um tiquinho">−0,2s</button>
+          <button class="acao" onclick="lnPausar()" id="lnPausaBt">pausa</button>
+          <button class="acao" onclick="lnPasso(0.2)">+0,2s</button>
+          <button class="acao" onclick="lnDoComeco()" title="volta pro começo do clipe">⟲ do começo</button>
+          <span class="lnRelogio" id="lnRelogio"></span>
+        </div>
+      </div>
+      <div class="lnLadoDetalhe">
         <div class="lnTocandoNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
+        ${lnMapinha(l)}
         <div class="lnTocandoPe">
-          ${l.ponto ? `<span class="lnTag">${esc(l.ponto.nome)}${l.ponto.aproximado ? ' (aprox)' : ''}</span>` : ''}
           ${l.habilidade ? `<span class="lnTag">${esc(l.habilidade.nome)}</span>` : ''}
           ${lnPulo(l.pula)}
         </div>
-        <div class="lnCanal">${esc(l.canal)} · ${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</div>
+        <div class="lnCanal">${esc(l.canal)} · clipe de ${lnMMSS(l.segundo)} a ${lnMMSS(l.fim ?? l.segundo)}</div>
         <div class="lnSalvarCx">
           <span>pula?</span>
           <select class="contaSel lnPulaSel">
             <option value="">não sei</option><option value="sim" ${l.pula === true ? 'selected' : ''}>sim</option><option value="nao">não</option>
           </select>
-          <button class="acao" onclick="lnSalvarAtual(this, ${i})">Salvar na minha lista</button>
+          <button class="acao" onclick="lnSalvarAtual(this, ${i})">Salvar</button>
         </div>
       </div>
     </div>`;
+  lnMontarPlayer(l);
   $('#lnPlayer').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+async function lnMontarPlayer(l){
+  await lnApiYT();
+  if (lnClipe !== l) return;                       // ele já clicou em outra
+  clearInterval(lnVigia);
+  try { lnPlayer?.destroy?.(); } catch {}
+  lnPlayer = new YT.Player('lnYT', {
+    videoId: l.video,
+    playerVars: { start: l.segundo, end: l.fim ?? undefined, autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1 },
+    events: {
+      onReady: (e) => { e.target.setPlaybackQuality?.('hd1080'); e.target.playVideo(); },
+      // o laço é nosso: o `end` do YouTube só PARA, e pra estudar lineup a gente quer repetir
+      onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) lnDoComeco(); },
+    },
+  });
+  lnVigia = setInterval(() => {
+    if (!lnPlayer?.getCurrentTime || lnClipe !== l) return;
+    const t = lnPlayer.getCurrentTime();
+    const r = $('#lnRelogio'); if (r) r.textContent = `${(t - l.segundo).toFixed(1)}s do clipe`;
+    if (l.fim && t >= l.fim - 0.05) lnDoComeco();
+  }, 200);
+}
+
+function lnDoComeco(){ if (lnClipe && lnPlayer?.seekTo) { lnPlayer.seekTo(lnClipe.segundo, true); lnPlayer.playVideo?.(); } }
+function lnPasso(d){
+  if (!lnPlayer?.getCurrentTime || !lnClipe) return;
+  lnPlayer.pauseVideo?.();
+  const alvo = Math.min(Math.max(lnPlayer.getCurrentTime() + d, lnClipe.segundo), (lnClipe.fim ?? 1e9) - 0.05);
+  lnPlayer.seekTo(alvo, true);
+  $('#lnPausaBt').textContent = 'tocar';
+}
+function lnPausar(){
+  if (!lnPlayer?.getPlayerState) return;
+  const tocando = lnPlayer.getPlayerState() === YT.PlayerState.PLAYING;
+  if (tocando) lnPlayer.pauseVideo(); else lnPlayer.playVideo();
+  $('#lnPausaBt').textContent = tocando ? 'tocar' : 'pausa';
 }
 
 async function lnSalvarAtual(botao, i){
@@ -4294,7 +4397,7 @@ async function lnSalvarAtual(botao, i){
     video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
     mapa: lnMapaAtual, agente: lnAgenteAtual,
     habilidade: l.habilidade?.nome ?? '', lado: lnLadoAtual,
-    ponto: l.ponto?.nome ?? '',
+    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '',
     pula: sel === 'sim' ? true : sel === 'nao' ? false : null,
   };
   botao.disabled = true; botao.textContent = 'salvando…';
@@ -4334,9 +4437,14 @@ function lnDesenharMinhas(){
 
 function lnVerSalva(id){
   const x = lnMinhasLista.find(v => v.id === id); if (!x) return;
+  // a salva guarda o NOME do ponto; a posição no mapa vem do catálogo do mapa dela
+  const callouts = lnCatalogo?.mapas.find(m => m.nome === x.mapa)?.callouts ?? [];
+  const achar = (n) => callouts.find(c => c.nome === n) ?? null;
+  lnPlanta = lnCatalogo?.mapas.find(m => m.nome === x.mapa)?.planta ?? lnPlanta;
   lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, fim: x.fim ?? null,
     site: null, pula: x.pula, habilidade: x.habilidade ? { nome: x.habilidade, icone: null } : null,
-    ponto: x.ponto ? { nome: x.ponto, aproximado: false } : null }];
+    ponto: achar(x.ponto) ?? (x.ponto ? { nome: x.ponto, x: 0.5, y: 0.5, aproximado: true } : null),
+    posicao: achar(x.posicao) }];
   lnVer(0);
 }
 

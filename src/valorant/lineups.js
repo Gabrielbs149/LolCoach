@@ -213,6 +213,26 @@ export function habilidadeDaLineup(nome, habilidades = []) {
   return null;
 }
 
+/**
+ * O título do capítulo costuma trazer as DUAS pontas: "A default from A Short" é alvo A
+ * default, jogada de A Short. Medido em 154 lineups: 33% dizem de onde se joga. Nessas dá
+ * pra desenhar a linha no mapa; nas outras sobra só o alvo, e é o que a gente mostra.
+ */
+const DE_ONDE = /^(.*?)\s+(?:from|at|@|desde)\s+(.+)$/i;
+
+export function pontasDaLineup(nome, callouts = [], site = null) {
+  const m = String(nome).match(DE_ONDE);
+  if (!m) return { alvo: pontoDaLineup(nome, callouts, site), posicao: null };
+  const [, alvoTxt, posTxt] = m;
+  // "(Crosshair)" e afins no fim não são lugar
+  const limpo = posTxt.replace(/\s*\((?:crosshair|hud|mira|game\s*hud)\)\s*$/i, '').trim();
+  const posicao = pontoDaLineup(limpo, callouts, null);
+  const alvo = pontoDaLineup(alvoTxt, callouts, site) ?? pontoDaLineup(nome, callouts, site);
+  // posição igual ao alvo não acrescenta nada — e linha de um ponto pra ele mesmo confunde
+  if (posicao && alvo && posicao.nome === alvo.nome) return { alvo, posicao: null };
+  return { alvo, posicao: posicao && !posicao.aproximado ? posicao : null };
+}
+
 /* ------------------------------------------------------------------ busca */
 
 /**
@@ -473,7 +493,7 @@ const detalhesDoVideo = async (base, id) => {
  * diante sai na hora, do disco, e só revalida quando fica velho.
  */
 const VALIDADE_BUSCA = 14 * 24 * 60 * 60 * 1000;
-const FORMATO_BUSCA = 1;
+const FORMATO_BUSCA = 2;
 const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
   .map((x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).join('__');
 
@@ -540,7 +560,7 @@ export async function buscarLineups(p = {}) {
   for (const { v, caps, tiras } of porVideo) {
     for (let i = 0; i < caps.length; i++) {
       const c = caps[i];
-      const ponto = pontoDaLineup(c.nome, callouts, c.site);
+      const { alvo: ponto, posicao } = pontasDaLineup(c.nome, callouts, c.site);
       // de onde sai a habilidade, na ordem: o nome do capítulo; o título do vídeo (quase sempre
       // é lá que está, porque o vídeo inteiro é sobre uma só — "Brimstone Molly Lineups"); e por
       // fim a que ele filtrou, que é o que ele pediu. Só 2 de 111 casavam só pelo capítulo.
@@ -556,6 +576,7 @@ export async function buscarLineups(p = {}) {
         quadros: quadrosDaLineup(tiras ?? [], c.segundo, fim),
         habilidade: hab ? { nome: hab.nome, icone: hab.icone } : null,
         ponto: ponto ? { nome: ponto.nome, x: ponto.x, y: ponto.y, aproximado: ponto.aproximado === true } : null,
+        posicao: posicao ? { nome: posicao.nome, x: posicao.x, y: posicao.y } : null,   // de onde se joga, quando o título diz
       });
     }
   }
@@ -610,7 +631,8 @@ export async function salvar(entrada = {}) {
     mapa: limpar(entrada.mapa, 40),
     agente: limpar(entrada.agente, 40),
     habilidade: limpar(entrada.habilidade, 60),
-    ponto: limpar(entrada.ponto, 60),          // o callout onde a lineup é jogada ("A Lobby")
+    ponto: limpar(entrada.ponto, 60),          // onde a lineup CAI ("A Lobby")
+    posicao: limpar(entrada.posicao, 60),      // de onde se joga, quando dá pra saber
     lado: ['atacando', 'defendendo'].includes(entrada.lado) ? entrada.lado : null,
     pula: entrada.pula === true ? true : entrada.pula === false ? false : null,   // null = ninguém disse ainda
     nota: limpar(entrada.nota, 300),
