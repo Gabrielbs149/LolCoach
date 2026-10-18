@@ -4334,7 +4334,7 @@ function lnDesenharMapa(){
     return;
   }
   // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
-  const nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
+  let nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
   const aberto = pinos.find(p => p.nome === lnPinoAtivo) ?? null;
   const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
 
@@ -4350,7 +4350,13 @@ function lnDesenharMapa(){
     if (!porLugar.has(k)) porLugar.set(k, { de: l.posicao, i, quantas: 0 });
     porLugar.get(k).quantas++;
   }
-  const leque = [...porLugar.values()];
+  const leque = lnDesempilhar([...porLugar.values()], aberto);
+
+  // nome de canto que cai embaixo de um marcador só atrapalha
+  if (aberto) {
+    const ocupado = [{ x: aberto.x, y: aberto.y }, ...leque.map(x => ({ x: x.dx, y: x.dy }))];
+    nomes = nomes.filter(c => !ocupado.some(o => Math.hypot(c.x - o.x, c.y - o.y) < 0.055));
+  }
 
   $('#lnMapaCx').innerHTML = `
     <div class="lnMapa ${aberto ? 'comLeque' : ''}">
@@ -4359,7 +4365,7 @@ function lnDesenharMapa(){
       ${aberto && leque.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
           ${leque.map((x, k) => {
             // a rota é um caminho de verdade pra bolinha poder correr em cima dele
-            const d = `M ${(x.de.x * 100).toFixed(2)} ${(x.de.y * 100).toFixed(2)} L ${(aberto.x * 100).toFixed(2)} ${(aberto.y * 100).toFixed(2)}`;
+            const d = `M ${(x.dx * 100).toFixed(2)} ${(x.dy * 100).toFixed(2)} L ${(aberto.x * 100).toFixed(2)} ${(aberto.y * 100).toFixed(2)}`;
             return `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
               <circle class="lnBola" data-k="${k}" r="1.7">
                 <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
@@ -4369,7 +4375,7 @@ function lnDesenharMapa(){
           }).join('')}
         </svg>` : ''}
       ${aberto ? leque.map((x, k) => `
-        <button class="lnDeMapa" data-k="${k}" style="left:${(x.de.x * 100).toFixed(2)}%;top:${(x.de.y * 100).toFixed(2)}%"
+        <button class="lnDeMapa" data-k="${k}" style="left:${(x.dx * 100).toFixed(2)}%;top:${(x.dy * 100).toFixed(2)}%"
           title="${esc(x.de.nome)}${x.quantas > 1 ? ` — ${x.quantas} lineups daqui` : ''}"
           onclick="event.stopPropagation();lnEscolherLugar('${esc(x.de.nome)}',${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
@@ -4403,6 +4409,50 @@ function lnDesenharMapa(){
  * posições saindo do mesmo ponto vira um emaranhado, e o que ele quer saber é "de onde sai
  * ESSA aqui".
  */
+/**
+ * Afasta os marcadores que ficam em cima uns dos outros.
+ *
+ * Quando o lugar de onde se joga é colado no ponto onde cai, o retrato cobria o pino e o
+ * nome do canto, e virava um amontoado ilegível. Aqui cada retrato é empurrado pra fora
+ * até respeitar uma distância mínima do pino e dos outros retratos. Só o DESENHO muda: o
+ * nome do lugar e a lineup continuam os mesmos, e a linha passa a terminar no retrato
+ * desenhado, pra não ficar uma linha apontando pro nada.
+ */
+const LN_LONGE = 0.075;        // distância mínima entre marcadores, em fração do mapa
+
+function lnDesempilhar(itens, pino){
+  const fora = itens.map(x => ({ ...x, dx: x.de.x, dy: x.de.y }));
+  const empurrar = (p, ax, ay, minimo) => {
+    let vx = p.dx - ax, vy = p.dy - ay;
+    let d = Math.hypot(vx, vy);
+    if (d >= minimo) return false;
+    if (d < 1e-4) { vx = 0; vy = 1; d = 1; }        // exatamente em cima: joga pra baixo
+    p.dx = ax + (vx / d) * minimo;
+    p.dy = ay + (vy / d) * minimo;
+    return true;
+  };
+  for (let volta = 0; volta < 14; volta++) {
+    let mexeu = false;
+    for (const p of fora) if (pino && empurrar(p, pino.x, pino.y, LN_LONGE)) mexeu = true;
+    for (let i = 0; i < fora.length; i++) for (let j = i + 1; j < fora.length; j++) {
+      const a = fora[i], b = fora[j];
+      const d = Math.hypot(a.dx - b.dx, a.dy - b.dy);
+      if (d >= LN_LONGE) continue;
+      // separa os dois pra cada lado, metade do que falta
+      let vx = b.dx - a.dx, vy = b.dy - a.dy, dd = d;
+      if (dd < 1e-4) { vx = Math.cos(i); vy = Math.sin(i); dd = 1; }
+      const passo = (LN_LONGE - d) / 2;
+      a.dx -= (vx / dd) * passo; a.dy -= (vy / dd) * passo;
+      b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo;
+      mexeu = true;
+    }
+    // sem sair do mapa
+    for (const p of fora) { p.dx = Math.max(0.03, Math.min(0.97, p.dx)); p.dy = Math.max(0.03, Math.min(0.97, p.dy)); }
+    if (!mexeu) break;
+  }
+  return fora;
+}
+
 function lnFocarRota(k){
   const mapa = document.querySelector('.lnMapa'); if (!mapa) return;
   mapa.classList.toggle('comFoco', k != null);
