@@ -1038,8 +1038,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPixels{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:var(--e2)}
 .lnPx{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);cursor:pointer}
 .lnPx:hover{border-color:var(--ouro)}
-.lnPxLupa{position:absolute;left:50%;bottom:7px;transform:translateX(-50%);background:#000b;color:#fff;
-  font-size:10px;padding:2px 7px;border-radius:4px;opacity:0;transition:opacity .12s;font-weight:600}
+.lnPxLupa{position:absolute;left:50%;bottom:7px;transform:translateX(-50%);background:#000c;color:#fff;
+  font-size:10px;padding:3px 9px;border-radius:4px;opacity:0;transition:opacity .12s;font-weight:600;
+  cursor:zoom-in;border:1px solid #fff3}
+.lnPxLupa:hover{background:#000;border-color:var(--ouro);color:var(--ouro-claro)}
 .lnPx:hover .lnPxLupa{opacity:1}
 .lnPxSemQuadro{display:flex;align-items:center;justify-content:center}
 .lnPxNada{color:var(--apagado);font-size:11px;text-align:center;padding:0 10px;line-height:1.5;
@@ -1355,8 +1357,8 @@ h2{letter-spacing:1px}
           <button data-vista="pixel" onclick="lnTrocarVista('pixel')">Pontos de mira</button>
         </div>
         <div id="lnAviso"></div>
-        <div class="lnMapaCx" id="lnMapaCx"></div>
         <div id="lnPlayer"></div>
+        <div class="lnMapaCx" id="lnMapaCx"></div>
         <div id="lnResultados"></div>
       </div>
     </div>
@@ -4201,7 +4203,7 @@ async function lnProcurar(forcar){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
   const meu = ++lnPedido;
-  lnFecharAlto(); lnSoltarSemQuadro(); lnEscolhido = new Map();
+  lnFecharAlto(); lnEscolhido = new Map();
   const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
   let r;
   try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...e, forcar: '1' } : e)); }
@@ -4447,7 +4449,7 @@ async function lnEscolherQuadros(){
 function lnTrocarVista(v){
   lnVista = v;
   for (const b of document.querySelectorAll('#lnVistas button')) b.classList.toggle('on', b.dataset.vista === v);
-  lnFecharAlto(); lnSoltarSemQuadro();
+  lnFecharAlto();
   if (v === 'mapa') { lnDesenharMapa(); lnDesenharAchadas(); }
   else { $('#lnMapaCx').innerHTML = ''; lnDesenharPixels(); }
 }
@@ -4468,11 +4470,11 @@ async function lnDesenharPixels(){
     $('#lnResultados').innerHTML = topo + `<div class="lnPixels">${lista.map(l => {
       const i = lnAchadas.indexOf(l);
       const q = lnEscolhido.get(i) ?? l.quadros?.[l.quadros.length - 1];
-      return `<div class="lnPx" data-i="${i}" onclick="lnVerAlto(${i})">
+      return `<div class="lnPx" data-i="${i}" onclick="lnVer(${i})">
         <div class="lnPxImg${q ? '' : ' lnPxSemQuadro'}" data-i="${i}">
-          ${q ? `<i style="${lnEstiloQuadro(q)}"></i>` : `<span class="lnPxNada">o YouTube não tem prévia desse vídeo<b>carregando em alta…</b></span>`}
+          ${q ? `<i style="${lnEstiloQuadro(q)}"></i>` : `<span class="lnPxNada">o YouTube não gera prévia desse vídeo<b>clica pra ver o clipe</b></span>`}
           <span class="lnPxMira"></span>
-          <b class="lnPxLupa">ver em alta</b>
+          <b class="lnPxLupa" onclick="event.stopPropagation();lnVerAlto(${i})" title="só o quadro parado, em alta">quadro em alta</b>
         </div>
         <div class="lnPxPe">
           <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
@@ -4485,44 +4487,6 @@ async function lnDesenharPixels(){
   };
   pintar();                                   // na hora, com o que já tem
   if (!lnEscolhido.size) { await lnEscolherQuadros(); if (lnVista === 'pixel') pintar(); }
-  lnCobrirSemQuadro();
-}
-
-/**
- * Lineup de vídeo sem storyboard fica sem prévia nenhuma — tem vídeo que o YouTube
- * simplesmente não gera. Antes isso caía na CAPA do vídeo, que é o cartaz do criador e
- * enganava: parecia que a tela estava mostrando lineup quando era propaganda. Agora esses
- * poucos montam o player em alta sozinhos, com teto, quando chegam na tela.
- */
-let lnObsNada = null;
-const lnNadaVivos = new Map();
-function lnCobrirSemQuadro(){
-  lnObsNada?.disconnect();
-  const alvos = document.querySelectorAll('.lnPxSemQuadro');
-  if (!alvos.length) return;
-  lnObsNada = new IntersectionObserver(async (es) => {
-    for (const e of es) {
-      const i = Number(e.target.dataset.i);
-      if (!e.isIntersecting) { const p = lnNadaVivos.get(i); if (p) { try { p.destroy(); } catch {} lnNadaVivos.delete(i); } continue; }
-      if (lnNadaVivos.has(i) || lnNadaVivos.size >= 3) continue;
-      const l = lnAchadas[i]; if (!l) continue;
-      lnNadaVivos.set(i, null);
-      await lnApiYT();
-      if (lnVista !== 'pixel' || !lnNadaVivos.has(i)) return;
-      const cx = document.createElement('div');
-      e.target.appendChild(cx);
-      const seg = Math.round(l.segundo + ((l.fim ?? l.segundo + 12) - l.segundo) * 0.7);
-      lnNadaVivos.set(i, new YT.Player(cx, {
-        videoId: l.video,
-        playerVars: { start: seg, autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
-        events: {
-          onReady: (ev) => { ev.target.setPlaybackQuality?.('hd1080'); setTimeout(() => { try { ev.target.pauseVideo(); } catch {} }, 500); },
-          onStateChange: (ev) => { if (ev.data === YT.PlayerState.PLAYING) setTimeout(() => { try { ev.target.pauseVideo(); } catch {} }, 400); },
-        },
-      }));
-    }
-  }, { rootMargin: '120px' });
-  for (const a of alvos) lnObsNada.observe(a);
 }
 
 /* -------------------------------------------------- o quadro em alta, um de cada vez */
@@ -4559,12 +4523,6 @@ function lnAltoPasso(d){
   lnAltoAtual.seekTo(lnAltoAtual.getCurrentTime() + d, true);
   setTimeout(() => { try { lnAltoAtual.pauseVideo(); } catch {} }, 350);
 }
-function lnSoltarSemQuadro(){
-  lnObsNada?.disconnect(); lnObsNada = null;
-  for (const [, p] of lnNadaVivos) { try { p?.destroy?.(); } catch {} }
-  lnNadaVivos.clear();
-}
-
 function lnFecharAlto(){
   try { lnAltoAtual?.destroy?.(); } catch {}
   lnAltoAtual = null;
@@ -4640,7 +4598,20 @@ function lnVer(i){
       </div>
     </div>`;
   lnMontarPlayer(l);
-  $('#lnPlayer').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  lnSubirPraVer();
+}
+
+/**
+ * Leva o vídeo pro alto da tela. É `main` que rola, então o scrollIntoView do elemento não
+ * bastava: na vista dos quadros ele clicava lá embaixo e o player ficava fora de vista.
+ */
+function lnSubirPraVer(){
+  const alvo = $('#lnPlayer'), rolo = $('main');
+  if (!alvo || !rolo) return;
+  requestAnimationFrame(() => {
+    const topo = alvo.getBoundingClientRect().top - rolo.getBoundingClientRect().top + rolo.scrollTop;
+    rolo.scrollTo({ top: Math.max(0, topo - 12), behavior: 'smooth' });
+  });
 }
 
 async function lnMontarPlayer(l){
