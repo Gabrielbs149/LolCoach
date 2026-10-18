@@ -919,6 +919,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    Agora a barra é mais larga, os cartões têm proporção de imagem e o conteúdo respira. */
 .lnHud{display:grid;grid-template-columns:272px minmax(0,1fr);gap:18px;align-items:start}
 @media (max-width:1040px){.lnHud{grid-template-columns:1fr}}
+/* Com um clipe aberto a barra de filtros sai da frente: numa janela de ~965 px ela comia
+   272 px e sobravam 540 pro vídeo. Fechado o clipe, ela volta. */
+.lnHud.focoNoClipe{grid-template-columns:minmax(0,1fr)}
+.lnHud.focoNoClipe .lnLado{display:none}
 .lnLado{display:flex;flex-direction:column;gap:14px}
 .lnBloco{display:flex;flex-direction:column;gap:7px}
 .lnRot{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--apagado);font-weight:600}
@@ -1018,9 +1022,9 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
 /* O vídeo é o que importa: ele manda na largura e o mapa acompanha, nunca o contrário.
    Antes, em janela estreita, os dois empatavam em ~620 px e o vídeo ficava pequeno. */
-.lnDetalhe{display:grid;grid-template-columns:minmax(0,1fr) 210px;gap:14px;
+.lnDetalhe{display:grid;grid-template-columns:minmax(0,1fr) 248px;gap:14px;
   margin-bottom:18px;align-items:start}
-@media (max-width:1180px){
+@media (max-width:820px){
   /* Abaixo disso o vídeo lado a lado fica pequeno demais (396 px numa janela de 900).
      Então ele ocupa a largura toda e o mapa vira uma faixa compacta embaixo.
      Qualificado com .lnDetalhe de propósito: a regra base de .lnMini vem depois no
@@ -1046,6 +1050,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnDe{width:14px;height:14px;background:#d9e2f1;border:2px solid #0b1016;box-shadow:0 0 0 2px #d9e2f1aa}
 .lnCai{width:13px;height:13px;background:var(--ouro);border:2px solid #0b1016;box-shadow:0 0 0 3px #d9a23a55}
 .lnCai.aprox{background:transparent;border:2px dashed var(--ouro);box-shadow:none}
+.lnVoltar{align-self:flex-start;padding:4px 10px;font-size:11.5px}
 .lnDeAte{font-size:11.5px;color:var(--fraco)}
 .lnDeAte b{color:var(--forte);font-weight:600}
 .lnDeAte i{font-style:normal;color:var(--ouro)}
@@ -1096,6 +1101,26 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPxBotoes{display:flex;gap:5px;align-items:center}
 .lnPxBotoes .acao{padding:2px 8px;font-size:11.5px}
 .lnPxSeg{font-size:11px;color:var(--apagado);font-variant-numeric:tabular-nums;min-width:36px;text-align:center}
+
+/* O CLIPE EM TELA CHEIA.
+   Medido na janela dele (965 px): com as duas barras laterais sobravam 424 px pro vídeo e
+   o YouTube mandava 480p, porque é o tamanho do player que decide a qualidade. Num espaço
+   desses não cabe player de 1080 — então o clipe passa a ocupar a janela inteira, e aí
+   sobra largura de verdade pro vídeo. O mapa fica flutuando num canto, sem roubar largura. */
+body.lnTelaCheia #lnPlayer{position:fixed;inset:0;z-index:70;background:#05070c;
+  display:flex;align-items:center;justify-content:center;padding:0}
+body.lnTelaCheia .lnDetalhe{display:block;margin:0;width:100%;height:100%}
+body.lnTelaCheia .lnVideoCx{width:100%;height:100%;aspect-ratio:auto;border-radius:0;
+  display:flex;align-items:center;justify-content:center}
+body.lnTelaCheia .lnVideoCx #lnYT,body.lnTelaCheia .lnVideoCx iframe{
+  width:100%;height:100%;max-width:calc(100vh * 16 / 9);max-height:calc(100vw * 9 / 16)}
+/* o lado vira um painel por cima, no canto */
+body.lnTelaCheia .lnLadoDetalhe{position:fixed;right:14px;top:14px;width:250px;z-index:71;
+  background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r2);padding:11px;
+  flex-direction:column;align-items:stretch;gap:8px;max-height:calc(100vh - 28px);overflow:auto;
+  backdrop-filter:blur(4px)}
+body.lnTelaCheia .lnLadoDetalhe .lnMini{width:100%;flex:none}
+body.lnTelaCheia .lnTocandoNome{font-size:14px}
 
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
@@ -4222,8 +4247,7 @@ async function lnProcurar(forcar){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
   const meu = ++lnPedido;
-  lnFecharAlto(); lnEscolhido = new Map();
-  document.querySelector('.lnPalco')?.classList.remove('comClipe');
+  lnFecharAlto(); lnEscolhido = new Map(); lnFecharClipe();
   const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
   let r;
   try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...e, forcar: '1' } : e)); }
@@ -4578,27 +4602,25 @@ let lnPlayer = null, lnClipe = null, lnVigia = null;
  * YouTube vê um player grande e manda o stream grande; a gente mostra do tamanho que cabe.
  * A imagem fica nítida porque o vídeo chega em 1080 e só é desenhado menor.
  */
-const LN_LARGURA_ALTA = 1920, LN_ALTURA_ALTA = 1080;
-
+/**
+ * O iframe ocupa o container no tamanho natural, sem `scale`.
+ *
+ * Tentei antes criar o iframe com 1920x1080 e encolher com `transform: scale()` pra
+ * enganar a escolha de qualidade do YouTube. Funcionou pra qualidade (ele passou a mandar
+ * hd1080) e estragou a imagem: o Chromium rasteriza o iframe transformado no tamanho
+ * REDUZIDO, então chegava grande e era desenhado borrado. Pior que o problema original.
+ *
+ * O que resolve de verdade é o container ser grande mesmo. Por isso, com um clipe aberto,
+ * a barra de filtros sai da frente e o vídeo fica com a largura toda.
+ */
 function lnEncaixar(cx){
   const quadro = cx?.querySelector('iframe'); if (!quadro) return;
-  const largura = cx.clientWidth || cx.getBoundingClientRect().width;
-  if (!largura) return;
-  const k = largura / LN_LARGURA_ALTA;
-  quadro.style.width = LN_LARGURA_ALTA + 'px';
-  quadro.style.height = LN_ALTURA_ALTA + 'px';
-  quadro.style.transformOrigin = 'top left';
-  quadro.style.transform = `scale(${k})`;
-  cx.style.height = Math.round(LN_ALTURA_ALTA * k) + 'px';
+  quadro.style.width = '100%';
+  quadro.style.height = '100%';
+  quadro.style.transform = '';
+  cx.style.height = '';
 }
-
-/** Mantém o encaixe quando a janela muda de tamanho. */
-function lnVigiarTamanho(cx){
-  cx._ro?.disconnect();
-  cx._ro = new ResizeObserver(() => lnEncaixar(cx));
-  cx._ro.observe(cx);
-  lnEncaixar(cx);
-}
+function lnVigiarTamanho(cx){ lnEncaixar(cx); }
 
 function lnForcarAlta(p){
   // continua pedindo: não custa nada e em vídeo antigo ainda pega
@@ -4642,6 +4664,7 @@ function lnVer(i){
         <div id="lnYT"></div>
       </div>
       <div class="lnLadoDetalhe">
+        <button class="acao lnVoltar" onclick="lnFecharClipe()">← voltar</button>
         <div class="lnTocandoNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
         ${lnMapinha(l)}
         <div class="lnTocandoPe">
@@ -4651,15 +4674,22 @@ function lnVer(i){
         <div class="lnSalvarCx"><button class="acao" onclick="lnSalvarAtual(this, ${i})">Salvar na minha lista</button></div>
       </div>
     </div>`;
-  document.querySelector('.lnPalco')?.classList.add('comClipe');
+  document.body.classList.add('lnTelaCheia');
   lnMontarPlayer(l);
-  lnSubirPraVer();
 }
 
 /**
  * Leva o vídeo pro alto da tela. É `main` que rola, então o scrollIntoView do elemento não
  * bastava: na vista dos quadros ele clicava lá embaixo e o player ficava fora de vista.
  */
+/** Fecha o clipe e devolve a barra de filtros. */
+function lnFecharClipe(){
+  try { lnPlayer?.destroy?.(); } catch {}
+  lnPlayer = null; lnClipe = null; clearInterval(lnVigia);
+  $('#lnPlayer').innerHTML = '';
+  document.body.classList.remove('lnTelaCheia');
+}
+
 function lnSubirPraVer(){
   const alvo = $('#lnPlayer'), rolo = $('main');
   if (!alvo || !rolo) return;
@@ -4771,7 +4801,11 @@ $('#lnFiltroMapa').onchange = lnDesenharMinhas;
 for (const b of document.querySelectorAll('#lnLados button')) {
   b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); lnProcurarLogo(); };
 }
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#lnModal').hidden) lnFecharSeletor(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (!$('#lnModal').hidden) lnFecharSeletor();
+  else if (document.body.classList.contains('lnTelaCheia')) lnFecharClipe();
+});
 
 const CARREGADORES = {
   estat: carregarEstat, calendario: () => carregarCalendario(), meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
