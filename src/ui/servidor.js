@@ -54,6 +54,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       ...cfg,
       riot: { ...(cfg.riot ?? {}), apiKey: '', temChave: !!cfg.riot?.apiKey },
       controle: { ...(cfg.controle ?? {}), githubToken: '', temToken: !!cfg.controle?.githubToken },
+      youtube: { ...(cfg.youtube ?? {}), chave: '', temChave: !!cfg.youtube?.chave },
     };
   };
 

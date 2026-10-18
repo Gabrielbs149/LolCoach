@@ -909,18 +909,20 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnTocando{display:flex;gap:var(--e2);margin-bottom:var(--e2);flex-wrap:wrap}
 .lnTocando iframe{flex:1 1 440px;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;min-width:300px}
 .lnTocandoLado{flex:1 1 220px;display:flex;flex-direction:column;gap:7px;justify-content:center}
-.lnTocandoNome{font-size:15px;color:var(--forte);line-height:1.3}
+.lnTocandoNome{font-size:16px;color:var(--forte);line-height:1.3;font-weight:600}
 .lnTocandoPe{display:flex;gap:6px;flex-wrap:wrap}
 .lnFiltros button.acao.on{border-color:var(--ouro);color:var(--ouro-claro)}
 .lnFiltros button.acao b{color:var(--apagado);font-weight:600;margin-left:4px}
 
 /* ---------------------------------------------------- lineups: HUD de mapa */
-.lnHud{display:grid;grid-template-columns:230px 1fr;gap:var(--e2);align-items:start}
-@media (max-width:900px){.lnHud{grid-template-columns:1fr}}
-.lnLado{display:flex;flex-direction:column;gap:var(--e2)}
-.lnBloco{display:flex;flex-direction:column;gap:6px}
-.lnRot{font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--apagado)}
-.lnCartao{position:relative;height:74px;border:1px solid var(--borda);border-radius:var(--r2);
+/* A barra tinha 230px e os cartões 74px de altura: ficava tudo espremido e sem hierarquia.
+   Agora a barra é mais larga, os cartões têm proporção de imagem e o conteúdo respira. */
+.lnHud{display:grid;grid-template-columns:272px minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1040px){.lnHud{grid-template-columns:1fr}}
+.lnLado{display:flex;flex-direction:column;gap:14px}
+.lnBloco{display:flex;flex-direction:column;gap:7px}
+.lnRot{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--apagado);font-weight:600}
+.lnCartao{position:relative;aspect-ratio:16/9;border:1px solid var(--borda);border-radius:var(--r2);
   overflow:hidden;background:var(--f3);display:flex;align-items:flex-end;width:100%;padding:0;
   cursor:pointer;font-family:inherit;text-align:left}
 .lnCartao:hover{border-color:var(--ouro)}
@@ -929,26 +931,30 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnCartao:hover .lnTrocar{opacity:1}
 .lnCartao img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.85}
 .lnCartao.lnCartaoAg img{object-fit:contain;object-position:right bottom}
-.lnCartao span{position:relative;padding:6px 8px;font-size:12.5px;color:#fff;font-weight:600;
-  text-shadow:0 1px 4px #000c;display:flex;flex-direction:column}
-.lnCartao span small{font-weight:400;font-size:10.5px;opacity:.8}
+.lnCartao span{position:relative;padding:9px 11px;font-size:14px;color:#fff;font-weight:600;
+  text-shadow:0 1px 5px #000e;display:flex;flex-direction:column;width:100%;
+  background:linear-gradient(transparent,#000a)}
+.lnCartao span small{font-weight:400;font-size:11px;opacity:.85}
 .lnVazioCartao{color:var(--apagado);font-weight:400;text-shadow:none}
 .lnLados{display:flex;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden}
-.lnLados button{flex:1;background:var(--f1);border:0;color:var(--fraco);padding:7px 0;
-  font-size:12px;cursor:pointer;font-family:inherit}
+.lnLados button{flex:1;background:var(--f1);border:0;color:var(--fraco);padding:9px 0;
+  font-size:12.5px;cursor:pointer;font-family:inherit;font-weight:600}
 .lnLados button.on{background:var(--f3);color:var(--ouro-claro)}
 .lnLados button[data-lado="atacando"].on{background:#7d1f2acc;color:#ffd9dd}
 .lnLados button[data-lado="defendendo"].on{background:#15493fcc;color:#c9f4e8}
-.lnHabs{display:flex;flex-wrap:wrap;gap:5px}
-.lnHab{display:flex;align-items:center;gap:5px;background:var(--f1);border:1px solid var(--borda);
-  border-radius:var(--r1);color:var(--fraco);padding:4px 7px;font-size:11px;cursor:pointer;font-family:inherit}
-.lnHab.on{border-color:var(--ouro);color:var(--ouro-claro)}
-.lnHab img{width:15px;height:15px;object-fit:contain}
-.lnBuscarBt{width:100%;justify-content:center}
+.lnHabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.lnHab{display:flex;align-items:center;gap:6px;background:var(--f1);border:1px solid var(--borda);
+  border-radius:var(--r1);color:var(--fraco);padding:7px 8px;font-size:11px;cursor:pointer;
+  font-family:inherit;min-width:0;text-align:left}
+.lnHab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnHab:first-child{grid-column:1 / -1;justify-content:center}
+.lnHab.on{border-color:var(--ouro);color:var(--ouro-claro);background:var(--f3)}
+.lnHab img{width:17px;height:17px;object-fit:contain;flex:0 0 auto}
+.lnBuscarBt{width:100%;justify-content:center;padding:9px 0;font-size:12.5px}
 .lnForaCx{display:flex;gap:6px}
 .lnFora{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;flex:1}
 .lnPalco{display:flex;flex-direction:column;gap:var(--e2);min-width:0}
-.lnMapa{position:relative;width:100%;max-width:760px;margin:0 auto;aspect-ratio:1/1;
+.lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;aspect-ratio:1/1;
   background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2)}
 .lnMapa img{width:100%;height:100%;object-fit:contain;display:block;opacity:.92}
 .lnPino{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;
@@ -1007,14 +1013,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   text-shadow:0 1px 3px #000}
 .lnHabMini{width:15px;height:15px;object-fit:contain;vertical-align:-3px;margin-right:4px;filter:brightness(1.3)}
 
-.lnDetalhe{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(250px,.9fr);gap:var(--e2);
-  margin-bottom:var(--e2);align-items:start}
+.lnDetalhe{display:grid;grid-template-columns:minmax(0,2.1fr) minmax(230px,.8fr);gap:16px;
+  margin-bottom:18px;align-items:start}
 @media (max-width:980px){.lnDetalhe{grid-template-columns:1fr}}
 .lnVideoCx{display:flex;flex-direction:column;gap:6px;min-width:0}
 .lnVideoCx #lnYT,.lnVideoCx iframe{width:100%;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;display:block}
-.lnControles{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
-.lnControles .acao{padding:3px 8px;font-size:11.5px}
-.lnRelogio{margin-left:auto;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
 .lnLadoDetalhe{display:flex;flex-direction:column;gap:7px;min-width:0}
 .lnMini{position:relative;width:100%;aspect-ratio:1/1;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r2);overflow:hidden}
@@ -1048,6 +1051,9 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   display:flex;flex-direction:column;gap:3px}
 .lnPxNada b{color:var(--fraco);font-weight:500;font-size:10.5px}
 .lnPxSemQuadro iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.lnDica{margin-top:8px;line-height:1.7;color:var(--fraco)}
+.lnDica code{background:var(--f3);border:1px solid var(--borda);border-radius:4px;padding:1px 5px;
+  font-size:11px;color:var(--ouro-claro)}
 .lnTagP{font-size:10.5px;border:1px solid var(--borda);border-radius:4px;padding:1px 6px;color:var(--fraco)}
 .lnAltoCx{width:min(1180px,97vw)}
 .lnAltoVideo{position:relative;background:#000}
@@ -1366,7 +1372,6 @@ h2{letter-spacing:1px}
     <h2>As suas <small id="lnQuantas"></small></h2>
     <div class="lnFiltros lnFiltrosMinhas">
       <select class="contaSel" id="lnFiltroMapa"><option value="">todos os mapas</option></select>
-      <label class="lnCheck"><input type="checkbox" id="lnSoPulo"> só as que precisam pular</label>
     </div>
     <div id="lnMinhas"></div>
 
@@ -4087,11 +4092,6 @@ let lnCatalogo = null, lnMinhasLista = [], lnAchadas = [], lnPlanta = null, lnCa
 let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
-/** Pulo tem TRÊS estados: o vídeo disse que pula, disse que não, ou não disse nada. */
-const lnPulo = (v) => v === true ? '<span class="lnTag pulo">PULA</span>'
-  : v === false ? '<span class="lnTag">sem pulo</span>'
-  : '<span class="lnTag lnSei">não diz</span>';
-
 async function carregarLineups(){
   $('#lnAviso').innerHTML = carregando('buscando mapas e agentes…');
   try { lnCatalogo = await pegar('/api/val/catalogo'); }
@@ -4218,7 +4218,13 @@ async function lnProcurar(forcar){
     const porque = r.semCapitulo
       ? 'achei vídeos, mas nenhum tem a lista de lineups na descrição — abre no YouTube ali do lado'
       : (r.aviso || r.erro || 'nada encontrado');
-    $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>`;
+    // sem chave do YouTube a gente depende de servidor da comunidade, que vive caindo.
+    // Quando falha, vale dizer o porquê e o que resolve, em vez de só "nada encontrado".
+    const dica = r.semChave
+      ? `<div class="vazio lnDica">As fontes abertas estão fora do ar agora.<br>
+         Pra ficar rápido e não falhar, põe uma chave do YouTube (de graça) no <code>config.json</code>:
+         <code>"youtube": { "chave": "SUA_CHAVE" }</code></div>` : '';
+    $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>` + dica;
     return;
   }
   $('#lnVistas').hidden = false;
@@ -4271,9 +4277,16 @@ function lnDesenharMapa(){
 }
 
 function lnClicarPino(nome){
-  lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
+  const abrindo = lnPinoAtivo !== nome;
+  lnPinoAtivo = abrindo ? nome : null;
   lnDesenharMapa();
   if (lnVista === 'pixel') lnDesenharPixels(); else lnDesenharAchadas();
+  // clicou no ponto: já toca a primeira de lá. No meio de uma partida ninguém quer
+  // clicar duas vezes pra começar a ver.
+  if (abrindo) {
+    const i = lnAchadas.findIndex((l) => l.ponto?.nome === nome);
+    if (i >= 0) lnVer(i);
+  }
 }
 
 /**
@@ -4322,8 +4335,7 @@ function lnDesenharAchadas(){
         <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="" title="${esc(l.habilidade.nome)}">` : ''}${esc(l.nome)}</div>
         <div class="lnCardPe">
           <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
-          ${lnPulo(l.pula)}
-          <span class="lnQuando">${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</span>
+                    <span class="lnQuando">${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</span>
         </div>
       </div>
     </div>`).join('')}</div>`;
@@ -4479,8 +4491,7 @@ async function lnDesenharPixels(){
         <div class="lnPxPe">
           <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
           <div class="lnPxBotoes">
-            <span class="lnTagP">${esc(l.ponto?.nome ?? '—')}</span>${lnPulo(l.pula)}
-          </div>
+            <span class="lnTagP">${esc(l.ponto?.nome ?? '—')}</span>          </div>
         </div>
       </div>`;
     }).join('')}</div>`;
@@ -4513,8 +4524,8 @@ async function lnVerAlto(i){
     videoId: l.video,
     playerVars: { start: seg, autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
     events: {
-      onReady: (e) => { e.target.setPlaybackQuality?.('hd1080'); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 500); },
-      onStateChange: (e) => { if (e.data === YT.PlayerState.PLAYING) setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 400); },
+      onReady: (e) => { lnForcarAlta(e.target); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 500); },
+      onStateChange: (e) => { if (e.data === YT.PlayerState.PLAYING) { lnForcarAlta(e.target); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 400); } },
     },
   });
 }
@@ -4535,6 +4546,18 @@ function lnFecharAlto(){
  * é ele que tem a imagem em alta — o quadro do cartão é storyboard de 320x180 e nunca vai
  * dar pra ler mira. Com os botões de -0,2 s / +0,2 s dá pra parar no quadro exato. */
 let lnPlayer = null, lnClipe = null, lnVigia = null;
+
+/**
+ * Pede a maior qualidade que o vídeo tiver. O YouTube decide sozinho e pode ignorar — não
+ * existe jeito de OBRIGAR — mas pedir no início e a cada vez que volta a tocar é o que dá
+ * pra fazer, porque ele costuma cair pra qualidade baixa quando o clipe reinicia.
+ */
+function lnForcarAlta(p){
+  try {
+    p.setPlaybackQualityRange?.('hd1080', 'hd2160');
+    p.setPlaybackQuality?.('hd1080');
+  } catch {}
+}
 
 /** Carrega a API do YouTube uma vez só. */
 function lnApiYT(){
@@ -4571,30 +4594,15 @@ function lnVer(i){
     <div class="lnDetalhe">
       <div class="lnVideoCx">
         <div id="lnYT"></div>
-        <div class="lnControles">
-          <button class="acao" onclick="lnPasso(-1)" title="volta 1 segundo">−1s</button>
-          <button class="acao" onclick="lnPasso(-0.2)" title="volta um tiquinho">−0,2s</button>
-          <button class="acao" onclick="lnPausar()" id="lnPausaBt">pausa</button>
-          <button class="acao" onclick="lnPasso(0.2)">+0,2s</button>
-          <button class="acao" onclick="lnDoComeco()" title="volta pro começo do clipe">⟲ do começo</button>
-          <span class="lnRelogio" id="lnRelogio"></span>
-        </div>
       </div>
       <div class="lnLadoDetalhe">
         <div class="lnTocandoNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
         ${lnMapinha(l)}
         <div class="lnTocandoPe">
           ${l.habilidade ? `<span class="lnTag">${esc(l.habilidade.nome)}</span>` : ''}
-          ${lnPulo(l.pula)}
-        </div>
+                  </div>
         <div class="lnCanal">${esc(l.canal)} · clipe de ${lnMMSS(l.segundo)} a ${lnMMSS(l.fim ?? l.segundo)}</div>
-        <div class="lnSalvarCx">
-          <span>pula?</span>
-          <select class="contaSel lnPulaSel">
-            <option value="">não sei</option><option value="sim" ${l.pula === true ? 'selected' : ''}>sim</option><option value="nao">não</option>
-          </select>
-          <button class="acao" onclick="lnSalvarAtual(this, ${i})">Salvar</button>
-        </div>
+        <div class="lnSalvarCx"><button class="acao" onclick="lnSalvarAtual(this, ${i})">Salvar na minha lista</button></div>
       </div>
     </div>`;
   lnMontarPlayer(l);
@@ -4621,45 +4629,32 @@ async function lnMontarPlayer(l){
   try { lnPlayer?.destroy?.(); } catch {}
   lnPlayer = new YT.Player('lnYT', {
     videoId: l.video,
-    playerVars: { start: l.segundo, end: l.fim ?? undefined, autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1 },
+    playerVars: { start: l.segundo, end: l.fim ?? undefined, autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1, vq: 'hd1080' },
     events: {
-      onReady: (e) => { e.target.setPlaybackQuality?.('hd1080'); e.target.playVideo(); },
+      onReady: (e) => { lnForcarAlta(e.target); e.target.playVideo(); },
       // o laço é nosso: o `end` do YouTube só PARA, e pra estudar lineup a gente quer repetir
-      onStateChange: (e) => { if (e.data === YT.PlayerState.ENDED) lnDoComeco(); },
+      onStateChange: (e) => {
+        if (e.data === YT.PlayerState.PLAYING) lnForcarAlta(e.target);   // o player baixa a qualidade sozinho ao recomeçar
+        if (e.data === YT.PlayerState.ENDED) lnDoComeco();
+      },
     },
   });
   lnVigia = setInterval(() => {
     if (!lnPlayer?.getCurrentTime || lnClipe !== l) return;
     const t = lnPlayer.getCurrentTime();
-    const r = $('#lnRelogio'); if (r) r.textContent = `${(t - l.segundo).toFixed(1)}s do clipe`;
     if (l.fim && t >= l.fim - 0.05) lnDoComeco();
   }, 200);
 }
 
 function lnDoComeco(){ if (lnClipe && lnPlayer?.seekTo) { lnPlayer.seekTo(lnClipe.segundo, true); lnPlayer.playVideo?.(); } }
-function lnPasso(d){
-  if (!lnPlayer?.getCurrentTime || !lnClipe) return;
-  lnPlayer.pauseVideo?.();
-  const alvo = Math.min(Math.max(lnPlayer.getCurrentTime() + d, lnClipe.segundo), (lnClipe.fim ?? 1e9) - 0.05);
-  lnPlayer.seekTo(alvo, true);
-  $('#lnPausaBt').textContent = 'tocar';
-}
-function lnPausar(){
-  if (!lnPlayer?.getPlayerState) return;
-  const tocando = lnPlayer.getPlayerState() === YT.PlayerState.PLAYING;
-  if (tocando) lnPlayer.pauseVideo(); else lnPlayer.playVideo();
-  $('#lnPausaBt').textContent = tocando ? 'tocar' : 'pausa';
-}
 
 async function lnSalvarAtual(botao, i){
   const l = lnAchadas[i]; if (!l) return;
-  const sel = botao.parentElement.querySelector('.lnPulaSel').value;
   const corpo = {
     video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
     mapa: lnMapaAtual, agente: lnAgenteAtual,
     habilidade: l.habilidade?.nome ?? '', lado: lnLadoAtual,
     ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '', mira: (() => { const q = lnEscolhido.get(i); return q ? Math.round((q.de + q.ate) / 2) : null; })(),
-    pula: sel === 'sim' ? true : sel === 'nao' ? false : null,
   };
   botao.disabled = true; botao.textContent = 'salvando…';
   try {
@@ -4678,8 +4673,8 @@ async function carregarMinhasLineups(){
 }
 
 function lnDesenharMinhas(){
-  const mapa = $('#lnFiltroMapa').value, soPulo = $('#lnSoPulo').checked;
-  const lista = lnMinhasLista.filter(x => (!mapa || x.mapa === mapa) && (!soPulo || x.pula === true));
+  const mapa = $('#lnFiltroMapa').value;
+  const lista = lnMinhasLista.filter(x => !mapa || x.mapa === mapa);
   $('#lnQuantas').textContent = lnMinhasLista.length ? `${lista.length} de ${lnMinhasLista.length}` : '';
   if (!lista.length) {
     $('#lnMinhas').innerHTML = `<div class="vazio">${lnMinhasLista.length ? 'nenhuma com esse filtro' : 'nenhuma salva ainda — procura ali em cima e salva as que servirem'}</div>`;
@@ -4689,7 +4684,6 @@ function lnDesenharMinhas(){
     <div class="lnLinha" onclick="lnVerSalva('${esc(x.id)}')">
       <span class="lnSite sx">${esc(x.agente.slice(0, 3))}</span>
       <span class="lnNome">${esc(x.titulo)}</span>
-      ${lnPulo(x.pula)}
       <span class="lnCanal">${esc(x.mapa)}${x.ponto ? ' · ' + esc(x.ponto) : ''}${x.habilidade ? ' · ' + esc(x.habilidade) : ''}</span>
       <span class="lnQuando">${lnMMSS(x.segundo)}</span>
       <button class="acao" onclick="event.stopPropagation();lnApagar('${esc(x.id)}')">Apagar</button>
@@ -4718,7 +4712,6 @@ async function lnApagar(id){
 
 $('#lnBuscar').onclick = () => lnProcurar(true);
 $('#lnFiltroMapa').onchange = lnDesenharMinhas;
-$('#lnSoPulo').onchange = lnDesenharMinhas;
 for (const b of document.querySelectorAll('#lnLados button')) {
   b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); lnProcurarLogo(); };
 }

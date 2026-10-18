@@ -253,11 +253,12 @@ const ESPERAR = (ms) => new Promise((r) => setTimeout(r, ms));
  * devolve 500 no pedido seguinte e 200 no outro. Então cada uma leva duas tentativas antes
  * da gente desistir dela — desistir na primeira deixava a aba vazia com a rede inteira de pé.
  */
-async function tentarJson(url, ms = 12000, vezes = 2) {
+async function tentarJson(url, ms = 9000, vezes = 2, ate = Infinity) {
   let ultimo = null;
   for (let i = 0; i < vezes; i++) {
-    try { return await buscarJson(url, ms); }
-    catch (e) { ultimo = e; if (i + 1 < vezes) await ESPERAR(500 + i * 500); }
+    if (Date.now() > ate) break;
+    try { return await buscarJson(url, Math.min(ms, Math.max(1500, ate - Date.now()))); }
+    catch (e) { ultimo = e; if (i + 1 < vezes && Date.now() < ate) await ESPERAR(400); }
   }
   throw ultimo ?? new Error('sem resposta');
 }
@@ -434,10 +435,11 @@ export function lerStoryboard(vtt) {
   return grelhar(fora);
 }
 
-const storyboardDoVideo = async (base, id) => {
+const storyboardDoVideo = async (base, id, ate = Infinity) => {
   for (const b of ordemAPartirDe(base)) {
+    if (Date.now() > ate) break;
     try {
-      const corta = AbortSignal.timeout(12000);
+      const corta = AbortSignal.timeout(Math.min(9000, Math.max(1500, ate - Date.now())));
       const r = await fetch(`${b}/api/v1/storyboards/${encodeURIComponent(id)}?width=320&height=180`, { signal: corta });
       if (!r.ok) continue;
       const txt = await r.text();
@@ -471,10 +473,29 @@ export function quadrosDaLineup(tiras, de, ate) {
  */
 const ordemAPartirDe = (base) => [base, ...INVIDIOUS.filter((x) => x !== base)];
 
-const detalhesDoVideo = async (base, id) => {
+/**
+ * Descrições pela API oficial do YouTube, em UMA chamada pra até 50 vídeos (custa 1 unidade).
+ * É o caminho rápido e confiável: as instâncias comunitárias de Invidious vivem caindo — num
+ * teste, as quatro recusaram detalhe ao mesmo tempo (500, 401, 403 e fora do ar) e a busca
+ * voltou vazia mesmo tendo achado os vídeos. Sem chave, cai no Invidious como antes.
+ */
+async function descricoesOficiais(ids, chave) {
+  if (!chave || !ids.length) return null;
+  try {
+    const u = new URL('https://www.googleapis.com/youtube/v3/videos');
+    u.search = new URLSearchParams({ part: 'snippet,contentDetails', id: ids.slice(0, 50).join(','), key: chave });
+    const d = await buscarJson(u.toString(), 9000);
+    const fora = new Map();
+    for (const v of d.items ?? []) fora.set(v.id, v.snippet?.description ?? '');
+    return fora;
+  } catch { return null; }
+}
+
+const detalhesDoVideo = async (base, id, ate = Infinity) => {
   for (const b of ordemAPartirDe(base)) {
+    if (Date.now() > ate) break;
     try {
-      const d = await tentarJson(`${b}/api/v1/videos/${encodeURIComponent(id)}`, 12000);
+      const d = await tentarJson(`${b}/api/v1/videos/${encodeURIComponent(id)}`, 9000, 2, ate);
       const caps = capitulosDaDescricao(d?.description);
       if (caps.length) return caps;
       if (d?.description != null) return caps;   // respondeu e o vídeo não tem capítulo mesmo
@@ -513,14 +534,33 @@ async function guardarBusca(p, r) {
   } catch { /* disco cheio: a busca continua valendo em memória */ }
 }
 
+/**
+ * Deixa pronto, sem pressa e sem avisar, o que ele provavelmente vai pedir a seguir: o
+ * outro lado do mesmo agente. No meio de uma partida, trocar de atacante pra defensor não
+ * pode custar 5 segundos de espera.
+ */
+const aquecendo = new Set();
+function aquecerDepois(p) {
+  const outro = { ...p, lado: p.lado === 'defendendo' ? 'atacando' : 'defendendo', forcar: false };
+  const chave = chaveDaBusca(outro);
+  if (aquecendo.has(chave)) return;
+  aquecendo.add(chave);
+  setTimeout(async () => {
+    try { if (!(await buscaGuardada(outro))) await guardarBusca(outro, await buscarLineups(outro)); }
+    catch { /* era só adiantamento */ }
+    finally { aquecendo.delete(chave); }
+  }, 1200);
+}
+
 /** Com cache: instantâneo quando já foi buscado. `forcar` ignora o disco. */
 export async function lineupsDe(p = {}) {
   if (!p.forcar) {
     const g = await buscaGuardada(p);
-    if (g && !g.velho) return g;
+    if (g && !g.velho) { aquecerDepois(p); return g; }
   }
   const r = await buscarLineups(p);
   await guardarBusca(p, r);
+  if (r.lineups?.length) aquecerDepois(p);
   // deu ruim agora mas tem coisa velha guardada? melhor velho que vazio
   if (!r.lineups?.length) {
     const g = await buscaGuardada(p);
@@ -539,16 +579,30 @@ export async function buscarLineups(p = {}) {
   // de uma vez (foi o que aconteceu ao buscar capítulo e quadro em paralelo pros 6 vídeos).
   const candidatos = r.videos.slice(0, 6);
   const porVideo = [];
-  for (let i = 0; i < candidatos.length; i += 3) {
+  const prazo = Date.now() + 11000;     // o que não chegou até aqui não vale a espera
+
+  // Caminho rápido: uma chamada à API oficial traz a descrição dos 6 de uma vez.
+  const oficiais = await descricoesOficiais(candidatos.map((v) => v.id), p.chaveYoutube);
+  if (oficiais?.size) {
+    const tiras = await Promise.all(candidatos.map(async (v) => {
+      const caps = capitulosDaDescricao(oficiais.get(v.id));
+      return { v, caps, tiras: caps.length ? await storyboardDoVideo(base, v.id, prazo).catch(() => []) : [] };
+    }));
+    porVideo.push(...tiras);
+  }
+
+  // Só cai pro Invidious se a oficial não deu conta (sem chave, ou cota estourada)
+  for (let i = 0; porVideo.length === 0 && i < candidatos.length; i += 3) {
+    if (i && Date.now() > prazo) break;
     const lote = await Promise.all(candidatos.slice(i, i + 3).map(async (v) => {
       try {
-        const [caps, tiras] = await Promise.all([detalhesDoVideo(base, v.id), storyboardDoVideo(base, v.id)]);
+        const [caps, tiras] = await Promise.all([detalhesDoVideo(base, v.id, prazo), storyboardDoVideo(base, v.id, prazo)]);
         return { v, caps, tiras: caps.length ? tiras : [] };
       } catch { return { v, caps: [], tiras: [] }; }
     }));
     porVideo.push(...lote);
     // já deu capítulo que chegue: não precisa incomodar a instância com o resto
-    if (porVideo.reduce((n, x) => n + x.caps.length, 0) >= 40) break;
+    if (porVideo.reduce((n, x) => n + x.caps.length, 0) >= 30) break;
   }
 
   // o ponto no mapa sai daqui, não do navegador: a tela só desenha o pino
@@ -584,6 +638,7 @@ export async function buscarLineups(p = {}) {
   const mapa = cat?.mapas?.find((x) => x.nome === p.mapa) ?? null;
   return {
     ...r, lineups,
+    semChave: !p.chaveYoutube,
     planta: mapa?.planta ?? null,
     callouts: mapa?.callouts ?? [],
     semCapitulo: !lineups.length,
