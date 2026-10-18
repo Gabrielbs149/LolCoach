@@ -816,6 +816,24 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         } catch { return enviar(404, 'text/plain', 'sem ícone'); }
       }
       // Ícone de campeão, servido pelo próprio client — nada vem da internet.
+      /* Folha de quadros do YouTube servida por aqui.
+       * Motivo: o i.ytimg.com não manda cabeçalho de CORS, então desenhar a folha num canvas
+       * contamina o canvas e a tela não consegue LER os pixels. Lendo pelo servidor ela vem da
+       * mesma origem e dá pra analisar o quadro (é assim que a gente descarta a vinheta do
+       * vídeo e acha o quadro com o HUD do jogo). Só i.ytimg.com: não é proxy aberto. */
+      if (url.pathname === '/api/val/quadro') {
+        const alvo = url.searchParams.get('u') || '';
+        let u; try { u = new URL(alvo); } catch { return enviar(400, 'text/plain', 'endereço torto'); }
+        if (u.protocol !== 'https:' || u.hostname !== 'i.ytimg.com') return enviar(403, 'text/plain', 'só i.ytimg.com');
+        try {
+          const r = await fetch(u, { signal: AbortSignal.timeout(12000) });
+          if (!r.ok) return enviar(502, 'text/plain', 'o YouTube recusou');
+          const buf = Buffer.from(await r.arrayBuffer());
+          res.writeHead(200, { 'Content-Type': r.headers.get('content-type') || 'image/jpeg', 'Cache-Control': 'max-age=86400' });
+          return res.end(buf);
+        } catch { return enviar(504, 'text/plain', 'o quadro não veio'); }
+      }
+
       const ic = url.pathname.match(/^\/icone\/(\d+)$/);
       if (ic && acoes.icone) {
         try {

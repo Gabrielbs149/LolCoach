@@ -1036,8 +1036,23 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   cursor:pointer;font-family:inherit}
 .lnVistas button.on{background:var(--f3);color:var(--ouro-claro)}
 .lnPixels{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:var(--e2)}
-.lnPx{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1)}
-.lnPx.alto{border-color:var(--ouro)}
+.lnPx{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);cursor:pointer}
+.lnPx:hover{border-color:var(--ouro)}
+.lnPxLupa{position:absolute;left:50%;bottom:7px;transform:translateX(-50%);background:#000b;color:#fff;
+  font-size:10px;padding:2px 7px;border-radius:4px;opacity:0;transition:opacity .12s;font-weight:600}
+.lnPx:hover .lnPxLupa{opacity:1}
+.lnPxSemQuadro{display:flex;align-items:center;justify-content:center}
+.lnPxNada{color:var(--apagado);font-size:11px;text-align:center;padding:0 10px;line-height:1.5;
+  display:flex;flex-direction:column;gap:3px}
+.lnPxNada b{color:var(--fraco);font-weight:500;font-size:10.5px}
+.lnPxSemQuadro iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.lnTagP{font-size:10.5px;border:1px solid var(--borda);border-radius:4px;padding:1px 6px;color:var(--fraco)}
+.lnAltoCx{width:min(1180px,97vw)}
+.lnAltoVideo{position:relative;background:#000}
+.lnAltoVideo #lnAltoYT,.lnAltoVideo iframe{width:100%;aspect-ratio:16/9;border:0;display:block}
+.lnPxMira.grande{width:34px;height:34px;opacity:.7}
+.lnAltoPe{display:flex;gap:6px;align-items:center;padding:9px 12px;border-top:1px solid var(--borda)}
+.lnAltoPe .acao{padding:3px 9px;font-size:11.5px}
 .lnPxImg{position:relative;aspect-ratio:16/9;background:#000;overflow:hidden}
 .lnPxImg i{position:absolute;inset:0;background-repeat:no-repeat}
 .lnPxImg img{width:100%;height:100%;object-fit:cover;display:block}
@@ -4148,7 +4163,7 @@ function lnAbrirSeletor(qual){
     </div></div>`;
   m.hidden = false;
 }
-function lnFecharSeletor(){ $('#lnModal').hidden = true; $('#lnModal').innerHTML = ''; }
+function lnFecharSeletor(){ lnFecharAlto(); }
 function lnEscolherNoSeletor(qual, nome){
   if (qual === 'mapa') lnMapaAtual = nome; else { lnAgenteAtual = nome; lnDesenharHabs(); }
   lnFecharSeletor(); lnDesenharCartoes(); lnLinks(); lnProcurarLogo();
@@ -4186,7 +4201,7 @@ async function lnProcurar(forcar){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
   const meu = ++lnPedido;
-  lnSoltarAltos();
+  lnFecharAlto(); lnSoltarSemQuadro(); lnEscolhido = new Map();
   const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
   let r;
   try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...e, forcar: '1' } : e)); }
@@ -4256,7 +4271,7 @@ function lnDesenharMapa(){
 function lnClicarPino(nome){
   lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
   lnDesenharMapa();
-  if (lnVista === 'pixel') { lnSoltarAltos(); lnDesenharPixels(); } else lnDesenharAchadas();
+  if (lnVista === 'pixel') lnDesenharPixels(); else lnDesenharAchadas();
 }
 
 /**
@@ -4313,128 +4328,247 @@ function lnDesenharAchadas(){
 }
 
 /* ---------------------------------------------------------------- a tela do pixel
- * Uma tela só com o ponto de mira de cada lineup. O quadro do storyboard (320x180) serve
- * pra reconhecer, mas não pra ler pixel — então o que está na frente dos olhos vira um
- * player PAUSADO no segundo da mira, que é imagem de verdade em alta. Só os visíveis
- * ficam montados (no máximo 6): 40 players vivos travariam a máquina.
+ * Uma tela só com o quadro da mira de cada lineup.
  *
- * Qual é o segundo da mira: ~70% do clipe. Antes disso ele ainda está andando pro lugar,
- * depois já soltou. Dá pra acertar na mão com os botões, e isso fica salvo com a lineup. */
+ * Escolher o quadro por tempo ("70% do clipe") não funcionou: caía na vinheta do vídeo ou
+ * na webcam do criador. Agora é pelo CONTEÚDO. O HUD do Valorant fica na faixa de baixo e
+ * é praticamente igual em todo quadro de jogo; vinheta e webcam não têm HUD. Então a gente
+ * tira a assinatura da faixa de baixo de todos os quadros do vídeo, pega a MEDIANA (que é o
+ * HUD, porque a maioria dos quadros é jogo) e, dentro do pedaço da lineup, fica com o
+ * quadro mais parecido com ela — preferindo o mais tarde, que é quando a mira já está posta.
+ *
+ * Os pixels são lidos num canvas, e pra isso a folha passa pelo servidor local: o
+ * i.ytimg.com não manda CORS e o canvas ficaria contaminado. */
 let lnVista = 'mapa';
-const LN_VIVOS = 6;
-const lnAltos = new Map();          // índice da lineup -> player montado
-let lnObs = null;
+const lnFolhas = new Map();      // url -> Promise<ctx de canvas>
+const lnAssinaturas = new Map(); // url|x|y -> Float64Array
+let lnEscolhido = new Map();     // índice da lineup -> quadro escolhido
+let lnAltoAtual = null;          // o único player em alta, sob demanda
 
-/** O segundo em que a mira aparece. Se ele ajustou, manda o ajuste dele. */
-function lnSegundoDaMira(l){
-  if (Number.isFinite(l.mira)) return l.mira;
-  const fim = l.fim ?? (l.segundo + 12);
-  return Math.max(l.segundo, Math.min(fim - 0.6, l.segundo + (fim - l.segundo) * 0.7));
+const LN_GRADE = 8;            // assinatura do quadro: 8x8 em cinza
+
+/** Carrega a folha de quadros pelo servidor local, pra poder ler os pixels. */
+function lnFolha(url){
+  if (lnFolhas.has(url)) return lnFolhas.get(url);
+  const p = new Promise((ok) => {
+    const im = new Image();
+    im.onload = () => {
+      const c = document.createElement('canvas');
+      c.width = im.naturalWidth; c.height = im.naturalHeight;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      ctx.drawImage(im, 0, 0);
+      ok(ctx);
+    };
+    im.onerror = () => ok(null);
+    im.src = '/api/val/quadro?u=' + encodeURIComponent(url);
+  });
+  lnFolhas.set(url, p);
+  return p;
+}
+
+/** A cara do quadro inteiro, em cinza e sem o brilho geral (8x8 = 64 números). */
+async function lnAssinatura(q){
+  const chave = `${q.url}|${q.x}|${q.y}`;
+  if (lnAssinaturas.has(chave)) return lnAssinaturas.get(chave);
+  const ctx = await lnFolha(q.url);
+  if (!ctx) return null;
+  let dados; try { dados = ctx.getImageData(q.x, q.y, q.w, q.h).data; } catch { return null; }
+  const n = LN_GRADE, fora = new Float64Array(n * n);
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+    let soma = 0, k = 0;
+    const xa = Math.floor((i * q.w) / n), xb = Math.floor(((i + 1) * q.w) / n);
+    const ya = Math.floor((j * q.h) / n), yb = Math.floor(((j + 1) * q.h) / n);
+    for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) {
+      const o = (y * q.w + x) * 4;
+      soma += (dados[o] * 299 + dados[o + 1] * 587 + dados[o + 2] * 114) / 1000; k++;
+    }
+    fora[j * n + i] = k ? soma / k : 0;
+  }
+  // tira o brilho médio: o que importa é o desenho, não se o quadro está claro ou escuro
+  let m = 0; for (const v of fora) m += v; m /= fora.length;
+  for (let i = 0; i < fora.length; i++) fora[i] -= m;
+  lnAssinaturas.set(chave, fora);
+  return fora;
+}
+
+const lnDistancia = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
+// Medido nas folhas reais: duplicata exata dá 0, quase-igual dá ~15 e jogo diferente passa
+// de 22. 10 pega a vinheta repetida sem juntar cena de jogo que só se parece.
+const LN_IGUAL = 10;
+
+/**
+ * Qual quadro de cada lineup mostra o JOGO.
+ *
+ * Escolher por tempo ("70% do clipe") não funcionou, e comparar com a mediana do vídeo
+ * também não: tem criador que põe uma vinheta no começo de CADA lineup, e aí a vinheta vira
+ * a maioria e a mediana passa a ser ela.
+ *
+ * O sinal que vale não depende de maioria: a vinheta é a MESMA IMAGEM em lineups
+ * diferentes, e jogo nunca é. Então: quadro que se repete quase igual em 3+ lineups do
+ * mesmo vídeo é enfeite, e fica fora. Dos que sobram, vale o mais tarde — é quando a mira
+ * já está posta.
+ */
+async function lnEscolherQuadros(){
+  lnEscolhido = new Map();
+  const porVideo = new Map();
+  for (let i = 0; i < lnAchadas.length; i++) {
+    const l = lnAchadas[i];
+    if (!l.quadros?.length) continue;
+    if (!porVideo.has(l.video)) porVideo.set(l.video, []);
+    porVideo.get(l.video).push({ i, l });
+  }
+
+  for (const [, itens] of porVideo) {
+    // assinatura de todo quadro do vídeo
+    const assinatura = new Map();
+    for (const { l } of itens) for (const q of l.quadros) {
+      const a = await lnAssinatura(q);
+      if (a) assinatura.set(q, a);
+    }
+    // grupos de quadros parecidos, contando em quantas LINEUPS diferentes cada grupo aparece
+    const grupos = [];
+    for (const { i, l } of itens) for (const q of l.quadros) {
+      const a = assinatura.get(q); if (!a) continue;
+      const g = grupos.find((x) => lnDistancia(x.ref, a) < LN_IGUAL);
+      if (g) g.lineups.add(i); else grupos.push({ ref: a, lineups: new Set([i]) });
+    }
+    const enfeite = (q) => {
+      const a = assinatura.get(q); if (!a) return false;
+      const g = grupos.find((x) => lnDistancia(x.ref, a) < LN_IGUAL);
+      return !!g && g.lineups.size >= 3;
+    };
+    for (const { i, l } of itens) {
+      const bons = l.quadros.filter((q) => !enfeite(q));
+      lnEscolhido.set(i, (bons.length ? bons : l.quadros)[Math.max(0, (bons.length ? bons : l.quadros).length - 1)]);
+    }
+  }
 }
 
 function lnTrocarVista(v){
   lnVista = v;
   for (const b of document.querySelectorAll('#lnVistas button')) b.classList.toggle('on', b.dataset.vista === v);
-  lnSoltarAltos();
+  lnFecharAlto(); lnSoltarSemQuadro();
   if (v === 'mapa') { lnDesenharMapa(); lnDesenharAchadas(); }
   else { $('#lnMapaCx').innerHTML = ''; lnDesenharPixels(); }
 }
 
-function lnSoltarAltos(){
-  for (const [, p] of lnAltos) { try { p.destroy?.(); } catch {} }
-  lnAltos.clear();
-  lnObs?.disconnect(); lnObs = null;
-}
+const lnEstiloQuadro = (q) => {
+  const px = q.cols > 1 ? (q.col / (q.cols - 1)) * 100 : 0;
+  const py = q.lins > 1 ? (q.lin / (q.lins - 1)) * 100 : 0;
+  return `background-image:url('${esc(q.url)}');background-size:${q.cols * 100}% ${q.lins * 100}%;`
+    + `background-position:${px.toFixed(3)}% ${py.toFixed(3)}%`;
+};
 
-function lnDesenharPixels(){
+async function lnDesenharPixels(){
   const lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
   const topo = lnPinoAtivo
     ? `<div class="lnResumo">${lista.length} em <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
-    : `<div class="lnResumo">${lista.length} pontos de mira · o que está na tela carrega em alta</div>`;
-  $('#lnResultados').innerHTML = topo + `<div class="lnPixels">${lista.map(l => {
-    const i = lnAchadas.indexOf(l);
-    return `<div class="lnPx" data-i="${i}">
-      <div class="lnPxImg">${lnQuadroDaMira(l)}<div class="lnPxAlto" id="lnPxAlto${i}"></div>
-        <span class="lnPxMira"></span></div>
-      <div class="lnPxPe">
-        <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
-        <div class="lnPxBotoes">
-          <button class="acao" onclick="event.stopPropagation();lnMira(${i},-0.3)" title="um tiquinho antes">−</button>
-          <span class="lnPxSeg" id="lnPxSeg${i}">${lnMMSS(Math.round(lnSegundoDaMira(l)))}</span>
-          <button class="acao" onclick="event.stopPropagation();lnMira(${i},0.3)" title="um tiquinho depois">+</button>
-          <button class="acao" onclick="event.stopPropagation();lnVer(${i})" title="abre o clipe inteiro">clipe</button>
+    : `<div class="lnResumo">${lista.length} pontos de mira · clica num pra ver em alta</div>`;
+  const pintar = () => {
+    $('#lnResultados').innerHTML = topo + `<div class="lnPixels">${lista.map(l => {
+      const i = lnAchadas.indexOf(l);
+      const q = lnEscolhido.get(i) ?? l.quadros?.[l.quadros.length - 1];
+      return `<div class="lnPx" data-i="${i}" onclick="lnVerAlto(${i})">
+        <div class="lnPxImg${q ? '' : ' lnPxSemQuadro'}" data-i="${i}">
+          ${q ? `<i style="${lnEstiloQuadro(q)}"></i>` : `<span class="lnPxNada">o YouTube não tem prévia desse vídeo<b>carregando em alta…</b></span>`}
+          <span class="lnPxMira"></span>
+          <b class="lnPxLupa">ver em alta</b>
         </div>
-      </div>
-    </div>`;
-  }).join('')}</div>`;
-  lnObservarPixels();
+        <div class="lnPxPe">
+          <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
+          <div class="lnPxBotoes">
+            <span class="lnTagP">${esc(l.ponto?.nome ?? '—')}</span>${lnPulo(l.pula)}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  };
+  pintar();                                   // na hora, com o que já tem
+  if (!lnEscolhido.size) { await lnEscolherQuadros(); if (lnVista === 'pixel') pintar(); }
+  lnCobrirSemQuadro();
 }
 
-/** O quadro do storyboard mais perto da mira: aparece na hora, enquanto o alto não monta. */
-function lnQuadroDaMira(l){
-  if (!l.quadros?.length) return `<img loading="lazy" src="${esc(l.capa)}" alt="">`;
-  const q = l.quadros[Math.min(l.quadros.length - 1, Math.round((l.quadros.length - 1) * 0.7))];
-  const px = q.cols > 1 ? (q.col / (q.cols - 1)) * 100 : 0;
-  const py = q.lins > 1 ? (q.lin / (q.lins - 1)) * 100 : 0;
-  return `<i style="background-image:url('${esc(q.url)}');background-size:${q.cols * 100}% ${q.lins * 100}%;background-position:${px.toFixed(3)}% ${py.toFixed(3)}%"></i>`;
-}
-
-/** Monta o player em alta só pro que está na tela, e desmonta o que saiu. */
-function lnObservarPixels(){
-  lnObs?.disconnect();
-  lnObs = new IntersectionObserver((entradas) => {
-    for (const e of entradas) {
+/**
+ * Lineup de vídeo sem storyboard fica sem prévia nenhuma — tem vídeo que o YouTube
+ * simplesmente não gera. Antes isso caía na CAPA do vídeo, que é o cartaz do criador e
+ * enganava: parecia que a tela estava mostrando lineup quando era propaganda. Agora esses
+ * poucos montam o player em alta sozinhos, com teto, quando chegam na tela.
+ */
+let lnObsNada = null;
+const lnNadaVivos = new Map();
+function lnCobrirSemQuadro(){
+  lnObsNada?.disconnect();
+  const alvos = document.querySelectorAll('.lnPxSemQuadro');
+  if (!alvos.length) return;
+  lnObsNada = new IntersectionObserver(async (es) => {
+    for (const e of es) {
       const i = Number(e.target.dataset.i);
-      if (e.isIntersecting) lnMontarAlto(i);
-      else lnDesmontarAlto(i);
+      if (!e.isIntersecting) { const p = lnNadaVivos.get(i); if (p) { try { p.destroy(); } catch {} lnNadaVivos.delete(i); } continue; }
+      if (lnNadaVivos.has(i) || lnNadaVivos.size >= 3) continue;
+      const l = lnAchadas[i]; if (!l) continue;
+      lnNadaVivos.set(i, null);
+      await lnApiYT();
+      if (lnVista !== 'pixel' || !lnNadaVivos.has(i)) return;
+      const cx = document.createElement('div');
+      e.target.appendChild(cx);
+      const seg = Math.round(l.segundo + ((l.fim ?? l.segundo + 12) - l.segundo) * 0.7);
+      lnNadaVivos.set(i, new YT.Player(cx, {
+        videoId: l.video,
+        playerVars: { start: seg, autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
+        events: {
+          onReady: (ev) => { ev.target.setPlaybackQuality?.('hd1080'); setTimeout(() => { try { ev.target.pauseVideo(); } catch {} }, 500); },
+          onStateChange: (ev) => { if (ev.data === YT.PlayerState.PLAYING) setTimeout(() => { try { ev.target.pauseVideo(); } catch {} }, 400); },
+        },
+      }));
     }
-  }, { rootMargin: '150px' });
-  for (const el of document.querySelectorAll('.lnPx')) lnObs.observe(el);
+  }, { rootMargin: '120px' });
+  for (const a of alvos) lnObsNada.observe(a);
 }
 
-async function lnMontarAlto(i){
-  if (lnAltos.has(i) || lnVista !== 'pixel') return;
+/* -------------------------------------------------- o quadro em alta, um de cada vez */
+
+/** Em alta só o que ele pediu: player pausado no segundo do quadro, por cima da grade. */
+async function lnVerAlto(i){
   const l = lnAchadas[i]; if (!l) return;
-  // mais velho sai pra o novo entrar: player de vídeo é caro
-  while (lnAltos.size >= LN_VIVOS) lnDesmontarAlto(lnAltos.keys().next().value);
-  lnAltos.set(i, null);                               // segura o lugar enquanto a API carrega
+  const q = lnEscolhido.get(i);
+  const seg = q ? Math.round((q.de + q.ate) / 2) : Math.round(l.segundo + ((l.fim ?? l.segundo + 12) - l.segundo) * 0.7);
+  $('#lnModal').innerHTML = `<div class="lnModalCx lnAltoCx">
+    <div class="lnModalTopo"><b>${esc(l.nome)}</b><button class="lnX" onclick="lnFecharAlto()">✕</button></div>
+    <div class="lnAltoVideo"><div id="lnAltoYT"></div><span class="lnPxMira grande"></span></div>
+    <div class="lnAltoPe">
+      <button class="acao" onclick="lnAltoPasso(-0.3)">−0,3s</button>
+      <button class="acao" onclick="lnAltoPasso(0.3)">+0,3s</button>
+      <span class="lnCanal">${esc(l.ponto?.nome ?? '')} · ${esc(l.canal)}</span>
+      <button class="acao" style="margin-left:auto" onclick="lnFecharAlto();lnVer(${i})">ver o clipe</button>
+    </div>
+  </div>`;
+  $('#lnModal').hidden = false;
   await lnApiYT();
-  if (!lnAltos.has(i) || lnVista !== 'pixel') return;
-  const alvo = document.getElementById('lnPxAlto' + i);
-  if (!alvo) { lnAltos.delete(i); return; }
-  const p = new YT.Player(alvo, {
+  if ($('#lnModal').hidden) return;
+  lnAltoAtual = new YT.Player('lnAltoYT', {
     videoId: l.video,
-    playerVars: { start: Math.round(lnSegundoDaMira(l)), autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
+    playerVars: { start: seg, autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
     events: {
-      onReady: (e) => {
-        e.target.setPlaybackQuality?.('hd1080');
-        e.target.seekTo(lnSegundoDaMira(l), true);
-        // um instante tocando pro quadro aparecer, e para: é uma FOTO, não um vídeo
-        setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 420);
-      },
-      onStateChange: (e) => { if (e.data === YT.PlayerState.PLAYING) setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 320); },
+      onReady: (e) => { e.target.setPlaybackQuality?.('hd1080'); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 500); },
+      onStateChange: (e) => { if (e.data === YT.PlayerState.PLAYING) setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 400); },
     },
   });
-  lnAltos.set(i, p);
-  document.querySelector(`.lnPx[data-i="${i}"]`)?.classList.add('alto');
+}
+function lnAltoPasso(d){
+  if (!lnAltoAtual?.getCurrentTime) return;
+  lnAltoAtual.seekTo(lnAltoAtual.getCurrentTime() + d, true);
+  setTimeout(() => { try { lnAltoAtual.pauseVideo(); } catch {} }, 350);
+}
+function lnSoltarSemQuadro(){
+  lnObsNada?.disconnect(); lnObsNada = null;
+  for (const [, p] of lnNadaVivos) { try { p?.destroy?.(); } catch {} }
+  lnNadaVivos.clear();
 }
 
-function lnDesmontarAlto(i){
-  const p = lnAltos.get(i);
-  if (p) { try { p.destroy(); } catch {} }
-  lnAltos.delete(i);
-  const el = document.querySelector(`.lnPx[data-i="${i}"]`);
-  if (el) { el.classList.remove('alto'); const a = el.querySelector('.lnPxAlto'); if (a) a.innerHTML = ''; }
-}
-
-/** Ajusta o segundo da mira e remonta esse quadro. Fica salvo junto quando ele salvar. */
-function lnMira(i, d){
-  const l = lnAchadas[i]; if (!l) return;
-  const fim = l.fim ?? (l.segundo + 12);
-  l.mira = Math.max(l.segundo, Math.min(fim - 0.4, lnSegundoDaMira(l) + d));
-  const s = document.getElementById('lnPxSeg' + i);
-  if (s) s.textContent = lnMMSS(Math.round(l.mira));
-  lnDesmontarAlto(i); lnMontarAlto(i);
+function lnFecharAlto(){
+  try { lnAltoAtual?.destroy?.(); } catch {}
+  lnAltoAtual = null;
+  const m = $('#lnModal'); if (m) { m.hidden = true; m.innerHTML = ''; }
 }
 
 /* ---------------------------------------------------------------- o clipe e o mapa
@@ -4553,7 +4687,7 @@ async function lnSalvarAtual(botao, i){
     video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
     mapa: lnMapaAtual, agente: lnAgenteAtual,
     habilidade: l.habilidade?.nome ?? '', lado: lnLadoAtual,
-    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '', mira: Math.round(lnSegundoDaMira(l)),
+    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '', mira: (() => { const q = lnEscolhido.get(i); return q ? Math.round((q.de + q.ate) / 2) : null; })(),
     pula: sel === 'sim' ? true : sel === 'nao' ? false : null,
   };
   botao.disabled = true; botao.textContent = 'salvando…';
