@@ -972,13 +972,21 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPinoN{position:absolute;right:-5px;top:-5px;font-style:normal;font-size:10px;line-height:1;
   background:var(--ouro);color:#0b1016;border-radius:6px;padding:2px 4px;font-weight:700}
 /* o leque: linhas da posição até o ponto, e o retrato do agente em cada posição */
-.lnLeque{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
-.lnLeque line{stroke:#49d6c0;stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.8}
+.lnLeque{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:visible}
+.lnRota{stroke:#49d6c0;stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.75;fill:none;
+  transition:opacity .15s}
+/* a bolinha corre pela rota, mostrando o caminho da habilidade */
+.lnBola{fill:#9ff5e4;filter:drop-shadow(0 0 3px #49d6c0);transition:opacity .15s}
+.lnRota.apagado,.lnBola.apagado{opacity:.08}
+.lnDeMapa.apagado{opacity:.3}
+.lnMapa.comFoco .lnCallout{opacity:.35}
 .lnDeMapa{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;
   border:2px solid #49d6c0;background:#11161f;padding:0;cursor:pointer;overflow:visible;z-index:3;
   box-shadow:0 0 9px #49d6c055;transition:transform .1s}
 .lnDeMapa img{width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:50%}
 .lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.22);z-index:6}
+.lnDeN{position:absolute;right:-6px;top:-6px;font-style:normal;font-size:9.5px;line-height:1;
+  background:#49d6c0;color:#06201c;border-radius:7px;padding:2px 5px;font-weight:700}
 .lnDeNome{position:absolute;top:32px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font-size:9.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 3px #000;opacity:0;pointer-events:none}
 .lnDeMapa:hover .lnDeNome{opacity:1}
@@ -1004,7 +1012,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnQn{position:absolute;right:5px;bottom:5px;background:#000a;color:#fff;font-size:9.5px;
   padding:1px 5px;border-radius:3px;font-weight:600;opacity:0;transition:opacity .15s}
 .lnCard:hover .lnQn{opacity:1}
-.lnSemTira img{width:100%;height:100%;object-fit:cover;display:block}
+.lnSemTira{display:flex;align-items:center;justify-content:center}
+.lnSemTira span{color:var(--apagado);font-size:11px;text-align:center;padding:0 12px;line-height:1.5}
 .lnCardCorpo{padding:7px 9px 9px;display:flex;flex-direction:column;gap:5px}
 .lnCardCorpo .lnNome{font-size:12.5px;line-height:1.3;color:var(--forte);white-space:normal}
 .lnCardPe{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -4329,27 +4338,45 @@ function lnDesenharMapa(){
   const aberto = pinos.find(p => p.nome === lnPinoAtivo) ?? null;
   const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
 
-  // as posições de onde se joga naquele ponto, cada uma com linha até ele
-  const leque = (aberto?.lista ?? []).map((l) => ({ l, i: lnAchadas.indexOf(l), de: l.posicao }))
-    .filter((x) => x.de && x.i >= 0);
+  /* As posições de onde se joga naquele ponto, UMA POR LUGAR.
+     Medido no Bind+Brimstone: o A Site tinha 35 lineups com posição, mas só 7 lugares
+     distintos — 23 delas saem do A Lobby. Desenhar uma por lineup empilhava 28 retratos no
+     mesmo pixel. Agora cada lugar é um retrato, com o número de lineups que saem dali. */
+  const porLugar = new Map();
+  for (const l of aberto?.lista ?? []) {
+    const i = lnAchadas.indexOf(l);
+    if (!l.posicao || i < 0) continue;
+    const k = l.posicao.nome;
+    if (!porLugar.has(k)) porLugar.set(k, { de: l.posicao, i, quantas: 0 });
+    porLugar.get(k).quantas++;
+  }
+  const leque = [...porLugar.values()];
 
   $('#lnMapaCx').innerHTML = `
     <div class="lnMapa ${aberto ? 'comLeque' : ''}">
       <img src="${esc(lnPlanta)}" alt="planta do mapa">
       ${nomes.map(c => `<span class="lnCallout" style="left:${(c.x * 100).toFixed(2)}%;top:${(c.y * 100).toFixed(2)}%">${esc(c.nome)}</span>`).join('')}
       ${aberto && leque.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
-          ${leque.map(x => `<line x1="${(x.de.x * 100).toFixed(2)}" y1="${(x.de.y * 100).toFixed(2)}"
-             x2="${(aberto.x * 100).toFixed(2)}" y2="${(aberto.y * 100).toFixed(2)}" />`).join('')}
+          ${leque.map((x, k) => {
+            // a rota é um caminho de verdade pra bolinha poder correr em cima dele
+            const d = `M ${(x.de.x * 100).toFixed(2)} ${(x.de.y * 100).toFixed(2)} L ${(aberto.x * 100).toFixed(2)} ${(aberto.y * 100).toFixed(2)}`;
+            return `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
+              <circle class="lnBola" data-k="${k}" r="1.7">
+                <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
+                  <mpath href="#lnRota${k}"/>
+                </animateMotion>
+              </circle>`;
+          }).join('')}
         </svg>` : ''}
-      ${aberto ? leque.map(x => {
-        const mx = (x.de.x + aberto.x) / 2 * 100, my = (x.de.y + aberto.y) / 2 * 100;
-        return `<span class="lnMeio" style="left:${mx.toFixed(2)}%;top:${my.toFixed(2)}%"></span>
-        <button class="lnDeMapa" style="left:${(x.de.x * 100).toFixed(2)}%;top:${(x.de.y * 100).toFixed(2)}%"
-          title="${esc(x.de.nome)} — ${esc(x.l.nome)}" onclick="event.stopPropagation();lnVer(${x.i})">
+      ${aberto ? leque.map((x, k) => `
+        <button class="lnDeMapa" data-k="${k}" style="left:${(x.de.x * 100).toFixed(2)}%;top:${(x.de.y * 100).toFixed(2)}%"
+          title="${esc(x.de.nome)}${x.quantas > 1 ? ` — ${x.quantas} lineups daqui` : ''}"
+          onclick="event.stopPropagation();lnEscolherLugar('${esc(x.de.nome)}',${x.i})"
+          onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
           ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">` : ''}
+          ${x.quantas > 1 ? `<i class="lnDeN">${x.quantas}</i>` : ''}
           <span class="lnDeNome">${esc(x.de.nome)}</span>
-        </button>`;
-      }).join('') : ''}
+        </button>`).join('') : ''}
       ${pinos.map(p => `
         <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
           style="left:${(p.x * 100).toFixed(2)}%;top:${(p.y * 100).toFixed(2)}%"
@@ -4361,7 +4388,7 @@ function lnDesenharMapa(){
         </button>`).join('')}
     </div>
     ${aberto ? `<div class="lnLequeNota">${leque.length
-      ? `${leque.length} posiç${leque.length > 1 ? 'ões' : 'ão'} de onde jogar — clica num retrato`
+      ? `${leque.length} lugar${leque.length > 1 ? 'es' : ''} de onde jogar — clica num retrato`
       : 'nenhum título diz de onde se joga essa; a lista está abaixo'}</div>` : ''}`;
 }
 
@@ -4371,8 +4398,30 @@ function lnDesenharMapa(){
  * da lineup passa a ser no mapa, que é como ele pensa — "quero fumar o A Site, de onde
  * eu consigo?" — em vez de abrir o primeiro vídeo e esperar que seja o certo.
  */
+/**
+ * Passar o mouse num retrato isola a rota dele: as outras linhas e bolinhas apagam. Com 6
+ * posições saindo do mesmo ponto vira um emaranhado, e o que ele quer saber é "de onde sai
+ * ESSA aqui".
+ */
+function lnFocarRota(k){
+  const mapa = document.querySelector('.lnMapa'); if (!mapa) return;
+  mapa.classList.toggle('comFoco', k != null);
+  for (const el of mapa.querySelectorAll('.lnRota,.lnBola,.lnDeMapa')) {
+    el.classList.toggle('apagado', k != null && Number(el.dataset.k) !== k);
+  }
+}
+
+/** Clicou num lugar: toca a primeira de lá e deixa a lista só com as daquele lugar. */
+let lnPosAtiva = null;
+function lnEscolherLugar(nome, i){
+  lnPosAtiva = nome;
+  if (lnVista === 'pixel') lnDesenharPixels(); else lnDesenharAchadas();
+  lnVer(i);
+}
+
 function lnClicarPino(nome){
   lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
+  lnPosAtiva = null;
   lnDesenharMapa();
   if (lnVista === 'pixel') lnDesenharPixels(); else lnDesenharAchadas();
 }
@@ -4383,7 +4432,8 @@ function lnClicarPino(nome){
  * só tem 318x180 e prender em pixel jogaria resolução fora.
  */
 function lnTira(l){
-  if (!l.quadros?.length) return `<div class="lnTira lnSemTira"><img loading="lazy" src="${esc(l.capa)}" alt=""></div>`;
+  // sem storyboard a capa do vídeo é o cartaz do criador, não a lineup: melhor nada que enganar
+  if (!l.quadros?.length) return `<div class="lnTira lnSemTira"><span>sem prévia — clica pra ver o clipe</span></div>`;
   const q = l.quadros;
   const pedaco = (x) => {
     const px = x.cols > 1 ? (x.col / (x.cols - 1)) * 100 : 0;
@@ -4410,9 +4460,10 @@ function lnPassarQuadros(tira, ligar){
 }
 
 function lnDesenharAchadas(){
-  const lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
+  let lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
+  if (lnPosAtiva) lista = lista.filter(l => l.posicao?.nome === lnPosAtiva);
   const titulo = lnPinoAtivo
-    ? `<div class="lnResumo">${lista.length} em <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
+    ? `<div class="lnResumo">${lista.length}${lnPosAtiva ? ` de <b>${esc(lnPosAtiva)}</b> para` : ' em'} <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
     : '';
   $('#lnResultados').innerHTML = titulo + `<div class="lnGrade">${lista.map(l => `
     <div class="lnCard" onclick="lnVer(${lnAchadas.indexOf(l)})"
