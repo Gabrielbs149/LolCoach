@@ -1043,13 +1043,19 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnLadoDetalhe{display:flex;flex-direction:column;gap:7px;min-width:0}
 .lnMini{position:relative;width:100%;aspect-ratio:1/1;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r2);overflow:hidden}
-.lnMini img{width:100%;height:100%;object-fit:contain;display:block;opacity:.9}
 .lnLinha{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.lnLinha line{stroke:var(--ouro);stroke-width:.7;stroke-dasharray:2.2 1.6;vector-effect:non-scaling-stroke}
-.lnDe,.lnCai{position:absolute;transform:translate(-50%,-50%);border-radius:50%}
-.lnDe{width:14px;height:14px;background:#d9e2f1;border:2px solid #0b1016;box-shadow:0 0 0 2px #d9e2f1aa}
-.lnCai{width:13px;height:13px;background:var(--ouro);border:2px solid #0b1016;box-shadow:0 0 0 3px #d9a23a55}
-.lnCai.aprox{background:transparent;border:2px dashed var(--ouro);box-shadow:none}
+.lnLinha line{stroke:#49d6c0;stroke-width:2.4;vector-effect:non-scaling-stroke;opacity:.95}
+/* as duas pontas: o retrato do agente onde você fica, o ícone da habilidade onde cai */
+.lnDe,.lnCai{position:absolute;transform:translate(-50%,-50%);border-radius:50%;
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.lnDe{width:30px;height:30px;background:#11161f;border:2px solid #49d6c0;box-shadow:0 0 10px #49d6c066}
+.lnDe img{width:100%;height:100%;object-fit:cover;object-position:top center}
+.lnCai{width:28px;height:28px;background:#11161fee;border:2px solid #49d6c0;box-shadow:0 0 10px #49d6c066}
+.lnCai img{width:17px;height:17px;object-fit:contain;filter:brightness(1.5)}
+.lnCai.aprox{border-style:dashed;box-shadow:none}
+/* o ponto do meio do caminho, igual ao do site */
+.lnMeio{position:absolute;transform:translate(-50%,-50%);width:11px;height:11px;border-radius:50%;
+  background:#ffd93b;box-shadow:0 0 0 2px #0b1016}
 .lnVoltar{align-self:flex-start;padding:4px 10px;font-size:11.5px}
 .lnDeAte{font-size:11.5px;color:var(--fraco)}
 .lnDeAte b{color:var(--forte);font-weight:600}
@@ -4640,17 +4646,53 @@ function lnApiYT(){
   return lnApiYT._p;
 }
 
-/** O mapa do lado: de onde se joga (agente) até onde cai (bolinha). */
+/**
+ * O mapa do lado, como no site que ele mandou: o RETRATO DO AGENTE no lugar de onde se
+ * joga, o ÍCONE DA HABILIDADE onde cai, a linha ligando os dois e um ponto no meio do
+ * caminho. E ampliado na região da lineup — mapa inteiro deixa tudo minúsculo e não diz
+ * nada; o que interessa é o pedaço entre as duas pontas.
+ */
+const LN_FOLGA = 0.17;            // quanto de mapa fica em volta das pontas
+
+/** A janelinha do mapa que vale a pena mostrar: as duas pontas, com folga, em quadrado. */
+function lnRecorte(a, b){
+  const xs = [b.x, a?.x ?? b.x], ys = [b.y, a?.y ?? b.y];
+  let x0 = Math.min(...xs) - LN_FOLGA, x1 = Math.max(...xs) + LN_FOLGA;
+  let y0 = Math.min(...ys) - LN_FOLGA, y1 = Math.max(...ys) + LN_FOLGA;
+  // quadrado, pra não distorcer a planta
+  const lado = Math.max(x1 - x0, y1 - y0, 0.26);
+  const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  x0 = cx - lado / 2; y0 = cy - lado / 2;
+  // sem passar da borda do mapa
+  x0 = Math.max(0, Math.min(1 - lado, x0));
+  y0 = Math.max(0, Math.min(1 - lado, y0));
+  return { x: x0, y: y0, lado: Math.min(lado, 1) };
+}
+
 function lnMapinha(l){
   if (!lnPlanta || !l.ponto) return '<div class="vazio">sem ponto no mapa</div>';
-  const a = l.posicao, b = l.ponto;
-  return `<div class="lnMini">
-    <img src="${esc(lnPlanta)}" alt="">
-    ${a ? `<svg class="lnLinha" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <line x1="${a.x * 100}" y1="${a.y * 100}" x2="${b.x * 100}" y2="${b.y * 100}" />
+  const b = l.ponto, a = l.posicao;
+  const r = lnRecorte(a, b);
+  const onde = (p) => ({ x: ((p.x - r.x) / r.lado) * 100, y: ((p.y - r.y) / r.lado) * 100 });
+  const pb = onde(b), pa = a ? onde(a) : null;
+  const meio = pa ? { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 } : null;
+  const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
+  // a planta ampliada: o recorte vira background-size/position
+  const fundo = `background-image:url('${esc(lnPlanta)}');background-size:${(100 / r.lado).toFixed(2)}% ${(100 / r.lado).toFixed(2)}%;`
+    + `background-position:${((r.x / (1 - r.lado || 1)) * 100).toFixed(3)}% ${((r.y / (1 - r.lado || 1)) * 100).toFixed(3)}%;background-repeat:no-repeat`;
+  // os nomes dos cantos que caírem dentro do recorte
+  const nomes = (lnCallouts ?? []).filter(c => c.x >= r.x && c.x <= r.x + r.lado && c.y >= r.y && c.y <= r.y + r.lado);
+
+  return `<div class="lnMini" style="${fundo}">
+    ${nomes.map(c => { const q = onde(c); return `<span class="lnCallout" style="left:${q.x.toFixed(2)}%;top:${q.y.toFixed(2)}%">${esc(c.nome)}</span>`; }).join('')}
+    ${pa ? `<svg class="lnLinha" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <line x1="${pa.x.toFixed(2)}" y1="${pa.y.toFixed(2)}" x2="${pb.x.toFixed(2)}" y2="${pb.y.toFixed(2)}" />
           </svg>` : ''}
-    ${a ? `<span class="lnDe" style="left:${(a.x * 100).toFixed(2)}%;top:${(a.y * 100).toFixed(2)}%" title="de onde você joga: ${esc(a.nome)}"></span>` : ''}
-    <span class="lnCai ${b.aproximado ? 'aprox' : ''}" style="left:${(b.x * 100).toFixed(2)}%;top:${(b.y * 100).toFixed(2)}%" title="onde cai: ${esc(b.nome)}"></span>
+    ${meio ? `<span class="lnMeio" style="left:${meio.x.toFixed(2)}%;top:${meio.y.toFixed(2)}%"></span>` : ''}
+    ${pa ? `<span class="lnDe" style="left:${pa.x.toFixed(2)}%;top:${pa.y.toFixed(2)}%" title="você fica aqui: ${esc(a.nome)}">
+            ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">` : ''}</span>` : ''}
+    <span class="lnCai ${b.aproximado ? 'aprox' : ''}" style="left:${pb.x.toFixed(2)}%;top:${pb.y.toFixed(2)}%" title="cai aqui: ${esc(b.nome)}">
+      ${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}</span>
   </div>
   <div class="lnDeAte">${a ? `<b>${esc(a.nome)}</b> <i>→</i> ` : ''}<b>${esc(b.nome)}</b>${b.aproximado ? ' <small>(ponto aproximado)</small>' : ''}</div>`;
 }

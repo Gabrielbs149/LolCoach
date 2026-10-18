@@ -218,12 +218,18 @@ export function habilidadeDaLineup(nome, habilidades = []) {
  * default, jogada de A Short. Medido em 154 lineups: 33% dizem de onde se joga. Nessas dá
  * pra desenhar a linha no mapa; nas outras sobra só o alvo, e é o que a gente mostra.
  */
+// "A default FROM A Short" → alvo primeiro, posição depois.
 const DE_ONDE = /^(.*?)\s+(?:from|at|@|desde)\s+(.+)$/i;
+// "A Garden TO A Long Ramp" → o contrário: posição primeiro, alvo depois. Os dois formatos
+// aparecem; sem o segundo, título assim ficava sem linha no mapa.
+const PARA_ONDE = /^(.*?)\s+(?:to|para|pro)\s+(.+)$/i;
 
 export function pontasDaLineup(nome, callouts = [], site = null) {
-  const m = String(nome).match(DE_ONDE);
+  let m = String(nome).match(DE_ONDE), invertido = false;
+  if (!m) { m = String(nome).match(PARA_ONDE); invertido = !!m; }
   if (!m) return { alvo: pontoDaLineup(nome, callouts, site), posicao: null };
-  const [, alvoTxt, posTxt] = m;
+  const [, um, dois] = m;
+  const [alvoTxt, posTxt] = invertido ? [dois, um] : [um, dois];
   // "(Crosshair)" e afins no fim não são lugar
   const limpo = posTxt.replace(/\s*\((?:crosshair|hud|mira|game\s*hud)\)\s*$/i, '').trim();
   const posicao = pontoDaLineup(limpo, callouts, null);
@@ -514,7 +520,7 @@ const detalhesDoVideo = async (base, id, ate = Infinity) => {
  * diante sai na hora, do disco, e só revalida quando fica velho.
  */
 const VALIDADE_BUSCA = 14 * 24 * 60 * 60 * 1000;
-const FORMATO_BUSCA = 2;
+const FORMATO_BUSCA = 3;
 const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
   .map((x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).join('__');
 
