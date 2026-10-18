@@ -971,6 +971,21 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPino img{width:20px;height:20px;object-fit:contain;filter:brightness(1.4)}
 .lnPinoN{position:absolute;right:-5px;top:-5px;font-style:normal;font-size:10px;line-height:1;
   background:var(--ouro);color:#0b1016;border-radius:6px;padding:2px 4px;font-weight:700}
+/* o leque: linhas da posição até o ponto, e o retrato do agente em cada posição */
+.lnLeque{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.lnLeque line{stroke:#49d6c0;stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.8}
+.lnDeMapa{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;
+  border:2px solid #49d6c0;background:#11161f;padding:0;cursor:pointer;overflow:visible;z-index:3;
+  box-shadow:0 0 9px #49d6c055;transition:transform .1s}
+.lnDeMapa img{width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:50%}
+.lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.22);z-index:6}
+.lnDeNome{position:absolute;top:32px;left:50%;transform:translateX(-50%);white-space:nowrap;
+  font-size:9.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 3px #000;opacity:0;pointer-events:none}
+.lnDeMapa:hover .lnDeNome{opacity:1}
+.lnPinoX{position:absolute;right:-7px;top:-7px;font-style:normal;font-size:9px;line-height:1;
+  background:#0b1016;border:1px solid var(--borda);color:var(--fraco);border-radius:50%;padding:2px 3px}
+.lnMapa.comLeque .lnPino:not(.on){opacity:.35}
+.lnLequeNota{text-align:center;color:var(--fraco);font-size:11.5px;margin-top:7px}
 .lnCallout{position:absolute;transform:translate(-50%,-50%);font-size:9.5px;color:#cfd6e4;
   text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;white-space:nowrap;opacity:.75}
 .lnPino:hover{transform:translate(-50%,-50%) scale(1.18);z-index:3}
@@ -4311,32 +4326,55 @@ function lnDesenharMapa(){
   }
   // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
   const nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
+  const aberto = pinos.find(p => p.nome === lnPinoAtivo) ?? null;
+  const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
+
+  // as posições de onde se joga naquele ponto, cada uma com linha até ele
+  const leque = (aberto?.lista ?? []).map((l) => ({ l, i: lnAchadas.indexOf(l), de: l.posicao }))
+    .filter((x) => x.de && x.i >= 0);
+
   $('#lnMapaCx').innerHTML = `
-    <div class="lnMapa">
+    <div class="lnMapa ${aberto ? 'comLeque' : ''}">
       <img src="${esc(lnPlanta)}" alt="planta do mapa">
       ${nomes.map(c => `<span class="lnCallout" style="left:${(c.x * 100).toFixed(2)}%;top:${(c.y * 100).toFixed(2)}%">${esc(c.nome)}</span>`).join('')}
+      ${aberto && leque.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
+          ${leque.map(x => `<line x1="${(x.de.x * 100).toFixed(2)}" y1="${(x.de.y * 100).toFixed(2)}"
+             x2="${(aberto.x * 100).toFixed(2)}" y2="${(aberto.y * 100).toFixed(2)}" />`).join('')}
+        </svg>` : ''}
+      ${aberto ? leque.map(x => {
+        const mx = (x.de.x + aberto.x) / 2 * 100, my = (x.de.y + aberto.y) / 2 * 100;
+        return `<span class="lnMeio" style="left:${mx.toFixed(2)}%;top:${my.toFixed(2)}%"></span>
+        <button class="lnDeMapa" style="left:${(x.de.x * 100).toFixed(2)}%;top:${(x.de.y * 100).toFixed(2)}%"
+          title="${esc(x.de.nome)} — ${esc(x.l.nome)}" onclick="event.stopPropagation();lnVer(${x.i})">
+          ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">` : ''}
+          <span class="lnDeNome">${esc(x.de.nome)}</span>
+        </button>`;
+      }).join('') : ''}
       ${pinos.map(p => `
         <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
           style="left:${(p.x * 100).toFixed(2)}%;top:${(p.y * 100).toFixed(2)}%"
           title="${esc(p.nome)}${p.aproximado ? ' (posição aproximada)' : ''}" onclick="lnClicarPino('${esc(p.nome)}')">
           ${p.icone ? `<img src="${esc(p.icone)}" alt="">` : `<b>${p.lista.length}</b>`}
           ${p.icone ? `<i class="lnPinoN">${p.lista.length}</i>` : ''}
+          ${lnPinoAtivo === p.nome ? '<i class="lnPinoX">✕</i>' : ''}
           <span class="lnPinoNome">${esc(p.nome)}</span>
         </button>`).join('')}
-    </div>`;
+    </div>
+    ${aberto ? `<div class="lnLequeNota">${leque.length
+      ? `${leque.length} posiç${leque.length > 1 ? 'ões' : 'ão'} de onde jogar — clica num retrato`
+      : 'nenhum título diz de onde se joga essa; a lista está abaixo'}</div>` : ''}`;
 }
 
+/**
+ * Clicar no ponto onde a habilidade CAI abre em leque todas as posições de onde dá pra
+ * jogar ali: cada uma vira o retrato do agente no mapa, ligado por uma linha. A escolha
+ * da lineup passa a ser no mapa, que é como ele pensa — "quero fumar o A Site, de onde
+ * eu consigo?" — em vez de abrir o primeiro vídeo e esperar que seja o certo.
+ */
 function lnClicarPino(nome){
-  const abrindo = lnPinoAtivo !== nome;
-  lnPinoAtivo = abrindo ? nome : null;
+  lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
   lnDesenharMapa();
   if (lnVista === 'pixel') lnDesenharPixels(); else lnDesenharAchadas();
-  // clicou no ponto: já toca a primeira de lá. No meio de uma partida ninguém quer
-  // clicar duas vezes pra começar a ver.
-  if (abrindo) {
-    const i = lnAchadas.findIndex((l) => l.ponto?.nome === nome);
-    if (i >= 0) lnVer(i);
-  }
 }
 
 /**
