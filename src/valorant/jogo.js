@@ -16,6 +16,7 @@
  */
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { request as pedirHttps, Agent as AgenteHttps } from 'node:https';
 
 const LOCKFILE = () => resolve(
   process.env.LOCALAPPDATA ?? 'C:/Users/Default/AppData/Local',
@@ -26,18 +27,18 @@ const LOCKFILE = () => resolve(
  * O cliente da Riot usa certificado próprio, então a verificação precisa ser afrouxada —
  * mas SÓ nesta conexão. A primeira versão disto mexia em NODE_TLS_REJECT_UNAUTHORIZED, que
  * vale pro processo inteiro: enquanto estivesse ligado, qualquer outra chamada HTTPS do app
- * (Riot, YouTube) deixaria de conferir certificado. Com um dispatcher próprio o buraco fica
- * restrito ao 127.0.0.1.
+ * (Riot, YouTube) deixaria de conferir certificado.
+ *
+ * A segunda versão trocou aquilo por um dispatcher do pacote `undici` — e era esse o motivo
+ * de a detecção NUNCA ter funcionado: `undici` não é dependência do app, o `import` falhava,
+ * `pedir` devolvia null na hora e o Valorant aparecia como fechado mesmo estando aberto.
+ * Testado com o jogo rodando: o import estourava com "Cannot find package 'undici'", e sem
+ * agente nenhum o fetch morria em UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+ *
+ * `node:https` vem junto com o Node e com o Electron, não precisa instalar nada, e o agente
+ * abaixo deixa o buraco restrito a este agente — nenhuma outra chamada do app o usa.
  */
-let dispatcherLocal = null;
-async function doCliente() {
-  if (dispatcherLocal !== null) return dispatcherLocal;
-  try {
-    const { Agent } = await import('undici');
-    dispatcherLocal = new Agent({ connect: { rejectUnauthorized: false } });
-  } catch { dispatcherLocal = false; }     // sem undici: não dá pra isolar, então não tenta
-  return dispatcherLocal;
-}
+const agenteLocal = new AgenteHttps({ rejectUnauthorized: false, keepAlive: false });
 
 async function lerLockfile() {
   try {
@@ -48,19 +49,41 @@ async function lerLockfile() {
   } catch { return null; }
 }
 
-const pedir = async (lock, caminho, extra = {}) => {
-  const dispatcher = await doCliente();
-  if (dispatcher === false) return null;
-  try {
-    const r = await fetch(`${lock.protocolo}://127.0.0.1:${lock.porta}${caminho}`, {
-      signal: AbortSignal.timeout(4000),
-      dispatcher,
-      headers: { Authorization: 'Basic ' + Buffer.from(`riot:${lock.senha}`).toString('base64'), ...extra },
+const pedir = (lock, caminho, extra = {}) => new Promise((pronto) => {
+  if (lock.protocolo !== 'https') return pronto(null);   // o cliente só serve https aqui
+  const req = pedirHttps(`https://127.0.0.1:${lock.porta}${caminho}`, {
+    agent: agenteLocal,
+    timeout: 4000,
+    headers: { Authorization: 'Basic ' + Buffer.from(`riot:${lock.senha}`).toString('base64'), ...extra },
+  }, (res) => {
+    let txt = '';
+    res.setEncoding('utf8');
+    res.on('data', (p) => { txt += p; });
+    res.on('end', () => {
+      if (res.statusCode < 200 || res.statusCode >= 300) return pronto(null);
+      try { pronto(JSON.parse(txt)); } catch { pronto(null); }
     });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch { return null; }
-};
+  });
+  req.on('timeout', () => { req.destroy(); pronto(null); });
+  req.on('error', () => pronto(null));
+  req.end();
+});
+
+/**
+ * Onde perguntar pelo agente. Duas pegadinhas, as duas conferidas com o jogo aberto:
+ *  - a região que o chat devolve vem com número ("br1") e o pvp.net não aceita assim;
+ *  - o shard NÃO é igual à região: Brasil e LATAM jogam no shard "na". Conferi por DNS —
+ *    glz-br-1.br.a.pvp.net não resolve, glz-br-1.na.a.pvp.net resolve.
+ */
+const SHARD = { na: 'na', latam: 'na', br: 'na', eu: 'eu', ap: 'ap', kr: 'kr' };
+
+async function regiaoEShard(lock) {
+  // /riotclient/region-locale devolve "BR" limpo; o chat devolve "br1"
+  const local = await pedir(lock, '/riotclient/region-locale');
+  const sessao = await pedir(lock, '/chat/v1/session');
+  const regiao = String(local?.region ?? sessao?.region ?? 'na').toLowerCase().replace(/\d+$/, '') || 'na';
+  return { regiao, shard: String(SHARD[regiao] ?? sessao?.shard ?? regiao).toLowerCase(), puuid: sessao?.puuid ?? null };
+}
 
 /* ------------------------------------------------------------------ mapa */
 
@@ -79,6 +102,29 @@ export function mapaPeloCaminho(caminho) {
 /** Em que ponto do jogo ele está, em palavra nossa. */
 const ESTADOS = { MENUS: 'menu', PREGAME: 'selecao', INGAME: 'jogando' };
 
+/**
+ * Onde estão o estado e o mapa dentro do blob de presença.
+ *
+ * Isto é função separada e exportada DE PROPÓSITO: o formato já mudou uma vez sem aviso e
+ * quebrou a detecção inteira em silêncio — `sessionLoopState` e `matchMap` saíram da raiz do
+ * blob e foram pra dentro de `matchPresenceData`. Como o resto do caminho só dá pra exercitar
+ * com o jogo aberto, nenhum teste pegava isso. Aqui dá, e os testes cobrem os dois formatos.
+ *
+ * Ordem de procura: o lugar novo, depois a raiz (formato antigo), e por último o que o dono
+ * do grupo reporta — que é o que aparece quando a partida é do grupo e não sua.
+ */
+export function lerPresenca(blob) {
+  const md = blob?.matchPresenceData ?? {};
+  const pd = blob?.partyPresenceData ?? {};
+  const laco = md.sessionLoopState ?? blob?.sessionLoopState ?? pd.partyOwnerSessionLoopState ?? null;
+  const ondeEstaOMapa = md.matchMap ?? blob?.matchMap ?? pd.partyOwnerMatchMap ?? null;
+  return {
+    estado: ESTADOS[laco] ?? null,
+    mapa: mapaPeloCaminho(ondeEstaOMapa),
+    fila: md.queueId ?? blob?.queueId ?? null,
+  };
+}
+
 /* ------------------------------------------------------------------ agente */
 
 /**
@@ -88,11 +134,10 @@ const ESTADOS = { MENUS: 'menu', PREGAME: 'selecao', INGAME: 'jogando' };
 async function agenteEscolhido(lock, estado) {
   if (estado !== 'selecao' && estado !== 'jogando') return null;
   const ent = await pedir(lock, '/entitlements/v1/token');
-  const sessao = await pedir(lock, '/chat/v1/session');
-  if (!ent?.accessToken || !ent?.token || !sessao?.puuid) return null;
+  const { regiao, shard, puuid } = await regiaoEShard(lock);
+  if (!ent?.accessToken || !ent?.token || !puuid) return null;
 
-  const regiao = (sessao.region || '').toLowerCase() || 'na';
-  const shard = (sessao.shard || regiao).toLowerCase();
+  const sessao = { puuid };
   const cab = {
     Authorization: `Bearer ${ent.accessToken}`,
     'X-Riot-Entitlements-JWT': ent.token,
@@ -135,8 +180,7 @@ export async function situacaoDoValorant() {
   try { blob = JSON.parse(Buffer.from(minha.private, 'base64').toString('utf8')); } catch { /* formato novo */ }
   if (!blob) return { ligado: true, estado: null, mapa: null, agenteId: null };
 
-  const estado = ESTADOS[blob.sessionLoopState] ?? null;
-  const mapa = mapaPeloCaminho(blob.matchMap);
+  const { estado, mapa, fila } = lerPresenca(blob);
   const agenteId = await agenteEscolhido(lock, estado).catch(() => null);
-  return { ligado: true, estado, mapa, agenteId, fila: blob.queueId ?? null };
+  return { ligado: true, estado, mapa, agenteId, fila };
 }

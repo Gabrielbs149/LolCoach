@@ -650,3 +650,42 @@ test('repetida: a estreia sai inteira, a 2a vez sai curta', async () => {
   assert.equal(render(fala), 'Canhão. Olha a wave.', 'a personalizada dele manda');
   personalizar({});
 });
+
+/* ------------------------------------------------------------------ Valorant: presença
+ * O formato do blob mudou sem aviso e derrubou a detecção inteira em silêncio. Estes
+ * testes travam os dois formatos pra isso não voltar. */
+test('presença no formato novo: estado e mapa vêm de matchPresenceData', async () => {
+  const { lerPresenca } = await import('../src/valorant/jogo.js');
+  const r = lerPresenca({
+    isIdle: false, partySize: 1, queueId: 'unrated',
+    matchPresenceData: { sessionLoopState: 'INGAME', matchMap: '/Game/Maps/Triad/Triad', queueId: 'competitive' },
+  });
+  assert.equal(r.estado, 'jogando');
+  assert.equal(r.mapa, 'Haven');
+  assert.equal(r.fila, 'competitive');
+});
+
+test('presença no formato antigo (raiz) continua lida', async () => {
+  const { lerPresenca } = await import('../src/valorant/jogo.js');
+  const r = lerPresenca({ sessionLoopState: 'PREGAME', matchMap: '/Game/Maps/Duality/Duality', queueId: 'unrated' });
+  assert.equal(r.estado, 'selecao');
+  assert.equal(r.mapa, 'Bind');
+});
+
+test('no menu: estado menu e mapa nulo, sem estourar', async () => {
+  const { lerPresenca } = await import('../src/valorant/jogo.js');
+  const r = lerPresenca({ matchPresenceData: { sessionLoopState: 'MENUS', matchMap: '' } });
+  assert.equal(r.estado, 'menu');
+  assert.equal(r.mapa, null);
+  assert.equal(lerPresenca(null).estado, null);
+});
+
+test('partida do grupo: cai pro que o dono reporta', async () => {
+  const { lerPresenca } = await import('../src/valorant/jogo.js');
+  const r = lerPresenca({
+    matchPresenceData: {},
+    partyPresenceData: { partyOwnerSessionLoopState: 'INGAME', partyOwnerMatchMap: '/Game/Maps/Hurm/Hurm' },
+  });
+  assert.equal(r.estado, 'jogando');
+  assert.equal(r.mapa, 'Corrode');
+});

@@ -4843,13 +4843,17 @@ async function lnOlharOJogo(){
   const cx = $('#lnJogo');
   if (cx) { cx.hidden = false; cx.className = 'lnJogo' + (j.ligado ? ' ligado' : ''); cx.innerHTML = lnTextoDoJogo(j); }
 
+  /* Antes isto exigia o mapa pra fazer qualquer coisa: `if (!j.mapa) return`. Só que na
+   * seleção os dois não chegam juntos — dá pra já ter travado o agente antes de o mapa
+   * aparecer na presença, e nesse intervalo o cartão do agente ficava parado no antigo.
+   * Agora cada um entra assim que aparece, e a busca só dispara quando os dois estão de pé. */
   const marca = `${j.mapa ?? ''}|${j.agenteNome ?? ''}`;
-  if (!j.mapa || marca === lnUltimoDetectado) return;     // nada novo
+  if (marca === '|' || marca === lnUltimoDetectado) return;     // nada novo
   lnUltimoDetectado = marca;
-  lnMapaAtual = j.mapa;
+  if (j.mapa) lnMapaAtual = j.mapa;
   if (j.agenteNome) lnAgenteAtual = j.agenteNome;
   lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
-  lnProcurarLogo();
+  if (lnMapaAtual && lnAgenteAtual) lnProcurarLogo();
 }
 
 function lnVigiarJogo(ligar){
