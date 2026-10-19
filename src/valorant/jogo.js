@@ -85,6 +85,29 @@ const pedir = (lock, caminho, extra = {}) => new Promise((pronto) => {
  */
 const SHARD = { na: 'na', latam: 'na', br: 'na', eu: 'eu', ap: 'ap', kr: 'kr' };
 
+/**
+ * O glz EXIGE `X-Riot-ClientVersion`. Sem ele a resposta é 400 INVALID_HEADERS ("Bad headers
+ * used for request") e a busca do agente nunca chega a lugar nenhum — era o que estava
+ * acontecendo. Comprovado com o jogo aberto, a mesma chamada:
+ *   sem o cabeçalho -> 400 INVALID_HEADERS
+ *   com o cabeçalho -> 404 (resposta certa pra quem está no menu, sem pré-partida)
+ *
+ * A string muda a cada patch do Valorant, então vem da valorant-api (a mesma que já serve
+ * mapas e agentes) e fica guardada por 6 h. Se a busca falhar, segue sem — vai dar 400, mas
+ * não é pior do que não tentar, e na próxima volta tenta de novo.
+ */
+let versaoCache = { valor: null, quando: 0 };
+async function versaoDoCliente() {
+  if (versaoCache.valor && Date.now() - versaoCache.quando < 6 * 60 * 60 * 1000) return versaoCache.valor;
+  try {
+    const r = await fetch('https://valorant-api.com/v1/version', { signal: AbortSignal.timeout(6000) });
+    const j = r.ok ? await r.json() : null;
+    const v = j?.data?.riotClientVersion ?? null;
+    if (v) versaoCache = { valor: v, quando: Date.now() };
+    return v;
+  } catch { return versaoCache.valor; }
+}
+
 async function regiaoEShard(lock) {
   // /riotclient/region-locale devolve "BR" limpo; o chat devolve "br1"
   const local = await pedir(lock, '/riotclient/region-locale');
@@ -146,10 +169,12 @@ async function agenteEscolhido(lock, estado) {
   if (!ent?.accessToken || !ent?.token || !puuid) return null;
 
   const sessao = { puuid };
+  const versao = await versaoDoCliente();
   const cab = {
     Authorization: `Bearer ${ent.accessToken}`,
     'X-Riot-Entitlements-JWT': ent.token,
     'X-Riot-ClientPlatform': 'ew0KCSJwbGF0Zm9ybVR5cGUiOiAiUEMiLA0KCSJwbGF0Zm9ybU9TIjogIldpbmRvd3MiLA0KCSJwbGF0Zm9ybU9TVmVyc2lvbiI6ICIxMC4wLjE5MDQyLjEuMjU2LjY0Yml0IiwNCgkicGxhdGZvcm1DaGlwc2V0IjogIlVua25vd24iDQp9',
+    ...(versao ? { 'X-Riot-ClientVersion': versao } : {}),
   };
   const glz = `https://glz-${regiao}-1.${shard}.a.pvp.net`;
   const buscar = async (u) => {
