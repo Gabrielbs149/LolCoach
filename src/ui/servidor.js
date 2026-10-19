@@ -957,7 +957,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       // GET: catálogo (mapas/agentes), busca de vídeo, as salvas e os links de fora.
       // Tudo devolve JSON e nenhuma derruba a aba: sem internet, a busca volta com aviso
       // e as salvas continuam vindo do disco.
-      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks']]) {
+      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao']]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         const p = {
           forcar: url.searchParams.get('forcar') === '1',

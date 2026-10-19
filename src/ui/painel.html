@@ -925,6 +925,12 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnHud.focoNoClipe .lnLado{display:none}
 .lnLado{display:flex;flex-direction:column;gap:14px}
 .lnBloco{display:flex;flex-direction:column;gap:7px}
+.lnJogo{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:var(--r2);
+  border:1px solid var(--borda);background:var(--f1);font-size:12px;color:var(--fraco)}
+.lnJogo.ligado{border-color:#49d6c0;background:#0e1a1acc}
+.lnJogo b{color:var(--forte);font-weight:600;font-size:12.5px}
+.lnJogo.ligado b{color:#9ff5e4}
+.lnJogo small{color:var(--apagado);font-size:11px}
 .lnRot{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--apagado);font-weight:600}
 .lnCartao{position:relative;aspect-ratio:16/9;border:1px solid var(--borda);border-radius:var(--r2);
   overflow:hidden;background:var(--f3);display:flex;align-items:flex-end;width:100%;padding:0;
@@ -1405,6 +1411,7 @@ h2{letter-spacing:1px}
     <div class="titulo">Lineups <small>Valorant</small></div>
     <div class="lnHud">
       <aside class="lnLado">
+        <div class="lnJogo" id="lnJogo" hidden></div>
         <div class="lnBloco">
           <div class="lnRot">Mapa</div>
           <button class="lnCartao" id="lnCartaoMapa" onclick="lnAbrirSeletor('mapa')"></button>
@@ -4185,6 +4192,7 @@ async function carregarLineups(){
   } catch {}
   lnDesenharLados(); lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
   await carregarMinhasLineups();
+  lnVigiarJogo(true);
   // lembrou mapa e agente da última vez? já mostra, sem ele pedir
   if (lnMapaAtual && lnAgenteAtual) lnProcurar();
 }
@@ -4977,6 +4985,44 @@ async function lnApagar(id){
   await carregarMinhasLineups();
 }
 
+/* ---------------------------------------------------------------- o jogo manda
+ * Com o Valorant aberto, o app lê do cliente local qual mapa e qual agente ele pegou e
+ * deixa as lineups prontas sozinho. Só troca quando a deteção MUDA: se ele escolher outra
+ * coisa na mão, não fica brigando com ele. */
+let lnJogoVigia = null, lnUltimoDetectado = '';
+
+function lnTextoDoJogo(j){
+  if (!j?.ligado) return '<b>Valorant fechado</b><small>escolhe o mapa e o agente aqui</small>';
+  const onde = { menu: 'no menu', selecao: 'escolhendo agente', jogando: 'em partida' }[j.estado] ?? 'aberto';
+  const det = [j.mapa, j.agenteNome].filter(Boolean).join(' · ');
+  return `<b>Valorant ${esc(onde)}</b><small>${det ? esc(det) : 'ainda sem mapa'}</small>`;
+}
+
+async function lnOlharOJogo(){
+  if (abaAtual !== 'lineups') return;
+  let j;
+  try { j = await pegar('/api/val/situacao'); } catch { return; }
+  if (!j) return;
+  j.agenteNome = j.agenteId ? (lnCatalogo?.agentes.find(a => a.id === j.agenteId)?.nome ?? null) : null;
+  const cx = $('#lnJogo');
+  if (cx) { cx.hidden = false; cx.className = 'lnJogo' + (j.ligado ? ' ligado' : ''); cx.innerHTML = lnTextoDoJogo(j); }
+
+  const marca = `${j.mapa ?? ''}|${j.agenteNome ?? ''}`;
+  if (!j.mapa || marca === lnUltimoDetectado) return;     // nada novo
+  lnUltimoDetectado = marca;
+  lnMapaAtual = j.mapa;
+  if (j.agenteNome) lnAgenteAtual = j.agenteNome;
+  lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
+  lnProcurarLogo();
+}
+
+function lnVigiarJogo(ligar){
+  clearInterval(lnJogoVigia); lnJogoVigia = null;
+  if (!ligar) return;
+  lnOlharOJogo();
+  lnJogoVigia = setInterval(lnOlharOJogo, 5000);
+}
+
 $('#lnBuscar').onclick = () => lnProcurar(true);
 $('#lnFiltroMapa').onchange = lnDesenharMinhas;
 for (const b of document.querySelectorAll('#lnLados button')) {
@@ -4997,6 +5043,8 @@ const jaCarregou = new Set();
 const abrirAbaOriginal = abrirAba;
 abrirAba = function(nome){
   abrirAbaOriginal(nome);
+  // o vigia do Valorant só roda com a aba aberta: não faz sentido bater no cliente à toa
+  if (typeof lnVigiarJogo === 'function') lnVigiarJogo(nome === 'lineups');
   if(CARREGADORES[nome] && !jaCarregou.has(nome)){
     jaCarregou.add(nome);
     Promise.resolve(CARREGADORES[nome]()).catch((e) => {

@@ -15,6 +15,7 @@ import * as Controle from './dados/controle.js';
 import { recadoDeSequencia } from './analise/parar.js';
 import { licaoDaPartida } from './analise/licao.js';
 import * as Lineups from './valorant/lineups.js';
+import { situacaoDoValorant } from './valorant/jogo.js';
 
 /**
  * Liga tudo: aceitar fila, seleção de campeão, runas e coleta.
@@ -2517,6 +2518,9 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     valSalvas: () => Lineups.salvas(),
     valSalvar: (p = {}) => Lineups.salvar(p),
     valApagar: (p = {}) => Lineups.apagar(String(p.id ?? '')),
+    /* O que está rolando no Valorant agora (mapa e agente), lido do cliente local.
+       Só leitura: nada é escrito no cliente nem desenhado por cima do jogo. */
+    valSituacao: () => situacaoDoValorant(),
     valLinks: (p = {}) => ({
       youtube: Lineups.linkYoutube(Lineups.termoDaBusca(p)),
       strats: Lineups.linkStrats(p),
@@ -2542,5 +2546,5 @@ const ACOES_DO_PAINEL = [
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
-  'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks',
+  'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
 ];
