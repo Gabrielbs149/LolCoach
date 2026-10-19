@@ -902,13 +902,17 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   padding:2px 0;background:var(--f3);color:var(--fraco)}
 .lnSite.sA{color:#ff6b6b}.lnSite.sB{color:#4dabf7}.lnSite.sC{color:#9775fa}.lnSite.sMid{color:#ffd43b}
 .lnHabVazia{flex:0 0 15px}
-.lnNome{flex:1 1 auto;min-width:0;color:var(--forte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lnRota2{flex:0 0 auto;color:var(--apagado);font-size:11px;white-space:nowrap;max-width:230px;
+ /* A rota e o que ele le pra escolher ("de onde saio, onde cai"); o nome vem do titulo do
+   video e costuma ser "A default" repetido 20 vezes. Entao a rota vai na frente, acesa e
+   sem encolher, e o NOME e quem cede espaco e reticencia quando falta largura. */
+.lnNome{flex:1 1 auto;min-width:0;color:var(--fraco);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnRota2{flex:0 0 auto;color:var(--forte);font-size:11.5px;white-space:nowrap;max-width:none;
   overflow:hidden;text-overflow:ellipsis}
 .lnRota2 i{font-style:normal;color:#49d6c0}
+.lnRota2.lnSemRota{color:var(--apagado)}
 .lnCanal{flex:0 0 auto;color:var(--apagado);font-size:11px;max-width:200px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
-.lnQuando{flex:0 0 72px;text-align:right;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
+.lnQuando{flex:0 0 38px;text-align:right;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
 .lnTag.lnSei{color:var(--apagado);border-style:dashed}
 .lnTocando{display:flex;gap:var(--e2);margin-bottom:var(--e2);flex-wrap:wrap}
 .lnTocando iframe{flex:1 1 440px;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;min-width:300px}
@@ -923,13 +927,30 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    Agora a barra é mais larga, os cartões têm proporção de imagem e o conteúdo respira. */
 /* Dois corpos lado a lado ate ficar estreito de verdade. Com o corte em 1040 px, numa
    janela de 1000 a barra ia pro topo e sobravam ~450 px vazios ao lado dela. */
-.lnHud{display:grid;grid-template-columns:248px minmax(0,1fr);gap:16px;align-items:start}
-@media (max-width:820px){.lnHud{grid-template-columns:1fr}}
-/* Com um clipe aberto a barra de filtros sai da frente: numa janela de ~965 px ela comia
-   272 px e sobravam 540 pro vídeo. Fechado o clipe, ela volta. */
-.lnHud.focoNoClipe{grid-template-columns:minmax(0,1fr)}
+ /* A barra de filtros era uma COLUNA de 248 px na esquerda. Ela empurrava o mapa e a lista
+   pra uma faixa de 457 px, e como os dois ficavam EMPILHADOS a lista media 4072 px de altura:
+   cinco linhas na tela e quatro mil pixels de rolagem pra ver as outras 102. Agora os filtros
+   sao uma barra horizontal em cima, e o palco usa a largura inteira com mapa e lista lado a
+   lado, a lista rolando por dentro. */
+.lnHud{display:flex;flex-direction:column;gap:12px}
+.lnLado{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px;
+  border:1px solid var(--borda);border-radius:var(--r2);background:var(--f1)}
 .lnHud.focoNoClipe .lnLado{display:none}
-.lnLado{display:flex;flex-direction:column;gap:14px}
+.lnEmpurra{flex:1 1 auto;min-width:0}
+/* os cartoes de mapa e agente eram retratos 16/9 de coluna; na barra viram fichas baixas */
+.lnLado .lnCartao{width:108px;height:42px;aspect-ratio:auto;flex:0 0 auto;border-radius:var(--r1)}
+.lnLado .lnCartao span{padding:4px 7px;font-size:12px}
+.lnLado .lnCartao span small{font-size:9.5px}
+.lnLado .lnCartaoAg{width:104px}
+.lnLado .lnLados{flex:0 0 auto;width:136px}
+.lnLado .lnLados button{padding:6px 0;font-size:11px}
+.lnLado .lnHabs{display:flex;gap:5px;flex-wrap:wrap}
+.lnLado .lnHab{padding:5px 7px;font-size:10.5px}
+.lnLado .lnHab:first-child{grid-column:auto}
+.lnLado .lnBuscarBt{width:auto;padding:7px 11px;font-size:11.5px}
+.lnLado .lnFora{flex:0 0 auto;padding:6px 9px;font-size:11px}
+/* o aviso do jogo era um bloco de duas linhas e sozinho empurrava a barra pra mais uma faixa */
+.lnLado .lnJogo{flex:0 0 auto;flex-direction:row;align-items:baseline;gap:6px;padding:5px 9px;font-size:10.5px}
 .lnBloco{display:flex;flex-direction:column;gap:7px}
 .lnJogo{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:var(--r2);
   border:1px solid var(--borda);background:var(--f1);font-size:12px;color:var(--fraco)}
@@ -970,6 +991,13 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnForaCx{display:flex;gap:6px}
 .lnFora{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;flex:1}
 .lnPalco{display:flex;flex-direction:column;gap:var(--e2);min-width:0}
+/* mapa e lista lado a lado; a lista rola por dentro em vez de esticar a pagina */
+ /* Com o mapa em 400 px sobravam 307 pra lista e o nome da lineup ficava com OITENTA pixels:
+   tudo virava "A default I...". O mapa de 320 continua com os pinos de 32 px clicaveis e
+   devolve ~390 pra lista, que e onde esta a informacao que ele le. */
+.lnDuplo{display:grid;grid-template-columns:minmax(220px,320px) minmax(0,1fr);gap:12px;align-items:start}
+@media (max-width:700px){.lnDuplo{grid-template-columns:1fr}}
+.lnDuplo .lnLista{max-height:min(680px,calc(100vh - 224px));overflow-y:auto}
 .lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;aspect-ratio:1/1;
   background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2);transition:max-width .18s}
 /* com um clipe aberto o mapão encolhe: o detalhe já mostra o mapa, e quem tem que
@@ -1411,39 +1439,28 @@ h2{letter-spacing:1px}
   <section id="lineups">
     <div class="titulo">Lineups <small>Valorant</small></div>
     <div class="lnHud">
-      <aside class="lnLado">
-        <div class="lnJogo" id="lnJogo" hidden></div>
-        <div class="lnBloco">
-          <div class="lnRot">Mapa</div>
-          <button class="lnCartao" id="lnCartaoMapa" onclick="lnAbrirSeletor('mapa')"></button>
-        </div>
+      <div class="lnLado">
+        <button class="lnCartao" id="lnCartaoMapa" onclick="lnAbrirSeletor('mapa')"></button>
         <div class="lnLados" id="lnLados">
           <button class="on" data-lado="atacando">Atacante</button>
           <button data-lado="defendendo">Defensor</button>
         </div>
-        <div class="lnBloco">
-          <div class="lnRot">Agente</div>
-          <button class="lnCartao lnCartaoAg" id="lnCartaoAgente" onclick="lnAbrirSeletor('agente')"></button>
-        </div>
-        <div class="lnBloco" id="lnBlocoHab">
-          <div class="lnRot">Habilidade</div>
-          <div class="lnHabs" id="lnHabs"></div>
-        </div>
-        <button class="acao lnBuscarBt" id="lnBuscar" title="busca de novo, ignorando o que está salvo">Atualizar lineups</button>
-        <div class="lnBloco">
-          <div class="lnRot">Fora do app</div>
-          <div class="lnForaCx">
-            <a class="acao lnFora" id="lnYoutube" target="_blank" rel="noreferrer">YouTube</a>
-            <a class="acao lnFora" id="lnStrats" target="_blank" rel="noreferrer">strats.gg</a>
-          </div>
-        </div>
-      </aside>
+        <button class="lnCartao lnCartaoAg" id="lnCartaoAgente" onclick="lnAbrirSeletor('agente')"></button>
+        <div class="lnHabs" id="lnBlocoHab"><div class="lnHabs" id="lnHabs"></div></div>
+        <div class="lnEmpurra"></div>
+        <div class="lnJogo" id="lnJogo" hidden></div>
+        <button class="acao lnBuscarBt" id="lnBuscar" title="busca de novo, ignorando o que está salvo">Atualizar</button>
+        <a class="acao lnFora" id="lnYoutube" target="_blank" rel="noreferrer">YouTube</a>
+        <a class="acao lnFora" id="lnStrats" target="_blank" rel="noreferrer">strats.gg</a>
+      </div>
 
       <div class="lnPalco">
         <div id="lnAviso"></div>
         <div id="lnPlayer"></div>
-        <div class="lnMapaCx" id="lnMapaCx"></div>
-        <div id="lnResultados"></div>
+        <div class="lnDuplo">
+          <div class="lnMapaCx" id="lnMapaCx"></div>
+          <div id="lnResultados"></div>
+        </div>
       </div>
     </div>
 
@@ -4509,6 +4526,30 @@ function lnClicarPino(nome){
   lnDesenharAchadas();
 }
 
+/* O nome vem do capítulo do vídeo e quase sempre repete a rota: "A default from A Short
+ * (Crosshair)" ao lado de uma coluna que já diz "A Short → A Site". Numa linha estreita era
+ * justamente essa repetição que estourava e virava "A default from A Short (Crossh...".
+ * Corto o trecho da rota e devolvo o parêntese do fim, que costuma ser a dica que importa
+ * (Crosshair, One Way, Post Plant). */
+/* Palavras que o titulo do video repete e a propria linha ja mostra: o icone da habilidade
+ * diz qual e, entao "Incendiary" escrito ao lado dele e so largura gasta. Lista curta e de
+ * proposito — se nao casar, nao tira nada e o nome fica inteiro. */
+const LN_REDUNDANTE = /\b(?:incendiary|molly|molotov|molotof|smokes?|flash(?:es)?|stim\s*beacon|orbital\s*strike|sky\s*smoke|grenade|nade)\b/ig;
+
+function lnNomeCurto(l){
+  const par = l.nome.match(/\([^)]*\)\s*$/);
+  let n = l.nome;
+  // "Site A Defuse Prevention..." com o selo A do lado: o prefixo nao informa nada
+  if (l.site) n = n.replace(new RegExp('^\\s*site\\s+' + l.site + '\\b[\\s:.-]*', 'i'), '');
+  // "A default from A Short": a coluna da rota ja diz de onde sai e onde cai
+  if (l.posicao || l.ponto) n = n.replace(/\s+(?:from|at|@|desde|to|para|pro)\s+.+$/i, '');
+  if (l.habilidade?.icone) n = n.replace(LN_REDUNDANTE, ' ');
+  n = n.replace(/\s{2,}/g, ' ').replace(/^[\s:.-]+|[\s:.-]+$/g, '').trim();
+  if (!n) return l.nome;
+  if (par && !n.endsWith(par[0])) n += ' ' + par[0];
+  return n;
+}
+
 function lnDesenharAchadas(){
   let lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
   if (lnPosAtiva) lista = lista.filter(l => l.posicao?.nome === lnPosAtiva);
@@ -4525,9 +4566,10 @@ function lnDesenharAchadas(){
     <div class="lnLinha" onclick="lnVer(${lnAchadas.indexOf(l)})">
       <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
       ${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="" title="${esc(l.habilidade.nome)}">` : '<i class="lnHabVazia"></i>'}
-      <span class="lnNome">${esc(l.nome)}</span>
-      ${l.posicao ? `<span class="lnRota2">${esc(l.posicao.nome)} <i>→</i> ${esc(l.ponto?.nome ?? '')}</span>` : ''}
-      <span class="lnQuando">${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</span>
+      ${l.posicao ? `<span class="lnRota2">${esc(l.posicao.nome)} <i>→</i> ${esc(l.ponto?.nome ?? '')}</span>`
+        : l.ponto ? `<span class="lnRota2"><i>→</i> ${esc(l.ponto.nome)}</span>` : '<span class="lnRota2 lnSemRota">—</span>'}
+      <span class="lnNome" title="${esc(l.nome)}">${esc(lnNomeCurto(l))}</span>
+      <span class="lnQuando" title="${lnMMSS(l.segundo)} até ${lnMMSS(l.fim ?? l.segundo)}">${lnMMSS(l.segundo)}</span>
     </div>`).join('')}</div>`;
 }
 
