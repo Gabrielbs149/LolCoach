@@ -7,6 +7,7 @@ import { dirname, join } from 'node:path';
 import electronUpdater from 'electron-updater';
 import { iniciarDaemon } from '../src/daemon.js';
 import { criarServidor, criarEstado } from '../src/ui/servidor.js';
+import { situacaoDoValorant } from '../src/valorant/jogo.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 // Notificação do Windows só fora de partida e de seleção — nada de roubar
@@ -136,20 +137,32 @@ function ligarAtualizacao() {
   autoUpdater.on('update-available', (i) => estado.log(`atualização ${i.version} encontrada — baixando em segundo plano`));
   autoUpdater.on('update-not-available', () => { if (primeiraBusca) estado.log(`você está na versão mais recente (${app.getVersion()})`); primeiraBusca = false; });
   autoUpdater.on('download-progress', (p) => { if (Math.round(p.percent) % 25 === 0) estado.set('atualizacao', { baixando: Math.round(p.percent) }); });
-  autoUpdater.on('update-downloaded', (i) => {
+  autoUpdater.on('update-downloaded', async (i) => {
     baixada = i.version;
     estado.set('atualizacao', { pronta: i.version });
-    estado.log(`atualização ${i.version} pronta — instalo assim que você não estiver em fila, seleção ou partida`);
+    estado.log(`atualização ${i.version} pronta — instalo assim que você não estiver em fila, seleção ou partida (League ou Valorant)`);
     // Quem deixa o app aberto pra sempre nunca fechava e ficava preso na
     // versão velha. Instala sozinho no primeiro momento em que não atrapalha:
     // client fechado, ou em None/Lobby/EndOfGame. Nunca com o jogo rodando.
-    const tranquilo = () => faseAtual == null || ['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(faseAtual);
-    if (pedidoManual && tranquilo()) {
+    const foraDeJogoNoLol = () => faseAtual == null || ['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(faseAtual);
+    /* A trava só olhava a fase do LEAGUE. Mas instalar reinicia o app, e reiniciar com o
+     * VALORANT em partida arranca ele do jogo — que é exatamente o que não pode acontecer.
+     * Agora seleção e partida de Valorant também seguram a instalação. A checagem custa
+     * ~50 ms e só roda enquanto há atualização esperando, não o tempo todo. */
+    const valorantOcupado = async () => {
+      try {
+        const v = await situacaoDoValorant();
+        return v.estado === 'selecao' || v.estado === 'jogando';
+      } catch { return false; }          // na dúvida não trava o app na versão velha
+    };
+    const tranquilo = async () => foraDeJogoNoLol() && !(await valorantOcupado());
+
+    if (pedidoManual && await tranquilo()) {
       estado.log(`instalando a ${i.version} e reabrindo…`);
       return setTimeout(() => autoUpdater.quitAndInstall(true, true), 1500);
     }
-    const tentar = setInterval(() => {
-      if (!tranquilo()) return;
+    const tentar = setInterval(async () => {
+      if (!(await tranquilo())) return;
       clearInterval(tentar);
       estado.log(`instalando a ${i.version} e reabrindo…`);
       setTimeout(() => autoUpdater.quitAndInstall(true, true), 1500);
