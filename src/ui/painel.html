@@ -4335,7 +4335,9 @@ function lnPinos(){
 
 function lnDesenharMapa(){
   if (!lnPlanta) { $('#lnMapaCx').innerHTML = ''; return; }
-  const pinos = lnPinos();
+  // Os PINOS também se empilham: dois callouts vizinhos (A Bath e A Site, por exemplo) caem
+  // praticamente no mesmo lugar e um cobre o outro. Mesma separação do leque.
+  const pinos = lnAfastar(lnPinos(), LN_LONGE_PINO);
   // mapa sem pino nenhum confunde mais do que ajuda: diz o porquê em vez de mostrar vazio
   if (!pinos.length) {
     $('#lnMapaCx').innerHTML = `<div class="vazio">as lineups vieram sem ponto no mapa — a lista está logo abaixo</div>`;
@@ -4358,11 +4360,14 @@ function lnDesenharMapa(){
     if (!porLugar.has(k)) porLugar.set(k, { de: l.posicao, i, quantas: 0 });
     porLugar.get(k).quantas++;
   }
-  const leque = lnDesempilhar([...porLugar.values()], aberto);
+  const leque = lnDesempilhar([...porLugar.values()], aberto ? { x: aberto.dx, y: aberto.dy } : null);
 
-  // nome de canto que cai embaixo de um marcador só atrapalha
+  // Nome de canto embaixo de marcador só atrapalha — e isso vale SEMPRE, não só com um ponto
+  // aberto. Era por isso que "A Bath" aparecia duplicado: o nome do canto por baixo do
+  // retrato, mais o rótulo do próprio marcador.
+  nomes = nomes.filter(c => !pinos.some(p => Math.hypot(c.x - p.dx, c.y - p.dy) < 0.055));
   if (aberto) {
-    const ocupado = [{ x: aberto.x, y: aberto.y }, ...leque.map(x => ({ x: x.dx, y: x.dy }))];
+    const ocupado = [{ x: aberto.dx, y: aberto.dy }, ...leque.map(x => ({ x: x.dx, y: x.dy }))];
     nomes = nomes.filter(c => !ocupado.some(o => Math.hypot(c.x - o.x, c.y - o.y) < 0.055));
   }
 
@@ -4373,7 +4378,7 @@ function lnDesenharMapa(){
       ${aberto && leque.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
           ${leque.map((x, k) => {
             // a rota é um caminho de verdade pra bolinha poder correr em cima dele
-            const d = `M ${(x.dx * 100).toFixed(2)} ${(x.dy * 100).toFixed(2)} L ${(aberto.x * 100).toFixed(2)} ${(aberto.y * 100).toFixed(2)}`;
+            const d = `M ${(x.dx * 100).toFixed(2)} ${(x.dy * 100).toFixed(2)} L ${(aberto.dx * 100).toFixed(2)} ${(aberto.dy * 100).toFixed(2)}`;
             return `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
               <circle class="lnBola" data-k="${k}" r="1.7">
                 <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
@@ -4393,7 +4398,7 @@ function lnDesenharMapa(){
         </button>`).join('') : ''}
       ${pinos.map(p => `
         <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
-          style="left:${(p.x * 100).toFixed(2)}%;top:${(p.y * 100).toFixed(2)}%"
+          style="left:${(p.dx * 100).toFixed(2)}%;top:${(p.dy * 100).toFixed(2)}%"
           title="${esc(p.nome)}${p.aproximado ? ' (posição aproximada)' : ''}" onclick="lnClicarPino('${esc(p.nome)}')">
           ${p.icone ? `<img src="${esc(p.icone)}" alt="">` : `<b>${p.lista.length}</b>`}
           ${p.icone ? `<i class="lnPinoN">${p.lista.length}</i>` : ''}
@@ -4426,7 +4431,30 @@ function lnDesenharMapa(){
  * nome do lugar e a lineup continuam os mesmos, e a linha passa a terminar no retrato
  * desenhado, pra não ficar uma linha apontando pro nada.
  */
-const LN_LONGE = 0.075;        // distância mínima entre marcadores, em fração do mapa
+const LN_LONGE = 0.075;        // distância mínima entre retratos do leque
+const LN_LONGE_PINO = 0.065;   // e entre os pinos, que são um pouco menores
+
+/** Afasta uma lista de pontos entre si. Devolve cada um com `dx`/`dy` pro desenho. */
+function lnAfastar(itens, minimo){
+  const fora = itens.map(x => ({ ...x, dx: x.x, dy: x.y }));
+  for (let volta = 0; volta < 14; volta++) {
+    let mexeu = false;
+    for (let i = 0; i < fora.length; i++) for (let j = i + 1; j < fora.length; j++) {
+      const a = fora[i], b = fora[j];
+      const d = Math.hypot(a.dx - b.dx, a.dy - b.dy);
+      if (d >= minimo) continue;
+      let vx = b.dx - a.dx, vy = b.dy - a.dy, dd = d;
+      if (dd < 1e-4) { vx = Math.cos(i); vy = Math.sin(i); dd = 1; }
+      const passo = (minimo - d) / 2;
+      a.dx -= (vx / dd) * passo; a.dy -= (vy / dd) * passo;
+      b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo;
+      mexeu = true;
+    }
+    for (const p of fora) { p.dx = Math.max(0.03, Math.min(0.97, p.dx)); p.dy = Math.max(0.03, Math.min(0.97, p.dy)); }
+    if (!mexeu) break;
+  }
+  return fora;
+}
 
 function lnDesempilhar(itens, pino){
   const fora = itens.map(x => ({ ...x, dx: x.de.x, dy: x.de.y }));
