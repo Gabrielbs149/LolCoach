@@ -29,14 +29,22 @@ const LOCKFILE = () => resolve(
  * vale pro processo inteiro: enquanto estivesse ligado, qualquer outra chamada HTTPS do app
  * (Riot, YouTube) deixaria de conferir certificado.
  *
- * A segunda versão trocou aquilo por um dispatcher do pacote `undici` — e era esse o motivo
- * de a detecção NUNCA ter funcionado: `undici` não é dependência do app, o `import` falhava,
- * `pedir` devolvia null na hora e o Valorant aparecia como fechado mesmo estando aberto.
- * Testado com o jogo rodando: o import estourava com "Cannot find package 'undici'", e sem
- * agente nenhum o fetch morria em UNABLE_TO_VERIFY_LEAF_SIGNATURE.
+ * A segunda versão trocou aquilo por um dispatcher do pacote `undici`, e era aí que estava a
+ * armadilha: `undici` existe em node_modules como dependência TRANSITIVA, então em
+ * desenvolvimento o `import` funciona e tudo parece certo. Só que ele não está declarado no
+ * package.json, e o electron-builder só empacota dependência declarada — no app INSTALADO
+ * o pacote simplesmente não existe (conferido: `asar list` devolve zero linha com undici).
+ * Lá o import falhava, `pedir` devolvia null antes de qualquer requisição e o Valorant
+ * aparecia como fechado mesmo estando aberto.
  *
- * `node:https` vem junto com o Node e com o Electron, não precisa instalar nada, e o agente
- * abaixo deixa o buraco restrito a este agente — nenhuma outra chamada do app o usa.
+ * Medido com o jogo rodando, o mesmo código:
+ *   - rodando do projeto (undici resolve):  { ligado: true,  estado: null }
+ *   - no app empacotado (undici ausente):   { ligado: false }
+ * Ou seja: o bug só aparecia onde importa, e qualquer teste em desenvolvimento dizia que
+ * estava tudo bem. Por isso aqui não se usa pacote que não esteja no package.json.
+ *
+ * `node:https` vem junto com o Node e com o Electron, não precisa declarar nada, e o
+ * afrouxamento fica preso a este agente — nenhuma outra chamada do app o usa.
  */
 const agenteLocal = new AgenteHttps({ rejectUnauthorized: false, keepAlive: false });
 

@@ -689,3 +689,55 @@ test('partida do grupo: cai pro que o dono reporta', async () => {
   assert.equal(r.estado, 'jogando');
   assert.equal(r.mapa, 'Corrode');
 });
+
+/* ------------------------------------------------------------------ pacote nao declarado
+ * Esta e a rede pro bug que derrubou a deteccao do Valorant em silencio: o codigo importava
+ * `undici`, que existe em node_modules como dependencia TRANSITIVA. Em desenvolvimento o
+ * import funcionava e tudo parecia certo; mas o electron-builder so empacota dependencia
+ * DECLARADA, entao no app instalado o pacote nao existia e a funcao desistia antes de
+ * qualquer requisicao. O bug so aparecia onde importa, e nenhum teste daqui via.
+ * Agora ve. */
+test('nada em src/ e electron/ importa pacote fora do package.json', async () => {
+  const { readdir, readFile } = await import('node:fs/promises');
+  const { join, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const { builtinModules } = await import('node:module');
+
+  const raiz = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const pkg = JSON.parse(await readFile(join(raiz, 'package.json'), 'utf8'));
+  const declarados = new Set([
+    ...Object.keys(pkg.dependencies ?? {}),
+    ...Object.keys(pkg.devDependencies ?? {}),
+  ]);
+  const embutidos = new Set(builtinModules);
+
+  async function varrer(dir) {
+    const fora = [];
+    for (const e of await readdir(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
+      const caminho = join(dir, e.name);
+      if (e.isDirectory()) { fora.push(...await varrer(caminho)); continue; }
+      if (!/\.(mjs|js)$/.test(e.name)) continue;
+      fora.push([caminho, await readFile(caminho, 'utf8')]);
+    }
+    return fora;
+  }
+
+  const arquivos = [...await varrer(join(raiz, 'src')), ...await varrer(join(raiz, 'electron'))];
+  const padrao = /(?:from\s*|import\s*\(\s*)['"]([^'"]+)['"]/g;
+  const problemas = [];
+
+  for (const [caminho, texto] of arquivos) {
+    for (const m of texto.matchAll(padrao)) {
+      const alvo = m[1];
+      if (alvo.startsWith('.') || alvo.startsWith('/') || alvo.startsWith('node:')) continue;
+      // nome do pacote, lidando com escopo (@org/pacote/sub -> @org/pacote)
+      const partes = alvo.split('/');
+      const nome = alvo.startsWith('@') ? partes.slice(0, 2).join('/') : partes[0];
+      if (embutidos.has(nome) || declarados.has(nome)) continue;
+      problemas.push(`${caminho.replace(raiz, '')} importa '${alvo}'`);
+    }
+  }
+
+  assert.deepEqual(problemas, [], 'pacote usado sem estar no package.json — some no app empacotado:\n' + problemas.join('\n'));
+});
