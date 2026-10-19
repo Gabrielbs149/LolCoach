@@ -992,11 +992,16 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnFora{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;flex:1}
 .lnPalco{display:flex;flex-direction:column;gap:var(--e2);min-width:0}
 /* mapa e lista lado a lado; a lista rola por dentro em vez de esticar a pagina */
- /* Com o mapa em 400 px sobravam 307 pra lista e o nome da lineup ficava com OITENTA pixels:
-   tudo virava "A default I...". O mapa de 320 continua com os pinos de 32 px clicaveis e
-   devolve ~390 pra lista, que e onde esta a informacao que ele le. */
-.lnDuplo{display:grid;grid-template-columns:minmax(220px,320px) minmax(0,1fr);gap:12px;align-items:start}
-@media (max-width:700px){.lnDuplo{grid-template-columns:1fr}}
+ /* "eu so preciso clicar no mapa de qual eu vou usar" — entao o mapa manda, e a lista so
+   existe depois que ele escolhe um ponto. Antes eram 107 linhas plantadas na tela desde o
+   comeco: parecia um app de lista com um mapinha do lado, quando e o contrario. Sem ponto
+   escolhido: so o mapa, grande, no meio. Com ponto escolhido: mapa menor e ao lado as
+   lineups DAQUELE ponto (umas poucas), que e quando a lista ajuda em vez de atrapalhar. */
+.lnDuplo{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;justify-items:center}
+.lnDuplo:not(.comLista) #lnResultados{display:none}
+.lnDuplo:not(.comLista) .lnMapa{max-width:min(560px,calc(100vh - 250px))}
+.lnDuplo.comLista{grid-template-columns:minmax(220px,320px) minmax(0,1fr);justify-items:stretch}
+@media (max-width:700px){.lnDuplo.comLista{grid-template-columns:1fr}}
 .lnDuplo .lnLista{max-height:min(680px,calc(100vh - 224px));overflow-y:auto}
 .lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;aspect-ratio:1/1;
   background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2);transition:max-width .18s}
@@ -4323,7 +4328,7 @@ async function lnProcurar(forcar){
     $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>` + dica;
     return;
   }
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica num ponto do mapa</div>`;
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica no mapa onde a habilidade tem que cair</div>`;
   lnDesenharMapa();
   lnDesenharAchadas();
 }
@@ -4551,11 +4556,14 @@ function lnNomeCurto(l){
 }
 
 function lnDesenharAchadas(){
-  let lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
+  // sem ponto escolhido a lista nem aparece: quem escolhe e o mapa
+  const duplo = document.querySelector('.lnDuplo');
+  if (duplo) duplo.classList.toggle('comLista', !!lnPinoAtivo);
+  if (!lnPinoAtivo) { $('#lnResultados').innerHTML = ''; return; }
+
+  let lista = lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo);
   if (lnPosAtiva) lista = lista.filter(l => l.posicao?.nome === lnPosAtiva);
-  const titulo = lnPinoAtivo
-    ? `<div class="lnResumo">${lista.length}${lnPosAtiva ? ` de <b>${esc(lnPosAtiva)}</b> para` : ' em'} <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
-    : '';
+  const titulo = `<div class="lnResumo">${lista.length}${lnPosAtiva ? ` de <b>${esc(lnPosAtiva)}</b> para` : ' em'} <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">voltar pro mapa</a></div>`;
 
   /* Lista, não grade de cartões com miniatura.
    * A miniatura vinha do storyboard do YouTube, que só as instâncias de Invidious serviam —
