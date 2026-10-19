@@ -894,17 +894,21 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
 .lnResumo{color:var(--fraco);font-size:12px;margin-bottom:var(--e1)}
 .lnLista{display:flex;flex-direction:column;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden}
-.lnLinha{display:flex;align-items:center;gap:10px;padding:7px 10px;cursor:pointer;
+.lnLinha{display:flex;align-items:center;gap:9px;padding:8px 11px;cursor:pointer;
   border-top:1px solid var(--borda);font-size:12.5px}
 .lnLinha:first-child{border-top:0}
 .lnLinha:hover{background:var(--f3)}
-.lnSite{flex:0 0 30px;text-align:center;font-weight:700;font-size:11px;border-radius:4px;
+.lnSite{flex:0 0 26px;text-align:center;font-weight:700;font-size:11px;border-radius:4px;
   padding:2px 0;background:var(--f3);color:var(--fraco)}
 .lnSite.sA{color:#ff6b6b}.lnSite.sB{color:#4dabf7}.lnSite.sC{color:#9775fa}.lnSite.sMid{color:#ffd43b}
-.lnNome{flex:1;min-width:0;color:var(--forte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnHabVazia{flex:0 0 15px}
+.lnNome{flex:1 1 auto;min-width:0;color:var(--forte);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnRota2{flex:0 0 auto;color:var(--apagado);font-size:11px;white-space:nowrap;max-width:230px;
+  overflow:hidden;text-overflow:ellipsis}
+.lnRota2 i{font-style:normal;color:#49d6c0}
 .lnCanal{flex:0 0 auto;color:var(--apagado);font-size:11px;max-width:200px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
-.lnQuando{flex:0 0 44px;text-align:right;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
+.lnQuando{flex:0 0 72px;text-align:right;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
 .lnTag.lnSei{color:var(--apagado);border-style:dashed}
 .lnTocando{display:flex;gap:var(--e2);margin-bottom:var(--e2);flex-wrap:wrap}
 .lnTocando iframe{flex:1 1 440px;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;min-width:300px}
@@ -917,8 +921,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 /* ---------------------------------------------------- lineups: HUD de mapa */
 /* A barra tinha 230px e os cartões 74px de altura: ficava tudo espremido e sem hierarquia.
    Agora a barra é mais larga, os cartões têm proporção de imagem e o conteúdo respira. */
-.lnHud{display:grid;grid-template-columns:272px minmax(0,1fr);gap:18px;align-items:start}
-@media (max-width:1040px){.lnHud{grid-template-columns:1fr}}
+/* Dois corpos lado a lado ate ficar estreito de verdade. Com o corte em 1040 px, numa
+   janela de 1000 a barra ia pro topo e sobravam ~450 px vazios ao lado dela. */
+.lnHud{display:grid;grid-template-columns:248px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:820px){.lnHud{grid-template-columns:1fr}}
 /* Com um clipe aberto a barra de filtros sai da frente: numa janela de ~965 px ela comia
    272 px e sobravam 540 pro vídeo. Fechado o clipe, ela volta. */
 .lnHud.focoNoClipe{grid-template-columns:minmax(0,1fr)}
@@ -1012,9 +1018,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:var(--e2)}
 .lnCard{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);cursor:pointer}
 .lnCard:hover{border-color:var(--ouro)}
-.lnTira{position:relative;background:#000;aspect-ratio:318/180;overflow:hidden}
-.lnTira i{position:absolute;inset:0;background-repeat:no-repeat;opacity:0;transition:opacity .15s}
-.lnTira i.on{opacity:1}
 .lnQn{position:absolute;right:5px;bottom:5px;background:#000a;color:#fff;font-size:9.5px;
   padding:1px 5px;border-radius:3px;font-weight:600;opacity:0;transition:opacity .15s}
 .lnCard:hover .lnQn{opacity:1}
@@ -1073,8 +1076,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnLadoDetalhe{display:flex;flex-direction:column;gap:7px;min-width:0}
 .lnMini{position:relative;width:100%;aspect-ratio:1/1;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r2);overflow:hidden}
-.lnLinha{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.lnLinha line{stroke:#49d6c0;stroke-width:2.4;vector-effect:non-scaling-stroke;opacity:.95}
+/* o traço do mapinha. Chamava-se .lnLinha e colidia com a LINHA DA LISTA: como esta regra
+   vem depois no arquivo, toda linha da lista virava position:absolute invisivel e flutuava
+   por cima da tela. */
+.lnSvgRota{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.lnSvgRota line{stroke:#49d6c0;stroke-width:2.4;vector-effect:non-scaling-stroke;opacity:.95}
 /* as duas pontas: o retrato do agente onde você fica, o ícone da habilidade onde cai */
 .lnDe,.lnCai{position:absolute;transform:translate(-50%,-50%);border-radius:50%;
   display:flex;align-items:center;justify-content:center;overflow:hidden}
@@ -1092,11 +1098,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnDeAte i{font-style:normal;color:var(--ouro)}
 .lnDeAte small{color:var(--apagado)}
 
-.lnVistas{display:flex;gap:0;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;
-  align-self:flex-start}
-.lnVistas button{background:var(--f1);border:0;color:var(--fraco);padding:6px 14px;font-size:12px;
-  cursor:pointer;font-family:inherit}
-.lnVistas button.on{background:var(--f3);color:var(--ouro-claro)}
 .lnPixels{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:var(--e2)}
 .lnPx{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);cursor:pointer}
 .lnPx:hover{border-color:var(--ouro)}
@@ -1439,10 +1440,6 @@ h2{letter-spacing:1px}
       </aside>
 
       <div class="lnPalco">
-        <div class="lnVistas" id="lnVistas" hidden>
-          <button class="on" data-vista="mapa" onclick="lnTrocarVista('mapa')">Mapa</button>
-          <button data-vista="pixel" onclick="lnTrocarVista('pixel')">Pontos de mira</button>
-        </div>
         <div id="lnAviso"></div>
         <div id="lnPlayer"></div>
         <div class="lnMapaCx" id="lnMapaCx"></div>
@@ -4247,7 +4244,7 @@ function lnAbrirSeletor(qual){
     </div></div>`;
   m.hidden = false;
 }
-function lnFecharSeletor(){ lnFecharAlto(); }
+function lnFecharSeletor(){ const m = $('#lnModal'); if (m) { m.hidden = true; m.innerHTML = ''; } }
 function lnEscolherNoSeletor(qual, nome){
   if (qual === 'mapa') lnMapaAtual = nome; else { lnAgenteAtual = nome; lnDesenharHabs(); }
   lnFecharSeletor(); lnDesenharCartoes(); lnLinks(); lnProcurarLogo();
@@ -4285,7 +4282,7 @@ async function lnProcurar(forcar){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
   const meu = ++lnPedido;
-  lnFecharAlto(); lnEscolhido = new Map(); lnFecharClipe();
+  lnFecharClipe();
   const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
   let r;
   try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...e, forcar: '1' } : e)); }
@@ -4309,9 +4306,9 @@ async function lnProcurar(forcar){
     $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>` + dica;
     return;
   }
-  $('#lnVistas').hidden = false;
-  if (lnVista === 'pixel') { $('#lnMapaCx').innerHTML = ''; lnDesenharPixels(); }
-  else { $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica num ponto do mapa</div>`; lnDesenharMapa(); lnDesenharAchadas(); }
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica num ponto do mapa</div>`;
+  lnDesenharMapa();
+  lnDesenharAchadas();
 }
 
 /** Lineups agrupadas por ponto: cada pino traz quantas tem ali e o ícone da habilidade. */
@@ -4501,7 +4498,7 @@ function lnFocarRota(k){
 let lnPosAtiva = null;
 function lnEscolherLugar(nome, i){
   lnPosAtiva = nome;
-  if (lnVista === 'pixel') lnDesenharPixels(); else lnDesenharAchadas();
+  lnDesenharAchadas();
   lnVer(i);
 }
 
@@ -4509,40 +4506,7 @@ function lnClicarPino(nome){
   lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
   lnPosAtiva = null;
   lnDesenharMapa();
-  if (lnVista === 'pixel') lnDesenharPixels(); else lnDesenharAchadas();
-}
-
-/**
- * Os quadros do próprio vídeo naquele pedaço: é a tela do jogo, pra ele VER a lineup sem
- * abrir nada. A posição do recorte vai em PORCENTAGEM pra escalar com o cartão — a fonte
- * só tem 318x180 e prender em pixel jogaria resolução fora.
- */
-function lnTira(l){
-  // sem storyboard a capa do vídeo é o cartaz do criador, não a lineup: melhor nada que enganar
-  if (!l.quadros?.length) return `<div class="lnTira lnSemTira"><span>sem prévia — clica pra ver o clipe</span></div>`;
-  const q = l.quadros;
-  const pedaco = (x) => {
-    const px = x.cols > 1 ? (x.col / (x.cols - 1)) * 100 : 0;
-    const py = x.lins > 1 ? (x.lin / (x.lins - 1)) * 100 : 0;
-    return `background-image:url('${esc(x.url)}');background-size:${x.cols * 100}% ${x.lins * 100}%;`
-      + `background-position:${px.toFixed(3)}% ${py.toFixed(3)}%`;
-  };
-  return `<div class="lnTira">
-    ${q.map((x, i) => `<i class="${i === Math.floor(q.length / 2) ? 'on' : ''}" style="${pedaco(x)}"></i>`).join('')}
-    ${q.length > 1 ? `<b class="lnQn">${q.length} quadros</b>` : ''}
-  </div>`;
-}
-
-/** Passa os quadros enquanto o mouse está em cima; sem timer parado quando não precisa. */
-function lnPassarQuadros(tira, ligar){
-  if (!tira) return;
-  clearInterval(tira._t);
-  const qs = [...tira.querySelectorAll('i')];
-  if (!qs.length) return;
-  const meio = Math.floor(qs.length / 2);
-  if (!ligar || qs.length < 2) { qs.forEach((x, i) => x.classList.toggle('on', i === meio)); return; }
-  let i = Math.max(0, qs.findIndex(x => x.classList.contains('on')));
-  tira._t = setInterval(() => { qs[i].classList.remove('on'); i = (i + 1) % qs.length; qs[i].classList.add('on'); }, 700);
+  lnDesenharAchadas();
 }
 
 function lnDesenharAchadas(){
@@ -4551,218 +4515,20 @@ function lnDesenharAchadas(){
   const titulo = lnPinoAtivo
     ? `<div class="lnResumo">${lista.length}${lnPosAtiva ? ` de <b>${esc(lnPosAtiva)}</b> para` : ' em'} <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
     : '';
-  $('#lnResultados').innerHTML = titulo + `<div class="lnGrade">${lista.map(l => `
-    <div class="lnCard" onclick="lnVer(${lnAchadas.indexOf(l)})"
-      onmouseenter="lnPassarQuadros(this.querySelector('.lnTira'),true)"
-      onmouseleave="lnPassarQuadros(this.querySelector('.lnTira'),false)">
-      ${lnTira(l)}
-      <div class="lnCardCorpo">
-        <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="" title="${esc(l.habilidade.nome)}">` : ''}${esc(l.nome)}</div>
-        <div class="lnCardPe">
-          <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
-                    <span class="lnQuando">${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</span>
-        </div>
-      </div>
+
+  /* Lista, não grade de cartões com miniatura.
+   * A miniatura vinha do storyboard do YouTube, que só as instâncias de Invidious serviam —
+   * e elas morreram: todas devolvem vazio ou página de erro. O que sobrava era uma parede de
+   * 107 retângulos cinzas dizendo "sem prévia", pior do que não ter imagem. Em lista cabe
+   * mais lineup na tela, dá pra ler o nome inteiro e a rota de onde sai até onde cai. */
+  $('#lnResultados').innerHTML = titulo + `<div class="lnLista">${lista.map(l => `
+    <div class="lnLinha" onclick="lnVer(${lnAchadas.indexOf(l)})">
+      <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
+      ${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="" title="${esc(l.habilidade.nome)}">` : '<i class="lnHabVazia"></i>'}
+      <span class="lnNome">${esc(l.nome)}</span>
+      ${l.posicao ? `<span class="lnRota2">${esc(l.posicao.nome)} <i>→</i> ${esc(l.ponto?.nome ?? '')}</span>` : ''}
+      <span class="lnQuando">${lnMMSS(l.segundo)}–${lnMMSS(l.fim ?? l.segundo)}</span>
     </div>`).join('')}</div>`;
-}
-
-/* ---------------------------------------------------------------- a tela do pixel
- * Uma tela só com o quadro da mira de cada lineup.
- *
- * Escolher o quadro por tempo ("70% do clipe") não funcionou: caía na vinheta do vídeo ou
- * na webcam do criador. Agora é pelo CONTEÚDO. O HUD do Valorant fica na faixa de baixo e
- * é praticamente igual em todo quadro de jogo; vinheta e webcam não têm HUD. Então a gente
- * tira a assinatura da faixa de baixo de todos os quadros do vídeo, pega a MEDIANA (que é o
- * HUD, porque a maioria dos quadros é jogo) e, dentro do pedaço da lineup, fica com o
- * quadro mais parecido com ela — preferindo o mais tarde, que é quando a mira já está posta.
- *
- * Os pixels são lidos num canvas, e pra isso a folha passa pelo servidor local: o
- * i.ytimg.com não manda CORS e o canvas ficaria contaminado. */
-let lnVista = 'mapa';
-const lnFolhas = new Map();      // url -> Promise<ctx de canvas>
-const lnAssinaturas = new Map(); // url|x|y -> Float64Array
-let lnEscolhido = new Map();     // índice da lineup -> quadro escolhido
-let lnAltoAtual = null;          // o único player em alta, sob demanda
-
-const LN_GRADE = 8;            // assinatura do quadro: 8x8 em cinza
-
-/** Carrega a folha de quadros pelo servidor local, pra poder ler os pixels. */
-function lnFolha(url){
-  if (lnFolhas.has(url)) return lnFolhas.get(url);
-  const p = new Promise((ok) => {
-    const im = new Image();
-    im.onload = () => {
-      const c = document.createElement('canvas');
-      c.width = im.naturalWidth; c.height = im.naturalHeight;
-      const ctx = c.getContext('2d', { willReadFrequently: true });
-      ctx.drawImage(im, 0, 0);
-      ok(ctx);
-    };
-    im.onerror = () => ok(null);
-    im.src = '/api/val/quadro?u=' + encodeURIComponent(url);
-  });
-  lnFolhas.set(url, p);
-  return p;
-}
-
-/** A cara do quadro inteiro, em cinza e sem o brilho geral (8x8 = 64 números). */
-async function lnAssinatura(q){
-  const chave = `${q.url}|${q.x}|${q.y}`;
-  if (lnAssinaturas.has(chave)) return lnAssinaturas.get(chave);
-  const ctx = await lnFolha(q.url);
-  if (!ctx) return null;
-  let dados; try { dados = ctx.getImageData(q.x, q.y, q.w, q.h).data; } catch { return null; }
-  const n = LN_GRADE, fora = new Float64Array(n * n);
-  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-    let soma = 0, k = 0;
-    const xa = Math.floor((i * q.w) / n), xb = Math.floor(((i + 1) * q.w) / n);
-    const ya = Math.floor((j * q.h) / n), yb = Math.floor(((j + 1) * q.h) / n);
-    for (let y = ya; y < yb; y++) for (let x = xa; x < xb; x++) {
-      const o = (y * q.w + x) * 4;
-      soma += (dados[o] * 299 + dados[o + 1] * 587 + dados[o + 2] * 114) / 1000; k++;
-    }
-    fora[j * n + i] = k ? soma / k : 0;
-  }
-  // tira o brilho médio: o que importa é o desenho, não se o quadro está claro ou escuro
-  let m = 0; for (const v of fora) m += v; m /= fora.length;
-  for (let i = 0; i < fora.length; i++) fora[i] -= m;
-  lnAssinaturas.set(chave, fora);
-  return fora;
-}
-
-const lnDistancia = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += Math.abs(a[i] - b[i]); return s / a.length; };
-// Medido nas folhas reais: duplicata exata dá 0, quase-igual dá ~15 e jogo diferente passa
-// de 22. 10 pega a vinheta repetida sem juntar cena de jogo que só se parece.
-const LN_IGUAL = 10;
-
-/**
- * Qual quadro de cada lineup mostra o JOGO.
- *
- * Escolher por tempo ("70% do clipe") não funcionou, e comparar com a mediana do vídeo
- * também não: tem criador que põe uma vinheta no começo de CADA lineup, e aí a vinheta vira
- * a maioria e a mediana passa a ser ela.
- *
- * O sinal que vale não depende de maioria: a vinheta é a MESMA IMAGEM em lineups
- * diferentes, e jogo nunca é. Então: quadro que se repete quase igual em 3+ lineups do
- * mesmo vídeo é enfeite, e fica fora. Dos que sobram, vale o mais tarde — é quando a mira
- * já está posta.
- */
-async function lnEscolherQuadros(){
-  lnEscolhido = new Map();
-  const porVideo = new Map();
-  for (let i = 0; i < lnAchadas.length; i++) {
-    const l = lnAchadas[i];
-    if (!l.quadros?.length) continue;
-    if (!porVideo.has(l.video)) porVideo.set(l.video, []);
-    porVideo.get(l.video).push({ i, l });
-  }
-
-  for (const [, itens] of porVideo) {
-    // assinatura de todo quadro do vídeo
-    const assinatura = new Map();
-    for (const { l } of itens) for (const q of l.quadros) {
-      const a = await lnAssinatura(q);
-      if (a) assinatura.set(q, a);
-    }
-    // grupos de quadros parecidos, contando em quantas LINEUPS diferentes cada grupo aparece
-    const grupos = [];
-    for (const { i, l } of itens) for (const q of l.quadros) {
-      const a = assinatura.get(q); if (!a) continue;
-      const g = grupos.find((x) => lnDistancia(x.ref, a) < LN_IGUAL);
-      if (g) g.lineups.add(i); else grupos.push({ ref: a, lineups: new Set([i]) });
-    }
-    const enfeite = (q) => {
-      const a = assinatura.get(q); if (!a) return false;
-      const g = grupos.find((x) => lnDistancia(x.ref, a) < LN_IGUAL);
-      return !!g && g.lineups.size >= 3;
-    };
-    for (const { i, l } of itens) {
-      const bons = l.quadros.filter((q) => !enfeite(q));
-      lnEscolhido.set(i, (bons.length ? bons : l.quadros)[Math.max(0, (bons.length ? bons : l.quadros).length - 1)]);
-    }
-  }
-}
-
-function lnTrocarVista(v){
-  lnVista = v;
-  for (const b of document.querySelectorAll('#lnVistas button')) b.classList.toggle('on', b.dataset.vista === v);
-  lnFecharAlto();
-  if (v === 'mapa') { lnDesenharMapa(); lnDesenharAchadas(); }
-  else { $('#lnMapaCx').innerHTML = ''; lnDesenharPixels(); }
-}
-
-const lnEstiloQuadro = (q) => {
-  const px = q.cols > 1 ? (q.col / (q.cols - 1)) * 100 : 0;
-  const py = q.lins > 1 ? (q.lin / (q.lins - 1)) * 100 : 0;
-  return `background-image:url('${esc(q.url)}');background-size:${q.cols * 100}% ${q.lins * 100}%;`
-    + `background-position:${px.toFixed(3)}% ${py.toFixed(3)}%`;
-};
-
-async function lnDesenharPixels(){
-  const lista = lnPinoAtivo ? lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo) : lnAchadas;
-  const topo = lnPinoAtivo
-    ? `<div class="lnResumo">${lista.length} em <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">ver todas</a></div>`
-    : `<div class="lnResumo">${lista.length} pontos de mira · clica num pra ver em alta</div>`;
-  const pintar = () => {
-    $('#lnResultados').innerHTML = topo + `<div class="lnPixels">${lista.map(l => {
-      const i = lnAchadas.indexOf(l);
-      const q = lnEscolhido.get(i) ?? l.quadros?.[l.quadros.length - 1];
-      return `<div class="lnPx" data-i="${i}" onclick="lnVer(${i})">
-        <div class="lnPxImg${q ? '' : ' lnPxSemQuadro'}" data-i="${i}">
-          ${q ? `<i style="${lnEstiloQuadro(q)}"></i>` : `<span class="lnPxNada">o YouTube não gera prévia desse vídeo<b>clica pra ver o clipe</b></span>`}
-          <span class="lnPxMira"></span>
-          <b class="lnPxLupa" onclick="event.stopPropagation();lnVerAlto(${i})" title="só o quadro parado, em alta">quadro em alta</b>
-        </div>
-        <div class="lnPxPe">
-          <div class="lnNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
-          <div class="lnPxBotoes">
-            <span class="lnTagP">${esc(l.ponto?.nome ?? '—')}</span>          </div>
-        </div>
-      </div>`;
-    }).join('')}</div>`;
-  };
-  pintar();                                   // na hora, com o que já tem
-  if (!lnEscolhido.size) { await lnEscolherQuadros(); if (lnVista === 'pixel') pintar(); }
-}
-
-/* -------------------------------------------------- o quadro em alta, um de cada vez */
-
-/** Em alta só o que ele pediu: player pausado no segundo do quadro, por cima da grade. */
-async function lnVerAlto(i){
-  const l = lnAchadas[i]; if (!l) return;
-  const q = lnEscolhido.get(i);
-  const seg = q ? Math.round((q.de + q.ate) / 2) : Math.round(l.segundo + ((l.fim ?? l.segundo + 12) - l.segundo) * 0.7);
-  $('#lnModal').innerHTML = `<div class="lnModalCx lnAltoCx">
-    <div class="lnModalTopo"><b>${esc(l.nome)}</b><button class="lnX" onclick="lnFecharAlto()">✕</button></div>
-    <div class="lnAltoVideo"><div id="lnAltoYT"></div><span class="lnPxMira grande"></span></div>
-    <div class="lnAltoPe">
-      <button class="acao" onclick="lnAltoPasso(-0.3)">−0,3s</button>
-      <button class="acao" onclick="lnAltoPasso(0.3)">+0,3s</button>
-      <span class="lnCanal">${esc(l.ponto?.nome ?? '')} · ${esc(l.canal)}</span>
-      <button class="acao" style="margin-left:auto" onclick="lnFecharAlto();lnVer(${i})">ver o clipe</button>
-    </div>
-  </div>`;
-  $('#lnModal').hidden = false;
-  await lnApiYT();
-  if ($('#lnModal').hidden) return;
-  lnAltoAtual = new YT.Player('lnAltoYT', {
-    videoId: l.video,
-    playerVars: { start: seg, autoplay: 1, mute: 1, controls: 0, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1 },
-    events: {
-      onReady: (e) => { lnForcarAlta(e.target); lnVigiarTamanho($('.lnAltoVideo')); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 500); },
-      onStateChange: (e) => { if (e.data === YT.PlayerState.PLAYING) { lnForcarAlta(e.target); setTimeout(() => { try { e.target.pauseVideo(); } catch {} }, 400); } },
-    },
-  });
-}
-function lnAltoPasso(d){
-  if (!lnAltoAtual?.getCurrentTime) return;
-  lnAltoAtual.seekTo(lnAltoAtual.getCurrentTime() + d, true);
-  setTimeout(() => { try { lnAltoAtual.pauseVideo(); } catch {} }, 350);
-}
-function lnFecharAlto(){
-  try { lnAltoAtual?.destroy?.(); } catch {}
-  lnAltoAtual = null;
-  const m = $('#lnModal'); if (m) { m.hidden = true; m.innerHTML = ''; }
 }
 
 /* ---------------------------------------------------------------- o clipe e o mapa
@@ -4860,7 +4626,7 @@ function lnMapinha(l){
 
   return `<div class="lnMini" style="${fundo}">
     ${nomes.map(c => { const q = onde(c); return `<span class="lnCallout" style="left:${q.x.toFixed(2)}%;top:${q.y.toFixed(2)}%">${esc(c.nome)}</span>`; }).join('')}
-    ${pa ? `<svg class="lnLinha" viewBox="0 0 100 100" preserveAspectRatio="none">
+    ${pa ? `<svg class="lnSvgRota" viewBox="0 0 100 100" preserveAspectRatio="none">
             <line x1="${pa.x.toFixed(2)}" y1="${pa.y.toFixed(2)}" x2="${pb.x.toFixed(2)}" y2="${pb.y.toFixed(2)}" />
           </svg>` : ''}
     ${meio ? `<span class="lnMeio" style="left:${meio.x.toFixed(2)}%;top:${meio.y.toFixed(2)}%"></span>` : ''}
@@ -4957,7 +4723,7 @@ async function lnSalvarAtual(botao, i){
     video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
     mapa: lnMapaAtual, agente: lnAgenteAtual,
     habilidade: l.habilidade?.nome ?? '', lado: lnLadoAtual,
-    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '', mira: (() => { const q = lnEscolhido.get(i); return q ? Math.round((q.de + q.ate) / 2) : null; })(),
+    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '',
   };
   botao.disabled = true; botao.textContent = 'salvando…';
   try {
