@@ -1006,7 +1006,9 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    virava 560x530 em vez de 560x613 e a arte do mapa esticava. O teto tem que ser de
    LARGURA, ja descontando a altura disponivel pela proporcao do recorte (--ar). */
 .lnDuplo:not(.comLista) .lnMapa{max-width:min(560px, calc((100vh - 250px) * var(--ar, 1)))}
-.lnDuplo.comLista{grid-template-columns:minmax(220px,320px) minmax(0,1fr)}
+ /* Com o ponto aberto o mapa caia pra 320 px fixos, virando um selo numa janela larga —
+   e e no mapa que ele escolhe. Agora o mapa fica com a sobra e a lista e que tem teto. */
+.lnDuplo.comLista{grid-template-columns:minmax(300px,1fr) minmax(250px,380px)}
 @media (max-width:700px){.lnDuplo.comLista{grid-template-columns:1fr}}
 .lnDuplo .lnLista{max-height:min(680px,calc(100vh - 224px));overflow-y:auto}
  /* sem aspect-ratio fixo: a proporcao agora vem do recorte, inline, por mapa */
@@ -1033,6 +1035,16 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnRota.apagado,.lnBola.apagado{opacity:.08}
 .lnDeMapa.apagado{opacity:.3}
 .lnMapa.comFoco .lnCallout{opacity:.35}
+ /* a lineup como marcador, pra quando nao existe "de onde jogar" */
+.lnTiro{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;
+  border:2px solid var(--ouro);background:#11161fee;padding:0;cursor:pointer;z-index:4;
+  display:flex;align-items:center;justify-content:center;font-family:inherit;color:var(--ouro-claro);
+  font-size:11px;font-weight:700;box-shadow:0 0 8px #0008;transition:transform .1s}
+.lnTiro img{width:18px;height:18px;object-fit:contain;filter:brightness(1.35)}
+.lnTiro:hover{transform:translate(-50%,-50%) scale(1.25);z-index:7;border-color:#49d6c0}
+.lnTiro .lnDeNome{opacity:0;transition:opacity .12s}
+.lnTiro:hover .lnDeNome{opacity:1}
+
 .lnDeMapa{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;
   border:2px solid #49d6c0;background:#11161f;padding:0;cursor:pointer;overflow:visible;z-index:3;
   box-shadow:0 0 9px #49d6c055;transition:transform .1s}
@@ -4479,7 +4491,26 @@ function lnDesenharMapa(){
     nomes = nomes.filter(c => !ocupado.some(o => Math.hypot(c.x - o.x, c.y - o.y) < 0.055));
   }
 
+  /* Quando NENHUM título diz de onde se joga, o leque fica vazio e o mapa não oferece nada
+   * pra clicar — sobrava a lista, que é justo o que ele não quer. E isso não é defeito de
+   * parsing: no Breeze, por exemplo, o pessoal escreve "from cave" e a Riot não publica
+   * callout nenhum chamado Cave (medido: 57 de 58 lineups de Fade ficam sem posição).
+   * Então as PRÓPRIAS lineups viram marcadores em volta do ponto: continua sendo clicar
+   * no mapa pra escolher, que é o que ele pediu. */
   const rec = lnJanelaDoMapa();
+  const anel = (aberto && !leque.length)
+    ? (aberto.lista ?? []).slice(0, 12).map((l, k, todas) => {
+        const ang = (-Math.PI / 2) + (k / todas.length) * Math.PI * 2;
+        const p = {
+          l, k, i: lnAchadas.indexOf(l),
+          dx: aberto.dx + Math.cos(ang) * rec.lx * 0.135,
+          dy: aberto.dy + Math.sin(ang) * rec.ly * 0.135,
+        };
+        lnPrender(p);
+        return p;
+      })
+    : [];
+
   const RX = (x) => (((x - rec.x0) / rec.lx) * 100).toFixed(2);
   const RY = (y) => (((y - rec.y0) / rec.ly) * 100).toFixed(2);
 
@@ -4508,6 +4539,15 @@ function lnDesenharMapa(){
           ${x.quantas > 1 ? `<i class="lnDeN">${x.quantas}</i>` : ''}
           <span class="lnDeNome">${esc(x.de.nome)}</span>
         </button>`).join('') : ''}
+      ${anel.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
+          ${anel.map((x) => `<path class="lnRota" d="M ${RX(x.dx)} ${RY(x.dy)} L ${RX(aberto.dx)} ${RY(aberto.dy)}" />`).join('')}
+        </svg>` : ''}
+      ${anel.map((x) => `
+        <button class="lnTiro" style="left:${RX(x.dx)}%;top:${RY(x.dy)}%"
+          title="${esc(x.l.nome)}" onclick="event.stopPropagation();lnVer(${x.i})">
+          ${x.l.habilidade?.icone ? `<img src="${esc(x.l.habilidade.icone)}" alt="">` : `<b>${x.k + 1}</b>`}
+          <span class="lnDeNome">${esc(lnNomeCurto(x.l))}</span>
+        </button>`).join('')}
       ${pinos.map(p => `
         <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
           style="left:${RX(p.dx)}%;top:${RY(p.dy)}%"
@@ -4520,7 +4560,9 @@ function lnDesenharMapa(){
     </div>
     ${aberto ? `<div class="lnLequeNota">${leque.length
       ? `${leque.length} lugar${leque.length > 1 ? 'es' : ''} de onde jogar — clica num retrato`
-      : 'nenhum título diz de onde se joga essa; a lista está abaixo'}</div>` : ''}`;
+      : anel.length
+        ? `${anel.length} lineup${anel.length > 1 ? 's' : ''} aqui — clica numa`
+        : 'nenhuma lineup com ponto aqui'}</div>` : ''}`;
 }
 
 /**
