@@ -4197,6 +4197,7 @@ async function carregarConquistas(){
  * Nada aqui encosta no Valorant. Sem leitura de memória e sem desenhar por cima do jogo —
  * o Vanguard é anticheat de kernel e trata sobreposição como trapaça. */
 let lnCatalogo = null, lnMinhasLista = [], lnAchadas = [], lnPlanta = null, lnCallouts = [];
+let lnTodas = [];        // tudo que a busca trouxe, antes do filtro e da deduplicação
 let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
@@ -4253,7 +4254,27 @@ function lnDesenharHabs(){
     + habs.map(h => `<button class="lnHab ${lnHabAtual === h.busca ? 'on' : ''}" onclick="lnEscolherHab('${esc(h.busca)}')" title="${esc(h.nome)}">
         ${h.icone ? `<img src="${esc(h.icone)}" alt="">` : ''}<span>${esc(h.nome)}</span></button>`).join('');
 }
-function lnEscolherHab(v){ lnHabAtual = v; lnDesenharHabs(); lnLinks(); lnProcurarLogo(); }
+/* Trocar de habilidade NÃO refaz a busca: filtra o que já está carregado, instantâneo. */
+function lnEscolherHab(v){
+  lnHabAtual = v;
+  lnDesenharHabs(); lnLinks();
+  if (!lnTodas.length) return lnProcurarLogo();      // nada carregado ainda: aí sim procura
+  lnPinoAtivo = null; lnPosAtiva = null;
+  lnFiltrarEDedupar();
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  lnDesenharMapa(); lnDesenharAchadas();
+}
+
+/** "18 caminhos de 107 lineups" — deixa claro que a deduplicação escondeu repetição. */
+function lnQuantas(){
+  const n = lnAchadas.length, total = lnTodas.length;
+  const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
+  const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
+  const quais = hab ? ` de ${esc(hab.nome)}` : '';
+  return n === total
+    ? `${n} lineup${n === 1 ? '' : 's'}${quais}`
+    : `${n} caminho${n === 1 ? '' : 's'}${quais} · ${total} lineups no total`;
+}
 
 /* ---------------------------------------------------------------- seletores em grade */
 
@@ -4321,7 +4342,9 @@ async function lnProcurar(forcar){
   if (meu !== lnPedido) return;           // ele já trocou de agente: esse resultado é velho
   $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = ''; $('#lnResultados').innerHTML = '';
 
-  lnAchadas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnCallouts = r.callouts ?? []; lnPinoAtivo = null;
+  lnTodas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnCallouts = r.callouts ?? []; lnPinoAtivo = null;
+  lnPosAtiva = null;
+  lnFiltrarEDedupar();
   if (!lnAchadas.length) {
     $('#lnMapaCx').innerHTML = '';
     const porque = r.semCapitulo
@@ -4336,7 +4359,7 @@ async function lnProcurar(forcar){
     $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>` + dica;
     return;
   }
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${esc(r.resumo)} · clica no mapa onde a habilidade tem que cair</div>`;
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
   lnDesenharMapa();
   lnDesenharAchadas();
 }
@@ -4365,6 +4388,38 @@ function lnJanelaDoMapa(){
   const lx = x1 - x0, ly = y1 - y0;
   if (!(lx > 0.1) || !(ly > 0.1)) return { x0: 0, y0: 0, lx: 1, ly: 1 };
   return { x0, y0, lx, ly };
+}
+
+/**
+ * O que de fato vai pro mapa: filtra pela habilidade e deixa UMA por caminho.
+ *
+ * Filtro: antes, clicar numa habilidade chamava lnProcurarLogo(), ou seja REFAZIA a busca no
+ * YouTube com a habilidade no termo. Medido com Brimstone no Bind: a busca trazia 107
+ * lineups, 78 delas de Incendiário; clicar em "Incendiário" devolvia 17 — jogava fora 61 que
+ * já estavam na mão, e ainda demorava segundos. Agora filtra o que já tem, na hora.
+ *
+ * Deduplicação: o A Site tinha 58 lineups e só o A Lobby mandava 23. Ele não precisa de 23
+ * jeitos de fazer a mesma coisa — precisa de um. Agrupo por (de onde → onde cai →
+ * habilidade) e guardo as outras em `outras`, pra nada sumir de vez.
+ */
+function lnFiltrarEDedupar(){
+  const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
+  const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
+  const base = hab ? lnTodas.filter(l => l.habilidade?.nome === hab.nome) : lnTodas;
+
+  const por = new Map();
+  for (const l of base) {
+    const k = `${l.posicao?.nome ?? '?'}>${l.ponto?.nome ?? '?'}>${l.habilidade?.nome ?? '?'}`;
+    if (!por.has(k)) por.set(k, []);
+    por.get(k).push(l);
+  }
+  // a melhor do grupo: ponto certo vale mais que ponto chutado, ter posição vale, e entre
+  // iguais fica a que aparece primeiro no vídeo (costuma ser a versão canônica)
+  const nota = (l) => (l.ponto && !l.ponto.aproximado ? 4 : 0) + (l.posicao ? 2 : 0) + (l.fim > l.segundo ? 1 : 0);
+  lnAchadas = [...por.values()].map((g) => {
+    g.sort((a, b) => nota(b) - nota(a) || a.segundo - b.segundo);
+    return { ...g[0], outras: g.slice(1) };
+  });
 }
 
 function lnPinos(){
@@ -4412,7 +4467,8 @@ function lnDesenharMapa(){
     if (!porLugar.has(k)) porLugar.set(k, { de: l.posicao, i, quantas: 0 });
     porLugar.get(k).quantas++;
   }
-  const leque = lnDesempilhar([...porLugar.values()], aberto ? { x: aberto.dx, y: aberto.dy } : null);
+  const leque = lnDesempilhar([...porLugar.values()], aberto ? { x: aberto.dx, y: aberto.dy } : null,
+    pinos.filter(p => p.nome !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })));
 
   // Nome de canto embaixo de marcador só atrapalha — e isso vale SEMPRE, não só com um ponto
   // aberto. Era por isso que "A Bath" aparecia duplicado: o nome do canto por baixo do
@@ -4491,6 +4547,17 @@ const LN_LONGE = 0.075;        // distância mínima entre retratos do leque
 const LN_LONGE_PINO = 0.065;   // e entre os pinos, que são um pouco menores
 
 /** Afasta uma lista de pontos entre si. Devolve cada um com `dx`/`dy` pro desenho. */
+/* O limite do que é "dentro do mapa" não é mais 0..1: desde que a arte passou a ser
+ * recortada pela caixa dos callouts, o que aparece é só a janela do recorte. Prender um
+ * marcador em 0.03 cru deixava ele FORA da caixa (o x0 do Bind é 0.105) e o overflow
+ * cortava — era a "lineup fora do mapa". Agora o limite é a janela, com uma folga. */
+function lnPrender(p){
+  const r = lnJanelaDoMapa();
+  const ix = r.lx * 0.045, iy = r.ly * 0.045;
+  p.dx = Math.max(r.x0 + ix, Math.min(r.x0 + r.lx - ix, p.dx));
+  p.dy = Math.max(r.y0 + iy, Math.min(r.y0 + r.ly - iy, p.dy));
+}
+
 function lnAfastar(itens, minimo){
   const fora = itens.map(x => ({ ...x, dx: x.x, dy: x.y }));
   for (let volta = 0; volta < 14; volta++) {
@@ -4506,13 +4573,13 @@ function lnAfastar(itens, minimo){
       b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo;
       mexeu = true;
     }
-    for (const p of fora) { p.dx = Math.max(0.03, Math.min(0.97, p.dx)); p.dy = Math.max(0.03, Math.min(0.97, p.dy)); }
+    for (const p of fora) lnPrender(p);
     if (!mexeu) break;
   }
   return fora;
 }
 
-function lnDesempilhar(itens, pino){
+function lnDesempilhar(itens, pino, obstaculos = []){
   const fora = itens.map(x => ({ ...x, dx: x.de.x, dy: x.de.y }));
   const empurrar = (p, ax, ay, minimo) => {
     let vx = p.dx - ax, vy = p.dy - ay;
@@ -4526,6 +4593,11 @@ function lnDesempilhar(itens, pino){
   for (let volta = 0; volta < 14; volta++) {
     let mexeu = false;
     for (const p of fora) if (pino && empurrar(p, pino.x, pino.y, LN_LONGE)) mexeu = true;
+    /* E também longe dos OUTROS pinos. Sem isto o retrato do leque caía exatamente em cima
+     * do pino do mesmo lugar (A Short, A Lobby, A Link, A Bath, B Site), e como .lnDeMapa
+     * tem z-index 3 e o pino não tem, o retrato roubava o clique e o pino embaixo ficava
+     * inclicável. Medido: 5 de 15 marcadores com o clique roubado. */
+    for (const p of fora) for (const o of obstaculos) if (empurrar(p, o.x, o.y, LN_LONGE_PINO)) mexeu = true;
     for (let i = 0; i < fora.length; i++) for (let j = i + 1; j < fora.length; j++) {
       const a = fora[i], b = fora[j];
       const d = Math.hypot(a.dx - b.dx, a.dy - b.dy);
@@ -4538,8 +4610,8 @@ function lnDesempilhar(itens, pino){
       b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo;
       mexeu = true;
     }
-    // sem sair do mapa
-    for (const p of fora) { p.dx = Math.max(0.03, Math.min(0.97, p.dx)); p.dy = Math.max(0.03, Math.min(0.97, p.dy)); }
+    // sem sair da janela do recorte
+    for (const p of fora) lnPrender(p);
     if (!mexeu) break;
   }
   return fora;
@@ -4939,6 +5011,23 @@ abrirAba = function(nome){
   }
 };
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => abrirAba(b.dataset.aba));
+
+/* Abrir ja numa aba (#lineups): e assim que a janela da segunda tela nasce direto nas
+ * lineups quando a partida de Valorant comeca.
+ *
+ * Roda num setTimeout(0) de proposito. Chamando direto aqui a aba abria mas os CARREGADORES
+ * nao disparavam, e a tela ficava vazia -- exatamente o que nao pode acontecer no meio de
+ * uma partida. Com o timeout isso cai DEPOIS de todo o resto do carregamento, inclusive de
+ * qualquer abrirAba() padrao, e ai o wrapper ja esta no lugar e a busca acontece. O erro vai
+ * pro console em vez de ser engolido: foi um catch vazio que escondeu isso de mim. */
+function lnAbrirPelaHash(){
+  try {
+    const pedida = (location.hash || '').replace('#', '');
+    if (pedida && document.getElementById(pedida)) abrirAba(pedida);
+  } catch (e) { console.error('abrir pela hash', e); }
+}
+addEventListener('hashchange', lnAbrirPelaHash);
+setTimeout(lnAbrirPelaHash, 0);
 
 /** Nome e id de campeão ficam disponíveis pra todas as telas de uma vez. */
 async function carregarCampeoes(){

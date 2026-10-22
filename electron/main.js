@@ -275,6 +275,57 @@ function segundaTela() {
  * na segunda tela, ocupando ela inteira. Nunca rouba o foco: showInactive.
  * Com um monitor só, abre do lado, pequena, também sem foco.
  */
+/* ------------------------------------------------------------------ lineups do Valorant
+ * Quando a partida comeca, as lineups aparecem sozinhas na SEGUNDA tela, ja na aba certa.
+ *
+ * Duas regras que nao se negociam aqui:
+ *  - so abre se existir segunda tela. Com um monitor so, a janela cairia por cima do jogo,
+ *    e por cima do Valorant nao se desenha nada: o Vanguard e anticheat de kernel e trata
+ *    sobreposicao como trapaca. Sem segunda tela, nao faz nada.
+ *  - nunca show() nem focus(): so showInactive(), senao o Valorant em tela cheia minimiza.
+ *    E a mesma regra de ouro que vale pro League.
+ */
+let janelaLineups = null;
+function abrirLineups() {
+  const tela = segundaTela();
+  if (!tela) return;
+  if (janelaLineups && !janelaLineups.isDestroyed()) {
+    if (!janelaLineups.isVisible()) janelaLineups.showInactive();
+    return;
+  }
+  janelaLineups = new BrowserWindow({
+    x: tela.workArea.x, y: tela.workArea.y, width: tela.workArea.width, height: tela.workArea.height,
+    icon: join(AQUI, 'icone.png'), backgroundColor: '#080b11', title: 'LolCoach — lineups',
+    autoHideMenuBar: true, show: false,
+    webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
+  });
+  janelaLineups.loadURL(endereco ? `${endereco}/#lineups` : PAGINA_DE_ERRO('o painel local não subiu.'));
+  janelaLineups.once('ready-to-show', () => {
+    if (janelaLineups?.isDestroyed()) return;
+    posicionarNaTela(janelaLineups, tela);
+    janelaLineups.showInactive();
+  });
+  janelaLineups.on('closed', () => { janelaLineups = null; });
+}
+function fecharLineups() {
+  if (janelaLineups && !janelaLineups.isDestroyed()) janelaLineups.close();
+}
+
+/* O Valorant nao tem API de fase como o League: o estado vem da presenca do cliente da Riot,
+ * lida a cada 6 s. E uma chamada local (medida em ~55 ms) e so muda de verdade quando ele
+ * entra ou sai de partida. */
+let valEstado = null;
+function olharValorant() {
+  situacaoDoValorant().then((v) => {
+    const antes = valEstado;
+    valEstado = v?.estado ?? null;
+    if (antes === valEstado) return;
+    const emPartida = (e) => e === 'selecao' || e === 'jogando';
+    if (emPartida(valEstado)) { estado.log(`Valorant ${valEstado}: abrindo as lineups na segunda tela`); abrirLineups(); }
+    else if (emPartida(antes)) fecharLineups();
+  }).catch(() => {});
+}
+
 function abrirVivo({ focar = true } = {}) {
   const tela = segundaTela();
   if (janelaVivo && !janelaVivo.isDestroyed()) {
@@ -568,6 +619,7 @@ app.whenReady().then(async () => {
         if (antes === 'InProgress' && fase !== 'InProgress' && app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
       },
     });
+    setInterval(olharValorant, 6000);
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
       acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, diagnostico, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },

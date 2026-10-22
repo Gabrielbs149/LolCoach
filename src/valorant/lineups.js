@@ -154,7 +154,13 @@ export function pontoDaLineup(nome, callouts = [], site = null) {
   const soRegiao = callouts.filter((c) => contem(c.regiao)).sort((a, b) => b.regiao.length - a.regiao.length);
   const noSite = site ? soRegiao.find((c) => c.site === site) : null;
   if (noSite) return noSite;
-  if (soRegiao.length === 1) return soRegiao[0];
+  /* Este atalho mandava lineup pro lado errado do mapa. "B Default B Lobby" tem site B, mas
+   * o Bind não tem callout "B Lobby" — só "A Lobby". A região "Lobby" casava, dava UM
+   * resultado, e o atalho devolvia o A Lobby, do outro lado do mapa. Quando a lineup já diz
+   * de que site ela é, um casamento de OUTRO site não serve: é melhor cair no centro do
+   * site certo (passo 3) do que fincar no lugar errado. */
+  const soUm = soRegiao.length === 1 ? soRegiao[0] : null;
+  if (soUm && !(site && soUm.site && soUm.site !== site)) return soUm;
   // 3. nada de específico: o centro do site, se a gente souber qual é
   if (site) {
     const doSite = callouts.filter((c) => c.site === site);
