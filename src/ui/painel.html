@@ -997,18 +997,26 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    comeco: parecia um app de lista com um mapinha do lado, quando e o contrario. Sem ponto
    escolhido: so o mapa, grande, no meio. Com ponto escolhido: mapa menor e ao lado as
    lineups DAQUELE ponto (umas poucas), que e quando a lista ajuda em vez de atrapalhar. */
-.lnDuplo{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start;justify-items:center}
+ /* nada de justify-items:center aqui: com a imagem do mapa em position:absolute o
+   container fica sem conteudo em fluxo, a coluna encolhe pra zero e o width:100% da caixa
+   vira 2 px de borda. A coluna estica e quem centraliza e o margin:0 auto da .lnMapa. */
+.lnDuplo{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
 .lnDuplo:not(.comLista) #lnResultados{display:none}
-.lnDuplo:not(.comLista) .lnMapa{max-width:min(560px,calc(100vh - 250px))}
-.lnDuplo.comLista{grid-template-columns:minmax(220px,320px) minmax(0,1fr);justify-items:stretch}
+ /* max-height sozinho corta a ALTURA sem mexer na largura, e a proporcao quebra: a caixa
+   virava 560x530 em vez de 560x613 e a arte do mapa esticava. O teto tem que ser de
+   LARGURA, ja descontando a altura disponivel pela proporcao do recorte (--ar). */
+.lnDuplo:not(.comLista) .lnMapa{max-width:min(560px, calc((100vh - 250px) * var(--ar, 1)))}
+.lnDuplo.comLista{grid-template-columns:minmax(220px,320px) minmax(0,1fr)}
 @media (max-width:700px){.lnDuplo.comLista{grid-template-columns:1fr}}
 .lnDuplo .lnLista{max-height:min(680px,calc(100vh - 224px));overflow-y:auto}
-.lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;aspect-ratio:1/1;
+ /* sem aspect-ratio fixo: a proporcao agora vem do recorte, inline, por mapa */
+.lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;overflow:hidden;
   background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2);transition:max-width .18s}
 /* com um clipe aberto o mapão encolhe: o detalhe já mostra o mapa, e quem tem que
    mandar na tela é o vídeo. Sem isso ficava vídeo pequeno embaixo de mapa gigante. */
 .lnPalco.comClipe .lnMapa{max-width:400px}
-.lnMapa img{width:100%;height:100%;object-fit:contain;display:block;opacity:.92}
+ /* a imagem fica MAIOR que a caixa de proposito e deslocada: a caixa e a janela do recorte */
+.lnMapa img{position:absolute;display:block;opacity:.92;max-width:none}
 .lnPino{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;
   border:2px solid var(--ouro);background:#0b1016e6;color:var(--ouro-claro);cursor:pointer;
   font-family:inherit;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
@@ -4334,6 +4342,31 @@ async function lnProcurar(forcar){
 }
 
 /** Lineups agrupadas por ponto: cada pino traz quantas tem ali e o ícone da habilidade. */
+/* A arte do mapa vem num PNG quadrado de 1024, mas o mapa jogável ocupa só o miolo dele.
+ * Medido pela caixa dos callouts: Bind usa 66% da imagem, Corrode 65%, Ascent/Haven/Split
+ * 57% e Lotus 49%. Ou seja, de 35% a 51% da caixa era margem preta — e desde que o mapa
+ * virou A interface isso custa direto: pino menor, pinos mais perto um do outro e menos
+ * área pra acertar o clique.
+ *
+ * Recorto pela caixa dos callouts com uma folga, e a MESMA transformação vai na imagem e em
+ * cada marcador. Como tudo aqui já é coordenada normalizada virando porcentagem dentro da
+ * mesma caixa, nada sai do lugar. Se o mapa vier sem callouts suficientes, devolve o
+ * quadrado inteiro e fica como era. */
+const LN_MARGEM_RECORTE = 0.06;
+function lnJanelaDoMapa(){
+  const cs = lnCallouts ?? [];
+  if (cs.length < 3) return { x0: 0, y0: 0, lx: 1, ly: 1 };
+  const xs = cs.map(c => c.x), ys = cs.map(c => c.y);
+  let x0 = Math.min(...xs), x1 = Math.max(...xs);
+  let y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const fx = (x1 - x0) * LN_MARGEM_RECORTE, fy = (y1 - y0) * LN_MARGEM_RECORTE;
+  x0 = Math.max(0, x0 - fx); x1 = Math.min(1, x1 + fx);
+  y0 = Math.max(0, y0 - fy); y1 = Math.min(1, y1 + fy);
+  const lx = x1 - x0, ly = y1 - y0;
+  if (!(lx > 0.1) || !(ly > 0.1)) return { x0: 0, y0: 0, lx: 1, ly: 1 };
+  return { x0, y0, lx, ly };
+}
+
 function lnPinos(){
   const por = new Map();
   for (const l of lnAchadas) {
@@ -4390,14 +4423,18 @@ function lnDesenharMapa(){
     nomes = nomes.filter(c => !ocupado.some(o => Math.hypot(c.x - o.x, c.y - o.y) < 0.055));
   }
 
+  const rec = lnJanelaDoMapa();
+  const RX = (x) => (((x - rec.x0) / rec.lx) * 100).toFixed(2);
+  const RY = (y) => (((y - rec.y0) / rec.ly) * 100).toFixed(2);
+
   $('#lnMapaCx').innerHTML = `
-    <div class="lnMapa ${aberto ? 'comLeque' : ''}">
-      <img src="${esc(lnPlanta)}" alt="planta do mapa">
-      ${nomes.map(c => `<span class="lnCallout" style="left:${(c.x * 100).toFixed(2)}%;top:${(c.y * 100).toFixed(2)}%">${esc(c.nome)}</span>`).join('')}
+    <div class="lnMapa ${aberto ? 'comLeque' : ''}" style="aspect-ratio:${(rec.lx / rec.ly).toFixed(4)};--ar:${(rec.lx / rec.ly).toFixed(4)}">
+      <img src="${esc(lnPlanta)}" alt="planta do mapa" style="width:${(100 / rec.lx).toFixed(2)}%;height:${(100 / rec.ly).toFixed(2)}%;left:${((-rec.x0 / rec.lx) * 100).toFixed(2)}%;top:${((-rec.y0 / rec.ly) * 100).toFixed(2)}%">
+      ${nomes.map(c => `<span class="lnCallout" style="left:${RX(c.x)}%;top:${RY(c.y)}%">${esc(c.nome)}</span>`).join('')}
       ${aberto && leque.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
           ${leque.map((x, k) => {
             // a rota é um caminho de verdade pra bolinha poder correr em cima dele
-            const d = `M ${(x.dx * 100).toFixed(2)} ${(x.dy * 100).toFixed(2)} L ${(aberto.dx * 100).toFixed(2)} ${(aberto.dy * 100).toFixed(2)}`;
+            const d = `M ${RX(x.dx)} ${RY(x.dy)} L ${RX(aberto.dx)} ${RY(aberto.dy)}`;
             return `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
               <circle class="lnBola" data-k="${k}" r="1.7">
                 <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
@@ -4407,7 +4444,7 @@ function lnDesenharMapa(){
           }).join('')}
         </svg>` : ''}
       ${aberto ? leque.map((x, k) => `
-        <button class="lnDeMapa" data-k="${k}" style="left:${(x.dx * 100).toFixed(2)}%;top:${(x.dy * 100).toFixed(2)}%"
+        <button class="lnDeMapa" data-k="${k}" style="left:${RX(x.dx)}%;top:${RY(x.dy)}%"
           title="${esc(x.de.nome)}${x.quantas > 1 ? ` — ${x.quantas} lineups daqui` : ''}"
           onclick="event.stopPropagation();lnEscolherLugar('${esc(x.de.nome)}',${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
@@ -4417,7 +4454,7 @@ function lnDesenharMapa(){
         </button>`).join('') : ''}
       ${pinos.map(p => `
         <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
-          style="left:${(p.dx * 100).toFixed(2)}%;top:${(p.dy * 100).toFixed(2)}%"
+          style="left:${RX(p.dx)}%;top:${RY(p.dy)}%"
           title="${esc(p.nome)}${p.aproximado ? ' (posição aproximada)' : ''}" onclick="lnClicarPino('${esc(p.nome)}')">
           ${p.icone ? `<img src="${esc(p.icone)}" alt="">` : `<b>${p.lista.length}</b>`}
           ${p.icone ? `<i class="lnPinoN">${p.lista.length}</i>` : ''}
