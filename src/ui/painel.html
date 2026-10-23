@@ -1009,7 +1009,13 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
  /* Com o ponto aberto o mapa caia pra 320 px fixos, virando um selo numa janela larga —
    e e no mapa que ele escolhe. Agora o mapa fica com a sobra e a lista e que tem teto. */
 .lnDuplo.comLista{grid-template-columns:minmax(300px,1fr) minmax(250px,380px)}
-@media (max-width:700px){.lnDuplo.comLista{grid-template-columns:1fr}}
+/* Janela estreita: a lista desce pra baixo do mapa em vez de dividir a largura com ele.
+ * Com as duas colunas, o mapa caía pros 300 px do mínimo (a lista sozinha pede 250) — e é
+ * no mapa que ele escolhe. Medido numa janela de 900: 300 px de mapa viram ~620. */
+@media (max-width:1150px){
+  .lnDuplo.comLista{grid-template-columns:minmax(0,1fr)}
+  .lnDuplo.comLista .lnMapa{max-width:min(620px, calc((100vh - 300px) * var(--ar, 1)))}
+}
 .lnDuplo .lnLista{max-height:min(680px,calc(100vh - 224px));overflow-y:auto}
  /* sem aspect-ratio fixo: a proporcao agora vem do recorte, inline, por mapa */
 .lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;overflow:hidden;
@@ -1019,15 +1025,34 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPalco.comClipe .lnMapa{max-width:400px}
  /* a imagem fica MAIOR que a caixa de proposito e deslocada: a caixa e a janela do recorte */
 .lnMapa img{position:absolute;display:block;opacity:.92;max-width:none}
-.lnPino{position:absolute;transform:translate(-50%,-50%);width:32px;height:32px;border-radius:50%;
+/* O TAMANHO DO MARCADOR acompanha a largura do mapa.
+ *
+ * A distância mínima entre marcadores é uma fração da largura (ver `longe`), mas o
+ * marcador era fixo em px — então numa janela estreita o mapa encolhia e os 32 px não
+ * cabiam mais na distância calculada. Medido no Lotus com a janela apertada: mapa em
+ * 300 px, 17 pinos, C Waterfall a 24 px do C Link, ou seja um em cima do outro. Com os
+ * dois em fração da mesma largura, encostar vira impossível em qualquer tamanho. O teto
+ * e o piso do clamp são o tamanho de hoje e o menor que ainda dá pra acertar o clique. */
+.lnPino{position:absolute;transform:translate(-50%,-50%);width:clamp(18px, 5.1%, 32px);height:auto;
+  aspect-ratio:1;border-radius:50%;
   border:2px solid var(--ouro);background:#0b1016e6;color:var(--ouro-claro);cursor:pointer;
-  font-family:inherit;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  font-family:inherit;font-size:clamp(9px, 1.9%, 12px);font-weight:700;display:flex;align-items:center;justify-content:center;
   padding:0;transition:transform .1s}
-.lnPino img{width:20px;height:20px;object-fit:contain;filter:brightness(1.4)}
+.lnPino img{width:62%;height:62%;object-fit:contain;filter:brightness(1.4)}
 .lnPinoN{position:absolute;right:-5px;top:-5px;font-style:normal;font-size:10px;line-height:1;
   background:var(--ouro);color:#0b1016;border-radius:6px;padding:2px 4px;font-weight:700}
 /* o leque: linhas da posição até o ponto, e o retrato do agente em cada posição */
-.lnLeque{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2;overflow:visible}
+/* QUEM FICA POR CIMA. A regra é a que ele pediu: o que apareceu por causa do clique dele
+ * manda em tudo. De baixo pra cima — pino comum, linha do leque, pino aberto, e no topo o
+ * marcador da lineup clicada. Antes .lnTiro e .lnPino.on empatavam em 4 e .lnPino comum nem
+ * tinha z-index: quem ganhava era a ordem do HTML, ou seja, sorte. */
+.lnPino{z-index:1}
+.lnPino:hover{z-index:2}
+.lnPino.on{z-index:4}
+.lnDeMapa,.lnTiro{z-index:10}
+.lnDeMapa:hover,.lnTiro:hover{z-index:12}
+
+.lnLeque{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}
 .lnRota{stroke:#49d6c0;stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.75;fill:none;
   transition:opacity .15s}
 /* a bolinha corre pela rota, mostrando o caminho da habilidade */
@@ -1050,20 +1075,20 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .acAndando{font-size:12px;color:var(--fraco);padding:6px 2px}
 
  /* a lineup como marcador, pra quando nao existe "de onde jogar" */
-.lnTiro{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;
-  border:2px solid var(--ouro);background:#11161fee;padding:0;cursor:pointer;z-index:4;
+.lnTiro{position:absolute;transform:translate(-50%,-50%);width:clamp(17px, 4.6%, 28px);height:auto;aspect-ratio:1;border-radius:50%;
+  border:2px solid var(--ouro);background:#11161fee;padding:0;cursor:pointer;
   display:flex;align-items:center;justify-content:center;font-family:inherit;color:var(--ouro-claro);
   font-size:11px;font-weight:700;box-shadow:0 0 8px #0008;transition:transform .1s}
-.lnTiro img{width:18px;height:18px;object-fit:contain;filter:brightness(1.35)}
-.lnTiro:hover{transform:translate(-50%,-50%) scale(1.25);z-index:7;border-color:#49d6c0}
+.lnTiro img{width:64%;height:64%;object-fit:contain;filter:brightness(1.35)}
+.lnTiro:hover{transform:translate(-50%,-50%) scale(1.25);border-color:#49d6c0}
 .lnTiro .lnDeNome{opacity:0;transition:opacity .12s}
 .lnTiro:hover .lnDeNome{opacity:1}
 
-.lnDeMapa{position:absolute;transform:translate(-50%,-50%);width:30px;height:30px;border-radius:50%;
-  border:2px solid #49d6c0;background:#11161f;padding:0;cursor:pointer;overflow:visible;z-index:3;
+.lnDeMapa{position:absolute;transform:translate(-50%,-50%);width:clamp(18px, 4.9%, 30px);height:auto;aspect-ratio:1;border-radius:50%;
+  border:2px solid #49d6c0;background:#11161f;padding:0;cursor:pointer;overflow:visible;
   box-shadow:0 0 9px #49d6c055;transition:transform .1s}
 .lnDeMapa img{width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:50%}
-.lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.22);z-index:6}
+.lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.22)}
 .lnDeN{position:absolute;right:-6px;top:-6px;font-style:normal;font-size:9.5px;line-height:1;
   background:#49d6c0;color:#06201c;border-radius:7px;padding:2px 5px;font-weight:700}
 .lnDeNome{position:absolute;top:32px;left:50%;transform:translateX(-50%);white-space:nowrap;
@@ -1075,8 +1100,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnLequeNota{text-align:center;color:var(--fraco);font-size:11.5px;margin-top:7px}
 .lnCallout{position:absolute;transform:translate(-50%,-50%);font-size:9.5px;color:#cfd6e4;
   text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;white-space:nowrap;opacity:.75}
-.lnPino:hover{transform:translate(-50%,-50%) scale(1.18);z-index:3}
-.lnPino.on{background:var(--ouro);color:#0b1016;z-index:4}
+.lnPino:hover{transform:translate(-50%,-50%) scale(1.18)}
+.lnPino.on{background:var(--ouro);color:#0b1016}
 .lnPino.aprox{border-style:dashed;opacity:.8}
 .lnPinoNome{position:absolute;top:30px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font-size:10px;font-weight:600;color:#fff;text-shadow:0 1px 4px #000,0 0 3px #000;pointer-events:none;opacity:0}
@@ -4478,7 +4503,7 @@ function lnDesenharMapa(){
   if (!lnPlanta) { $('#lnMapaCx').innerHTML = ''; return; }
   // Os PINOS também se empilham: dois callouts vizinhos (A Bath e A Site, por exemplo) caem
   // praticamente no mesmo lugar e um cobre o outro. Mesma separação do leque.
-  const pinos = lnAfastar(lnPinos(), LN_LONGE_PINO);
+  const pinos = lnAfastar(lnPinos(), longe(LN_LONGE_PINO));
   // mapa sem pino nenhum confunde mais do que ajuda: diz o porquê em vez de mostrar vazio
   if (!pinos.length) {
     $('#lnMapaCx').innerHTML = `<div class="vazio">as lineups vieram sem ponto no mapa — a lista está logo abaixo</div>`;
@@ -4520,17 +4545,24 @@ function lnDesenharMapa(){
    * Então as PRÓPRIAS lineups viram marcadores em volta do ponto: continua sendo clicar
    * no mapa pra escolher, que é o que ele pediu. */
   const rec = lnJanelaDoMapa();
+  /* O anel era um círculo e pronto: cada marcador caía onde a conta mandasse, inclusive
+   * exatamente em cima de outro pino. Medido em 34 pontos abertos de 3 mapas: 10 pares com
+   * mais de 35% de cobertura e 7 cliques roubados — no A Main do Ascent, três marcadores
+   * cobriam 64%, 67% e 83% dos pinos A Tree, A Lobby e A Wine. O círculo agora é só o
+   * ponto de partida: o mesmo desempilhamento do leque afasta os marcadores entre si e dos
+   * outros pinos, e o lnPrender segura dentro da janela do recorte. */
   const anel = (aberto && !leque.length)
-    ? (aberto.lista ?? []).slice(0, 12).map((l, k, todas) => {
-        const ang = (-Math.PI / 2) + (k / todas.length) * Math.PI * 2;
-        const p = {
-          l, k, i: lnAchadas.indexOf(l),
-          dx: aberto.dx + Math.cos(ang) * rec.lx * 0.135,
-          dy: aberto.dy + Math.sin(ang) * rec.ly * 0.135,
-        };
-        lnPrender(p);
-        return p;
-      })
+    ? lnDesempilhar(
+        (aberto.lista ?? []).slice(0, 12).map((l, k, todas) => {
+          const ang = (-Math.PI / 2) + (k / todas.length) * Math.PI * 2;
+          return { l, k, i: lnAchadas.indexOf(l), de: {
+            x: aberto.dx + Math.cos(ang) * rec.lx * 0.135,
+            y: aberto.dy + Math.sin(ang) * rec.ly * 0.135,
+          } };
+        }),
+        { x: aberto.dx, y: aberto.dy },
+        pinos.filter(p => p.nome !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })),
+      )
     : [];
 
   const RX = (x) => (((x - rec.x0) / rec.lx) * 100).toFixed(2);
@@ -4607,8 +4639,18 @@ function lnDesenharMapa(){
  * nome do lugar e a lineup continuam os mesmos, e a linha passa a terminar no retrato
  * desenhado, pra não ficar uma linha apontando pro nada.
  */
-const LN_LONGE = 0.075;        // distância mínima entre retratos do leque
-const LN_LONGE_PINO = 0.065;   // e entre os pinos, que são um pouco menores
+/* A distância mínima tem que dar o mesmo NA TELA em todo mapa, não no número cru.
+ *
+ * O marcador tem 26 a 30 px em qualquer mapa, mas o recorte muda quanto vale uma unidade
+ * crua: no Ascent (janela 0,77 de largura) 0,065 davam ~50 px; no Lotus (0,49) os MESMOS
+ * 0,065 davam ~79 px. O Lotus então exigia 79 px entre 17 pinos espremidos num canto, o
+ * afastamento nunca fechava e os pinos terminavam um em cima do outro — medido: 35 cliques
+ * roubados num mapa só, 34 deles pino em cima de pino.
+ *
+ * Agora o número é fração da LARGURA da janela do mapa, e `longe()` converte na hora. */
+const LN_LONGE = 0.090;        // retratos do leque, que têm 30 px
+const LN_LONGE_PINO = 0.078;   // pinos, que têm 26 px
+const longe = (f) => Math.max(0.015, lnJanelaDoMapa().lx * f);
 
 /** Afasta uma lista de pontos entre si. Devolve cada um com `dx`/`dy` pro desenho. */
 /* O limite do que é "dentro do mapa" não é mais 0..1: desde que a arte passou a ser
@@ -4640,10 +4682,12 @@ function lnAfastar(itens, minimo){
     for (const p of fora) lnPrender(p);
     if (!mexeu) break;
   }
-  return fora;
+  // os que mesmo assim ficaram colados (canto apertado) ganham um lugar, não um empurrão
+  return lnDesencalhar(fora, [], minimo);
 }
 
 function lnDesempilhar(itens, pino, obstaculos = []){
+  const dLeque = longe(LN_LONGE), dPino = longe(LN_LONGE_PINO);
   const fora = itens.map(x => ({ ...x, dx: x.de.x, dy: x.de.y }));
   const empurrar = (p, ax, ay, minimo) => {
     let vx = p.dx - ax, vy = p.dy - ay;
@@ -4656,20 +4700,20 @@ function lnDesempilhar(itens, pino, obstaculos = []){
   };
   for (let volta = 0; volta < 14; volta++) {
     let mexeu = false;
-    for (const p of fora) if (pino && empurrar(p, pino.x, pino.y, LN_LONGE)) mexeu = true;
+    for (const p of fora) if (pino && empurrar(p, pino.x, pino.y, dLeque)) mexeu = true;
     /* E também longe dos OUTROS pinos. Sem isto o retrato do leque caía exatamente em cima
      * do pino do mesmo lugar (A Short, A Lobby, A Link, A Bath, B Site), e como .lnDeMapa
      * tem z-index 3 e o pino não tem, o retrato roubava o clique e o pino embaixo ficava
      * inclicável. Medido: 5 de 15 marcadores com o clique roubado. */
-    for (const p of fora) for (const o of obstaculos) if (empurrar(p, o.x, o.y, LN_LONGE_PINO)) mexeu = true;
+    for (const p of fora) for (const o of obstaculos) if (empurrar(p, o.x, o.y, dPino)) mexeu = true;
     for (let i = 0; i < fora.length; i++) for (let j = i + 1; j < fora.length; j++) {
       const a = fora[i], b = fora[j];
       const d = Math.hypot(a.dx - b.dx, a.dy - b.dy);
-      if (d >= LN_LONGE) continue;
+      if (d >= dLeque) continue;
       // separa os dois pra cada lado, metade do que falta
       let vx = b.dx - a.dx, vy = b.dy - a.dy, dd = d;
       if (dd < 1e-4) { vx = Math.cos(i); vy = Math.sin(i); dd = 1; }
-      const passo = (LN_LONGE - d) / 2;
+      const passo = (dLeque - d) / 2;
       a.dx -= (vx / dd) * passo; a.dy -= (vy / dd) * passo;
       b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo;
       mexeu = true;
@@ -4678,7 +4722,47 @@ function lnDesempilhar(itens, pino, obstaculos = []){
     for (const p of fora) lnPrender(p);
     if (!mexeu) break;
   }
-  return fora;
+  return lnDesencalhar(fora, [...(pino ? [pino] : []), ...obstaculos]);
+}
+
+/**
+ * O que sobra encalhado na borda.
+ *
+ * Empurrar resolve quase tudo, mas não quem já está na beirada: a empurrada manda pra fora
+ * da janela, o lnPrender traz de volta pro mesmo lugar, e o marcador termina em cima do
+ * pino. Foi o que sobrou da primeira correção — 2 casos em 34 pontos abertos, os dois na
+ * borda: no A Wine do Ascent o marcador parou a 0,86% do pino (96% de cobertura) e no
+ * C Long do Haven a mesma coisa embaixo.
+ *
+ * Aqui não se empurra: procura-se lugar. Em volta da posição atual, em anéis cada vez mais
+ * largos, o primeiro ponto que está dentro da janela e longe de todo mundo. Como a saída é
+ * tangente à borda em vez de perpendicular, a beirada deixa de ser um beco sem saída.
+ */
+function lnDesencalhar(itens, obstaculos, minimo = longe(LN_LONGE_PINO)){
+  const r = lnJanelaDoMapa();
+  const ix = r.lx * 0.045, iy = r.ly * 0.045;
+  const dentro = (x, y) => x >= r.x0 + ix && x <= r.x0 + r.lx - ix && y >= r.y0 + iy && y <= r.y0 + r.ly - iy;
+  const folga = (x, y, menos) => {
+    let pior = Infinity;
+    for (const o of obstaculos) pior = Math.min(pior, Math.hypot(x - o.x, y - o.y));
+    for (const p of itens) if (p !== menos) pior = Math.min(pior, Math.hypot(x - p.dx, y - p.dy));
+    return pior;
+  };
+  for (const p of itens) {
+    let melhor = { x: p.dx, y: p.dy, folga: folga(p.dx, p.dy, p) };
+    if (melhor.folga >= minimo) continue;
+    for (let raio = minimo; raio <= minimo * 2.6 && melhor.folga < minimo; raio += minimo * 0.3) {
+      for (let a = 0; a < 24; a++) {
+        const ang = (a / 24) * Math.PI * 2;
+        const x = p.dx + Math.cos(ang) * raio, y = p.dy + Math.sin(ang) * raio;
+        if (!dentro(x, y)) continue;
+        const f = folga(x, y, p);
+        if (f > melhor.folga) melhor = { x, y, folga: f };
+      }
+    }
+    p.dx = melhor.x; p.dy = melhor.y;
+  }
+  return itens;
 }
 
 function lnFocarRota(k){
