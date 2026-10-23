@@ -872,7 +872,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
 /* ---------------------------------------------------- lineups (Valorant) */
 .lnFiltros{display:flex;gap:var(--e1);margin-bottom:var(--e2);flex-wrap:wrap;align-items:center}
-.lnFiltrosMinhas{margin-top:var(--e1)}
 .lnCheck{display:flex;align-items:center;gap:6px;color:var(--fraco);font-size:12px;cursor:pointer}
 .lnFora{text-decoration:none;display:inline-flex;align-items:center}
 .lnGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:var(--e2)}
@@ -890,7 +889,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnTag.pulo{border-color:var(--ouro);color:var(--ouro-claro)}
 .lnCard video,.lnCard iframe{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
 .lnMin{font-variant-numeric:tabular-nums;width:62px;text-align:center}
-.lnSalvarCx{display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--fraco)}
 
 .lnResumo{color:var(--fraco);font-size:12px;margin-bottom:var(--e1)}
 .lnLista{display:flex;flex-direction:column;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden}
@@ -1001,21 +999,17 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    container fica sem conteudo em fluxo, a coluna encolhe pra zero e o width:100% da caixa
    vira 2 px de borda. A coluna estica e quem centraliza e o margin:0 auto da .lnMapa. */
 .lnDuplo{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
-.lnDuplo:not(.comLista) #lnResultados{display:none}
+
  /* max-height sozinho corta a ALTURA sem mexer na largura, e a proporcao quebra: a caixa
    virava 560x530 em vez de 560x613 e a arte do mapa esticava. O teto tem que ser de
    LARGURA, ja descontando a altura disponivel pela proporcao do recorte (--ar). */
-.lnDuplo:not(.comLista) .lnMapa{max-width:min(560px, calc((100vh - 250px) * var(--ar, 1)))}
+/* Sem lista nenhuma na tela, o mapa manda sozinho: largura toda e altura até onde a
+   janela deixa. Quem escolhe é o mapa — foi o que ele pediu desde o começo. */
+.lnDuplo .lnMapa{max-width:min(760px, calc((100vh - 210px) * var(--ar, 1)))}
  /* Com o ponto aberto o mapa caia pra 320 px fixos, virando um selo numa janela larga —
    e e no mapa que ele escolhe. Agora o mapa fica com a sobra e a lista e que tem teto. */
-.lnDuplo.comLista{grid-template-columns:minmax(300px,1fr) minmax(250px,380px)}
-/* Janela estreita: a lista desce pra baixo do mapa em vez de dividir a largura com ele.
- * Com as duas colunas, o mapa caía pros 300 px do mínimo (a lista sozinha pede 250) — e é
- * no mapa que ele escolhe. Medido numa janela de 900: 300 px de mapa viram ~620. */
-@media (max-width:1150px){
-  .lnDuplo.comLista{grid-template-columns:minmax(0,1fr)}
-  .lnDuplo.comLista .lnMapa{max-width:min(620px, calc((100vh - 300px) * var(--ar, 1)))}
-}
+
+
 .lnDuplo .lnLista{max-height:min(680px,calc(100vh - 224px));overflow-y:auto}
  /* sem aspect-ratio fixo: a proporcao agora vem do recorte, inline, por mapa */
 .lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;overflow:hidden;
@@ -1100,9 +1094,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPinoX{position:absolute;right:-7px;top:-7px;font-style:normal;font-size:9px;line-height:1;
   background:#0b1016;border:1px solid var(--borda);color:var(--fraco);border-radius:50%;padding:2px 3px}
 .lnMapa.comLeque .lnPino:not(.on){opacity:.35}
-.lnLequeNota{text-align:center;color:var(--fraco);font-size:11.5px;margin-top:7px}
-/* dizer que o mapa girou evita ele achar que a planta esta errada quando troca de lado */
-.lnBussola{text-align:center;color:var(--fraco);font-size:11px;opacity:.75;margin-top:6px}
+
 .lnCallout{position:absolute;transform:translate(-50%,-50%);font-size:9.5px;color:#cfd6e4;
   text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;white-space:nowrap;opacity:.75}
 .lnPino:hover{transform:translate(-50%,-50%) scale(1.18)}
@@ -1164,7 +1156,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   .lnDetalhe .lnMini{width:168px;flex:0 0 168px}
   .lnDetalhe .lnTocandoNome{flex:1 1 100%;order:-1}
   .lnDetalhe .lnDeAte,.lnDetalhe .lnCanal{flex:1 1 140px}
-  .lnDetalhe .lnTocandoPe,.lnDetalhe .lnSalvarCx{flex:0 0 auto}
+  .lnDetalhe .lnTocandoPe{flex:0 0 auto}
 }
 .lnVideoCx{position:relative;min-width:0;overflow:hidden;border-radius:var(--r2);background:#000;
   aspect-ratio:16/9}
@@ -1528,19 +1520,12 @@ h2{letter-spacing:1px}
         <div id="lnPlayer"></div>
         <div class="lnDuplo">
           <div class="lnMapaCx" id="lnMapaCx"></div>
-          <div id="lnResultados"></div>
         </div>
       </div>
     </div>
 
     <h2>Acervo <small id="lnAcervoQ">o que já está guardado aqui no PC</small></h2>
     <div id="lnAcervo"></div>
-
-    <h2>As suas <small id="lnQuantas"></small></h2>
-    <div class="lnFiltros lnFiltrosMinhas">
-      <select class="contaSel" id="lnFiltroMapa"><option value="">todos os mapas</option></select>
-    </div>
-    <div id="lnMinhas"></div>
 
     <div class="lnModal" id="lnModal" hidden onclick="if(event.target===this)lnFecharSeletor()"></div>
   </section>
@@ -4255,7 +4240,7 @@ async function carregarConquistas(){
  *
  * Nada aqui encosta no Valorant. Sem leitura de memória e sem desenhar por cima do jogo —
  * o Vanguard é anticheat de kernel e trata sobreposição como trapaça. */
-let lnCatalogo = null, lnMinhasLista = [], lnAchadas = [], lnPlanta = null, lnCallouts = [];
+let lnCatalogo = null, lnAchadas = [], lnPlanta = null, lnCallouts = [];
 let lnTodas = [];        // tudo que a busca trouxe, antes do filtro e da deduplicação
 let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
@@ -4265,8 +4250,6 @@ async function carregarLineups(){
   try { lnCatalogo = await pegar('/api/val/catalogo'); }
   catch { $('#lnAviso').innerHTML = `<div class="vazio">não consegui carregar o catálogo do Valorant</div>`; return; }
 
-  $('#lnFiltroMapa').innerHTML = `<option value="">todos os mapas</option>`
-    + lnCatalogo.mapas.map(m => `<option value="${esc(m.nome)}">${esc(m.nome)}</option>`).join('');
   $('#lnAviso').innerHTML = lnCatalogo.aviso ? `<div class="vazio">${esc(lnCatalogo.aviso)}</div>` : '';
 
   // o que ele escolheu da última vez: na hora de jogar ninguém quer remontar o filtro
@@ -4278,7 +4261,6 @@ async function carregarLineups(){
     if (g.habilidade) lnHabAtual = g.habilidade;
   } catch {}
   lnDesenharLados(); lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
-  await carregarMinhasLineups();
   carregarAcervo();
   lnVigiarJogo(true);
   // lembrou mapa e agente da última vez? já mostra, sem ele pedir
@@ -4319,10 +4301,10 @@ function lnEscolherHab(v){
   lnHabAtual = v;
   lnDesenharHabs(); lnLinks();
   if (!lnTodas.length) return lnProcurarLogo();      // nada carregado ainda: aí sim procura
-  lnPinoAtivo = null; lnPosAtiva = null;
+  lnPinoAtivo = null;
   lnFiltrarEDedupar();
   $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
-  lnDesenharMapa(); lnDesenharAchadas();
+  lnDesenharMapa();
 }
 
 /** "18 caminhos de 107 lineups" — deixa claro que a deduplicação escondeu repetição. */
@@ -4404,10 +4386,9 @@ async function lnProcurar(forcar){
   catch { r = { lineups: [], aviso: 'a busca não respondeu' }; }
   clearTimeout(lento);
   if (meu !== lnPedido) return;           // ele já trocou de agente: esse resultado é velho
-  $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = ''; $('#lnResultados').innerHTML = '';
+  $('#lnAviso').innerHTML = ''; $('#lnPlayer').innerHTML = '';
 
   lnTodas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnCallouts = r.callouts ?? []; lnPinoAtivo = null;
-  lnPosAtiva = null;
   lnFiltrarEDedupar();
   if (!lnAchadas.length) {
     $('#lnMapaCx').innerHTML = '';
@@ -4425,7 +4406,6 @@ async function lnProcurar(forcar){
   }
   $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
   lnDesenharMapa();
-  lnDesenharAchadas();
 }
 
 /** Lineups agrupadas por ponto: cada pino traz quantas tem ali e o ícone da habilidade. */
@@ -4624,12 +4604,7 @@ function lnDesenharMapa(){
           <span class="lnPinoNome">${esc(p.nome)}</span>
         </button>`).join('')}
     </div>
-    <div class="lnBussola">${lnLadoAtual === 'defendendo' ? 'defendendo' : 'atacando'} — mapa virado como no jogo, seu spawn embaixo</div>
-    ${aberto ? `<div class="lnLequeNota">${leque.length
-      ? `${leque.length} lugar${leque.length > 1 ? 'es' : ''} de onde jogar — clica num retrato`
-      : anel.length
-        ? `${anel.length} lineup${anel.length > 1 ? 's' : ''} aqui — clica numa`
-        : 'nenhuma lineup com ponto aqui'}</div>` : ''}`;
+    `;
 }
 
 /**
@@ -4825,19 +4800,14 @@ function lnFocarRota(k){
   }
 }
 
-/** Clicou num lugar: toca a primeira de lá e deixa a lista só com as daquele lugar. */
-let lnPosAtiva = null;
+/** Clicou num retrato: abre o clipe daquela lineup, direto. */
 function lnEscolherLugar(nome, i){
-  lnPosAtiva = nome;
-  lnDesenharAchadas();
   lnVer(i);
 }
 
 function lnClicarPino(nome){
   lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
-  lnPosAtiva = null;
   lnDesenharMapa();
-  lnDesenharAchadas();
 }
 
 /* O nome vem do capítulo do vídeo e quase sempre repete a rota: "A default from A Short
@@ -4862,32 +4832,6 @@ function lnNomeCurto(l){
   if (!n) return l.nome;
   if (par && !n.endsWith(par[0])) n += ' ' + par[0];
   return n;
-}
-
-function lnDesenharAchadas(){
-  // sem ponto escolhido a lista nem aparece: quem escolhe e o mapa
-  const duplo = document.querySelector('.lnDuplo');
-  if (duplo) duplo.classList.toggle('comLista', !!lnPinoAtivo);
-  if (!lnPinoAtivo) { $('#lnResultados').innerHTML = ''; return; }
-
-  let lista = lnAchadas.filter(l => l.ponto?.nome === lnPinoAtivo);
-  if (lnPosAtiva) lista = lista.filter(l => l.posicao?.nome === lnPosAtiva);
-  const titulo = `<div class="lnResumo">${lista.length}${lnPosAtiva ? ` de <b>${esc(lnPosAtiva)}</b> para` : ' em'} <b>${esc(lnPinoAtivo)}</b> · <a href="#" onclick="lnClicarPino('${esc(lnPinoAtivo)}');return false">voltar pro mapa</a></div>`;
-
-  /* Lista, não grade de cartões com miniatura.
-   * A miniatura vinha do storyboard do YouTube, que só as instâncias de Invidious serviam —
-   * e elas morreram: todas devolvem vazio ou página de erro. O que sobrava era uma parede de
-   * 107 retângulos cinzas dizendo "sem prévia", pior do que não ter imagem. Em lista cabe
-   * mais lineup na tela, dá pra ler o nome inteiro e a rota de onde sai até onde cai. */
-  $('#lnResultados').innerHTML = titulo + `<div class="lnLista">${lista.map(l => `
-    <div class="lnLinha" onclick="lnVer(${lnAchadas.indexOf(l)})">
-      <span class="lnSite s${esc(l.site ?? 'x')}">${esc(l.site ?? '—')}</span>
-      ${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="" title="${esc(l.habilidade.nome)}">` : '<i class="lnHabVazia"></i>'}
-      ${l.posicao ? `<span class="lnRota2">${esc(l.posicao.nome)} <i>→</i> ${esc(l.ponto?.nome ?? '')}</span>`
-        : l.ponto ? `<span class="lnRota2"><i>→</i> ${esc(l.ponto.nome)}</span>` : '<span class="lnRota2 lnSemRota">—</span>'}
-      <span class="lnNome" title="${esc(l.nome)}">${esc(lnNomeCurto(l))}</span>
-      <span class="lnQuando" title="${lnMMSS(l.segundo)} até ${lnMMSS(l.fim ?? l.segundo)}">${lnMMSS(l.segundo)}</span>
-    </div>`).join('')}</div>`;
 }
 
 /* ---------------------------------------------------------------- o clipe e o mapa
@@ -5013,7 +4957,6 @@ function lnVer(i){
           ${l.habilidade ? `<span class="lnTag">${esc(l.habilidade.nome)}</span>` : ''}
                   </div>
         <div class="lnCanal">${esc(l.canal)} · clipe de ${lnMMSS(l.segundo)} a ${lnMMSS(l.fim ?? l.segundo)}</div>
-        <div class="lnSalvarCx"><button class="acao" onclick="lnSalvarAtual(this, ${i})">Salvar na minha lista</button></div>
       </div>
     </div>`;
   document.body.classList.add('lnTelaCheia');
@@ -5075,23 +5018,6 @@ async function lnMontarPlayer(l){
 }
 
 function lnDoComeco(){ if (lnClipe && lnPlayer?.seekTo) { lnPlayer.seekTo(lnClipe.segundo, true); lnPlayer.playVideo?.(); } }
-
-async function lnSalvarAtual(botao, i){
-  const l = lnAchadas[i]; if (!l) return;
-  const corpo = {
-    video: l.video, titulo: l.nome, canal: l.canal, capa: l.capa, segundo: l.segundo, fim: l.fim ?? null,
-    mapa: lnMapaAtual, agente: lnAgenteAtual,
-    habilidade: l.habilidade?.nome ?? '', lado: lnLadoAtual,
-    ponto: l.ponto?.nome ?? '', posicao: l.posicao?.nome ?? '',
-  };
-  botao.disabled = true; botao.textContent = 'salvando…';
-  try {
-    const r = await fetch('/api/val/salvar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(corpo) }).then(x => x.json());
-    if (r.erro) throw new Error(r.erro);
-    botao.textContent = 'salva ✓';
-    await carregarMinhasLineups();
-  } catch (err) { botao.disabled = false; botao.textContent = 'Salvar na minha lista'; alert('não deu pra salvar: ' + err.message); }
-}
 
 /* ---------------------------------------------------------------- o acervo
  * "pra parar de ter q ficar pesquisando toda vez e organizar tudo": mostra o que já está
@@ -5176,51 +5102,6 @@ async function lnEsquecerAgente(agente){
   carregarAcervo();
 }
 
-/* ---------------------------------------------------------------- as dele */
-
-async function carregarMinhasLineups(){
-  try { lnMinhasLista = await pegar('/api/val/salvas'); } catch { lnMinhasLista = []; }
-  lnDesenharMinhas();
-}
-
-function lnDesenharMinhas(){
-  const mapa = $('#lnFiltroMapa').value;
-  const lista = lnMinhasLista.filter(x => !mapa || x.mapa === mapa);
-  $('#lnQuantas').textContent = lnMinhasLista.length ? `${lista.length} de ${lnMinhasLista.length}` : '';
-  if (!lista.length) {
-    $('#lnMinhas').innerHTML = `<div class="vazio">${lnMinhasLista.length ? 'nenhuma com esse filtro' : 'nenhuma salva ainda — procura ali em cima e salva as que servirem'}</div>`;
-    return;
-  }
-  $('#lnMinhas').innerHTML = `<div class="lnLista">${lista.map(x => `
-    <div class="lnLinha" onclick="lnVerSalva('${esc(x.id)}')">
-      <span class="lnSite sx">${esc(x.agente.slice(0, 3))}</span>
-      <span class="lnNome">${esc(x.titulo)}</span>
-      <span class="lnCanal">${esc(x.mapa)}${x.ponto ? ' · ' + esc(x.ponto) : ''}${x.habilidade ? ' · ' + esc(x.habilidade) : ''}</span>
-      <span class="lnQuando">${lnMMSS(x.segundo)}</span>
-      <button class="acao" onclick="event.stopPropagation();lnApagar('${esc(x.id)}')">Apagar</button>
-    </div>`).join('')}</div>`;
-}
-
-function lnVerSalva(id){
-  const x = lnMinhasLista.find(v => v.id === id); if (!x) return;
-  // a salva guarda o NOME do ponto; a posição no mapa vem do catálogo do mapa dela
-  const callouts = lnCatalogo?.mapas.find(m => m.nome === x.mapa)?.callouts ?? [];
-  const achar = (n) => callouts.find(c => c.nome === n) ?? null;
-  lnPlanta = lnCatalogo?.mapas.find(m => m.nome === x.mapa)?.planta ?? lnPlanta;
-  lnAchadas = [{ video: x.video, nome: x.titulo, canal: x.canal, capa: x.capa, segundo: x.segundo, fim: x.fim ?? null,
-    site: null, pula: x.pula, habilidade: x.habilidade ? { nome: x.habilidade, icone: null } : null,
-    ponto: achar(x.ponto) ?? (x.ponto ? { nome: x.ponto, x: 0.5, y: 0.5, aproximado: true } : null),
-    posicao: achar(x.posicao), mira: Number.isFinite(x.mira) ? x.mira : undefined }];
-  lnVer(0);
-}
-
-async function lnApagar(id){
-  const x = lnMinhasLista.find(v => v.id === id);
-  if (!confirm(`Apagar "${x?.titulo ?? 'essa lineup'}"?`)) return;
-  try { await fetch('/api/val/apagar', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id }) }); } catch {}
-  await carregarMinhasLineups();
-}
-
 /* ---------------------------------------------------------------- o jogo manda
  * Com o Valorant aberto, o app lê do cliente local qual mapa e qual agente ele pegou e
  * deixa as lineups prontas sozinho. Só troca quando a deteção MUDA: se ele escolher outra
@@ -5264,7 +5145,6 @@ function lnVigiarJogo(ligar){
 }
 
 $('#lnBuscar').onclick = () => lnProcurar(true);
-$('#lnFiltroMapa').onchange = lnDesenharMinhas;
 for (const b of document.querySelectorAll('#lnLados button')) {
   b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); lnProcurarLogo(); };
 }
