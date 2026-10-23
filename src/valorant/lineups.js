@@ -571,6 +571,9 @@ const detalhesDoVideo = async (base, id, ate = Infinity) => {
 const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 4: antes do filtro de mapa, o que estava em disco tinha lineup de mapa errado dentro
 const FORMATO_BUSCA = 4;
+// quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
+const VIDEOS_LIDOS = 18;
+const VIDEOS_COM_PREVIA = 6;
 const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
   .map((x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).join('__');
 
@@ -581,7 +584,12 @@ export async function buscaGuardada(p = {}) {
   if (!g?.lineups?.length) return null;
   const pronto = g.formato === FORMATO_BUSCA ? g : await migrarBusca(p, g);
   if (!pronto) return null;
-  return { ...pronto, doDisco: true, velho: Date.now() - (pronto.em ?? 0) > VALIDADE_BUSCA };
+  /* "Velho" não é só por data: o que foi salvo quando a busca lia 6 vídeos tem um terço
+   * das lineups que a mesma busca traria hoje. Marcar como velho não faz ele esperar —
+   * o arquivo magro aparece na hora do mesmo jeito e a versão cheia entra por baixo. */
+  const magro = (pronto.lidos ?? 6) < VIDEOS_LIDOS;
+  const vencido = Date.now() - (pronto.em ?? 0) > VALIDADE_BUSCA;
+  return { ...pronto, doDisco: true, velho: magro || vencido };
 }
 
 /**
@@ -695,19 +703,30 @@ export async function buscarLineups(p = {}) {
   // storyboard (que a oficial não tem) é que continua saindo do Invidious.
   const base = INVIDIOUS.find((b) => new URL(b).host === r.fonte) ?? INVIDIOUS[0];
 
-  // Só os primeiros: cada um é uma chamada, e os de cima são os que têm capítulo.
-  // De 3 em 3: a instância é comunitária e passa a recusar quando a gente dispara 12 pedidos
-  // de uma vez (foi o que aconteceu ao buscar capítulo e quadro em paralelo pros 6 vídeos).
-  const candidatos = r.videos.slice(0, 6);
+  /* Com chave, 18 vídeos; sem chave, 6.
+   *
+   * Isto era o gargalo da variedade. A descrição de até 50 vídeos sai numa ÚNICA chamada
+   * (1 unidade de cota), então ler 18 custa exatamente o mesmo que ler 6 — e muda tudo.
+   * Medido agora, com a chave dele:
+   *   Ascent+Sova      105 capítulos de 3 canais  ->  301 capítulos de 8 canais
+   *   Bind+Brimstone   139 capítulos de 6 canais  ->  234 capítulos de 10 canais
+   *   Lotus+Viper      124 capítulos de 5 canais  ->  182 capítulos de 9 canais
+   * Sem chave continua 6: lá cada descrição é uma chamada ao Invidious, que é comunitário.
+   */
+  const candidatos = r.videos.slice(0, p.chaveYoutube ? VIDEOS_LIDOS : 6);
   const porVideo = [];
   const prazo = Date.now() + 11000;     // o que não chegou até aqui não vale a espera
 
   // Caminho rápido: uma chamada à API oficial traz a descrição dos 6 de uma vez.
   const oficiais = await descricoesOficiais(candidatos.map((v) => v.id), p.chaveYoutube);
   if (oficiais?.size) {
-    const tiras = await Promise.all(candidatos.map(async (v) => {
+    // O quadro de prévia (storyboard) é a parte cara: vem do Invidious, uma chamada por
+    // vídeo, e disparar 18 de uma vez faz a instância recusar tudo. Então só os 6 primeiros
+    // ganham prévia; as lineups dos outros 12 funcionam igual, só abrem sem miniatura.
+    const tiras = await Promise.all(candidatos.map(async (v, k) => {
       const caps = capitulosDaDescricao(oficiais.get(v.id));
-      return { v, caps, tiras: caps.length ? await storyboardDoVideo(base, v.id, prazo).catch(() => []) : [] };
+      const vale = caps.length && k < VIDEOS_COM_PREVIA;
+      return { v, caps, tiras: vale ? await storyboardDoVideo(base, v.id, prazo).catch(() => []) : [] };
     }));
     porVideo.push(...tiras);
   }
@@ -774,6 +793,7 @@ export async function buscarLineups(p = {}) {
     callouts: mapa?.callouts ?? [],
     semCapitulo: !lineups.length,
     deOutroMapa,
+    lidos: candidatos.length,
     resumo: lineups.length ? `${lineups.length} lineups de ${comCapitulo} vídeo${comCapitulo > 1 ? 's' : ''}` : null,
   };
 }
@@ -923,8 +943,10 @@ export async function guardarAgente({ agente, chaveYoutube = null, refazer = fal
     for (const item of fila) {
       varredura.agora = `${item.mapa} · ${item.lado === 'atacando' ? 'atacante' : 'defensor'}`;
       try {
-        // o que já está guardado não se procura de novo: a cota do YouTube é finita
-        if (!refazer && (await buscaGuardada(item))) { varredura.feitos++; continue; }
+        // o que já está guardado e cheio não se procura de novo: a cota do YouTube é finita.
+        // O que está guardado mas magro (salvo quando a busca lia 6 vídeos) vale refazer.
+        const tem = await buscaGuardada(item);
+        if (!refazer && tem && !tem.velho) { varredura.feitos++; continue; }
         const r = await buscarLineups({ ...item, chaveYoutube });
         if (r.lineups?.length) { await guardarBusca(item, r); varredura.novas += r.lineups.length; }
         else varredura.vazias++;

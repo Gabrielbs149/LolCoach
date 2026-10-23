@@ -839,6 +839,53 @@ test('acervo: arquivo do formato antigo é aproveitado, não descartado', async 
 });
 
 /* --------------------------------------------------------------------------
+ * Busca magra tem que se marcar como velha sozinha.
+ *
+ * Os 56 arquivos do acervo dele foram salvos quando a busca lia 6 vídeos; hoje lê 18 e
+ * traz o triplo de capítulos, de o dobro de canais. Jogar os arquivos fora (subindo o
+ * FORMATO_BUSCA) tirava o "sai na hora", que é o ponto do acervo. Então o arquivo magro
+ * continua valendo e sai na hora — só vem marcado `velho`, que é o que dispara a
+ * revalidação por baixo e faz a varredura refazer em vez de pular.
+ * -------------------------------------------------------------------------- */
+test('acervo: busca salva com poucos vídeos se marca velha, sem ser descartada', async () => {
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-magro-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const val = resolve(base, 'dados', 'valorant');
+    await mkdir(resolve(val, 'buscas'), { recursive: true });
+    await writeFile(resolve(val, 'catalogo.json'), JSON.stringify({
+      em: Date.now(), formato: 4,
+      mapas: [{ nome: 'Ascent', planta: null, callouts: [] }],
+      agentes: [{ nome: 'Sova', icone: null, habilidades: [] }],
+    }), 'utf8');
+
+    const lineups = [{ video: 'v1', titulo: 'Sova Ascent', nome: 'A Site Shock Dart', segundo: 10, fim: 40 }];
+    const salvar = (arquivo, extra) => writeFile(
+      resolve(val, 'buscas', arquivo),
+      JSON.stringify({ formato: 4, em: Date.now(), lineups, ...extra }), 'utf8',
+    );
+    await salvar('ascent__sova_____atacando.json', { lidos: 6 });
+    await salvar('ascent__sova_____defendendo.json', { lidos: 18 });
+
+    const { buscaGuardada } = await import(`../src/valorant/lineups.js?magro=${Date.now()}`);
+    const magro = await buscaGuardada({ mapa: 'Ascent', agente: 'Sova', lado: 'atacando' });
+    const cheio = await buscaGuardada({ mapa: 'Ascent', agente: 'Sova', lado: 'defendendo' });
+
+    assert.ok(magro, 'o arquivo magro tem que continuar servindo, não ser descartado');
+    assert.equal(magro.lineups.length, 1, 'e vir com as lineups dele');
+    assert.equal(magro.velho, true, 'salvo com 6 vídeos: tem que pedir revalidação');
+    assert.equal(cheio.velho, false, 'salvo já com 18: não precisa refazer');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
+/* --------------------------------------------------------------------------
  * O giro do mapa depende de a Riot publicar os dois spawns como callout. Se um dia
  * publicarem um mapa sem eles, o mapa volta a ficar na orientação da planta sem avisar —
  * e foi exatamente isso que o incomodava. Este teste olha o catálogo que está em disco.

@@ -1086,8 +1086,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   box-shadow:0 0 9px #49d6c055;transition:transform .1s}
 .lnDeMapa img{width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:50%}
 .lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.22)}
-.lnDeN{position:absolute;right:-6px;top:-6px;font-style:normal;font-size:9.5px;line-height:1;
-  background:#49d6c0;color:#06201c;border-radius:7px;padding:2px 5px;font-weight:700}
 .lnDeNome{position:absolute;top:32px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font-size:9.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 3px #000;opacity:0;pointer-events:none}
 .lnDeMapa:hover .lnDeNome{opacity:1}
@@ -4307,15 +4305,14 @@ function lnEscolherHab(v){
   lnDesenharMapa();
 }
 
-/** "18 caminhos de 107 lineups" — deixa claro que a deduplicação escondeu repetição. */
+/** "83 lineups de Incendiário · 7 canais" — quantas e de quanta gente diferente. */
 function lnQuantas(){
-  const n = lnAchadas.length, total = lnTodas.length;
+  const n = lnAchadas.length;
   const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
   const quais = hab ? ` de ${esc(hab.nome)}` : '';
-  return n === total
-    ? `${n} lineup${n === 1 ? '' : 's'}${quais}`
-    : `${n} caminho${n === 1 ? '' : 's'}${quais} · ${total} lineups no total`;
+  const canais = new Set(lnAchadas.map(l => l.canal).filter(Boolean)).size;
+  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}`;
 }
 
 /* ---------------------------------------------------------------- seletores em grade */
@@ -4442,28 +4439,65 @@ function lnJanelaDoMapa(){
  * lineups, 78 delas de Incendiário; clicar em "Incendiário" devolvia 17 — jogava fora 61 que
  * já estavam na mão, e ainda demorava segundos. Agora filtra o que já tem, na hora.
  *
- * Deduplicação: o A Site tinha 58 lineups e só o A Lobby mandava 23. Ele não precisa de 23
- * jeitos de fazer a mesma coisa — precisa de um. Agrupo por (de onde → onde cai →
- * habilidade) e guardo as outras em `outras`, pra nada sumir de vez.
+ * Repetição: aqui ficava um corte de UMA lineup por caminho (de onde → onde cai →
+ * habilidade). Parecia limpeza e era poda. Medido nos 56 arquivos do acervo dele: 4888
+ * lineups viravam 1512, e 179 dos 512 pontos do mapa sobravam com UMA opção só. O motivo é
+ * que "de onde se joga" só aparece em 20% dos títulos, então o caminho de quase todas é
+ * "?>A Site>Molly" — e lineups diferentes, de canais diferentes, caíam no mesmo balde.
+ *
+ * Agora só sai o que é repetição de verdade: o mesmo trecho do mesmo vídeo, ou o mesmo
+ * canal repetindo o mesmo capítulo no mesmo ponto (reupload). Dá 4468 das 4888. Quem cuida
+ * de não lotar a tela é o anel, que escolhe 12 variadas por canal.
  */
 function lnFiltrarEDedupar(){
   const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
   const base = hab ? lnTodas.filter(l => l.habilidade?.nome === hab.nome) : lnTodas;
 
-  const por = new Map();
-  for (const l of base) {
-    const k = `${l.posicao?.nome ?? '?'}>${l.ponto?.nome ?? '?'}>${l.habilidade?.nome ?? '?'}`;
-    if (!por.has(k)) por.set(k, []);
-    por.get(k).push(l);
-  }
-  // a melhor do grupo: ponto certo vale mais que ponto chutado, ter posição vale, e entre
-  // iguais fica a que aparece primeiro no vídeo (costuma ser a versão canônica)
-  const nota = (l) => (l.ponto && !l.ponto.aproximado ? 4 : 0) + (l.posicao ? 2 : 0) + (l.fim > l.segundo ? 1 : 0);
-  lnAchadas = [...por.values()].map((g) => {
-    g.sort((a, b) => nota(b) - nota(a) || a.segundo - b.segundo);
-    return { ...g[0], outras: g.slice(1) };
+  const mesmoTrecho = new Set(), mesmoCanal = new Set();
+  const cru = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  lnAchadas = base.filter((l) => {
+    const trecho = `${l.video}@${l.segundo}`;
+    if (mesmoTrecho.has(trecho)) return false;
+    mesmoTrecho.add(trecho);
+    const repost = `${l.canal}|${cru(l.nome)}|${l.ponto?.nome ?? '?'}`;
+    if (mesmoCanal.has(repost)) return false;
+    mesmoCanal.add(repost);
+    return true;
   });
+}
+
+/** Ponto certo vale mais que ponto chutado; ter posição vale; empatou, a mais cedo no vídeo. */
+const lnNota = (l) => (l.ponto && !l.ponto.aproximado ? 4 : 0) + (l.posicao ? 2 : 0) + (l.fim > l.segundo ? 1 : 0);
+
+/**
+ * As `limite` lineups do ponto, tirando uma de cada canal antes de repetir canal.
+ *
+ * Sem isto os 12 marcadores saíam quase todos do mesmo vídeo — ele veria 12 variações da
+ * mesma gravação em vez de 12 jeitos diferentes, que é justo a reclamação. Dentro de cada
+ * canal vem primeiro a de melhor nota.
+ */
+function lnVariadas(lista, limite){
+  const porCanal = new Map();
+  for (const l of lista) {
+    const k = l.canal || l.video || '?';
+    if (!porCanal.has(k)) porCanal.set(k, []);
+    porCanal.get(k).push(l);
+  }
+  const filas = [...porCanal.values()]
+    .map((g) => g.slice().sort((a, b) => lnNota(b) - lnNota(a) || a.segundo - b.segundo))
+    .sort((a, b) => b.length - a.length);
+  const fora = [];
+  for (let volta = 0; fora.length < limite; volta++) {
+    let achou = false;
+    for (const f of filas) {
+      if (!f[volta]) continue;
+      fora.push(f[volta]); achou = true;
+      if (fora.length >= limite) break;
+    }
+    if (!achou) break;
+  }
+  return fora;
 }
 
 function lnPinos(){
@@ -4499,56 +4533,46 @@ function lnDesenharMapa(){
   const aberto = pinos.find(p => p.nome === lnPinoAtivo) ?? null;
   const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
 
-  /* As posições de onde se joga naquele ponto, UMA POR LUGAR.
-     Medido no Bind+Brimstone: o A Site tinha 35 lineups com posição, mas só 7 lugares
-     distintos — 23 delas saem do A Lobby. Desenhar uma por lineup empilhava 28 retratos no
-     mesmo pixel. Agora cada lugar é um retrato, com o número de lineups que saem dali. */
-  const porLugar = new Map();
-  for (const l of aberto?.lista ?? []) {
-    const i = lnAchadas.indexOf(l);
-    if (!l.posicao || i < 0) continue;
-    const k = l.posicao.nome;
-    if (!porLugar.has(k)) porLugar.set(k, { de: l.posicao, i, quantas: 0 });
-    porLugar.get(k).quantas++;
-  }
-  const leque = lnDesempilhar([...porLugar.values()], aberto ? { x: aberto.dx, y: aberto.dy } : null,
-    pinos.filter(p => p.nome !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })));
+  /* UM MARCADOR POR LINEUP, ate 12, variadas por canal.
+   *
+   * Antes eram duas coisas separadas e as duas escondiam opcao: um retrato por LUGAR de
+   * onde se joga (o A Lobby do Bind juntava 23 lineups atras de um retrato so, e clicar
+   * abria sempre a primeira), e, quando nenhum titulo dizia o lugar, um anel das lineups.
+   * Agora e um marcador por lineup e pronto: a que sabe de onde se joga fica desenhada NO
+   * lugar de onde se joga (retrato do agente), a que nao sabe fica no anel em volta do
+   * ponto (icone da habilidade). Clicar em qualquer um abre o clipe dela.
+   */
+  const rec = lnJanelaDoMapa();
+  const escolhidas = aberto ? lnVariadas(aberto.lista ?? [], 12) : [];
+  const soltas = escolhidas.filter(l => !l.posicao).length;
+  let vaga = 0;
+  const marcas = aberto ? lnDesempilhar(
+    escolhidas.map((l) => {
+      const lugar = Boolean(l.posicao);
+      // sem lugar conhecido: cai numa vaga do anel, que e so o ponto de partida —
+      // o desempilhamento abaixo e que decide onde cada uma termina
+      const ang = (-Math.PI / 2) + (vaga / Math.max(1, soltas)) * Math.PI * 2;
+      if (!lugar) vaga++;
+      return {
+        l, lugar, i: lnAchadas.indexOf(l),
+        de: lugar ? { x: l.posicao.x, y: l.posicao.y } : {
+          x: aberto.dx + Math.cos(ang) * rec.lx * 0.135,
+          y: aberto.dy + Math.sin(ang) * rec.ly * 0.135,
+        },
+      };
+    }),
+    { x: aberto.dx, y: aberto.dy },
+    pinos.filter(p => p.nome !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })),
+  ) : [];
 
   // Nome de canto embaixo de marcador só atrapalha — e isso vale SEMPRE, não só com um ponto
   // aberto. Era por isso que "A Bath" aparecia duplicado: o nome do canto por baixo do
   // retrato, mais o rótulo do próprio marcador.
   nomes = nomes.filter(c => !pinos.some(p => Math.hypot(c.x - p.dx, c.y - p.dy) < 0.055));
   if (aberto) {
-    const ocupado = [{ x: aberto.dx, y: aberto.dy }, ...leque.map(x => ({ x: x.dx, y: x.dy }))];
+    const ocupado = [{ x: aberto.dx, y: aberto.dy }, ...marcas.map(x => ({ x: x.dx, y: x.dy }))];
     nomes = nomes.filter(c => !ocupado.some(o => Math.hypot(c.x - o.x, c.y - o.y) < 0.055));
   }
-
-  /* Quando NENHUM título diz de onde se joga, o leque fica vazio e o mapa não oferece nada
-   * pra clicar — sobrava a lista, que é justo o que ele não quer. E isso não é defeito de
-   * parsing: no Breeze, por exemplo, o pessoal escreve "from cave" e a Riot não publica
-   * callout nenhum chamado Cave (medido: 57 de 58 lineups de Fade ficam sem posição).
-   * Então as PRÓPRIAS lineups viram marcadores em volta do ponto: continua sendo clicar
-   * no mapa pra escolher, que é o que ele pediu. */
-  const rec = lnJanelaDoMapa();
-  /* O anel era um círculo e pronto: cada marcador caía onde a conta mandasse, inclusive
-   * exatamente em cima de outro pino. Medido em 34 pontos abertos de 3 mapas: 10 pares com
-   * mais de 35% de cobertura e 7 cliques roubados — no A Main do Ascent, três marcadores
-   * cobriam 64%, 67% e 83% dos pinos A Tree, A Lobby e A Wine. O círculo agora é só o
-   * ponto de partida: o mesmo desempilhamento do leque afasta os marcadores entre si e dos
-   * outros pinos, e o lnPrender segura dentro da janela do recorte. */
-  const anel = (aberto && !leque.length)
-    ? lnDesempilhar(
-        (aberto.lista ?? []).slice(0, 12).map((l, k, todas) => {
-          const ang = (-Math.PI / 2) + (k / todas.length) * Math.PI * 2;
-          return { l, k, i: lnAchadas.indexOf(l), de: {
-            x: aberto.dx + Math.cos(ang) * rec.lx * 0.135,
-            y: aberto.dy + Math.sin(ang) * rec.ly * 0.135,
-          } };
-        }),
-        { x: aberto.dx, y: aberto.dy },
-        pinos.filter(p => p.nome !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })),
-      )
-    : [];
 
   const giro = lnGiroDoMapa();
   const RX = (x, y) => (lnNaCaixa(x, y, rec, giro)[0] * 100).toFixed(2);
@@ -4564,34 +4588,28 @@ function lnDesenharMapa(){
         <img src="${esc(lnPlanta)}" alt="planta do mapa" style="width:${(100 / rec.lx).toFixed(2)}%;height:${(100 / rec.ly).toFixed(2)}%;left:${((-rec.x0 / rec.lx) * 100).toFixed(2)}%;top:${((-rec.y0 / rec.ly) * 100).toFixed(2)}%">
       </div>
       ${nomes.map(c => `<span class="lnCallout" style="left:${RX(c.x, c.y)}%;top:${RY(c.x, c.y)}%">${esc(c.nome)}</span>`).join('')}
-      ${aberto && leque.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
-          ${leque.map((x, k) => {
-            // a rota é um caminho de verdade pra bolinha poder correr em cima dele
+      ${marcas.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
+          ${marcas.map((x, k) => {
             const d = `M ${RX(x.dx, x.dy)} ${RY(x.dx, x.dy)} L ${RX(aberto.dx, aberto.dy)} ${RY(aberto.dx, aberto.dy)}`;
-            return `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
-              <circle class="lnBola" data-k="${k}" r="1.7">
-                <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
-                  <mpath href="#lnRota${k}"/>
-                </animateMotion>
-              </circle>`;
+            // a bolinha correndo so vale quando a rota e de verdade (a lineup diz de onde
+            // sai). No anel o lugar e arbitrario, entao animar seria inventar trajetoria.
+            return x.lugar
+              ? `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
+                 <circle class="lnBola" data-k="${k}" r="1.7">
+                   <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
+                     <mpath href="#lnRota${k}"/>
+                   </animateMotion>
+                 </circle>`
+              : `<path class="lnRota" data-k="${k}" d="${d}" />`;
           }).join('')}
         </svg>` : ''}
-      ${aberto ? leque.map((x, k) => `
-        <button class="lnDeMapa" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
-          title="${esc(x.de.nome)}${x.quantas > 1 ? ` — ${x.quantas} lineups daqui` : ''}"
-          onclick="event.stopPropagation();lnEscolherLugar('${esc(x.de.nome)}',${x.i})"
+      ${marcas.map((x, k) => `
+        <button class="${x.lugar ? 'lnDeMapa' : 'lnTiro'}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
+          title="${esc(x.l.nome)}${x.lugar ? ` — de ${esc(x.l.posicao.nome)}` : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}"
+          onclick="event.stopPropagation();lnVer(${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
-          ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">` : ''}
-          ${x.quantas > 1 ? `<i class="lnDeN">${x.quantas}</i>` : ''}
-          <span class="lnDeNome">${esc(x.de.nome)}</span>
-        </button>`).join('') : ''}
-      ${anel.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
-          ${anel.map((x) => `<path class="lnRota" d="M ${RX(x.dx, x.dy)} ${RY(x.dx, x.dy)} L ${RX(aberto.dx, aberto.dy)} ${RY(aberto.dx, aberto.dy)}" />`).join('')}
-        </svg>` : ''}
-      ${anel.map((x) => `
-        <button class="lnTiro" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
-          title="${esc(x.l.nome)}" onclick="event.stopPropagation();lnVer(${x.i})">
-          ${x.l.habilidade?.icone ? `<img src="${esc(x.l.habilidade.icone)}" alt="">` : `<b>${x.k + 1}</b>`}
+          ${x.lugar && agente?.icone ? `<img src="${esc(agente.icone)}" alt="">`
+            : x.l.habilidade?.icone ? `<img src="${esc(x.l.habilidade.icone)}" alt="">` : '<b>•</b>'}
           <span class="lnDeNome">${esc(lnNomeCurto(x.l))}</span>
         </button>`).join('')}
       ${pinos.map(p => `
@@ -4608,10 +4626,9 @@ function lnDesenharMapa(){
 }
 
 /**
- * Clicar no ponto onde a habilidade CAI abre em leque todas as posições de onde dá pra
- * jogar ali: cada uma vira o retrato do agente no mapa, ligado por uma linha. A escolha
- * da lineup passa a ser no mapa, que é como ele pensa — "quero fumar o A Site, de onde
- * eu consigo?" — em vez de abrir o primeiro vídeo e esperar que seja o certo.
+ * Clicar no ponto onde a habilidade CAI abre as lineups dali, uma por marcador, ligadas
+ * por uma linha. A escolha passa a ser no mapa, que é como ele pensa — "quero fumar o A
+ * Site, de onde eu consigo?" — em vez de abrir o primeiro vídeo e torcer pra ser o certo.
  */
 /**
  * Passar o mouse num retrato isola a rota dele: as outras linhas e bolinhas apagam. Com 6
@@ -4795,14 +4812,9 @@ function lnDesencalhar(itens, obstaculos, minimo = longe(LN_LONGE_PINO)){
 function lnFocarRota(k){
   const mapa = document.querySelector('.lnMapa'); if (!mapa) return;
   mapa.classList.toggle('comFoco', k != null);
-  for (const el of mapa.querySelectorAll('.lnRota,.lnBola,.lnDeMapa')) {
+  for (const el of mapa.querySelectorAll('.lnRota,.lnBola,.lnDeMapa,.lnTiro')) {
     el.classList.toggle('apagado', k != null && Number(el.dataset.k) !== k);
   }
-}
-
-/** Clicou num retrato: abre o clipe daquela lineup, direto. */
-function lnEscolherLugar(nome, i){
-  lnVer(i);
 }
 
 function lnClicarPino(nome){
