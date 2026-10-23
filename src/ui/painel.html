@@ -1025,6 +1025,9 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPalco.comClipe .lnMapa{max-width:400px}
  /* a imagem fica MAIOR que a caixa de proposito e deslocada: a caixa e a janela do recorte */
 .lnMapa img{position:absolute;display:block;opacity:.92;max-width:none}
+/* A caixa que gira. Só a ARTE gira; os marcadores e os nomes de canto ficam de fora dela,
+   senão o texto viraria de cabeça pra baixo junto. */
+.lnGiro{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) rotate(var(--g,0deg))}
 /* O TAMANHO DO MARCADOR acompanha a largura do mapa.
  *
  * A distância mínima entre marcadores é uma fração da largura (ver `longe`), mas o
@@ -1098,6 +1101,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   background:#0b1016;border:1px solid var(--borda);color:var(--fraco);border-radius:50%;padding:2px 3px}
 .lnMapa.comLeque .lnPino:not(.on){opacity:.35}
 .lnLequeNota{text-align:center;color:var(--fraco);font-size:11.5px;margin-top:7px}
+/* dizer que o mapa girou evita ele achar que a planta esta errada quando troca de lado */
+.lnBussola{text-align:center;color:var(--fraco);font-size:11px;opacity:.75;margin-top:6px}
 .lnCallout{position:absolute;transform:translate(-50%,-50%);font-size:9.5px;color:#cfd6e4;
   text-shadow:0 1px 3px #000,0 0 2px #000;pointer-events:none;white-space:nowrap;opacity:.75}
 .lnPino:hover{transform:translate(-50%,-50%) scale(1.18)}
@@ -4565,17 +4570,24 @@ function lnDesenharMapa(){
       )
     : [];
 
-  const RX = (x) => (((x - rec.x0) / rec.lx) * 100).toFixed(2);
-  const RY = (y) => (((y - rec.y0) / rec.ly) * 100).toFixed(2);
+  const giro = lnGiroDoMapa();
+  const RX = (x, y) => (lnNaCaixa(x, y, rec, giro)[0] * 100).toFixed(2);
+  const RY = (x, y) => (lnNaCaixa(x, y, rec, giro)[1] * 100).toFixed(2);
+  // com 90 ou 270 a caixa deita: a largura passa a ser a altura crua
+  const cx = (giro === 90 || giro === 270) ? rec.ly : rec.lx;
+  const cy = (giro === 90 || giro === 270) ? rec.lx : rec.ly;
+  const deitado = giro === 90 || giro === 270;
 
   $('#lnMapaCx').innerHTML = `
-    <div class="lnMapa ${aberto ? 'comLeque' : ''}" style="aspect-ratio:${(rec.lx / rec.ly).toFixed(4)};--ar:${(rec.lx / rec.ly).toFixed(4)}">
-      <img src="${esc(lnPlanta)}" alt="planta do mapa" style="width:${(100 / rec.lx).toFixed(2)}%;height:${(100 / rec.ly).toFixed(2)}%;left:${((-rec.x0 / rec.lx) * 100).toFixed(2)}%;top:${((-rec.y0 / rec.ly) * 100).toFixed(2)}%">
-      ${nomes.map(c => `<span class="lnCallout" style="left:${RX(c.x)}%;top:${RY(c.y)}%">${esc(c.nome)}</span>`).join('')}
+    <div class="lnMapa ${aberto ? 'comLeque' : ''}" style="aspect-ratio:${(cx / cy).toFixed(4)};--ar:${(cx / cy).toFixed(4)}">
+      <div class="lnGiro" style="--g:${giro}deg;width:${deitado ? ((rec.lx / rec.ly) * 100).toFixed(2) : '100'}%;height:${deitado ? ((rec.ly / rec.lx) * 100).toFixed(2) : '100'}%">
+        <img src="${esc(lnPlanta)}" alt="planta do mapa" style="width:${(100 / rec.lx).toFixed(2)}%;height:${(100 / rec.ly).toFixed(2)}%;left:${((-rec.x0 / rec.lx) * 100).toFixed(2)}%;top:${((-rec.y0 / rec.ly) * 100).toFixed(2)}%">
+      </div>
+      ${nomes.map(c => `<span class="lnCallout" style="left:${RX(c.x, c.y)}%;top:${RY(c.x, c.y)}%">${esc(c.nome)}</span>`).join('')}
       ${aberto && leque.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
           ${leque.map((x, k) => {
             // a rota é um caminho de verdade pra bolinha poder correr em cima dele
-            const d = `M ${RX(x.dx)} ${RY(x.dy)} L ${RX(aberto.dx)} ${RY(aberto.dy)}`;
+            const d = `M ${RX(x.dx, x.dy)} ${RY(x.dx, x.dy)} L ${RX(aberto.dx, aberto.dy)} ${RY(aberto.dx, aberto.dy)}`;
             return `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
               <circle class="lnBola" data-k="${k}" r="1.7">
                 <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
@@ -4585,7 +4597,7 @@ function lnDesenharMapa(){
           }).join('')}
         </svg>` : ''}
       ${aberto ? leque.map((x, k) => `
-        <button class="lnDeMapa" data-k="${k}" style="left:${RX(x.dx)}%;top:${RY(x.dy)}%"
+        <button class="lnDeMapa" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
           title="${esc(x.de.nome)}${x.quantas > 1 ? ` — ${x.quantas} lineups daqui` : ''}"
           onclick="event.stopPropagation();lnEscolherLugar('${esc(x.de.nome)}',${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
@@ -4594,17 +4606,17 @@ function lnDesenharMapa(){
           <span class="lnDeNome">${esc(x.de.nome)}</span>
         </button>`).join('') : ''}
       ${anel.length ? `<svg class="lnLeque" viewBox="0 0 100 100" preserveAspectRatio="none">
-          ${anel.map((x) => `<path class="lnRota" d="M ${RX(x.dx)} ${RY(x.dy)} L ${RX(aberto.dx)} ${RY(aberto.dy)}" />`).join('')}
+          ${anel.map((x) => `<path class="lnRota" d="M ${RX(x.dx, x.dy)} ${RY(x.dx, x.dy)} L ${RX(aberto.dx, aberto.dy)} ${RY(aberto.dx, aberto.dy)}" />`).join('')}
         </svg>` : ''}
       ${anel.map((x) => `
-        <button class="lnTiro" style="left:${RX(x.dx)}%;top:${RY(x.dy)}%"
+        <button class="lnTiro" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
           title="${esc(x.l.nome)}" onclick="event.stopPropagation();lnVer(${x.i})">
           ${x.l.habilidade?.icone ? `<img src="${esc(x.l.habilidade.icone)}" alt="">` : `<b>${x.k + 1}</b>`}
           <span class="lnDeNome">${esc(lnNomeCurto(x.l))}</span>
         </button>`).join('')}
       ${pinos.map(p => `
         <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
-          style="left:${RX(p.dx)}%;top:${RY(p.dy)}%"
+          style="left:${RX(p.dx, p.dy)}%;top:${RY(p.dx, p.dy)}%"
           title="${esc(p.nome)}${p.aproximado ? ' (posição aproximada)' : ''}" onclick="lnClicarPino('${esc(p.nome)}')">
           ${p.icone ? `<img src="${esc(p.icone)}" alt="">` : `<b>${p.lista.length}</b>`}
           ${p.icone ? `<i class="lnPinoN">${p.lista.length}</i>` : ''}
@@ -4612,6 +4624,7 @@ function lnDesenharMapa(){
           <span class="lnPinoNome">${esc(p.nome)}</span>
         </button>`).join('')}
     </div>
+    <div class="lnBussola">${lnLadoAtual === 'defendendo' ? 'defendendo' : 'atacando'} — mapa virado como no jogo, seu spawn embaixo</div>
     ${aberto ? `<div class="lnLequeNota">${leque.length
       ? `${leque.length} lugar${leque.length > 1 ? 'es' : ''} de onde jogar — clica num retrato`
       : anel.length
@@ -4650,7 +4663,46 @@ function lnDesenharMapa(){
  * Agora o número é fração da LARGURA da janela do mapa, e `longe()` converte na hora. */
 const LN_LONGE = 0.090;        // retratos do leque, que têm 30 px
 const LN_LONGE_PINO = 0.078;   // pinos, que têm 26 px
-const longe = (f) => Math.max(0.015, lnJanelaDoMapa().lx * f);
+const longe = (f) => Math.max(0.015, lnLarguraCrua() * f);
+
+/**
+ * Quanto girar o mapa pro SEU spawn ficar embaixo — como o jogo mostra.
+ *
+ * Era o que mais incomodava e eu não tinha visto: a planta da Riot vem numa orientação
+ * fixa, e no jogo o minimapa fica virado pro teu lado. Medido pelos callouts de spawn dos
+ * 13 mapas: atacando, 7 já estavam certos (Bind, Breeze, Fracture, Lotus, Pearl, Summit,
+ * Sunset), 5 precisavam de 90° (Abyss, Ascent, Corrode, Haven, Split) e o Icebox de 270°.
+ * Defendendo, TODOS precisam de mais 180°. Ou seja: o mapa nunca virava, e em 6 deles
+ * estava torto mesmo no ataque.
+ *
+ * O ângulo não é chutado: sai do vetor entre "Attacker Side Spawn" e "Defender Side Spawn",
+ * que a Riot publica em todo mapa, arredondado pro múltiplo de 90 mais perto.
+ */
+function lnGiroDoMapa(){
+  const cs = lnCallouts ?? [];
+  const atq = cs.find(c => /attacker side spawn/i.test(c.nome));
+  const def = cs.find(c => /defender side spawn/i.test(c.nome));
+  if (!atq || !def) return 0;                       // sem os dois spawns, melhor não inventar
+  const meu = lnLadoAtual === 'defendendo' ? def : atq;
+  const dele = lnLadoAtual === 'defendendo' ? atq : def;
+  const ang = Math.atan2(dele.y - meu.y, dele.x - meu.x) * 180 / Math.PI;
+  return ((Math.round((-90 - ang) / 90) * 90) % 360 + 360) % 360;
+}
+
+/** Que extensão crua vira a LARGURA na tela — troca de eixo quando o giro é 90 ou 270. */
+function lnLarguraCrua(){
+  const r = lnJanelaDoMapa(), g = lnGiroDoMapa();
+  return (g === 90 || g === 270) ? r.ly : r.lx;
+}
+
+/** O ponto cru vira posição 0..1 dentro da caixa JÁ GIRADA. */
+function lnNaCaixa(x, y, rec, giro){
+  const u = (x - rec.x0) / rec.lx, v = (y - rec.y0) / rec.ly;
+  if (giro === 90) return [1 - v, u];
+  if (giro === 180) return [1 - u, 1 - v];
+  if (giro === 270) return [v, 1 - u];
+  return [u, v];
+}
 
 /** Afasta uma lista de pontos entre si. Devolve cada um com `dx`/`dy` pro desenho. */
 /* O limite do que é "dentro do mapa" não é mais 0..1: desde que a arte passou a ser

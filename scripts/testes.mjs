@@ -837,3 +837,36 @@ test('acervo: arquivo do formato antigo é aproveitado, não descartado', async 
     if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
   }
 });
+
+/* --------------------------------------------------------------------------
+ * O giro do mapa depende de a Riot publicar os dois spawns como callout. Se um dia
+ * publicarem um mapa sem eles, o mapa volta a ficar na orientação da planta sem avisar —
+ * e foi exatamente isso que o incomodava. Este teste olha o catálogo que está em disco.
+ * -------------------------------------------------------------------------- */
+test('mapa: todo mapa do catálogo tem os dois spawns, senão o giro não acontece', async (t) => {
+  const { readFile } = await import('node:fs/promises');
+  const { resolve } = await import('node:path');
+  const { pastaBase } = await import('../src/caminhos.js');
+  let cat;
+  try { cat = JSON.parse(await readFile(resolve(pastaBase(), 'dados', 'valorant', 'catalogo.json'), 'utf8')); }
+  catch { return t.skip('sem catálogo em disco'); }
+  if (!cat?.mapas?.length) return t.skip('catálogo vazio');
+
+  const sem = [];
+  for (const m of cat.mapas) {
+    const nomes = (m.callouts ?? []).map((c) => c.nome);
+    const atq = nomes.some((n) => /attacker side spawn/i.test(n));
+    const def = nomes.some((n) => /defender side spawn/i.test(n));
+    if (!atq || !def) sem.push(`${m.nome}${atq ? '' : ' (sem spawn atacante)'}${def ? '' : ' (sem spawn defensor)'}`);
+  }
+  assert.deepEqual(sem, [], 'mapa sem spawn não gira e fica na orientação da planta');
+
+  // e o giro tem que ser um múltiplo de 90 — a conta é a mesma do painel
+  for (const m of cat.mapas) {
+    const atq = m.callouts.find((c) => /attacker side spawn/i.test(c.nome));
+    const def = m.callouts.find((c) => /defender side spawn/i.test(c.nome));
+    const ang = Math.atan2(def.y - atq.y, def.x - atq.x) * 180 / Math.PI;
+    const giro = ((Math.round((-90 - ang) / 90) * 90) % 360 + 360) % 360;
+    assert.ok([0, 90, 180, 270].includes(giro), `${m.nome}: giro ${giro} não é múltiplo de 90`);
+  }
+});
