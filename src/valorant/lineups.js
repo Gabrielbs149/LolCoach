@@ -14,7 +14,7 @@
  * Nada aqui toca no processo do Valorant. Não há leitura de memória nem sobreposição em
  * cima do jogo: o Vanguard é anticheat de kernel e trata overlay como trapaça.
  */
-import { readFile, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, unlink } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pastaBase } from '../caminhos.js';
 
@@ -22,6 +22,7 @@ const pasta = () => resolve(pastaBase(), 'dados', 'valorant');
 const arqCatalogo = () => resolve(pasta(), 'catalogo.json');
 const arqSalvas = () => resolve(pasta(), 'lineups.json');
 const arqBusca = (chave) => resolve(pasta(), 'buscas', `${chave}.json`);
+const arqAcervo = () => resolve(pasta(), 'acervo.json');
 
 const garantirPasta = () => mkdir(pasta(), { recursive: true }).catch(() => {});
 const garantirBuscas = () => mkdir(resolve(pasta(), 'buscas'), { recursive: true }).catch(() => {});
@@ -566,7 +567,8 @@ const detalhesDoVideo = async (base, id, ate = Infinity) => {
  * 6 vídeos) e lineup de um mapa não muda de semana pra semana — então da segunda vez em
  * diante sai na hora, do disco, e só revalida quando fica velho.
  */
-const VALIDADE_BUSCA = 14 * 24 * 60 * 60 * 1000;
+// Só decide QUANDO atualizar por baixo — nunca faz ninguém esperar, então pode ser longo.
+const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 4: antes do filtro de mapa, o que estava em disco tinha lineup de mapa errado dentro
 const FORMATO_BUSCA = 4;
 const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
@@ -576,16 +578,67 @@ const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado 
 export async function buscaGuardada(p = {}) {
   if (!buscavel(p)) return null;
   const g = await lerJson(arqBusca(chaveDaBusca(p)), null);
-  if (g?.formato !== FORMATO_BUSCA || !g.lineups?.length) return null;
-  return { ...g, doDisco: true, velho: Date.now() - (g.em ?? 0) > VALIDADE_BUSCA };
+  if (!g?.lineups?.length) return null;
+  const pronto = g.formato === FORMATO_BUSCA ? g : await migrarBusca(p, g);
+  if (!pronto) return null;
+  return { ...pronto, doDisco: true, velho: Date.now() - (pronto.em ?? 0) > VALIDADE_BUSCA };
 }
 
-async function guardarBusca(p, r) {
+/**
+ * Aproveita o que já está no disco em vez de mandar procurar tudo de novo.
+ *
+ * O formato 4 entrou porque o 3 guardava lineup de outro mapa dentro. Só que jogar fora
+ * 3 MB de acervo por causa disso é pior pra ele do que arrumar: o filtro de mapa roda em
+ * cima do que está salvo (os capítulos de um vídeo estão lá, na ordem) e o arquivo sobe
+ * pra 4 sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
+ */
+async function migrarBusca(p, g) {
+  if (g.formato !== 3) return null;        // formato mais velho que isso não vale a tentativa
+  const cat = await catalogo().catch(() => null);
+  const nomes = (cat?.mapas ?? []).map((x) => x.nome);
+  if (!nomes.length) return null;
+  const porVideo = new Map();
+  for (const l of g.lineups) {
+    if (!porVideo.has(l.video)) porVideo.set(l.video, []);
+    porVideo.get(l.video).push(l);
+  }
+  const fica = new Set();
+  for (const ls of porVideo.values()) {
+    const ok = capitulosDesteMapa(ls, ls[0]?.titulo ?? '', p.mapa, nomes);
+    ls.forEach((l, i) => { if (ok[i]) fica.add(l); });
+  }
+  const lineups = g.lineups.filter((l) => fica.has(l));
+  if (!lineups.length) return null;        // era tudo de outro mapa: melhor procurar de novo
+  const novo = { ...g, lineups, formato: FORMATO_BUSCA };
+  await guardarBusca(p, novo, g.em ?? Date.now());
+  return novo;
+}
+
+async function guardarBusca(p, r, em = Date.now()) {
   if (!r?.lineups?.length) return;
+  // `pedido` junto do resultado: sem isso o acervo só tinha o nome do arquivo pra se virar,
+  // e nome de arquivo é slug ("kay_o"), não dá pra mostrar na tela.
+  const pedido = { mapa: p.mapa ?? '', agente: p.agente ?? '', habilidade: p.habilidade || null, lado: p.lado || null };
   try {
     await garantirBuscas();
-    await writeFile(arqBusca(chaveDaBusca(p)), JSON.stringify({ ...r, em: Date.now(), formato: FORMATO_BUSCA }), 'utf8');
+    await writeFile(arqBusca(chaveDaBusca(p)), JSON.stringify({ ...r, pedido, em, formato: FORMATO_BUSCA }), 'utf8');
+    await anotarNoAcervo(chaveDaBusca(p), { ...pedido, lineups: r.lineups.length, em });
   } catch { /* disco cheio: a busca continua valendo em memória */ }
+}
+
+/** Atualiza por baixo o que já está no acervo mas ficou velho. Ele não espera nada disso. */
+const revalidando = new Set();
+function revalidarDepois(p) {
+  const chave = chaveDaBusca(p);
+  if (revalidando.has(chave)) return;
+  revalidando.add(chave);
+  setTimeout(async () => {
+    try {
+      const r = await buscarLineups(p);
+      if (r.lineups?.length) await guardarBusca(p, r);
+    } catch { /* fica o velho, que é melhor que nada */ }
+    finally { revalidando.delete(chave); }
+  }, 2500);
 }
 
 /**
@@ -606,11 +659,17 @@ function aquecerDepois(p) {
   }, 1200);
 }
 
-/** Com cache: instantâneo quando já foi buscado. `forcar` ignora o disco. */
+/**
+ * Com acervo: instantâneo quando já foi guardado. `forcar` ignora o disco.
+ *
+ * O que está em disco sai NA HORA, mesmo velho. Antes, passado o prazo, ele tinha que
+ * esperar a busca de novo (uns 25 s) — no meio de uma partida isso é inútil. Agora o
+ * velho aparece na mesma e a atualização acontece por baixo; na próxima vez já é a nova.
+ */
 export async function lineupsDe(p = {}) {
   if (!p.forcar) {
     const g = await buscaGuardada(p);
-    if (g && !g.velho) { aquecerDepois(p); return g; }
+    if (g) { if (g.velho) revalidarDepois(p); aquecerDepois(p); return g; }
   }
   const r = await buscarLineups(p);
   await guardarBusca(p, r);
@@ -717,6 +776,166 @@ export async function buscarLineups(p = {}) {
     deOutroMapa,
     resumo: lineups.length ? `${lineups.length} lineups de ${comCapitulo} vídeo${comCapitulo > 1 ? 's' : ''}` : null,
   };
+}
+
+/* ------------------------------------------------------------------ o acervo
+ *
+ * "pra parar de ter q ficar pesquisando toda vez e organizar tudo".
+ *
+ * O que muda em relação ao cache que já existia: o cache era um efeito colateral — só
+ * enchia no que ele por acaso tinha aberto, e vencia. O acervo é de propósito: ele manda
+ * guardar um agente, o app varre os 13 mapas dos dois lados e grava tudo em disco. Dali em
+ * diante a aba abre sem rede nenhuma, e a atualização acontece por baixo.
+ *
+ * Por que por AGENTE e não tudo de uma vez: a busca do YouTube custa 100 unidades da cota
+ * diária de 10.000, ou seja 100 buscas por dia. Um agente são 13 mapas x 2 lados = 26
+ * buscas (2.600 unidades), cabe 3 agentes por dia. Varrer os 28 agentes seriam 728 buscas:
+ * estouraria a cota no primeiro terço e deixaria o resto sem nada.
+ */
+
+const indice = () => lerJson(arqAcervo(), null);
+let gravandoIndice = Promise.resolve();
+
+/** Anota uma linha no índice. Serializado: a varredura e o aquecimento gravam juntos. */
+function anotarNoAcervo(chave, linha) {
+  gravandoIndice = gravandoIndice.then(async () => {
+    const ix = (await indice()) ?? {};
+    ix[chave] = linha;
+    await gravarJson(arqAcervo(), ix);
+  }).catch(() => {});
+  return gravandoIndice;
+}
+
+const comoSlug = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
+
+/**
+ * Remonta o índice lendo a pasta. Só roda quando o índice não existe ou está atrás da
+ * pasta — quem usa o app desde antes do acervo tem arquivo lá sem nenhuma anotação.
+ */
+async function remontarIndice(cat) {
+  const arquivos = (await readdir(resolve(pasta(), 'buscas')).catch(() => [])).filter((n) => n.endsWith('.json'));
+  const ix = (await indice()) ?? {};
+  if (arquivos.length <= Object.keys(ix).length) return ix;
+  const mapas = (cat?.mapas ?? []).map((m) => [comoSlug(m.nome), m.nome]);
+  const agentes = (cat?.agentes ?? []).map((a) => [comoSlug(a.nome), a.nome]);
+  for (const arq of arquivos) {
+    const chave = arq.replace(/\.json$/, '');
+    if (ix[chave]) continue;
+    const g = await lerJson(resolve(pasta(), 'buscas', arq), null);
+    if (!g?.lineups?.length) continue;
+    // o nome do arquivo é slug; o `pedido` só existe nos gravados a partir do acervo
+    const [m, a, hab, lado] = chave.split('__');
+    ix[chave] = g.pedido ? { ...g.pedido, lineups: g.lineups.length, em: g.em ?? 0 } : {
+      mapa: mapas.find(([sl]) => sl === m)?.[1] ?? m,
+      agente: agentes.find(([sl]) => sl === a)?.[1] ?? a,
+      habilidade: hab && hab !== '-' ? hab : null,
+      lado: lado && lado !== '-' ? lado : null,
+      lineups: g.lineups.length, em: g.em ?? 0,
+    };
+  }
+  await gravarJson(arqAcervo(), ix);
+  return ix;
+}
+
+/**
+ * O acervo agrupado por agente, que é como ele escolhe: "tenho a Fade pronta?".
+ *
+ * As linhas com `habilidade` ficam de fora da conta. Até a 2.28.251 a busca levava a
+ * habilidade junto, então o disco tinha um arquivo por habilidade do mesmo mapa — somar
+ * todos daria "1081 lineups no Brimstone em 3 mapas", que é a mesma lineup contada cinco
+ * vezes. Hoje a habilidade filtra na tela e esses arquivos não são lidos por ninguém:
+ * entram só como `sobra`, pra ele apagar quando quiser.
+ */
+export async function acervo() {
+  const cat = await catalogo().catch(() => null);
+  const ix = await remontarIndice(cat);
+  const porAgente = new Map();
+  const sobra = { arquivos: 0, lineups: 0 };
+  for (const [chave, l] of Object.entries(ix)) {
+    if (!l?.agente) continue;
+    if (l.habilidade) { sobra.arquivos++; sobra.lineups += l.lineups ?? 0; continue; }
+    if (!porAgente.has(l.agente)) porAgente.set(l.agente, { agente: l.agente, icone: null, mapas: new Map(), lineups: 0, em: 0, chaves: [] });
+    const g = porAgente.get(l.agente);
+    g.chaves.push(chave);
+    g.lineups += l.lineups ?? 0;
+    g.em = Math.max(g.em, l.em ?? 0);
+    const m = g.mapas.get(l.mapa) ?? { mapa: l.mapa, lineups: 0, lados: new Set(), em: 0 };
+    m.lineups += l.lineups ?? 0;
+    m.em = Math.max(m.em, l.em ?? 0);
+    if (l.lado) m.lados.add(l.lado);
+    g.mapas.set(l.mapa, m);
+  }
+  const totalMapas = (cat?.mapas ?? []).length;
+  const lista = [...porAgente.values()].map((g) => ({
+    agente: g.agente,
+    icone: cat?.agentes?.find((a) => a.nome === g.agente)?.icone ?? null,
+    lineups: g.lineups,
+    em: g.em,
+    mapas: [...g.mapas.values()].map((m) => ({ ...m, lados: [...m.lados] })).sort((a, b) => a.mapa.localeCompare(b.mapa, 'pt-BR')),
+    completo: totalMapas > 0 && g.mapas.size >= totalMapas,
+  })).sort((a, b) => b.em - a.em);
+  return { agentes: lista, totalMapas, sobra, varredura: statusDaVarredura() };
+}
+
+/** Apaga as buscas por habilidade, que o app não lê mais. Só a pedido dele. */
+export async function limparSobra() {
+  const ix = (await indice()) ?? {};
+  const chaves = Object.entries(ix).filter(([, l]) => l?.habilidade).map(([c]) => c);
+  for (const c of chaves) { await unlink(arqBusca(c)).catch(() => {}); delete ix[c]; }
+  await gravarJson(arqAcervo(), ix);
+  return { apagadas: chaves.length };
+}
+
+/** Tira do disco tudo que é de um agente — o botão de arrumar a casa. */
+export async function esquecerAgente(agente) {
+  const ix = (await indice()) ?? {};
+  const chaves = Object.entries(ix).filter(([, l]) => l?.agente === agente).map(([c]) => c);
+  for (const c of chaves) {
+    await unlink(arqBusca(c)).catch(() => {});
+    delete ix[c];
+  }
+  await gravarJson(arqAcervo(), ix);
+  return { apagadas: chaves.length };
+}
+
+/* ---------------------------------------------------------- varrer um agente */
+
+const varredura = { rodando: false, agente: null, feitos: 0, total: 0, agora: null, novas: 0, vazias: 0, em: null };
+export const statusDaVarredura = () => ({ ...varredura });
+
+/**
+ * Guarda um agente inteiro: todos os mapas, os dois lados, um de cada vez.
+ *
+ * Um de cada vez de propósito. As instâncias do Invidious são comunitárias e passam a
+ * recusar quando a gente dispara pedido em paralelo — foi o que já aconteceu buscando
+ * capítulo e quadro juntos pros 6 vídeos. Uma varredura leva uns 10 min e roda por baixo:
+ * nenhuma janela é tocada e ele pode usar o app normalmente enquanto isso.
+ */
+export async function guardarAgente({ agente, chaveYoutube = null, refazer = false } = {}) {
+  if (varredura.rodando) return { ...varredura, aviso: 'já tem uma varredura rodando' };
+  const cat = await catalogo();
+  if (!cat.agentes?.some((a) => a.nome === agente)) throw new Error('agente desconhecido');
+  const fila = [];
+  for (const m of cat.mapas) for (const lado of ['atacando', 'defendendo']) fila.push({ mapa: m.nome, agente, lado });
+  Object.assign(varredura, { rodando: true, agente, feitos: 0, total: fila.length, agora: null, novas: 0, vazias: 0, em: Date.now() });
+
+  (async () => {
+    for (const item of fila) {
+      varredura.agora = `${item.mapa} · ${item.lado === 'atacando' ? 'atacante' : 'defensor'}`;
+      try {
+        // o que já está guardado não se procura de novo: a cota do YouTube é finita
+        if (!refazer && (await buscaGuardada(item))) { varredura.feitos++; continue; }
+        const r = await buscarLineups({ ...item, chaveYoutube });
+        if (r.lineups?.length) { await guardarBusca(item, r); varredura.novas += r.lineups.length; }
+        else varredura.vazias++;
+      } catch { varredura.vazias++; }
+      varredura.feitos++;
+      await new Promise((ok) => setTimeout(ok, 1200));    // respiro entre uma busca e outra
+    }
+    Object.assign(varredura, { rodando: false, agora: null });
+  })();
+
+  return { ...varredura };
 }
 
 /** A mesma busca, pra abrir no navegador quando nada funcionar. */

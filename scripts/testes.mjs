@@ -783,3 +783,57 @@ test('lineup: o título manda enquanto nenhum capítulo disser o mapa', async ()
   // ninguém disse nada: não dá pra afirmar que é de outro mapa, então fica
   assert.deepEqual(capitulosDesteMapa(c, 'Fade lineups', 'Breeze', MAPAS), [true, true, true]);
 });
+
+/* --------------------------------------------------------------------------
+ * O acervo: o que está em disco tem que ser aproveitado, não descartado.
+ *
+ * Quando o FORMATO_BUSCA subiu pra 4 (por causa do filtro de mapa), os 51 arquivos que ele
+ * já tinha viraram lixo de um dia pro outro — 3,1 MB e ~25 s de busca por arquivo pra
+ * recuperar. O migrador roda o filtro em cima do que está salvo e sobe o arquivo sem rede.
+ * -------------------------------------------------------------------------- */
+test('acervo: arquivo do formato antigo é aproveitado, não descartado', async () => {
+  const { mkdtemp, mkdir, writeFile, readFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-acervo-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const val = resolve(base, 'dados', 'valorant');
+    await mkdir(resolve(val, 'buscas'), { recursive: true });
+    // catálogo falso, pra não depender de rede
+    await writeFile(resolve(val, 'catalogo.json'), JSON.stringify({
+      em: Date.now(), formato: 4,
+      mapas: ['Ascent', 'Bind', 'Breeze', 'Haven'].map((nome) => ({ nome, planta: null, callouts: [] })),
+      agentes: [{ nome: 'Fade', icone: null, habilidades: [] }],
+    }), 'utf8');
+
+    const ontem = Date.now() - 24 * 60 * 60 * 1000;
+    const l = (video, nome) => ({ video, titulo: 'BEST Fade Lineups ALL MAPS', nome, segundo: 30, fim: 60 });
+    await writeFile(resolve(val, 'buscas', 'breeze__fade_____atacando.json'), JSON.stringify({
+      formato: 3, em: ontem,
+      lineups: [l('v1', 'Fade Lineup Bind A Site'), l('v1', 'Fade Lineup Breeze B Site'), l('v1', 'Fade Lineup Haven C Site')],
+    }), 'utf8');
+    // arquivo por habilidade: o app não lê mais, então não pode entrar na conta
+    await writeFile(resolve(val, 'buscas', 'breeze__fade__haunt__atacando.json'), JSON.stringify({
+      formato: 3, em: ontem, lineups: [l('v2', 'Breeze A Site Haunt')],
+    }), 'utf8');
+
+    const { buscaGuardada, acervo } = await import(`../src/valorant/lineups.js?acervo=${Date.now()}`);
+    const g = await buscaGuardada({ mapa: 'Breeze', agente: 'Fade', lado: 'atacando' });
+    assert.ok(g, 'o arquivo do formato 3 tinha que ser aproveitado');
+    assert.deepEqual(g.lineups.map((x) => x.nome), ['Fade Lineup Breeze B Site'], 'só a de Breeze fica');
+    assert.equal(g.em, ontem, 'a data original não pode virar "agora"');
+
+    const salvo = JSON.parse(await readFile(resolve(val, 'buscas', 'breeze__fade_____atacando.json'), 'utf8'));
+    assert.equal(salvo.formato, 4, 'o arquivo tinha que subir de formato no disco');
+
+    const a = await acervo();
+    const fade = a.agentes.find((x) => x.agente === 'Fade');
+    assert.equal(fade.lineups, 1, 'a conta é só do que o app lê');
+    assert.equal(a.sobra.arquivos, 1, 'a busca por habilidade entra como sobra, não na conta');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});

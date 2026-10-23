@@ -1035,6 +1035,20 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnRota.apagado,.lnBola.apagado{opacity:.08}
 .lnDeMapa.apagado{opacity:.3}
 .lnMapa.comFoco .lnCallout{opacity:.35}
+ /* o acervo: o que esta guardado em disco, por agente */
+.acAg{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--borda);
+  border-radius:10px;background:#0e131bcc;margin-bottom:6px}
+.acAg img{width:34px;height:34px;border-radius:8px;object-fit:cover;background:#0b0f16}
+.acAg b{font-size:13px}
+.acAg .acInfo{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.acAg .acMapas{font-size:11px;color:var(--fraco);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acAg .acSelo{font-size:10px;font-weight:700;letter-spacing:.04em;padding:2px 7px;border-radius:999px;
+  border:1px solid var(--ouro);color:var(--ouro-claro)}
+.acAg .acSelo.pouco{border-color:#6b7280;color:#9aa4b2}
+.acBarra{height:6px;border-radius:999px;background:#1b2330;overflow:hidden;margin-top:4px}
+.acBarra i{display:block;height:100%;background:var(--ouro)}
+.acAndando{font-size:12px;color:var(--fraco);padding:6px 2px}
+
  /* a lineup como marcador, pra quando nao existe "de onde jogar" */
 .lnTiro{position:absolute;transform:translate(-50%,-50%);width:28px;height:28px;border-radius:50%;
   border:2px solid var(--ouro);background:#11161fee;padding:0;cursor:pointer;z-index:4;
@@ -1488,6 +1502,9 @@ h2{letter-spacing:1px}
         </div>
       </div>
     </div>
+
+    <h2>Acervo <small id="lnAcervoQ">o que já está guardado aqui no PC</small></h2>
+    <div id="lnAcervo"></div>
 
     <h2>As suas <small id="lnQuantas"></small></h2>
     <div class="lnFiltros lnFiltrosMinhas">
@@ -4232,6 +4249,7 @@ async function carregarLineups(){
   } catch {}
   lnDesenharLados(); lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
   await carregarMinhasLineups();
+  carregarAcervo();
   lnVigiarJogo(true);
   // lembrou mapa e agente da última vez? já mostra, sem ele pedir
   if (lnMapaAtual && lnAgenteAtual) lnProcurar();
@@ -4309,7 +4327,7 @@ function lnAbrirSeletor(qual){
 }
 function lnFecharSeletor(){ const m = $('#lnModal'); if (m) { m.hidden = true; m.innerHTML = ''; } }
 function lnEscolherNoSeletor(qual, nome){
-  if (qual === 'mapa') lnMapaAtual = nome; else { lnAgenteAtual = nome; lnDesenharHabs(); }
+  if (qual === 'mapa') lnMapaAtual = nome; else { lnAgenteAtual = nome; lnDesenharHabs(); lnDesenharAcervo(); }
   lnFecharSeletor(); lnDesenharCartoes(); lnLinks(); lnProcurarLogo();
 }
 
@@ -4348,7 +4366,11 @@ async function lnProcurar(forcar){
   lnFecharClipe();
   const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
   let r;
-  try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...e, forcar: '1' } : e)); }
+  /* A habilidade NÃO vai na busca. Ela filtra aqui dentro desde a 2.28.249, e mandar ela
+   * pro YouTube só estreitava o resultado e criava um arquivo separado em disco pra cada
+   * habilidade — cinco buscas de 25 s onde bastava uma, e nenhuma delas completa. */
+  const { habilidade: _hab, ...busca } = e;
+  try { r = await pegar('/api/val/buscar?' + new URLSearchParams(forcar ? { ...busca, forcar: '1' } : busca)); }
   catch { r = { lineups: [], aviso: 'a busca não respondeu' }; }
   clearTimeout(lento);
   if (meu !== lnPedido) return;           // ele já trocou de agente: esse resultado é velho
@@ -4933,6 +4955,89 @@ async function lnSalvarAtual(botao, i){
     botao.textContent = 'salva ✓';
     await carregarMinhasLineups();
   } catch (err) { botao.disabled = false; botao.textContent = 'Salvar na minha lista'; alert('não deu pra salvar: ' + err.message); }
+}
+
+/* ---------------------------------------------------------------- o acervo
+ * "pra parar de ter q ficar pesquisando toda vez e organizar tudo": mostra o que já está
+ * no PC, por agente, e deixa ele mandar guardar um agente inteiro de uma vez. */
+
+let lnAcervoDados = null, lnAcervoVigia = null;
+
+async function carregarAcervo(){
+  try { lnAcervoDados = await pegar('/api/val/acervo'); } catch { lnAcervoDados = null; }
+  lnDesenharAcervo();
+}
+
+function lnDesenharAcervo(){
+  const d = lnAcervoDados;
+  const cx = $('#lnAcervo'); if (!cx) return;
+  const v = d?.varredura;
+  const andando = v?.rodando ? `
+    <div class="acAg">
+      <div class="acInfo">
+        <b>Guardando ${esc(v.agente)}…</b>
+        <span class="acMapas">${esc(v.agora ?? 'começando')} · ${v.feitos} de ${v.total}${v.novas ? ` · ${v.novas} lineups novas` : ''}</span>
+        <div class="acBarra"><i style="width:${Math.round((v.feitos / Math.max(1, v.total)) * 100)}%"></i></div>
+      </div>
+    </div>` : '';
+
+  const agora = lnAgenteAtual;
+  const jaTem = (d?.agentes ?? []).find(a => a.agente === agora);
+  const botao = agora && !v?.rodando ? `
+    <div class="acAndando">
+      <button class="acao" onclick="lnGuardarAgente()">${jaTem?.completo ? `Atualizar ${esc(agora)}` : `Guardar ${esc(agora)} em todos os mapas`}</button>
+      <span> — ${d?.totalMapas ?? 13} mapas, os dois lados. Roda por baixo, uns 10 min; pode usar o app normalmente.</span>
+    </div>` : '';
+
+  const linhas = (d?.agentes ?? []).map(a => `
+    <div class="acAg">
+      ${a.icone ? `<img src="${esc(a.icone)}" alt="">` : ''}
+      <div class="acInfo">
+        <b>${esc(a.agente)}</b>
+        <span class="acMapas">${a.mapas.map(m => esc(m.mapa)).join(' · ')}</span>
+      </div>
+      <span class="acSelo ${a.completo ? '' : 'pouco'}">${a.mapas.length}/${d.totalMapas} mapas · ${a.lineups}</span>
+      <button class="acao" onclick="lnEsquecerAgente('${esc(a.agente)}')">Apagar</button>
+    </div>`).join('');
+
+  const s = d?.sobra;
+  const limpeza = s?.arquivos ? `
+    <div class="acAndando">
+      <button class="acao" onclick="lnLimparSobra()">Limpar ${s.arquivos} arquivo${s.arquivos > 1 ? 's' : ''} antigo${s.arquivos > 1 ? 's' : ''}</button>
+      <span> — buscas por habilidade de antes da 2.28.252. O app não lê mais, só ocupam espaço.</span>
+    </div>` : '';
+
+  cx.innerHTML = andando + botao + limpeza + (linhas || `<div class="vazio">nada guardado ainda — escolhe um agente ali em cima e manda guardar</div>`);
+  $('#lnAcervoQ').textContent = d?.agentes?.length
+    ? `${d.agentes.length} agente${d.agentes.length > 1 ? 's' : ''} · ${d.agentes.reduce((n, a) => n + a.lineups, 0)} lineups no PC`
+    : 'o que já está guardado aqui no PC';
+
+  // enquanto varre, olha de novo; quando para, desliga o vigia (nada de laço eterno)
+  clearTimeout(lnAcervoVigia);
+  if (v?.rodando) lnAcervoVigia = setTimeout(carregarAcervo, 3000);
+}
+
+async function lnGuardarAgente(){
+  if (!lnAgenteAtual) return;
+  try {
+    await fetch('/api/val/guardar-agente', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agente: lnAgenteAtual }) });
+  } catch {}
+  carregarAcervo();
+}
+
+async function lnLimparSobra(){
+  try { await fetch('/api/val/limpar-sobra', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); } catch {}
+  carregarAcervo();
+}
+
+async function lnEsquecerAgente(agente){
+  if (!confirm(`Apagar do PC tudo que está guardado de ${agente}?`)) return;
+  try {
+    await fetch('/api/val/esquecer-agente', { method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ agente }) });
+  } catch {}
+  carregarAcervo();
 }
 
 /* ---------------------------------------------------------------- as dele */

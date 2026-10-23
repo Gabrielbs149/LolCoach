@@ -2516,6 +2516,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     valCatalogo: (p = {}) => Lineups.catalogo({ forcar: p.forcar === true }),
     valBuscar: (p = {}) => Lineups.lineupsDe({ ...p, chaveYoutube: config.youtube?.chave || null }),
     valSalvas: () => Lineups.salvas(),
+    /* O acervo: o que já está guardado em disco e o botão de guardar um agente inteiro.
+       Só leitura de disco e busca de vídeo — nada toca em janela nem no jogo. */
+    valAcervo: () => Lineups.acervo(),
+    valGuardarAgente: (p = {}) => Lineups.guardarAgente({
+      agente: String(p.agente ?? ''), refazer: p.refazer === true || p.refazer === '1',
+      chaveYoutube: config.youtube?.chave || null,
+    }),
+    valEsquecerAgente: (p = {}) => Lineups.esquecerAgente(String(p.agente ?? '')),
+    valLimparSobra: () => Lineups.limparSobra(),
     valSalvar: (p = {}) => Lineups.salvar(p),
     valApagar: (p = {}) => Lineups.apagar(String(p.id ?? '')),
     /* O que está rolando no Valorant agora (mapa e agente), lido do cliente local.
@@ -2547,4 +2556,5 @@ const ACOES_DO_PAINEL = [
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
+  'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra',
 ];

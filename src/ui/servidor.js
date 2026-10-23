@@ -783,8 +783,8 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         return enviar(200, 'application/json', JSON.stringify(await acoes.atualizar()));
       }
 
-      // POST: salvar e apagar lineup
-      for (const [caminho, nome] of [['/api/val/salvar', 'valSalvar'], ['/api/val/apagar', 'valApagar']]) {
+      // POST: salvar e apagar lineup, e mexer no acervo (guardar um agente, esquecer um agente)
+      for (const [caminho, nome] of [['/api/val/salvar', 'valSalvar'], ['/api/val/apagar', 'valApagar'], ['/api/val/guardar-agente', 'valGuardarAgente'], ['/api/val/esquecer-agente', 'valEsquecerAgente'], ['/api/val/limpar-sobra', 'valLimparSobra']]) {
         if (req.method !== 'POST' || url.pathname !== caminho || !acoes[nome]) continue;
         const pedacos = []; for await (const p of req) pedacos.push(p);
         try {
@@ -957,7 +957,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       // GET: catálogo (mapas/agentes), busca de vídeo, as salvas e os links de fora.
       // Tudo devolve JSON e nenhuma derruba a aba: sem internet, a busca volta com aviso
       // e as salvas continuam vindo do disco.
-      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao']]) {
+      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao'], ['/api/val/acervo', 'valAcervo']]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         const p = {
           forcar: url.searchParams.get('forcar') === '1',
@@ -965,6 +965,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
           agente: url.searchParams.get('agente') || '',
           habilidade: url.searchParams.get('habilidade') || '',
           lado: url.searchParams.get('lado') || null,
+          refazer: url.searchParams.get('refazer') === '1',
         };
         try { return enviar(200, 'application/json', JSON.stringify(await acoes[nome](p))); }
         catch (erro) { return enviar(503, 'application/json', JSON.stringify({ erro: erro.message })); }
