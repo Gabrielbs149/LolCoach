@@ -741,3 +741,45 @@ test('nada em src/ e electron/ importa pacote fora do package.json', async () =>
 
   assert.deepEqual(problemas, [], 'pacote usado sem estar no package.json — some no app empacotado:\n' + problemas.join('\n'));
 });
+
+/* --------------------------------------------------------------------------
+ * Lineups de Valorant: o capítulo é DESTE mapa?
+ *
+ * Medido antes do filtro: buscando Breeze com Fade vinham 85 lineups, e 38 delas saíam de
+ * um único vídeo — "BEST Fade Lineups ALL MAPS" — sem nenhuma ser de Breeze. Abyss, Bind,
+ * Corrode, Fracture, Haven, Lotus, Pearl e Sunset iam todas pra planta do Breeze.
+ * -------------------------------------------------------------------------- */
+const MAPAS = ['Abyss', 'Ascent', 'Bind', 'Breeze', 'Corrode', 'Fracture', 'Haven', 'Icebox', 'Lotus', 'Pearl', 'Split', 'Sunset'];
+const caps = (...nomes) => nomes.map((nome, i) => ({ nome, segundo: 30 + i * 30 }));
+
+test('lineup: vídeo de todos os mapas só entrega os capítulos do mapa pedido', async () => {
+  const { capitulosDesteMapa } = await import('../src/valorant/lineups.js');
+  const c = caps(
+    'Fade Lineup Abyss A Site (Front) from A Main',
+    'Fade Lineup Bind B Site from B Long',
+    'Fade Lineup Haven A Site from A Long',
+    'Fade Lineup Haven C Site from C Long',
+    'Fade Lineup Lotus C Main from C Lobby',
+  );
+  const titulo = 'BEST Fade Lineups ALL MAPS 2026 Guide Valorant!';
+  assert.deepEqual(capitulosDesteMapa(c, titulo, 'Breeze', MAPAS), [false, false, false, false, false]);
+  assert.deepEqual(capitulosDesteMapa(c, titulo, 'Haven', MAPAS), [false, false, true, true, false]);
+  assert.deepEqual(capitulosDesteMapa(c, titulo, 'Bind', MAPAS), [false, true, false, false, false]);
+});
+
+test('lineup: capítulo sem mapa herda o do capítulo anterior (cabeçalho de seção)', async () => {
+  const { capitulosDesteMapa } = await import('../src/valorant/lineups.js');
+  const c = caps('ASCENT', 'A Site from A Main', 'B Site from B Lobby', 'HAVEN', 'C Long reveal');
+  assert.deepEqual(capitulosDesteMapa(c, 'Fade lineups guide', 'Ascent', MAPAS), [true, true, true, false, false]);
+  assert.deepEqual(capitulosDesteMapa(c, 'Fade lineups guide', 'Haven', MAPAS), [false, false, false, true, true]);
+});
+
+test('lineup: o título manda enquanto nenhum capítulo disser o mapa', async () => {
+  const { capitulosDesteMapa } = await import('../src/valorant/lineups.js');
+  const c = caps('Site B Seize 01', 'A Site Haunt 03', 'Mid Haunt 01');
+  const titulo = 'All 16 Fade Lineups on Breeze | VALORANT';
+  assert.deepEqual(capitulosDesteMapa(c, titulo, 'Breeze', MAPAS), [true, true, true]);
+  assert.deepEqual(capitulosDesteMapa(c, titulo, 'Ascent', MAPAS), [false, false, false]);
+  // ninguém disse nada: não dá pra afirmar que é de outro mapa, então fica
+  assert.deepEqual(capitulosDesteMapa(c, 'Fade lineups', 'Breeze', MAPAS), [true, true, true]);
+});

@@ -386,6 +386,41 @@ export function sitePeloNome(nome) {
   return ondes.sort((x, y) => x[1] - y[1])[0][0];
 }
 
+/** Que mapas são citados num nome, na ordem em que aparecem. Nome de mapa não é traduzido. */
+export function mapasNoNome(nome, nomes = []) {
+  const t = semAcentoMin(nome);
+  return nomes
+    .map((m) => [m, t.search(new RegExp(String.raw`\b${semAcentoMin(m).replace(/[^a-z0-9]/g, '.')}\b`))])
+    .filter(([, i]) => i >= 0)
+    .sort((a, b) => a[1] - b[1])
+    .map(([m]) => m);
+}
+
+/**
+ * Quais capítulos são DESTE mapa — devolve um booleano por capítulo.
+ *
+ * Sem isto a aba misturava mapa. Medido no Breeze com Fade: dos 85 capítulos, 38 vinham de
+ * um só vídeo, o "BEST Fade Lineups ALL MAPS", e NENHUM deles era de Breeze — eram Abyss,
+ * Bind, Corrode, Fracture, Haven, Lotus, Pearl e Sunset, todos fincados na planta do Breeze.
+ *
+ * A regra: o capítulo que cita um mapa é daquele mapa; o que não cita herda o do capítulo
+ * anterior (vídeo de compilação diz o mapa uma vez e segue). Quando ninguém disse nada
+ * ainda, vale o que o título do vídeo diz. E se nem o título diz, o capítulo fica — não dá
+ * pra afirmar que é de outro mapa, e jogar fora no escuro é pior do que deixar passar.
+ */
+export function capitulosDesteMapa(caps, titulo, mapa, nomes = []) {
+  if (!mapa || nomes.length < 2) return caps.map(() => true);
+  const noTitulo = mapasNoNome(titulo, nomes);
+  // o título citar o mapa pedido já basta, mesmo que cite outros junto
+  let atual = noTitulo.includes(mapa) ? mapa : (noTitulo.length === 1 ? noTitulo[0] : null);
+  return caps.map((c) => {
+    const citados = mapasNoNome(c.nome, nomes);
+    if (citados.includes(mapa)) atual = mapa;
+    else if (citados.length) atual = citados[0];
+    return atual == null || atual === mapa;
+  });
+}
+
 /** Capítulos de um vídeo viram lineups. Devolve [] se o vídeo não tiver marcação. */
 export function capitulosDaDescricao(descricao) {
   const fora = [];
@@ -532,7 +567,8 @@ const detalhesDoVideo = async (base, id, ate = Infinity) => {
  * diante sai na hora, do disco, e só revalida quando fica velho.
  */
 const VALIDADE_BUSCA = 14 * 24 * 60 * 60 * 1000;
-const FORMATO_BUSCA = 3;
+// 4: antes do filtro de mapa, o que estava em disco tinha lineup de mapa errado dentro
+const FORMATO_BUSCA = 4;
 const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
   .map((x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).join('__');
 
@@ -635,10 +671,14 @@ export async function buscarLineups(p = {}) {
   const cat = await catalogo().catch(() => null);
   const callouts = cat?.mapas?.find((x) => x.nome === p.mapa)?.callouts ?? [];
   const habs = cat?.agentes?.find((x) => x.nome === p.agente)?.habilidades ?? [];
+  const nomesDeMapa = (cat?.mapas ?? []).map((x) => x.nome);
 
   const lineups = [];
+  let deOutroMapa = 0;
   for (const { v, caps, tiras } of porVideo) {
+    const daqui = capitulosDesteMapa(caps, v.titulo, p.mapa, nomesDeMapa);
     for (let i = 0; i < caps.length; i++) {
+      if (!daqui[i]) { deOutroMapa++; continue; }      // capítulo de outro mapa: não é deste mapa
       const c = caps[i];
       const { alvo: ponto, posicao } = pontasDaLineup(c.nome, callouts, c.site);
       // de onde sai a habilidade, na ordem: o nome do capítulo; o título do vídeo (quase sempre
@@ -674,6 +714,7 @@ export async function buscarLineups(p = {}) {
     planta: mapa?.planta ?? null,
     callouts: mapa?.callouts ?? [],
     semCapitulo: !lineups.length,
+    deOutroMapa,
     resumo: lineups.length ? `${lineups.length} lineups de ${comCapitulo} vídeo${comCapitulo > 1 ? 's' : ''}` : null,
   };
 }
