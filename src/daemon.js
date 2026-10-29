@@ -2525,6 +2525,8 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }),
     valEsquecerAgente: (p = {}) => Lineups.esquecerAgente(String(p.agente ?? '')),
     valLimparSobra: () => Lineups.limparSobra(),
+    // a tela avisa quando o player não conseguiu tocar: o vídeo sai de todas as buscas
+    valVideoRuim: (p = {}) => Lineups.marcarVideoRuim(String(p.video ?? ''), String(p.motivo ?? '')),
     valSalvar: (p = {}) => Lineups.salvar(p),
     valApagar: (p = {}) => Lineups.apagar(String(p.id ?? '')),
     /* O que está rolando no Valorant agora (mapa e agente), lido do cliente local.
@@ -2556,5 +2558,5 @@ const ACOES_DO_PAINEL = [
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
-  'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra',
+  'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
 ];

@@ -839,6 +839,56 @@ test('acervo: arquivo do formato antigo é aproveitado, não descartado', async 
 });
 
 /* --------------------------------------------------------------------------
+ * Vídeo que não toca tem que sumir das buscas JÁ SALVAS também.
+ *
+ * Filtrar na hora da busca só resolve o que vem de hoje em diante. No acervo dele, 135 das
+ * 7890 lineups apontam pra dois vídeos que o dono marcou como "não pode tocar fora do
+ * YouTube" — e isso não dá pra saber sem tentar. Então quando o player erra, a tela avisa,
+ * e o vídeo sai de tudo: do que está em disco e do que for buscado depois.
+ * -------------------------------------------------------------------------- */
+test('lineups: vídeo que deu erro no player some até do que já estava salvo', async () => {
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-ruim-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const val = resolve(base, 'dados', 'valorant');
+    await mkdir(resolve(val, 'buscas'), { recursive: true });
+    await writeFile(resolve(val, 'catalogo.json'), JSON.stringify({
+      em: Date.now(), formato: 4,
+      mapas: [{ nome: 'Ascent', planta: null, callouts: [] }],
+      agentes: [{ nome: 'Sova', icone: null, habilidades: [] }],
+    }), 'utf8');
+
+    const l = (video, nome) => ({ video, titulo: 'Sova Ascent', nome, segundo: 10, fim: 40 });
+    await writeFile(resolve(val, 'buscas', 'ascent__sova_____atacando.json'), JSON.stringify({
+      formato: 4, em: Date.now(), lidos: 18,
+      lineups: [l('bom1', 'A Site'), l('ruim', 'A Main'), l('bom2', 'B Site'), l('ruim', 'Mid')],
+    }), 'utf8');
+
+    const { lineupsDe, marcarVideoRuim } = await import(`../src/valorant/lineups.js?ruim=${Date.now()}`);
+    const pedido = { mapa: 'Ascent', agente: 'Sova', lado: 'atacando' };
+
+    const antesDeMarcar = await lineupsDe(pedido);
+    assert.equal(antesDeMarcar.lineups.length, 4, 'começa com as quatro');
+
+    await marcarVideoRuim('ruim', '150');
+    const depois = await lineupsDe(pedido);
+    assert.deepEqual(depois.lineups.map((x) => x.video), ['bom1', 'bom2'], 'as do vídeo ruim saem');
+
+    // e continua valendo depois de reler do disco
+    const { lineupsDe: deNovo } = await import(`../src/valorant/lineups.js?ruim2=${Date.now()}`);
+    const terceira = await deNovo(pedido);
+    assert.deepEqual(terceira.lineups.map((x) => x.video), ['bom1', 'bom2'], 'a lista de ruins tem que ficar gravada');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
+/* --------------------------------------------------------------------------
  * Busca magra tem que se marcar como velha sozinha.
  *
  * Os 56 arquivos do acervo dele foram salvos quando a busca lia 6 vídeos; hoje lê 18 e

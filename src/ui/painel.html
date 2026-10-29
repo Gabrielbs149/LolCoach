@@ -1160,6 +1160,14 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   aspect-ratio:16/9}
 .lnVideoCx #lnYT{width:100%;height:100%}
 .lnVideoCx iframe{border:0;display:block}
+/* o cartaz de erro: por cima do quadro preto, com o que fazer a seguir */
+.lnErroClipe{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:9px;text-align:center;padding:18px;
+  background:#05070cf2;color:var(--texto)}
+.lnErroClipe b{font-size:15px}
+.lnErroClipe span{color:var(--fraco);font-size:12.5px;max-width:420px}
+.lnErroClipe small{color:var(--apagado);font-size:11px}
+.lnErroBotoes{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .lnLadoDetalhe{display:flex;flex-direction:column;gap:7px;min-width:0}
 .lnMini{position:relative;width:100%;aspect-ratio:1/1;background:var(--f1);border:1px solid var(--borda);
   border-radius:var(--r2);overflow:hidden}
@@ -4851,7 +4859,7 @@ function lnNomeCurto(l){
  * mostrando de onde se joga e onde cai. O player é o do YouTube pela API oficial, porque
  * é ele que tem a imagem em alta — o quadro do cartão é storyboard de 320x180 e nunca vai
  * dar pra ler mira. Com os botões de -0,2 s / +0,2 s dá pra parar no quadro exato. */
-let lnPlayer = null, lnClipe = null, lnVigia = null;
+let lnPlayer = null, lnClipe = null, lnVigia = null, lnRelogio = null, lnPulos = 0;
 
 /**
  * COMO SE CONSEGUE 1080p DE VERDADE.
@@ -4884,19 +4892,35 @@ function lnEncaixar(cx){
 }
 function lnVigiarTamanho(cx){ lnEncaixar(cx); }
 
+/* Quem escolhe a qualidade é o YouTube, pelo TAMANHO do player — `setPlaybackQuality` e o
+ * playerVar `vq` são ignorados desde 2019, então contar com eles é se enganar. O que
+ * funciona de verdade está no lnMontarPlayer: nascer já do tamanho final. Isto aqui fica
+ * só como pedido educado (vídeo antigo às vezes ainda obedece) e pra cutucar o player a
+ * reavaliar depois que o quadro muda de tamanho. */
 function lnForcarAlta(p){
-  // continua pedindo: não custa nada e em vídeo antigo ainda pega
   try { p.setPlaybackQualityRange?.('hd1080', 'hd2160'); p.setPlaybackQuality?.('hd1080'); } catch {}
+  try { window.dispatchEvent(new Event('resize')); } catch {}
 }
 
-/** Carrega a API do YouTube uma vez só. */
+/**
+ * Carrega a API do YouTube uma vez só.
+ *
+ * A versão anterior guardava a promessa pra sempre e não tinha prazo nem saída pro erro:
+ * se o script não viesse (internet caindo, DNS lento, o YouTube de mau humor), a promessa
+ * ficava PENDENTE eternamente — e, como ficava guardada, todo clique seguinte esperava a
+ * mesma promessa morta. O sintoma era exatamente "nem carrega o vídeo", e só reabrindo o
+ * app voltava. Agora tem prazo de 12 s e, falhando, a promessa é jogada fora pro próximo
+ * clique tentar de novo.
+ */
 function lnApiYT(){
   if (window.YT?.Player) return Promise.resolve();
-  if (!lnApiYT._p) lnApiYT._p = new Promise((ok) => {
+  if (!lnApiYT._p) lnApiYT._p = new Promise((ok, nao) => {
+    const prazo = setTimeout(() => { lnApiYT._p = null; nao(new Error('demorou')); }, 12000);
     const antes = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => { antes?.(); ok(); };
+    window.onYouTubeIframeAPIReady = () => { antes?.(); clearTimeout(prazo); ok(); };
     const t = document.createElement('script');
     t.src = 'https://www.youtube.com/iframe_api';
+    t.onerror = () => { clearTimeout(prazo); lnApiYT._p = null; nao(new Error('não baixou')); };
     document.head.appendChild(t);
   });
   return lnApiYT._p;
@@ -4982,7 +5006,7 @@ function lnVer(i){
 /** Fecha o clipe e devolve a barra de filtros. */
 function lnFecharClipe(){
   try { lnPlayer?.destroy?.(); } catch {}
-  lnPlayer = null; lnClipe = null; clearInterval(lnVigia);
+  lnPlayer = null; lnClipe = null; lnPulos = 0; clearInterval(lnVigia); clearTimeout(lnRelogio);
   $('#lnPlayer').innerHTML = '';
   document.body.classList.remove('lnTelaCheia');
 }
@@ -4996,17 +5020,44 @@ function lnSubirPraVer(){
   });
 }
 
+/**
+ * Monta o player. Três coisas aqui existem por bug visto na mão dele.
+ *
+ * 1. ESPERAR O LAYOUT. O `lnVer` troca o HTML e SÓ ENTÃO liga a tela cheia. Se o player
+ *    nascesse no mesmo instante, nasceria do tamanho do quadro de ANTES da tela cheia — e
+ *    é o tamanho do player na hora de nascer que o YouTube usa pra escolher a qualidade.
+ *    Daí 144p num vídeo que tem 1080. Dois quadros de espera, e a medida do contêiner vai
+ *    explícita pro construtor.
+ * 2. `origin`. O construtor liga `enablejsapi` sozinho; sem o `origin` casando com a página
+ *    o aperto de mão por postMessage pode não fechar, e aí o quadro fica preto porque o
+ *    `onReady` nunca chega.
+ * 3. SAÍDA PRO ERRO. Vídeo que o dono não deixa tocar fora do YouTube (101/150), apagado
+ *    (100) ou que o player não dá conta (5) virava um retângulo preto sem uma palavra
+ *    escrita e sem botão nenhum. Agora diz o que houve e pula pra próxima do mesmo ponto.
+ */
 async function lnMontarPlayer(l){
-  await lnApiYT();
+  try { await lnApiYT(); }
+  catch { return lnClipeFalhou(l, 'o YouTube não respondeu — clica de novo daqui a pouco'); }
   if (lnClipe !== l) return;                       // ele já clicou em outra
-  clearInterval(lnVigia);
+  clearInterval(lnVigia); clearTimeout(lnRelogio);
   try { lnPlayer?.destroy?.(); } catch {}
+
+  // dois quadros: o primeiro aplica a tela cheia, o segundo já mede o tamanho final
+  await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
+  if (lnClipe !== l || !document.getElementById('lnYT')) return;
+  const cx = $('.lnVideoCx'), cr = cx?.getBoundingClientRect();
+  const larg = Math.max(854, Math.round(cr?.width || 0));
+  const alt = Math.max(480, Math.round(cr?.height || 0));
+
   lnPlayer = new YT.Player('lnYT', {
-    videoId: l.video,
+    videoId: l.video, width: larg, height: alt,
     // `mute: 1` não é frescura: sem isso o navegador BLOQUEIA o autoplay, o clipe fica parado
-      // e o que aparece é o cartaz de pré-visualização do YouTube — que é de baixa resolução e
-      // parece "qualidade ruim" sendo que o vídeo nem começou. Lineup se estuda sem som.
-      playerVars: { start: l.segundo, end: l.fim ?? undefined, autoplay: 1, mute: 1, rel: 0, modestbranding: 1, playsinline: 1, vq: 'hd1080' },
+    // e o que aparece é o cartaz de pré-visualização do YouTube — que é de baixa resolução e
+    // parece "qualidade ruim" sendo que o vídeo nem começou. Lineup se estuda sem som.
+    playerVars: {
+      start: l.segundo, end: l.fim ?? undefined, autoplay: 1, mute: 1,
+      rel: 0, modestbranding: 1, playsinline: 1, origin: location.origin,
+    },
     events: {
       onReady: (e) => {
         lnForcarAlta(e.target); lnVigiarTamanho($('.lnVideoCx'));
@@ -5017,16 +5068,87 @@ async function lnMontarPlayer(l){
       },
       // o laço é nosso: o `end` do YouTube só PARA, e pra estudar lineup a gente quer repetir
       onStateChange: (e) => {
-        if (e.data === YT.PlayerState.PLAYING) { lnForcarAlta(e.target); lnEncaixar($('.lnVideoCx')); }
+        if (e.data === YT.PlayerState.PLAYING) {
+          clearTimeout(lnRelogio); lnPulos = 0;
+          $('.lnErroClipe')?.remove();
+          lnForcarAlta(e.target); lnEncaixar($('.lnVideoCx'));
+        }
         if (e.data === YT.PlayerState.ENDED) lnDoComeco();
+      },
+      onError: (e) => {
+        const porque = ({
+          2: 'o endereço do vídeo veio errado',
+          5: 'o player do YouTube não deu conta desse vídeo',
+          100: 'o vídeo foi apagado ou ficou privado',
+          101: 'o dono não deixa esse vídeo tocar fora do YouTube',
+          150: 'o dono não deixa esse vídeo tocar fora do YouTube',
+        })[e.data] ?? 'o YouTube recusou esse vídeo';
+        // 100/101/150 é defeito do vídeo, não da internet: some de todas as buscas
+        if ([100, 101, 150].includes(e.data)) lnAvisarVideoRuim(l.video, String(e.data));
+        lnClipeFalhou(l, porque, [100, 101, 150].includes(e.data));
       },
     },
   });
+
+  /* Rede ruim também dá retângulo preto, só que sem evento de erro: o player nasce e fica
+   * lá, parado. Sem este prazo ele ficava preto pra sempre, sem uma palavra. */
+  lnRelogio = setTimeout(() => {
+    if (lnClipe !== l) return;
+    let estado = -1;
+    try { estado = lnPlayer?.getPlayerState?.() ?? -1; } catch {}
+    if (estado === YT.PlayerState.PLAYING) return;
+    lnClipeFalhou(l, estado === YT.PlayerState.BUFFERING ? 'o vídeo está travando pra carregar' : 'o vídeo não começou', false);
+  }, 9000);
+
   lnVigia = setInterval(() => {
     if (!lnPlayer?.getCurrentTime || lnClipe !== l) return;
     const t = lnPlayer.getCurrentTime();
     if (l.fim && t >= l.fim - 0.05) lnDoComeco();
   }, 200);
+}
+
+/** Conta pro app que esse vídeo não toca, pra ele sumir das buscas (inclusive as salvas). */
+function lnAvisarVideoRuim(video, motivo){
+  try {
+    fetch('/api/val/video-ruim', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ video, motivo }),
+    }).catch(() => {});
+  } catch {}
+}
+
+/** A próxima lineup do MESMO ponto, de outro vídeo. -1 se não tem. */
+function lnProximaDoPonto(l){
+  const ponto = l.ponto?.nome; if (!ponto) return -1;
+  const aqui = lnAchadas.indexOf(l);
+  const serve = (x) => x !== l && x.ponto?.nome === ponto && x.video !== l.video;
+  const depois = lnAchadas.findIndex((x, i) => i > aqui && serve(x));
+  return depois >= 0 ? depois : lnAchadas.findIndex(serve);
+}
+
+/**
+ * Em vez do retângulo preto: diz o que houve, dá o link pro YouTube e, quando o defeito é
+ * do vídeo, já pula pra próxima lineup do mesmo ponto — que é o que ele faria na mão.
+ */
+function lnClipeFalhou(l, porque, pular = false){
+  const cx = $('.lnVideoCx'); if (!cx || lnClipe !== l) return;
+  clearTimeout(lnRelogio);
+  const proxima = pular && lnPulos < 4 ? lnProximaDoPonto(l) : -1;
+  $('.lnErroClipe')?.remove();
+  const cartaz = document.createElement('div');
+  cartaz.className = 'lnErroClipe';
+  cartaz.innerHTML = `
+    <b>Esse clipe não abriu</b>
+    <span>${esc(porque)}.</span>
+    <div class="lnErroBotoes">
+      <a class="acao" target="_blank" rel="noreferrer"
+         href="https://www.youtube.com/watch?v=${encodeURIComponent(l.video)}&t=${Math.max(0, Math.floor(l.segundo))}s">abrir no YouTube</a>
+      ${proxima >= 0 ? `<button class="acao" onclick="lnPulos++;lnVer(${proxima})">próxima lineup daqui</button>` : ''}
+      <button class="acao" onclick="lnFecharClipe()">voltar pro mapa</button>
+    </div>
+    ${proxima >= 0 ? '<small>pulando pra próxima…</small>' : ''}`;
+  cx.appendChild(cartaz);
+  if (proxima >= 0) setTimeout(() => { if (lnClipe === l) { lnPulos++; lnVer(proxima); } }, 1600);
 }
 
 function lnDoComeco(){ if (lnClipe && lnPlayer?.seekTo) { lnPlayer.seekTo(lnClipe.segundo, true); lnPlayer.playVideo?.(); } }

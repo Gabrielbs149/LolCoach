@@ -23,6 +23,40 @@ const arqCatalogo = () => resolve(pasta(), 'catalogo.json');
 const arqSalvas = () => resolve(pasta(), 'lineups.json');
 const arqBusca = (chave) => resolve(pasta(), 'buscas', `${chave}.json`);
 const arqAcervo = () => resolve(pasta(), 'acervo.json');
+const arqRuins = () => resolve(pasta(), 'videos-ruins.json');
+
+/* ------------------------------------------------------------- vídeo que não toca
+ *
+ * Filtrar no momento da busca resolve o que vem de hoje em diante, mas não o que já está
+ * no disco: medido no acervo dele, 135 das 7890 lineups (1,7%) apontam pra dois vídeos do
+ * Valomate que o dono marcou como "não pode tocar fora do YouTube" — e o player não tem
+ * como adivinhar isso antes de tentar. Então quando a tela erra, ela AVISA aqui, e o vídeo
+ * some de todas as buscas, inclusive das que já estão salvas. Uma tela preta só, nunca duas.
+ */
+let ruins = null;
+async function videosRuins() {
+  if (!ruins) ruins = new Set(await lerJson(arqRuins(), []));
+  return ruins;
+}
+
+export async function marcarVideoRuim(video, motivo = '') {
+  const id = String(video ?? '').trim();
+  if (!id || id.length > 32) return { ok: false };
+  const r = await videosRuins();
+  if (r.has(id)) return { ok: true, total: r.size };
+  r.add(id);
+  await mkdir(pasta(), { recursive: true }).catch(() => {});
+  await writeFile(arqRuins(), JSON.stringify([...r]), 'utf8').catch(() => {});
+  return { ok: true, total: r.size, motivo };
+}
+
+/** Tira do resultado as lineups de vídeo que já deu erro. */
+async function semOsRuins(r) {
+  const maus = await videosRuins();
+  if (!maus.size || !r?.lineups?.length) return r;
+  const lineups = r.lineups.filter((l) => !maus.has(l.video));
+  return lineups.length === r.lineups.length ? r : { ...r, lineups };
+}
 
 const garantirPasta = () => mkdir(pasta(), { recursive: true }).catch(() => {});
 const garantirBuscas = () => mkdir(resolve(pasta(), 'buscas'), { recursive: true }).catch(() => {});
@@ -537,10 +571,15 @@ async function descricoesOficiais(ids, chave) {
   if (!chave || !ids.length) return null;
   try {
     const u = new URL('https://www.googleapis.com/youtube/v3/videos');
-    u.search = new URLSearchParams({ part: 'snippet,contentDetails', id: ids.slice(0, 50).join(','), key: chave });
+    // `status` vem na MESMA chamada, de graça, e diz se o dono deixa tocar fora do YouTube.
+    // Sem isso a lineup entrava no acervo e virava retângulo preto na hora de assistir.
+    u.search = new URLSearchParams({ part: 'snippet,contentDetails,status', id: ids.slice(0, 50).join(','), key: chave });
     const d = await buscarJson(u.toString(), 9000);
     const fora = new Map();
-    for (const v of d.items ?? []) fora.set(v.id, v.snippet?.description ?? '');
+    for (const v of d.items ?? []) fora.set(v.id, {
+      descricao: v.snippet?.description ?? '',
+      embutivel: v.status?.embeddable !== false && v.status?.privacyStatus === 'public',
+    });
     return fora;
   } catch { return null; }
 }
@@ -677,7 +716,7 @@ function aquecerDepois(p) {
 export async function lineupsDe(p = {}) {
   if (!p.forcar) {
     const g = await buscaGuardada(p);
-    if (g) { if (g.velho) revalidarDepois(p); aquecerDepois(p); return g; }
+    if (g) { if (g.velho) revalidarDepois(p); aquecerDepois(p); return semOsRuins(g); }
   }
   const r = await buscarLineups(p);
   await guardarBusca(p, r);
@@ -685,9 +724,9 @@ export async function lineupsDe(p = {}) {
   // deu ruim agora mas tem coisa velha guardada? melhor velho que vazio
   if (!r.lineups?.length) {
     const g = await buscaGuardada(p);
-    if (g) return { ...g, aviso: 'não consegui atualizar agora; mostrando o que já estava salvo' };
+    if (g) return semOsRuins({ ...g, aviso: 'não consegui atualizar agora; mostrando o que já estava salvo' });
   }
-  return r;
+  return semOsRuins(r);
 }
 
 export async function buscarLineups(p = {}) {
@@ -702,6 +741,7 @@ export async function buscarLineups(p = {}) {
   // voltava 0 lineups em 0,4 s. Hoje a oficial lê descrição, então segue em frente; só o
   // storyboard (que a oficial não tem) é que continua saindo do Invidious.
   const base = INVIDIOUS.find((b) => new URL(b).host === r.fonte) ?? INVIDIOUS[0];
+  let semEmbed = 0;
 
   /* Com chave, 18 vídeos; sem chave, 6.
    *
@@ -724,7 +764,9 @@ export async function buscarLineups(p = {}) {
     // vídeo, e disparar 18 de uma vez faz a instância recusar tudo. Então só os 6 primeiros
     // ganham prévia; as lineups dos outros 12 funcionam igual, só abrem sem miniatura.
     const tiras = await Promise.all(candidatos.map(async (v, k) => {
-      const caps = capitulosDaDescricao(oficiais.get(v.id));
+      const o = oficiais.get(v.id);
+      if (o && !o.embutivel) { semEmbed++; return { v, caps: [], tiras: [] }; }
+      const caps = capitulosDaDescricao(o?.descricao);
       const vale = caps.length && k < VIDEOS_COM_PREVIA;
       return { v, caps, tiras: vale ? await storyboardDoVideo(base, v.id, prazo).catch(() => []) : [] };
     }));
@@ -793,6 +835,7 @@ export async function buscarLineups(p = {}) {
     callouts: mapa?.callouts ?? [],
     semCapitulo: !lineups.length,
     deOutroMapa,
+    semEmbed,
     lidos: candidatos.length,
     resumo: lineups.length ? `${lineups.length} lineups de ${comCapitulo} vídeo${comCapitulo > 1 ? 's' : ''}` : null,
   };
