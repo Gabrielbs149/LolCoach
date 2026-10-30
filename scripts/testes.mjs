@@ -697,8 +697,23 @@ test('lado: o que o texto diz, nos idiomas que o acervo dele tem', async () => {
   }
 });
 
-test('lado: quem não fala herda do bloco, como no filtro de mapa', async () => {
-  const { ladosDosCapitulos } = await import('../src/valorant/lineups.js');
+/* "ainda to vendo lineup de defesa no ataque e vice versa".
+ *
+ * A herança era de QUALQUER capítulo que dissesse o lado, até o fim do vídeo. No "FADE
+ * LINEUPS ASCENT" o capítulo "A RETAKE" — que é UMA lineup, não uma seção — marcava de
+ * defesa as 14 seguintes. Agora só cabeçalho de seção passa o lado adiante. */
+test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', async () => {
+  const { ladosDosCapitulos, ladoCabecalho } = await import('../src/valorant/lineups.js');
+
+  // é cabeçalho quem só diz o lado, com ou sem enfeite
+  for (const cab of ['Attacking', 'DEFENSE---', '❚█══ATTACK══█❚', 'Defense Lineups', 'ATAQUE', 'Post Plant', '수비']) {
+    assert.ok(ladoCabecalho(cab), `"${cab}" tinha que ser cabeçalho`);
+  }
+  // e NÃO é cabeçalho quem diz o lado junto com o resto do nome da lineup
+  for (const nao of ['A RETAKE', 'A RETAKE from RAFTERS', 'Abyss Defense - B Site', 'DEF A Retake 1 High']) {
+    assert.equal(ladoCabecalho(nao), null, `"${nao}" é nome de lineup, não cabeçalho`);
+  }
+
   const caps = [
     { nome: 'Attacking' },            // cabeçalho de seção
     { nome: 'A Site 1' },
@@ -712,6 +727,17 @@ test('lado: quem não fala herda do bloco, como no filtro de mapa', async () => 
     ['atacando', 'atacando', 'atacando', 'defendendo', 'defendendo', 'defendendo']);
   assert.deepEqual(r.map((x) => x.pista), ['nome', 'bloco', 'bloco', 'nome', 'bloco', 'bloco']);
 
+  // o caso do "FADE LINEUPS ASCENT": uma lineup de retake no meio não vira seção
+  const mix = ladosDosCapitulos(
+    [{ nome: 'A LOBBY' }, { nome: 'A RETAKE' }, { nome: 'B MAIN' }, { nome: 'GOD A' }],
+    'FADE LINEUPS ASCENT - VALORANT');
+  assert.deepEqual(mix, [
+    { lado: null, pista: null },
+    { lado: 'defendendo', pista: 'nome' },
+    { lado: null, pista: null },
+    { lado: null, pista: null },
+  ]);
+
   // ninguém falou nada ainda: vale o título do vídeo
   const t = ladosDosCapitulos([{ nome: 'A Site' }], 'Best Fade POST PLANT lineups');
   assert.deepEqual(t, [{ lado: 'atacando', pista: 'video' }]);
@@ -721,20 +747,71 @@ test('lado: quem não fala herda do bloco, como no filtro de mapa', async () => 
   assert.deepEqual(n, [{ lado: null, pista: null }]);
 });
 
-test('lado: de onde se joga também diz, menos no meio do mapa', async () => {
-  const { ladoPelaPosicao } = await import('../src/valorant/lineups.js');
+/* A primeira versão media distância até os dois spawns, e media errado: "A Main to A Site"
+ * no Pearl fica mais perto do spawn do defensor e virava defesa; no Fracture o atacante
+ * nasce dos dois lados e a conta não quer dizer nada. Território em vez de distância. */
+test('lado: o lugar de onde se joga só decide quando é de um lado só', async () => {
+  const { ladoPeloLugar, juntarLado } = await import('../src/valorant/lineups.js');
   const callouts = [
     { nome: 'Attacker Side Spawn', grande: 'Attacker Side', regiao: 'Spawn', x: 0.82, y: 0.57 },
     { nome: 'Defender Side Spawn', grande: 'Defender Side', regiao: 'Spawn', x: 0.13, y: 0.43 },
+    { nome: 'A Lobby', grande: 'A', regiao: 'Lobby', x: 0.75, y: 0.3 },
+    { nome: 'A Main', grande: 'A', regiao: 'Main', x: 0.5, y: 0.3 },
     { nome: 'A Site', grande: 'A', regiao: 'Site', x: 0.3, y: 0.2 },
   ];
-  assert.equal(ladoPelaPosicao({ x: 0.8, y: 0.55 }, callouts), 'atacando');
-  assert.equal(ladoPelaPosicao({ x: 0.15, y: 0.45 }, callouts), 'defendendo');
-  // em cima do meio não dá pra afirmar: empate não vira palpite
-  assert.equal(ladoPelaPosicao({ x: 0.475, y: 0.5 }, callouts), null);
-  assert.equal(ladoPelaPosicao(null, callouts), null);
-  // mapa sem os dois spawns no catálogo: não inventa
-  assert.equal(ladoPelaPosicao({ x: 0.8, y: 0.55 }, [callouts[2]]), null);
+  assert.equal(ladoPeloLugar({ nome: 'Attacker Side Spawn' }, callouts), 'atacando');
+  assert.equal(ladoPeloLugar({ nome: 'Defender Side Spawn' }, callouts), 'defendendo');
+  // lobby é de onde o atacante sai: todo mapa tem o do atacante, nenhum tem o do defensor
+  assert.equal(ladoPeloLugar({ nome: 'A Lobby' }, callouts), 'atacando');
+  // caminho é dos dois: quem entra passa, quem segura espera
+  assert.equal(ladoPeloLugar({ nome: 'A Main' }, callouts), null);
+  assert.equal(ladoPeloLugar({ nome: 'A Site' }, callouts), null);
+  assert.equal(ladoPeloLugar(null, callouts), null);
+
+  // a ordem: o que o capítulo DIZ ganha do lugar; o lugar ganha da seção e do título
+  assert.deepEqual(juntarLado({ lado: 'defendendo', pista: 'nome' }, { nome: 'A Lobby' }, callouts),
+    { lado: 'defendendo', pista: 'nome' });
+  assert.deepEqual(juntarLado({ lado: 'defendendo', pista: 'bloco' }, { nome: 'A Lobby' }, callouts),
+    { lado: 'atacando', pista: 'lugar' });
+  assert.deepEqual(juntarLado({ lado: 'atacando', pista: 'video' }, { nome: 'A Main' }, callouts),
+    { lado: 'atacando', pista: 'video' });
+  assert.deepEqual(juntarLado({ lado: null, pista: null }, { nome: 'A Main' }, callouts),
+    { lado: null, pista: null });
+});
+
+/* "lineup de fade apareceu uma do sova, deve ter varios assim tbm". Tem: 135 das 6245 do
+ * acervo dele — 99 de vídeo que não é do agente pedido (a busca do YouTube devolve "Sunset
+ * Sova Lineups" numa procura por Fade) e 36 de capítulo de outro agente dentro de vídeo de
+ * dois ("Sova&KAY/O Lineup Guide", com blocos de Gekko, Killjoy e Tejo no meio). */
+test('agente: capítulo e vídeo de outro agente ficam de fora', async () => {
+  const { capitulosDesteAgente, agentesNoNome } = await import('../src/valorant/lineups.js');
+  const nomes = ['Fade', 'Sova', 'KAY/O', 'Gekko', 'Killjoy', 'Tejo', 'Brimstone'];
+
+  // o canal escreve KAY/O de três jeitos
+  for (const jeito of ['KAYO Lineups Split', 'Sova&KAY/O Lineup Guide', 'KAY O lineups']) {
+    assert.ok(agentesNoNome(jeito, nomes).includes('KAY/O'), jeito);
+  }
+  assert.deepEqual(agentesNoNome('Sova&KAY/O Lineup Guide', nomes), ['Sova', 'KAY/O'], 'na ordem em que aparecem');
+  assert.deepEqual(agentesNoNome('A Site Haunt 01', nomes), []);
+
+  // vídeo de dois agentes, com bloco de cada um: fica só o bloco dele
+  const caps = [
+    { nome: 'Gekko - A molly' }, { nome: 'Killjoy - A molly' },
+    { nome: 'Sova - A shocks' }, { nome: 'Tejo explanation' },
+    { nome: 'KAY/O - A molly' }, { nome: 'Mid molly' },
+  ];
+  assert.deepEqual(capitulosDesteAgente(caps, 'Sova&KAY/O Lineup Guide - ALL Closing Doors on Summit', 'KAY/O', nomes),
+    [false, false, false, false, true, true], 'o capítulo calado herda o último agente dito');
+
+  // vídeo que não é dele de jeito nenhum: não entra nada
+  const outro = [{ nome: 'Fast A Elbow Reveal' }, { nome: 'A Main Reveal' }];
+  assert.deepEqual(capitulosDesteAgente(outro, 'Sunset Sova Lineups – VALORANT 2026 *NEW*', 'Fade', nomes),
+    [false, false]);
+  // e o vídeo dele fica inteiro, mesmo sem nenhum capítulo dizer o nome
+  assert.deepEqual(capitulosDesteAgente(outro, 'Fade Lineups Sunset - Valorant Guide', 'Fade', nomes),
+    [true, true]);
+  // sem catálogo de agente não dá pra afirmar nada: fica tudo
+  assert.deepEqual(capitulosDesteAgente(outro, 'Sunset Sova Lineups', 'Fade', []), [true, true]);
 });
 
 test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
@@ -754,7 +831,7 @@ test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
         { nome: 'Attacker Side Spawn', grande: 'Attacker Side', regiao: 'Spawn', x: 0.82, y: 0.57 },
         { nome: 'Defender Side Spawn', grande: 'Defender Side', regiao: 'Spawn', x: 0.13, y: 0.43 },
       ] }],
-      agentes: [{ nome: 'Sova', icone: null, habilidades: [] }],
+      agentes: [{ nome: 'Sova', icone: null, habilidades: [] }, { nome: 'Fade', icone: null, habilidades: [] }],
     }), 'utf8');
 
     const ontem = Date.now() - 24 * 60 * 60 * 1000;
@@ -765,7 +842,8 @@ test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
       lineups: [
         l('Attacking', 10), l('A Site Dart', 20),
         l('Defense', 30), l('A Main Dart', 40),
-        l('Mid Dart', 50, { nome: 'Attacker Side Spawn', x: 0.81, y: 0.56 }),
+        l('Mid Dart', 50, { nome: 'Attacker Side Spawn' }),
+        l('Fade Haunt A Site', 60),
       ],
     }), 'utf8');
 
@@ -777,13 +855,14 @@ test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
       ['A Site Dart', 'atacando', 'bloco'],
       ['Defense', 'defendendo', 'nome'],
       ['A Main Dart', 'defendendo', 'bloco'],
-      // esta herdaria defesa do bloco; o bloco manda, e é o certo — o lugar só entra
-      // quando ninguém falou nada (ver o teste do ladoPelaPosicao)
-      ['Mid Dart', 'defendendo', 'bloco'],
+      // esta herdaria defesa da seção, mas se joga do spawn do atacante: o lugar é fato,
+      // a seção é dedução, então o lugar manda
+      ['Mid Dart', 'atacando', 'lugar'],
+      // e a do Fade saiu: busca de Sova não mostra lineup de Fade
     ]);
     assert.equal(g.em, ontem, 'a data original não pode virar "agora"');
     const salvo = JSON.parse(await readFile(resolve(val, 'buscas', 'ascent__sova_____atacando.json'), 'utf8'));
-    assert.ok(salvo.formato >= 5, 'o lado tem que ficar gravado, não ser recalculado toda vez');
+    assert.ok(salvo.formato >= 6, 'o lado tem que ficar gravado, não ser recalculado toda vez');
     assert.equal(salvo.lineups[1].lado, 'atacando');
   } finally {
     if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;

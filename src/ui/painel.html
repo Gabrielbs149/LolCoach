@@ -1085,6 +1085,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   display:flex;align-items:center;justify-content:center;font-family:inherit;color:var(--ouro-claro);
   font-size:11px;font-weight:700;box-shadow:0 0 8px #0008;transition:transform .1s}
 .lnTiro img{width:64%;height:64%;object-fit:contain;filter:brightness(1.35)}
+/* lado nao dito: borda tracejada e apagada, pra ele ver NO MAPA que o video nao disse */
+.lnTiro.semLado,.lnDeMapa.semLado{border-style:dashed;border-color:#7a8495;box-shadow:0 0 6px #0008}
 .lnTiro:hover{transform:translate(-50%,-50%) scale(1.25);border-color:#49d6c0}
 .lnTiro .lnDeNome{opacity:0;transition:opacity .12s}
 .lnTiro:hover .lnDeNome{opacity:1}
@@ -4259,6 +4261,7 @@ let lnTodas = [];        // tudo que a busca trouxe, antes do filtro e da dedupl
 let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
 // quantas ficaram de fora por serem do outro lado, e se ele pediu pra ver elas mesmo assim
 let lnDoOutroLado = 0, lnMisturarLados = false;
+let lnMudasFora = 0, lnEsconderMudas = false;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 async function carregarLineups(){
@@ -4323,7 +4326,7 @@ function lnEscolherHab(v){
   lnDesenharMapa();
 }
 
-/** "83 lineups de Incendiário · 7 canais · 24 de defesa ficaram fora" — e dá pra ver elas. */
+/** "83 de Incendiário · 7 canais · 40 de ataque · 18 sem lado · 24 de defesa fora". */
 function lnQuantas(){
   const n = lnAchadas.length;
   const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
@@ -4331,13 +4334,27 @@ function lnQuantas(){
   const quais = hab ? ` de ${esc(hab.nome)}` : '';
   const canais = new Set(lnAchadas.map(l => l.canal).filter(Boolean)).size;
   const certas = lnAchadas.filter(l => l.lado === lnLadoAtual).length;
+  const mudas = lnAchadas.filter(l => !l.lado).length;
   const outro = LADO_NOME[lnLadoAtual === 'atacando' ? 'defendendo' : 'atacando'];
   // o que foi escondido aparece escrito: esconder calado é pior que não esconder
   const fora = lnDoOutroLado
     ? ` · <button class="lnMisturar" onclick="lnTrocarMistura()" title="mostrar também as do outro lado">${lnDoOutroLado} de ${outro} fora</button>`
     : lnMisturarLados ? ` · <button class="lnMisturar on" onclick="lnTrocarMistura()">mostrando os dois lados</button>` : '';
+  // as que ninguém disse de que lado são: aparecem, mas ele pode tirar
+  const semLado = lnMudasFora
+    ? ` · <button class="lnMisturar on" onclick="lnTrocarMudas()" title="mostrar de novo as que não dizem o lado">${lnMudasFora} sem lado fora</button>`
+    : mudas ? ` · <button class="lnMisturar" onclick="lnTrocarMudas()" title="esconder as que não dizem de que lado são">${mudas} sem lado</button>` : '';
   const conf = certas ? ` · ${certas} de ${LADO_NOME[lnLadoAtual]}` : '';
-  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${fora}`;
+  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${semLado}${fora}`;
+}
+
+/** Mostra/esconde as que não dizem o lado. Filtro no que já está carregado, instantâneo. */
+function lnTrocarMudas(){
+  lnEsconderMudas = !lnEsconderMudas;
+  lnPinoAtivo = null;
+  lnFiltrarEDedupar();
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  lnDesenharMapa();
 }
 
 /** Mostra/esconde as do outro lado. Sem refazer busca: é filtro no que já está carregado. */
@@ -4486,28 +4503,13 @@ function lnJanelaDoMapa(){
 function lnFiltrarEDedupar(){
   const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
-  let base = hab ? lnTodas.filter(l => l.habilidade?.nome === hab.nome) : lnTodas;
+  const base = hab ? lnTodas.filter(l => l.habilidade?.nome === hab.nome) : lnTodas;
 
-  /* FORA O QUE É DO OUTRO LADO.
-   *
-   * O lado só existia como palavra na busca, e todo capítulo do vídeo achado virava lineup
-   * daquele lado — inclusive os que diziam o contrário com todas as letras. Medido no
-   * acervo dele: pedindo atacante, 1128 das 3256 mostradas (34,6%) eram de defesa; pedindo
-   * defensor, 987 de 2989 eram de ataque. Uma em cada três estava errada.
-   *
-   * Sai só o que CONTRADIZ o lado escolhido. A que não declarou lado nenhum fica — são 32%
-   * do acervo, e esconder o que a gente não sabe seria jogar fora um terço das opções por
-   * falta de informação. Elas só entram depois das confirmadas, pela nota.
-   */
-  if (!lnMisturarLados) {
-    const antes = base.length;
-    base = base.filter(l => !l.lado || l.lado === lnLadoAtual);
-    lnDoOutroLado = antes - base.length;
-  } else lnDoOutroLado = 0;
-
+  /* A REPETIÇÃO SAI PRIMEIRO, os filtros de lado depois — senão a conta que vai pra tela
+   * mente: contando antes do dedupe, "22 sem lado fora" tirava 9 da lista. */
   const mesmoTrecho = new Set(), mesmoCanal = new Set();
   const cru = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-  lnAchadas = base.filter((l) => {
+  const uma = base.filter((l) => {
     const trecho = `${l.video}@${l.segundo}`;
     if (mesmoTrecho.has(trecho)) return false;
     mesmoTrecho.add(trecho);
@@ -4516,6 +4518,28 @@ function lnFiltrarEDedupar(){
     mesmoCanal.add(repost);
     return true;
   });
+
+  /* FORA O QUE É DO OUTRO LADO.
+   *
+   * O lado só existia como palavra na busca, e todo capítulo do vídeo achado virava lineup
+   * daquele lado — inclusive os que diziam o contrário com todas as letras. Medido no
+   * acervo dele: pedindo atacante, 1128 das 3256 mostradas (34,6%) eram de defesa; pedindo
+   * defensor, 987 de 2989 eram de ataque. Uma em cada três estava errada.
+   *
+   * Sai só o que CONTRADIZ o lado escolhido; a que não declarou nada fica (ver abaixo).
+   */
+  const certa = (l) => !l.lado || l.lado === lnLadoAtual;
+  lnDoOutroLado = lnMisturarLados ? 0 : uma.filter(l => !certa(l)).length;
+
+  /* E, se ele mandar, fora também o que não diz o lado.
+   *
+   * Metade do acervo não diz: o canal escreve "Market to Hookah" e ponto. Depois que o
+   * classificador ficou exigente (território em vez de distância, herança só de cabeçalho)
+   * essa metade cresceu, e é ela que ele vê como "defesa no ataque". Então ela continua
+   * aparecendo — marcada, com o pino tracejado — mas agora dá pra tirar com um clique. */
+  lnMudasFora = lnEsconderMudas ? uma.filter(l => !l.lado).length : 0;
+
+  lnAchadas = uma.filter(l => (lnMisturarLados || certa(l)) && !(lnEsconderMudas && !l.lado));
 }
 
 /**
@@ -4531,9 +4555,9 @@ const LADO_NOME = { atacando: 'ataque', defendendo: 'defesa' };
 /** De onde a gente sabe o lado — vai no title, pra ele poder desconfiar quando quiser. */
 const LADO_PISTA = {
   nome: 'o nome do capítulo diz',
-  bloco: 'o bloco do vídeo é desse lado',
+  lugar: 'o lugar de onde se joga é de um lado só',
+  bloco: 'a seção do vídeo em que ela está é desse lado',
   video: 'o título do vídeo diz',
-  lugar: 'pelo lugar de onde se joga',
 };
 
 /** O selo de lado da lineup, pra tela nunca afirmar mais do que sabe. */
@@ -4678,8 +4702,8 @@ function lnDesenharMapa(){
           }).join('')}
         </svg>` : ''}
       ${marcas.map((x, k) => `
-        <button class="${x.lugar ? 'lnDeMapa' : 'lnTiro'}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
-          title="${esc(x.l.nome)}${x.lugar ? ` — de ${esc(x.l.posicao.nome)}` : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}${x.l.lado ? ` · ${LADO_NOME[x.l.lado]}` : ''}"
+        <button class="${x.lugar ? 'lnDeMapa' : 'lnTiro'}${x.l.lado ? '' : ' semLado'}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
+          title="${esc(x.l.nome)}${x.lugar ? ` — de ${esc(x.l.posicao.nome)}` : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}${x.l.lado ? ` · ${LADO_NOME[x.l.lado]}` : ' · lado não dito'}"
           onclick="event.stopPropagation();lnVer(${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
           ${x.lugar && agente?.icone ? `<img src="${esc(agente.icone)}" alt="">`

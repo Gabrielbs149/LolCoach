@@ -269,40 +269,83 @@ export function ladoPeloTexto(texto) {
 }
 
 /**
- * De onde se joga diz o lado: quem está mais perto do spawn do atacante está atacando.
- * Vale só quando um dos dois spawns é claramente mais perto — posição no meio do mapa não
- * diz nada, e chutar no empate é pior que admitir que não sabe.
+ * De onde se joga diz o lado, quando o lugar é de um lado SÓ.
+ *
+ * A primeira versão media distância até os dois spawns e ficava com o mais perto. Media
+ * errado: "[Atk Eye] A Main to A Site" no Pearl fica mais perto do spawn do defensor e
+ * virava defesa, e no Fracture — onde o atacante nasce dos DOIS lados — a conta não quer
+ * dizer nada. Eram 44 brigas com o que o próprio capítulo dizia com todas as letras.
+ *
+ * Agora quem decide é o território, e ele vem do catálogo da Riot, não de conta nossa: o
+ * callout tem super-região "Attacker Side" ou "Defender Side" (são os spawns) e região
+ * "Lobby" — lobby é de onde o atacante sai, todo mapa tem o do atacante e nenhum tem o do
+ * defensor. Fora desses, lugar nenhum é de um lado só: A Main é caminho de quem entra e
+ * também de quem segura. Com essa regra dá 0 brigas, e 269 lineups do acervo dele ganham
+ * lado por aqui.
  */
-export function ladoPelaPosicao(posicao, callouts = []) {
-  if (!posicao) return null;
-  const atk = callouts.find((c) => /attacker/i.test(c.grande ?? '') && /spawn/i.test(c.regiao ?? ''));
-  const def = callouts.find((c) => /defender/i.test(c.grande ?? '') && /spawn/i.test(c.regiao ?? ''));
-  if (!atk || !def) return null;
-  const dist = (p) => Math.hypot(posicao.x - p.x, posicao.y - p.y);
-  const da = dist(atk), dd = dist(def);
-  if (Math.abs(da - dd) < 0.12) return null;
-  return da < dd ? 'atacando' : 'defendendo';
+export function ladoPeloLugar(posicao, callouts = []) {
+  if (!posicao?.nome) return null;
+  const c = callouts.find((x) => x.nome === posicao.nome);
+  if (/attacker/i.test(c?.grande ?? '')) return 'atacando';
+  if (/defender/i.test(c?.grande ?? '')) return 'defendendo';
+  if (/\blobby\b/i.test(c?.regiao ?? '') || /\blobby\b/i.test(posicao.nome)) return 'atacando';
+  return null;
+}
+
+/** Palavra que não muda nada num cabeçalho: "Defense Lineups" é a mesma coisa que "Defense". */
+const ENFEITE = /^(?:lineups?|setups?|sides?|parts?|sections?|all|new|best|the|and|of|for|valorant|guide|라인업|ラインアップ)$/;
+
+/**
+ * O capítulo é CABEÇALHO de seção ("Defense", "❚█══ATTACK══█❚", "Post Plant") ou é o nome
+ * de UMA lineup que por acaso diz o lado ("A RETAKE from RAFTERS")? Só cabeçalho vale pro
+ * que vem depois dele.
+ *
+ * Isto é o conserto do "ainda tô vendo lineup de defesa no ataque". Antes QUALQUER capítulo
+ * que dissesse o lado passava esse lado pra todos os seguintes até o fim do vídeo: no "FADE
+ * LINEUPS ASCENT" o capítulo "A RETAKE", que é uma lineup só, marcava de defesa as 14
+ * seguintes — "GOD A", "FAST B", "SIMPLE B", "MID CONTROL". Deu 208 lineups brigando com o
+ * lugar de onde se joga, e nessas quem estava certo era o lugar.
+ */
+export function ladoCabecalho(texto) {
+  const lado = ladoPeloTexto(texto);
+  if (!lado) return null;
+  let t = ` ${semAcentoCJK(texto).replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]+/g, ' ')} `;
+  for (const [pista] of PISTAS_DE_LADO) t = t.replace(new RegExp(pista.source, 'gi'), ' ');
+  const sobra = t.split(/\s+/).filter((p) => p && !ENFEITE.test(p) && !/^\d+$/.test(p));
+  return sobra.length ? null : lado;
 }
 
 /**
- * O lado de cada capítulo do vídeo. Mesma ideia do filtro de mapa: quem fala, manda; quem
- * não fala, herda de quem falou antes. É isso que faz o número subir de 30% pra 68% — vídeo
- * de lineup é organizado em bloco ("Abyss Attack - A Site", "- B Site", "- Mid", depois
- * "Abyss Defense - A Site"), e o bloco inteiro é do lado que o primeiro anunciou.
+ * O lado de cada capítulo do vídeo, pelo texto.
  *
  * `pista` é pra tela poder ser honesta sobre o que ela sabe:
  *   nome   - o capítulo disse
- *   bloco  - herdou do capítulo anterior
- *   video  - só o título do vídeo disse
+ *   bloco  - herdou do CABEÇALHO da seção em que ele está
+ *   video  - ninguém falou nada ainda e o título do vídeo diz
  */
 export function ladosDosCapitulos(caps, titulo = '') {
   const noTitulo = ladoPeloTexto(titulo);
-  let atual = noTitulo, pistaAtual = noTitulo ? 'video' : null;
+  let secao = null;
   return caps.map((c) => {
-    const dito = ladoPeloTexto(c.nome);
-    if (dito) { atual = dito; pistaAtual = 'bloco'; return { lado: dito, pista: 'nome' }; }
-    return atual ? { lado: atual, pista: pistaAtual } : { lado: null, pista: null };
+    const cab = ladoCabecalho(c.nome);
+    if (cab) secao = cab;                       // abriu seção: vale pro que vem depois
+    const dito = cab ?? ladoPeloTexto(c.nome);
+    if (dito) return { lado: dito, pista: 'nome' };
+    if (secao) return { lado: secao, pista: 'bloco' };
+    return noTitulo ? { lado: noTitulo, pista: 'video' } : { lado: null, pista: null };
   });
+}
+
+/**
+ * Junta as pistas na ordem de certeza: o que o capítulo DIZ, depois de onde se joga, e só
+ * então o que vem de fora dele (a seção do vídeo, o título). O lugar passa na frente da
+ * seção porque estar no A Lobby é fato, e herdar seção é dedução.
+ */
+export function juntarLado(doTexto, posicao, callouts = []) {
+  if (doTexto?.pista === 'nome') return doTexto;
+  const lugar = ladoPeloLugar(posicao, callouts);
+  if (lugar) return { lado: lugar, pista: 'lugar' };
+  return doTexto?.lado ? doTexto : { lado: null, pista: null };
 }
 
 /* --------------------------------------------------- qual habilidade é */
@@ -556,6 +599,40 @@ export function capitulosDesteMapa(caps, titulo, mapa, nomes = []) {
   });
 }
 
+/** Que agentes são citados num nome, na ordem em que aparecem. Nome de agente não é traduzido. */
+export function agentesNoNome(nome, nomes = []) {
+  const t = semAcentoMin(nome);
+  return nomes
+    // o `.?` no lugar da pontuação é o KAY/O: o canal escreve "KAY/O", "KAYO" e "KAY O"
+    .map((a) => [a, t.search(new RegExp(String.raw`\b${semAcentoMin(a).replace(/[^a-z0-9]/g, '.?')}\b`))])
+    .filter(([, i]) => i >= 0)
+    .sort((x, y) => x[1] - y[1])
+    .map(([a]) => a);
+}
+
+/**
+ * Quais capítulos são DESTE agente — um booleano por capítulo, a mesma regra do filtro de
+ * mapa (ver capitulosDesteMapa).
+ *
+ * "lineup de fade apareceu uma do sova, deve ter varios assim tbm". Tem: 131 das 6245 do
+ * acervo dele. 99 vêm de vídeo que não é do agente pedido de jeito nenhum — a busca do
+ * YouTube devolve "Sunset Sova Lineups" numa procura por Fade e os 21 capítulos entravam
+ * inteiros — e 32 são capítulo de outro agente dentro de vídeo de dois ("Sova&KAY/O Lineup
+ * Guide", com blocos de Gekko, Killjoy e Tejo no meio).
+ */
+export function capitulosDesteAgente(caps, titulo, agente, nomes = []) {
+  if (!agente || nomes.length < 2) return caps.map(() => true);
+  const noTitulo = agentesNoNome(titulo, nomes);
+  // o título citar o agente pedido já basta, mesmo que cite outros junto
+  let atual = noTitulo.includes(agente) ? agente : (noTitulo.length === 1 ? noTitulo[0] : null);
+  return caps.map((c) => {
+    const citados = agentesNoNome(c.nome, nomes);
+    if (citados.includes(agente)) atual = agente;
+    else if (citados.length) atual = citados[0];
+    return atual == null || atual === agente;
+  });
+}
+
 /** Capítulos de um vídeo viram lineups. Devolve [] se o vídeo não tiver marcação. */
 export function capitulosDaDescricao(descricao) {
   const fora = [];
@@ -710,7 +787,8 @@ const detalhesDoVideo = async (base, id, ate = Infinity) => {
 const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 4: antes do filtro de mapa, o que estava em disco tinha lineup de mapa errado dentro
 // 5: cada lineup passou a saber se é de ataque ou de defesa
-const FORMATO_BUSCA = 5;
+// 6: filtro de agente (tinha lineup de Sova dentro de busca de Fade) e lado mais exigente
+const FORMATO_BUSCA = 6;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
@@ -767,35 +845,45 @@ function comOLado(mapa, lineups, cat) {
     ordem.forEach((l, i) => achado.set(l, lados[i]));
   }
   return lineups.map((l) => {
-    const d = achado.get(l) ?? { lado: null, pista: null };
-    let lado = d.lado, ladoPista = d.pista;
-    if (!lado) {
-      const geo = ladoPelaPosicao(l.posicao, callouts);
-      if (geo) { lado = geo; ladoPista = 'lugar'; }
-    }
-    return { ...l, lado, ladoPista };
+    const { lado, pista } = juntarLado(achado.get(l), l.posicao, callouts);
+    return { ...l, lado, ladoPista: pista };
   });
+}
+
+/** 5 -> 6: tira do arquivo o capítulo que era de outro agente. */
+function soDesteAgente(agente, lineups, nomes) {
+  const fica = new Set();
+  for (const ls of porVideoNaOrdem(lineups).values()) {
+    const ordem = ls.slice().sort((a, b) => a.segundo - b.segundo);
+    const ok = capitulosDesteAgente(ordem, ordem[0]?.titulo ?? '', agente, nomes);
+    ordem.forEach((l, i) => { if (ok[i]) fica.add(l); });
+  }
+  return lineups.filter((l) => fica.has(l));
 }
 
 /**
  * Aproveita o que já está no disco em vez de mandar procurar tudo de novo.
  *
  * O formato 4 entrou porque o 3 guardava lineup de outro mapa dentro; o 5 porque a lineup
- * passou a saber de que lado ela é. Só que jogar fora 3 MB de acervo por causa disso é
- * pior pra ele do que arrumar: as duas contas rodam em cima do que já está salvo — os
- * capítulos de um vídeo estão lá, com nome, título e posição — e o arquivo sobe de formato
- * sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
+ * passou a saber de que lado ela é; o 6 porque guardava lineup de outro AGENTE dentro, e
+ * porque o lado passou a ser mais exigente. Só que jogar fora 3 MB de acervo por causa
+ * disso é pior pra ele do que arrumar: todas as contas rodam em cima do que já está salvo
+ * — os capítulos de um vídeo estão lá, com nome, título e posição — e o arquivo sobe de
+ * formato sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
  */
 async function migrarBusca(p, g) {
-  if (![3, 4].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
+  if (![3, 4, 5].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
   const cat = await catalogo().catch(() => null);
   const nomes = (cat?.mapas ?? []).map((x) => x.nome);
-  if (!nomes.length) return null;
+  const agentes = (cat?.agentes ?? []).map((x) => x.nome);
+  if (!nomes.length || !agentes.length) return null;
   let lineups = g.lineups;
   if (g.formato === 3) {
     lineups = soDesteMapa(p.mapa, lineups, nomes);
     if (!lineups.length) return null;      // era tudo de outro mapa: melhor procurar de novo
   }
+  lineups = soDesteAgente(p.agente, lineups, agentes);
+  if (!lineups.length) return null;        // era tudo de outro agente: melhor procurar de novo
   lineups = comOLado(p.mapa, lineups, cat);
   const novo = { ...g, lineups, formato: FORMATO_BUSCA };
   await guardarBusca(p, novo, g.em ?? Date.now());
@@ -933,14 +1021,17 @@ export async function buscarLineups(p = {}) {
   const callouts = cat?.mapas?.find((x) => x.nome === p.mapa)?.callouts ?? [];
   const habs = cat?.agentes?.find((x) => x.nome === p.agente)?.habilidades ?? [];
   const nomesDeMapa = (cat?.mapas ?? []).map((x) => x.nome);
+  const nomesDeAgente = (cat?.agentes ?? []).map((x) => x.nome);
 
   const lineups = [];
-  let deOutroMapa = 0;
+  let deOutroMapa = 0, deOutroAgente = 0;
   for (const { v, caps, tiras } of porVideo) {
     const daqui = capitulosDesteMapa(caps, v.titulo, p.mapa, nomesDeMapa);
+    const dele = capitulosDesteAgente(caps, v.titulo, p.agente, nomesDeAgente);
     const lados = ladosDosCapitulos(caps, v.titulo);
     for (let i = 0; i < caps.length; i++) {
-      if (!daqui[i]) { deOutroMapa++; continue; }      // capítulo de outro mapa: não é deste mapa
+      if (!daqui[i]) { deOutroMapa++; continue; }       // capítulo de outro mapa: não é deste mapa
+      if (!dele[i]) { deOutroAgente++; continue; }      // capítulo de outro agente: não é dele
       const c = caps[i];
       const { alvo: ponto, posicao } = pontasDaLineup(c.nome, callouts, c.site);
       // de onde sai a habilidade, na ordem: o nome do capítulo; o título do vídeo (quase sempre
@@ -952,12 +1043,8 @@ export async function buscarLineups(p = {}) {
         ?? null;
       // o fim da lineup é o começo da próxima: assim o player toca SÓ o clipe dela
       const fim = caps[i + 1]?.segundo ?? (v.segundos || c.segundo + 25);
-      // ataque ou defesa: o texto primeiro e, se ele calou, de onde se joga
-      let lado = lados[i].lado, ladoPista = lados[i].pista;
-      if (!lado) {
-        const geo = ladoPelaPosicao(posicao, callouts);
-        if (geo) { lado = geo; ladoPista = 'lugar'; }
-      }
+      // ataque ou defesa: o que o capítulo diz, depois o lugar, depois a seção e o título
+      const { lado, pista: ladoPista } = juntarLado(lados[i], posicao, callouts);
       lineups.push({
         video: v.id, titulo: v.titulo, canal: v.canal, lado, ladoPista,
         capa: v.capa, segundo: c.segundo, fim, nome: c.nome, site: c.site, pula: c.pula,
@@ -983,6 +1070,7 @@ export async function buscarLineups(p = {}) {
     callouts: mapa?.callouts ?? [],
     semCapitulo: !lineups.length,
     deOutroMapa,
+    deOutroAgente,
     semEmbed,
     lidos: candidatos.length,
     resumo: lineups.length ? `${lineups.length} lineups de ${comCapitulo} vídeo${comCapitulo > 1 ? 's' : ''}` : null,
