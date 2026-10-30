@@ -651,6 +651,145 @@ test('repetida: a estreia sai inteira, a 2a vez sai curta', async () => {
   personalizar({});
 });
 
+/* ------------------------------------------------------------------ Valorant: que lado é
+ *
+ * O lado só existia como palavra na busca, e todo capítulo do vídeo achado virava lineup
+ * daquele lado — inclusive os que diziam o contrário. Medido no acervo dele, rodando a
+ * migração numa cópia: 2334 das 6245 lineups (37,4%) estavam do lado errado. A pior,
+ * Lotus+Fade atacando, mostrava 215 e 131 delas (61%) eram de defesa. */
+test('lado: o que o texto diz, nos idiomas que o acervo dele tem', async () => {
+  const { ladoPeloTexto } = await import('../src/valorant/lineups.js');
+  const casos = [
+    // inglês, do jeito que os canais escrevem
+    ['Abyss Attack - A Site', 'atacando'],
+    ['Abyss Defense - B Site', 'defendendo'],
+    ['DEF A Retake 1 High', 'defendendo'],
+    ['ATT A Site 1 Close', 'atacando'],
+    ['Site A Defuse Prevention Incendiary 01', 'atacando'],
+    ['A Site (Delay Defuse)', 'atacando'],
+    ['B Main (Anti-Rush)', 'defendendo'],
+    ['B Counter push 1', 'defendendo'],
+    ['A Site Execute', 'atacando'],
+    ['Site Hold', 'defendendo'],
+    // lugar que só existe de um lado
+    ['A default from Defender Spawn', 'defendendo'],
+    ['B Default from CT', 'defendendo'],
+    // espanhol e português
+    ['Defensa Site A - Retake 1', 'defendendo'],
+    ['Ataque Site A - Lineup Post plant', 'atacando'],
+    // coreano: NFD quebra hangul em jamo, então isto também trava o normalizador
+    ['미드 공격 귀체', 'atacando'],
+    ['A 포스트플랜트 귀체', 'atacando'],
+    ['A 리테이크 귀체', 'defendendo'],
+    ['A 진입 카운터 귀체', 'defendendo'],   // entrada CONTRA-atacada: defesa, não ataque
+    // japonês
+    ['守りAメイン取りホウント①', 'defendendo'],
+    ['攻めAメイン取りホウント①', 'atacando'],
+    ['Aエントリーホウント①', 'atacando'],
+    // o que NÃO pode virar lado nenhum
+    ['A Attack - Shock to clear defender utilities', 'atacando'],  // "defender" ali é o inimigo
+    ['B Main Push 1', null],                                       // push é dos dois lados
+    ['A Default', null],                                           // "default" não é "def"
+    ['Fade Lineup Abyss B Site from B Lobby', null],
+  ];
+  for (const [nome, esperado] of casos) {
+    assert.equal(ladoPeloTexto(nome), esperado, `${JSON.stringify(nome)} tinha que dar ${esperado}`);
+  }
+});
+
+test('lado: quem não fala herda do bloco, como no filtro de mapa', async () => {
+  const { ladosDosCapitulos } = await import('../src/valorant/lineups.js');
+  const caps = [
+    { nome: 'Attacking' },            // cabeçalho de seção
+    { nome: 'A Site 1' },
+    { nome: 'A Site 2' },
+    { nome: 'Defense' },              // virou a chave
+    { nome: 'A Main Reveal' },
+    { nome: 'B Main Reveal' },
+  ];
+  const r = ladosDosCapitulos(caps, 'Fade Lineups Ascent');
+  assert.deepEqual(r.map((x) => x.lado),
+    ['atacando', 'atacando', 'atacando', 'defendendo', 'defendendo', 'defendendo']);
+  assert.deepEqual(r.map((x) => x.pista), ['nome', 'bloco', 'bloco', 'nome', 'bloco', 'bloco']);
+
+  // ninguém falou nada ainda: vale o título do vídeo
+  const t = ladosDosCapitulos([{ nome: 'A Site' }], 'Best Fade POST PLANT lineups');
+  assert.deepEqual(t, [{ lado: 'atacando', pista: 'video' }]);
+
+  // ninguém falou nada em lugar nenhum: fica null, não chuta
+  const n = ladosDosCapitulos([{ nome: 'A Site' }], 'Fade Lineups Ascent');
+  assert.deepEqual(n, [{ lado: null, pista: null }]);
+});
+
+test('lado: de onde se joga também diz, menos no meio do mapa', async () => {
+  const { ladoPelaPosicao } = await import('../src/valorant/lineups.js');
+  const callouts = [
+    { nome: 'Attacker Side Spawn', grande: 'Attacker Side', regiao: 'Spawn', x: 0.82, y: 0.57 },
+    { nome: 'Defender Side Spawn', grande: 'Defender Side', regiao: 'Spawn', x: 0.13, y: 0.43 },
+    { nome: 'A Site', grande: 'A', regiao: 'Site', x: 0.3, y: 0.2 },
+  ];
+  assert.equal(ladoPelaPosicao({ x: 0.8, y: 0.55 }, callouts), 'atacando');
+  assert.equal(ladoPelaPosicao({ x: 0.15, y: 0.45 }, callouts), 'defendendo');
+  // em cima do meio não dá pra afirmar: empate não vira palpite
+  assert.equal(ladoPelaPosicao({ x: 0.475, y: 0.5 }, callouts), null);
+  assert.equal(ladoPelaPosicao(null, callouts), null);
+  // mapa sem os dois spawns no catálogo: não inventa
+  assert.equal(ladoPelaPosicao({ x: 0.8, y: 0.55 }, [callouts[2]]), null);
+});
+
+test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
+  const { mkdtemp, mkdir, writeFile, readFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-lado-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const val = resolve(base, 'dados', 'valorant');
+    await mkdir(resolve(val, 'buscas'), { recursive: true });
+    await writeFile(resolve(val, 'catalogo.json'), JSON.stringify({
+      em: Date.now(), formato: 4,
+      mapas: [{ nome: 'Ascent', planta: null, callouts: [
+        { nome: 'Attacker Side Spawn', grande: 'Attacker Side', regiao: 'Spawn', x: 0.82, y: 0.57 },
+        { nome: 'Defender Side Spawn', grande: 'Defender Side', regiao: 'Spawn', x: 0.13, y: 0.43 },
+      ] }],
+      agentes: [{ nome: 'Sova', icone: null, habilidades: [] }],
+    }), 'utf8');
+
+    const ontem = Date.now() - 24 * 60 * 60 * 1000;
+    const l = (nome, seg, pos) => ({ video: 'v1', titulo: 'Sova Ascent Lineups', nome, segundo: seg, fim: seg + 20, posicao: pos ?? null });
+    await writeFile(resolve(val, 'buscas', 'ascent__sova_____atacando.json'), JSON.stringify({
+      formato: 4, em: ontem, lidos: 18,
+      pedido: { mapa: 'Ascent', agente: 'Sova', habilidade: null, lado: 'atacando' },
+      lineups: [
+        l('Attacking', 10), l('A Site Dart', 20),
+        l('Defense', 30), l('A Main Dart', 40),
+        l('Mid Dart', 50, { nome: 'Attacker Side Spawn', x: 0.81, y: 0.56 }),
+      ],
+    }), 'utf8');
+
+    const { buscaGuardada } = await import(`../src/valorant/lineups.js?lado=${Date.now()}`);
+    const g = await buscaGuardada({ mapa: 'Ascent', agente: 'Sova', lado: 'atacando' });
+    assert.ok(g, 'o arquivo do formato 4 tinha que ser aproveitado');
+    assert.deepEqual(g.lineups.map((x) => [x.nome, x.lado, x.ladoPista]), [
+      ['Attacking', 'atacando', 'nome'],
+      ['A Site Dart', 'atacando', 'bloco'],
+      ['Defense', 'defendendo', 'nome'],
+      ['A Main Dart', 'defendendo', 'bloco'],
+      // esta herdaria defesa do bloco; o bloco manda, e é o certo — o lugar só entra
+      // quando ninguém falou nada (ver o teste do ladoPelaPosicao)
+      ['Mid Dart', 'defendendo', 'bloco'],
+    ]);
+    assert.equal(g.em, ontem, 'a data original não pode virar "agora"');
+    const salvo = JSON.parse(await readFile(resolve(val, 'buscas', 'ascent__sova_____atacando.json'), 'utf8'));
+    assert.ok(salvo.formato >= 5, 'o lado tem que ficar gravado, não ser recalculado toda vez');
+    assert.equal(salvo.lineups[1].lado, 'atacando');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
 /* ------------------------------------------------------------------ Valorant: presença
  * O formato do blob mudou sem aviso e derrubou a detecção inteira em silêncio. Estes
  * testes travam os dois formatos pra isso não voltar. */
@@ -688,6 +827,38 @@ test('partida do grupo: cai pro que o dono reporta', async () => {
   });
   assert.equal(r.estado, 'jogando');
   assert.equal(r.mapa, 'Corrode');
+});
+
+/* ------------------------------------------------------------------ Valorant: de quem é
+ *
+ * O mapa dele trocou no meio de uma partida — estava numa Haven e virou Sunset. A causa:
+ * /chat/v4/presences devolve a dele E a de cada amigo online, e o código pegava a primeira
+ * de Valorant que aparecesse. A ordem da lista muda sozinha, então a partida de um amigo
+ * virava a partida dele. Conferido na máquina dele: a primeira presença com blob é de um
+ * amigo. Isto trava o conserto. */
+test('presença: pega a dele, não a do amigo que vier primeiro', async () => {
+  const { presencaDele } = await import('../src/valorant/jogo.js');
+  const blob = (m) => Buffer.from(JSON.stringify({ matchPresenceData: { matchMap: m } })).toString('base64');
+  const lista = { presences: [
+    { product: 'league_of_legends', puuid: 'amigo-1', private: blob('') },
+    { product: 'valorant', puuid: 'amigo-2', private: blob('/Game/Maps/Juliett/Juliett') },  // Sunset
+    { product: 'riot_client', puuid: 'eu', private: null },
+    { product: 'valorant', puuid: 'eu', private: blob('/Game/Maps/Triad/Triad') },          // Haven
+  ] };
+
+  const minha = presencaDele(lista, 'eu');
+  assert.equal(minha?.puuid, 'eu', 'tem que ser a dele, mesmo vindo depois');
+
+  const { lerPresenca } = await import('../src/valorant/jogo.js');
+  const lido = lerPresenca(JSON.parse(Buffer.from(minha.private, 'base64').toString('utf8')));
+  assert.equal(lido.mapa, 'Haven', 'o mapa é o DELE, não o do amigo');
+
+  // sem saber quem eu sou: uma candidata serve, duas não — chutar é o que causava o bug
+  const so = { presences: [lista.presences[1]] };
+  assert.equal(presencaDele(so, null)?.puuid, 'amigo-2', 'candidata única pode');
+  assert.equal(presencaDele(lista, null), null, 'com duas, não chuta');
+  assert.equal(presencaDele(lista, 'ninguem'), null, 'não é pra inventar presença');
+  assert.equal(presencaDele(null, 'eu'), null);
 });
 
 /* ------------------------------------------------------------------ pacote nao declarado
@@ -827,7 +998,7 @@ test('acervo: arquivo do formato antigo é aproveitado, não descartado', async 
     assert.equal(g.em, ontem, 'a data original não pode virar "agora"');
 
     const salvo = JSON.parse(await readFile(resolve(val, 'buscas', 'breeze__fade_____atacando.json'), 'utf8'));
-    assert.equal(salvo.formato, 4, 'o arquivo tinha que subir de formato no disco');
+    assert.ok(salvo.formato >= 5, 'o arquivo tinha que subir de formato no disco');
 
     const a = await acervo();
     const fade = a.agentes.find((x) => x.agente === 'Fade');

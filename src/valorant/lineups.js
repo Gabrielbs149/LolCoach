@@ -189,6 +189,14 @@ export function pontoDaLineup(nome, callouts = [], site = null) {
   const soRegiao = callouts.filter((c) => contem(c.regiao)).sort((a, b) => b.regiao.length - a.regiao.length);
   const noSite = site ? soRegiao.find((c) => c.site === site) : null;
   if (noSite) return noSite;
+  /* "from Defender Spawn" casa a região "Spawn" em DOIS callouts (o do atacante e o do
+   * defensor), empatava, e o lugar ficava sem ponto nenhum — eram 41 nomes do acervo dele
+   * sem seta no mapa. Quando o texto também diz a região grande ("Defender"), é ela que
+   * desempata. */
+  if (soRegiao.length > 1) {
+    const peloGrande = soRegiao.filter((c) => c.grande && contem(c.grande.replace(/\s*side\s*/i, ' ').trim()));
+    if (peloGrande.length === 1) return peloGrande[0];
+  }
   /* Este atalho mandava lineup pro lado errado do mapa. "B Default B Lobby" tem site B, mas
    * o Bind não tem callout "B Lobby" — só "A Lobby". A região "Lobby" casava, dava UM
    * resultado, e o atalho devolvia o A Lobby, do outro lado do mapa. Quando a lineup já diz
@@ -203,6 +211,98 @@ export function pontoDaLineup(nome, callouts = [], site = null) {
     if (alvo) return { ...alvo, aproximado: true };
   }
   return null;
+}
+
+/* ------------------------------------------------------- ataque ou defesa
+ *
+ * O app não sabia disso. O lado só existia como PALAVRA NA BUSCA ("sova ascent lineup
+ * attack") e como nome do arquivo salvo — e aí todo capítulo do vídeo achado virava lineup
+ * daquele lado, inclusive os que diziam o contrário com todas as letras. Medido no acervo
+ * dele, 8266 lineups: pedindo atacante, 1128 das 3256 mostradas (34,6%) são de defesa;
+ * pedindo defensor, 987 de 2989 (33%) são de ataque. Uma em cada três estava errada.
+ *
+ * As pistas, em ordem de certeza — a primeira que casar manda, por isso a ordem importa:
+ * "A 진입 카운터" é entrada CONTRA-atacada, defesa, e tem que ser vista antes de "진입".
+ *
+ * Os idiomas não são enfeite: são os que existem no acervo dele. Inglês, espanhol e
+ * português vêm dos canais de sempre; coreano são 140 nomes de capítulo e japonês 77, de
+ * canais que fazem lineup muito boa e nunca escrevem uma palavra em inglês.
+ *
+ * O que ficou DE FORA de propósito:
+ *  - "defender" solto: "A Attack - Shock to clear defender utilities" é ataque, e a palavra
+ *    ali é o inimigo, não o lado. Só "Defender Spawn" conta, que é lugar.
+ *  - "push"/"rush"/"푸시" soltos: "B Main Push 1" pode ser os dois. Só "anti-rush" e
+ *    "counter push" contam, que são reação, e reação é de quem defende.
+ *  - "default", "capturar": aparecem dos dois lados no mesmo canal.
+ */
+const PISTAS_DE_LADO = [
+  // inequívocos: a spike plantada é coisa de atacante, retomar o site é de defensor
+  [/\bpost\s*-?\s*plants?\b|\bpostplant\b|\bpos\s*-?\s*plant|포스트플랜트|ポストプラント/i, 'atacando'],
+  [/\bretakes?\b|\bretoma\w*|리테이크|リテイク/i, 'defendendo'],
+  [/\banti\s*-?\s*(?:rush|push|eco|entry)|\bcounter\s*-?\s*(?:push|rush|entry|exec)|카운터/i, 'defendendo'],
+  // impedir o desarme é de quem plantou
+  [/\bdefuse\b|\bdesarm\w*/i, 'atacando'],
+  // o lado dito com todas as letras (o "DEF"/"ATT" na frente do nome é o formato de 276 capítulos dele)
+  [/\bdefen[cs]\w*\b|\bdefend(?:ing|endo|iendo)\b|\bdef\b|수비|守り|守備/i, 'defendendo'],
+  [/\battack\w*\b|\batk\b|\batt\b|\bataques?\b|\batacand\w*|\bofensiv\w*|\boffens\w*|공격|攻め|攻撃/i, 'atacando'],
+  // de onde se joga: o spawn de um lado só é daquele lado ("CT" é como o pessoal chama o spawn do defensor)
+  [/\bdefender(?:'?s)?\s*(?:side\s*)?spawn\b|\bct\b/i, 'defendendo'],
+  [/\battacker(?:'?s)?\s*(?:side\s*)?spawn\b|\bt\s*-?\s*spawn\b/i, 'atacando'],
+  // entrar no site é de atacante; segurar é de defensor
+  [/\bentry\b|\bentrada\b|\bexecut\w*|\bejecu\w*|진입|エントリー/i, 'atacando'],
+  [/\bhold(?:s|ing)?\b|\bsegurar\b|\bstall\w*/i, 'defendendo'],
+];
+
+/**
+ * Tira acento sem desmontar hangul. O `semAcento` daqui faz NFD, e NFD QUEBRA sílaba
+ * coreana em jamo — "공격" deixava de ser "공격" e nenhuma pista casava. O NFC no fim
+ * remonta a sílaba; o acento latino já saiu, então não volta.
+ */
+const semAcentoCJK = (t) => String(t ?? '').normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '').normalize('NFC').toLowerCase();
+
+/** 'atacando', 'defendendo' ou null — só pelo texto, sem adivinhar. */
+export function ladoPeloTexto(texto) {
+  const t = ` ${semAcentoCJK(texto).replace(/[^a-z0-9\u3040-\u30ff\u4e00-\u9fff\uac00-\ud7af]+/g, ' ')} `;
+  for (const [pista, lado] of PISTAS_DE_LADO) if (pista.test(t)) return lado;
+  return null;
+}
+
+/**
+ * De onde se joga diz o lado: quem está mais perto do spawn do atacante está atacando.
+ * Vale só quando um dos dois spawns é claramente mais perto — posição no meio do mapa não
+ * diz nada, e chutar no empate é pior que admitir que não sabe.
+ */
+export function ladoPelaPosicao(posicao, callouts = []) {
+  if (!posicao) return null;
+  const atk = callouts.find((c) => /attacker/i.test(c.grande ?? '') && /spawn/i.test(c.regiao ?? ''));
+  const def = callouts.find((c) => /defender/i.test(c.grande ?? '') && /spawn/i.test(c.regiao ?? ''));
+  if (!atk || !def) return null;
+  const dist = (p) => Math.hypot(posicao.x - p.x, posicao.y - p.y);
+  const da = dist(atk), dd = dist(def);
+  if (Math.abs(da - dd) < 0.12) return null;
+  return da < dd ? 'atacando' : 'defendendo';
+}
+
+/**
+ * O lado de cada capítulo do vídeo. Mesma ideia do filtro de mapa: quem fala, manda; quem
+ * não fala, herda de quem falou antes. É isso que faz o número subir de 30% pra 68% — vídeo
+ * de lineup é organizado em bloco ("Abyss Attack - A Site", "- B Site", "- Mid", depois
+ * "Abyss Defense - A Site"), e o bloco inteiro é do lado que o primeiro anunciou.
+ *
+ * `pista` é pra tela poder ser honesta sobre o que ela sabe:
+ *   nome   - o capítulo disse
+ *   bloco  - herdou do capítulo anterior
+ *   video  - só o título do vídeo disse
+ */
+export function ladosDosCapitulos(caps, titulo = '') {
+  const noTitulo = ladoPeloTexto(titulo);
+  let atual = noTitulo, pistaAtual = noTitulo ? 'video' : null;
+  return caps.map((c) => {
+    const dito = ladoPeloTexto(c.nome);
+    if (dito) { atual = dito; pistaAtual = 'bloco'; return { lado: dito, pista: 'nome' }; }
+    return atual ? { lado: atual, pista: pistaAtual } : { lado: null, pista: null };
+  });
 }
 
 /* --------------------------------------------------- qual habilidade é */
@@ -609,7 +709,8 @@ const detalhesDoVideo = async (base, id, ate = Infinity) => {
 // Só decide QUANDO atualizar por baixo — nunca faz ninguém esperar, então pode ser longo.
 const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 4: antes do filtro de mapa, o que estava em disco tinha lineup de mapa errado dentro
-const FORMATO_BUSCA = 4;
+// 5: cada lineup passou a saber se é de ataque ou de defesa
+const FORMATO_BUSCA = 5;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
@@ -631,31 +732,71 @@ export async function buscaGuardada(p = {}) {
   return { ...pronto, doDisco: true, velho: magro || vencido };
 }
 
+const porVideoNaOrdem = (lineups) => {
+  const m = new Map();
+  for (const l of lineups) {
+    if (!m.has(l.video)) m.set(l.video, []);
+    m.get(l.video).push(l);
+  }
+  return m;
+};
+
+/** 3 -> 4: tira do arquivo o capítulo que era de outro mapa. */
+function soDesteMapa(mapa, lineups, nomes) {
+  const fica = new Set();
+  for (const ls of porVideoNaOrdem(lineups).values()) {
+    const ok = capitulosDesteMapa(ls, ls[0]?.titulo ?? '', mapa, nomes);
+    ls.forEach((l, i) => { if (ok[i]) fica.add(l); });
+  }
+  return lineups.filter((l) => fica.has(l));
+}
+
+/**
+ * 4 -> 5: diz o lado de cada lineup que já está salva.
+ *
+ * Dá pra fazer sem rede nenhuma: o nome do capítulo, o título do vídeo e a posição estão
+ * todos no arquivo. A ordem original da lista não muda — o lado é calculado na ordem do
+ * tempo de cada vídeo (que é o que a herança por bloco precisa) e devolvido por lineup.
+ */
+function comOLado(mapa, lineups, cat) {
+  const callouts = cat?.mapas?.find((x) => x.nome === mapa)?.callouts ?? [];
+  const achado = new Map();
+  for (const ls of porVideoNaOrdem(lineups).values()) {
+    const ordem = ls.slice().sort((a, b) => a.segundo - b.segundo);
+    const lados = ladosDosCapitulos(ordem, ordem[0]?.titulo ?? '');
+    ordem.forEach((l, i) => achado.set(l, lados[i]));
+  }
+  return lineups.map((l) => {
+    const d = achado.get(l) ?? { lado: null, pista: null };
+    let lado = d.lado, ladoPista = d.pista;
+    if (!lado) {
+      const geo = ladoPelaPosicao(l.posicao, callouts);
+      if (geo) { lado = geo; ladoPista = 'lugar'; }
+    }
+    return { ...l, lado, ladoPista };
+  });
+}
+
 /**
  * Aproveita o que já está no disco em vez de mandar procurar tudo de novo.
  *
- * O formato 4 entrou porque o 3 guardava lineup de outro mapa dentro. Só que jogar fora
- * 3 MB de acervo por causa disso é pior pra ele do que arrumar: o filtro de mapa roda em
- * cima do que está salvo (os capítulos de um vídeo estão lá, na ordem) e o arquivo sobe
- * pra 4 sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
+ * O formato 4 entrou porque o 3 guardava lineup de outro mapa dentro; o 5 porque a lineup
+ * passou a saber de que lado ela é. Só que jogar fora 3 MB de acervo por causa disso é
+ * pior pra ele do que arrumar: as duas contas rodam em cima do que já está salvo — os
+ * capítulos de um vídeo estão lá, com nome, título e posição — e o arquivo sobe de formato
+ * sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
  */
 async function migrarBusca(p, g) {
-  if (g.formato !== 3) return null;        // formato mais velho que isso não vale a tentativa
+  if (![3, 4].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
   const cat = await catalogo().catch(() => null);
   const nomes = (cat?.mapas ?? []).map((x) => x.nome);
   if (!nomes.length) return null;
-  const porVideo = new Map();
-  for (const l of g.lineups) {
-    if (!porVideo.has(l.video)) porVideo.set(l.video, []);
-    porVideo.get(l.video).push(l);
+  let lineups = g.lineups;
+  if (g.formato === 3) {
+    lineups = soDesteMapa(p.mapa, lineups, nomes);
+    if (!lineups.length) return null;      // era tudo de outro mapa: melhor procurar de novo
   }
-  const fica = new Set();
-  for (const ls of porVideo.values()) {
-    const ok = capitulosDesteMapa(ls, ls[0]?.titulo ?? '', p.mapa, nomes);
-    ls.forEach((l, i) => { if (ok[i]) fica.add(l); });
-  }
-  const lineups = g.lineups.filter((l) => fica.has(l));
-  if (!lineups.length) return null;        // era tudo de outro mapa: melhor procurar de novo
+  lineups = comOLado(p.mapa, lineups, cat);
   const novo = { ...g, lineups, formato: FORMATO_BUSCA };
   await guardarBusca(p, novo, g.em ?? Date.now());
   return novo;
@@ -797,6 +938,7 @@ export async function buscarLineups(p = {}) {
   let deOutroMapa = 0;
   for (const { v, caps, tiras } of porVideo) {
     const daqui = capitulosDesteMapa(caps, v.titulo, p.mapa, nomesDeMapa);
+    const lados = ladosDosCapitulos(caps, v.titulo);
     for (let i = 0; i < caps.length; i++) {
       if (!daqui[i]) { deOutroMapa++; continue; }      // capítulo de outro mapa: não é deste mapa
       const c = caps[i];
@@ -810,8 +952,14 @@ export async function buscarLineups(p = {}) {
         ?? null;
       // o fim da lineup é o começo da próxima: assim o player toca SÓ o clipe dela
       const fim = caps[i + 1]?.segundo ?? (v.segundos || c.segundo + 25);
+      // ataque ou defesa: o texto primeiro e, se ele calou, de onde se joga
+      let lado = lados[i].lado, ladoPista = lados[i].pista;
+      if (!lado) {
+        const geo = ladoPelaPosicao(posicao, callouts);
+        if (geo) { lado = geo; ladoPista = 'lugar'; }
+      }
       lineups.push({
-        video: v.id, titulo: v.titulo, canal: v.canal,
+        video: v.id, titulo: v.titulo, canal: v.canal, lado, ladoPista,
         capa: v.capa, segundo: c.segundo, fim, nome: c.nome, site: c.site, pula: c.pula,
         quadros: quadrosDaLineup(tiras ?? [], c.segundo, fim),
         habilidade: hab ? { nome: hab.nome, icone: hab.icone } : null,

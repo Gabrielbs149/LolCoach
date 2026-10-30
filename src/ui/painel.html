@@ -887,6 +887,14 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnCard .pe{display:flex;gap:6px;align-items:center;margin-top:auto;flex-wrap:wrap}
 .lnTag{font-size:10.5px;border:1px solid var(--borda);border-radius:4px;padding:1px 6px;color:var(--fraco)}
 .lnTag.pulo{border-color:var(--ouro);color:var(--ouro-claro)}
+/* o lado da lineup: a mesma cor dos botoes Atacante/Defensor, pra ligar na hora */
+.lnTag.lnSelo.atq{border-color:#7d1f2a;background:#7d1f2a44;color:#ffd9dd}
+.lnTag.lnSelo.def{border-color:#15493f;background:#15493f55;color:#c9f4e8}
+.lnTag.lnSeloMudo{color:var(--apagado);border-style:dashed}
+.lnMisturar{font:inherit;color:var(--ouro-claro);background:none;border:0;border-bottom:1px dotted currentColor;
+  padding:0;cursor:pointer}
+.lnMisturar:hover{color:#fff}
+.lnMisturar.on{color:var(--fraco)}
 .lnCard video,.lnCard iframe{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
 .lnMin{font-variant-numeric:tabular-nums;width:62px;text-align:center}
 
@@ -4249,6 +4257,8 @@ async function carregarConquistas(){
 let lnCatalogo = null, lnAchadas = [], lnPlanta = null, lnCallouts = [];
 let lnTodas = [];        // tudo que a busca trouxe, antes do filtro e da deduplicação
 let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
+// quantas ficaram de fora por serem do outro lado, e se ele pediu pra ver elas mesmo assim
+let lnDoOutroLado = 0, lnMisturarLados = false;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 async function carregarLineups(){
@@ -4313,14 +4323,30 @@ function lnEscolherHab(v){
   lnDesenharMapa();
 }
 
-/** "83 lineups de Incendiário · 7 canais" — quantas e de quanta gente diferente. */
+/** "83 lineups de Incendiário · 7 canais · 24 de defesa ficaram fora" — e dá pra ver elas. */
 function lnQuantas(){
   const n = lnAchadas.length;
   const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
   const quais = hab ? ` de ${esc(hab.nome)}` : '';
   const canais = new Set(lnAchadas.map(l => l.canal).filter(Boolean)).size;
-  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}`;
+  const certas = lnAchadas.filter(l => l.lado === lnLadoAtual).length;
+  const outro = LADO_NOME[lnLadoAtual === 'atacando' ? 'defendendo' : 'atacando'];
+  // o que foi escondido aparece escrito: esconder calado é pior que não esconder
+  const fora = lnDoOutroLado
+    ? ` · <button class="lnMisturar" onclick="lnTrocarMistura()" title="mostrar também as do outro lado">${lnDoOutroLado} de ${outro} fora</button>`
+    : lnMisturarLados ? ` · <button class="lnMisturar on" onclick="lnTrocarMistura()">mostrando os dois lados</button>` : '';
+  const conf = certas ? ` · ${certas} de ${LADO_NOME[lnLadoAtual]}` : '';
+  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${fora}`;
+}
+
+/** Mostra/esconde as do outro lado. Sem refazer busca: é filtro no que já está carregado. */
+function lnTrocarMistura(){
+  lnMisturarLados = !lnMisturarLados;
+  lnPinoAtivo = null;
+  lnFiltrarEDedupar();
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  lnDesenharMapa();
 }
 
 /* ---------------------------------------------------------------- seletores em grade */
@@ -4460,7 +4486,24 @@ function lnJanelaDoMapa(){
 function lnFiltrarEDedupar(){
   const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
-  const base = hab ? lnTodas.filter(l => l.habilidade?.nome === hab.nome) : lnTodas;
+  let base = hab ? lnTodas.filter(l => l.habilidade?.nome === hab.nome) : lnTodas;
+
+  /* FORA O QUE É DO OUTRO LADO.
+   *
+   * O lado só existia como palavra na busca, e todo capítulo do vídeo achado virava lineup
+   * daquele lado — inclusive os que diziam o contrário com todas as letras. Medido no
+   * acervo dele: pedindo atacante, 1128 das 3256 mostradas (34,6%) eram de defesa; pedindo
+   * defensor, 987 de 2989 eram de ataque. Uma em cada três estava errada.
+   *
+   * Sai só o que CONTRADIZ o lado escolhido. A que não declarou lado nenhum fica — são 32%
+   * do acervo, e esconder o que a gente não sabe seria jogar fora um terço das opções por
+   * falta de informação. Elas só entram depois das confirmadas, pela nota.
+   */
+  if (!lnMisturarLados) {
+    const antes = base.length;
+    base = base.filter(l => !l.lado || l.lado === lnLadoAtual);
+    lnDoOutroLado = antes - base.length;
+  } else lnDoOutroLado = 0;
 
   const mesmoTrecho = new Set(), mesmoCanal = new Set();
   const cru = (s) => String(s ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
@@ -4475,8 +4518,31 @@ function lnFiltrarEDedupar(){
   });
 }
 
-/** Ponto certo vale mais que ponto chutado; ter posição vale; empatou, a mais cedo no vídeo. */
-const lnNota = (l) => (l.ponto && !l.ponto.aproximado ? 4 : 0) + (l.posicao ? 2 : 0) + (l.fim > l.segundo ? 1 : 0);
+/**
+ * Lado confirmado na frente de tudo; depois ponto certo vale mais que ponto chutado, ter
+ * posição vale, e empatou vai a mais cedo no vídeo. O lado vem primeiro porque entre uma
+ * lineup que DIZ ser de defesa e uma que não disse nada, com ele defendendo, a primeira é
+ * melhor aposta — mesmo que a outra tenha ponto mais exato.
+ */
+const lnNota = (l) => (l.lado === lnLadoAtual ? 8 : 0)
+  + (l.ponto && !l.ponto.aproximado ? 4 : 0) + (l.posicao ? 2 : 0) + (l.fim > l.segundo ? 1 : 0);
+
+const LADO_NOME = { atacando: 'ataque', defendendo: 'defesa' };
+/** De onde a gente sabe o lado — vai no title, pra ele poder desconfiar quando quiser. */
+const LADO_PISTA = {
+  nome: 'o nome do capítulo diz',
+  bloco: 'o bloco do vídeo é desse lado',
+  video: 'o título do vídeo diz',
+  lugar: 'pelo lugar de onde se joga',
+};
+
+/** O selo de lado da lineup, pra tela nunca afirmar mais do que sabe. */
+function lnSelo(l){
+  if (!l.lado) return '<span class="lnTag lnSeloMudo" title="nem o capítulo nem o vídeo disseram de que lado é">lado não dito</span>';
+  const classe = l.lado === 'atacando' ? 'atq' : 'def';
+  const fora = l.lado !== lnLadoAtual ? ' · do outro lado' : '';
+  return `<span class="lnTag lnSelo ${classe}" title="${esc(LADO_PISTA[l.ladoPista] ?? '')}">${LADO_NOME[l.lado]}${fora}</span>`;
+}
 
 /**
  * As `limite` lineups do ponto, tirando uma de cada canal antes de repetir canal.
@@ -4613,7 +4679,7 @@ function lnDesenharMapa(){
         </svg>` : ''}
       ${marcas.map((x, k) => `
         <button class="${x.lugar ? 'lnDeMapa' : 'lnTiro'}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
-          title="${esc(x.l.nome)}${x.lugar ? ` — de ${esc(x.l.posicao.nome)}` : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}"
+          title="${esc(x.l.nome)}${x.lugar ? ` — de ${esc(x.l.posicao.nome)}` : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}${x.l.lado ? ` · ${LADO_NOME[x.l.lado]}` : ''}"
           onclick="event.stopPropagation();lnVer(${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
           ${x.lugar && agente?.icone ? `<img src="${esc(agente.icone)}" alt="">`
@@ -4991,6 +5057,7 @@ function lnVer(i){
         ${lnMapinha(l)}
         <div class="lnTocandoPe">
           ${l.habilidade ? `<span class="lnTag">${esc(l.habilidade.nome)}</span>` : ''}
+          ${lnSelo(l)}
                   </div>
         <div class="lnCanal">${esc(l.canal)} · clipe de ${lnMMSS(l.segundo)} a ${lnMMSS(l.fim ?? l.segundo)}</div>
       </div>
