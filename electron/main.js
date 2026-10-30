@@ -220,7 +220,10 @@ function criarJanela({ esconder = false } = {}) {
     icon: join(AQUI, 'icone.png'),
     autoHideMenuBar: true,
     show: !esconder,
-    webPreferences: { nodeIntegration: false, contextIsolation: true },
+    // backgroundThrottling desligado pelo mesmo motivo da janela de lineups: com o jogo em
+    // cima, esta janela fica sem foco, e o Chromium corta o relogio dela — o laco do clipe
+    // (que volta pro comeco a cada 200 ms) passava a rodar uma vez por segundo.
+    webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
   });
   if (!esconder) painelPendente = false;
   janela.loadURL(endereco ?? PAGINA_DE_ERRO(falha ?? 'o painel local não subiu.'));

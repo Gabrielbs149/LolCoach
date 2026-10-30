@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <title>LolCoach</title>
+<!-- o aperto de mão com o YouTube feito ANTES do primeiro clique: na hora de abrir o clipe
+     o DNS e o TLS já estão resolvidos, e isso é um pedaço do "demora pra carregar". -->
+<link rel="preconnect" href="https://www.youtube.com" crossorigin>
+<link rel="preconnect" href="https://i.ytimg.com" crossorigin>
+<link rel="dns-prefetch" href="https://googlevideo.com">
 <style>
 /* ===========================================================================
    Sistema visual do LolCoach.
@@ -1263,6 +1268,18 @@ body.lnTelaCheia .lnLadoDetalhe{position:fixed;right:14px;top:14px;width:250px;z
   backdrop-filter:blur(4px)}
 body.lnTelaCheia .lnLadoDetalhe .lnMini{width:100%;flex:none}
 body.lnTelaCheia .lnTocandoNome{font-size:14px}
+/* com o clipe aberto, o mapa grande fica ESCONDIDO de verdade (display:none). Ele continua
+   montado, mas para de ser desenhado — e com ele param as 12 bolinhas animadas das rotas.
+   Durante a partida essa GPU faz falta: é ela que o player usa pra decodificar o vídeo. */
+body.lnTelaCheia #lnMapaCx{display:none}
+/* o selo de qualidade: diz em quanto o YouTube está mandando e dá pra clicar pra ele
+   escolher de novo (ver lnOlharQualidade) */
+.lnTag.lnQ{font:inherit;font-size:10.5px;cursor:pointer;background:none;font-variant-numeric:tabular-nums}
+.lnTag.lnQ:hover{border-color:var(--borda-forte);color:var(--forte)}
+.lnTag.lnQ.ruim{border-color:#7d5a1f;background:#7d5a1f33;color:#ffe2b0}
+.lnCarregando{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);z-index:72;
+  background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r2);
+  padding:7px 13px;font-size:12.5px;color:var(--fraco)}
 
 /* ---------------------------------------------------- acabamento geral */
 /* Um acabamento só, pra tudo parecer o mesmo produto: cartão com o mesmo
@@ -4265,6 +4282,9 @@ let lnMudasFora = 0, lnEsconderMudas = false;
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 async function carregarLineups(){
+  // a API do YouTube baixa agora, enquanto ele escolhe mapa e agente — e não no primeiro
+  // clique numa lineup, que é justo a hora em que ele está com pressa
+  lnApiYT().catch(() => {});
   $('#lnAviso').innerHTML = carregando('buscando mapas e agentes…');
   try { lnCatalogo = await pegar('/api/val/catalogo'); }
   catch { $('#lnAviso').innerHTML = `<div class="vazio">não consegui carregar o catálogo do Valorant</div>`; return; }
@@ -4950,6 +4970,11 @@ function lnNomeCurto(l){
  * é ele que tem a imagem em alta — o quadro do cartão é storyboard de 320x180 e nunca vai
  * dar pra ler mira. Com os botões de -0,2 s / +0,2 s dá pra parar no quadro exato. */
 let lnPlayer = null, lnClipe = null, lnVigia = null, lnRelogio = null, lnPulos = 0;
+let lnOlhoQ = null, lnTentouHD = 0, lnCarregouEm = 0, lnPlayerRuim = false;
+
+/** O nome que o YouTube usa pra cada qualidade, em altura de imagem — que é o que dá pra comparar. */
+const LN_ALTURA = { tiny: 144, small: 240, medium: 360, large: 480, hd720: 720, hd1080: 1080, hd1440: 1440, hd2160: 2160 };
+const lnAltura = (q) => LN_ALTURA[q] ?? 0;
 
 /**
  * COMO SE CONSEGUE 1080p DE VERDADE.
@@ -4982,14 +5007,74 @@ function lnEncaixar(cx){
 }
 function lnVigiarTamanho(cx){ lnEncaixar(cx); }
 
-/* Quem escolhe a qualidade é o YouTube, pelo TAMANHO do player — `setPlaybackQuality` e o
- * playerVar `vq` são ignorados desde 2019, então contar com eles é se enganar. O que
- * funciona de verdade está no lnMontarPlayer: nascer já do tamanho final. Isto aqui fica
- * só como pedido educado (vídeo antigo às vezes ainda obedece) e pra cutucar o player a
- * reavaliar depois que o quadro muda de tamanho. */
-function lnForcarAlta(p){
-  try { p.setPlaybackQualityRange?.('hd1080', 'hd2160'); p.setPlaybackQuality?.('hd1080'); } catch {}
-  try { window.dispatchEvent(new Event('resize')); } catch {}
+/**
+ * POR QUE O VÍDEO FICA EM 144p E NÃO SOBE MAIS — e o que faz ele subir.
+ *
+ * Medido no app dele, com o player ocupando 1600x900: parado, nasce em hd720 em 1,5 s.
+ * Encolhendo o quadro pra 640x360 ele cai pra 480p em 6 s; e DEVOLVENDO o quadro pro
+ * tamanho grande, FICA em 480p. O YouTube desce rápido e não volta sozinho.
+ *
+ * Junta isso com o laço do clipe: são 15 s repetindo o MESMO trecho, que já está no buffer.
+ * Sem precisar baixar nada novo, o player não tem motivo nenhum pra reavaliar — então a
+ * qualidade que ele escolheu nos dois primeiros segundos (com o jogo comendo GPU e rede)
+ * fica pra sempre. É exatamente o "fica 144p muito feio".
+ *
+ * `setPlaybackQuality` e o playerVar `vq` são ignorados desde 2019, e mudar o tamanho só
+ * serve pra DESCER. A única coisa que faz o YouTube escolher de novo é RECARREGAR o vídeo.
+ * Então: quadro grande + imagem em 360p ou pior = recarrega no mesmo player. Duas vezes por
+ * clipe, espaçadas de 6 s; mais que isso vira pisca-pisca na cara dele.
+ */
+function lnOlharQualidade(l){
+  if (lnClipe !== l || !lnPlayer?.getPlaybackQuality) return;
+  let q = '', estado = -1;
+  try { q = lnPlayer.getPlaybackQuality(); estado = lnPlayer.getPlayerState(); } catch { return; }
+  lnPintarQualidade(q);
+  if (estado !== YT.PlayerState.PLAYING) return;
+  const larg = $('.lnVideoCx')?.getBoundingClientRect().width ?? 0;
+  const ruim = lnAltura(q) > 0 && lnAltura(q) <= 360;
+  if (!ruim || larg < 700 || lnTentouHD >= LN_TETO.length || Date.now() - lnCarregouEm < 6000) return;
+  lnTentouHD++;
+  lnTeto(LN_TETO[lnTentouHD - 1]);
+  lnTrocarVideo(l, true);
+}
+
+/**
+ * A ESCADA, pra quando recarregar não basta.
+ *
+ * Duas primeiras tentativas: recarrega do tamanho que está, que é o que faz o YouTube
+ * escolher de novo. Se AINDA ficar em 360p ou pior, o problema não é escolha ruim — é que a
+ * máquina ou a linha não estão dando conta do que ele pediu (com o Valorant rodando, a GPU
+ * é disputada, e o player desce feio quando perde quadro). Aí a gente pede MENOS de
+ * propósito: quadro com teto de 1280 px pede 720p, com 960 pede 480p. 720p firme é muito
+ * melhor que 1080 que desaba pra 144 — e foi medido: encolher o quadro pra 640 derruba pra
+ * 480p em 6 s, então o tamanho é mesmo o volante da qualidade.
+ */
+const LN_TETO = [null, null, 1280, 960];
+
+/** Põe (ou tira) um teto de largura no quadro do vídeo, centralizado. */
+function lnTeto(px){
+  const cx = $('.lnVideoCx'); if (!cx) return;
+  cx.style.maxWidth = px ? `${px}px` : '';
+  cx.style.margin = px ? '0 auto' : '';
+}
+
+/** O selo com a qualidade de agora. Clicar nele manda o YouTube escolher de novo. */
+function lnPintarQualidade(q){
+  const e = $('#lnQ'); if (!e) return;
+  const alt = lnAltura(q);
+  const menor = lnTentouHD >= 3;        // a escada já reduziu o quadro de propósito
+  e.textContent = alt ? `${alt}p${menor ? ' ↓' : ''}` : '…';
+  e.classList.toggle('ruim', alt > 0 && alt <= 360);
+  e.title = !alt ? 'medindo…'
+    : menor ? 'o quadro foi reduzido de propósito: assim o YouTube manda uma imagem que a máquina segura, em vez de desabar pra 144p — clica pra tentar o tamanho cheio de novo'
+    : 'quem escolhe a qualidade é o YouTube, pelo tamanho do player e pelo quanto a máquina está dando conta — clica pra ele escolher de novo';
+}
+
+/** O botão do selo: zera as tentativas e recarrega, que é o que faz o YouTube reavaliar. */
+function lnTentarDeNovo(){
+  if (!lnClipe) return;
+  lnTentouHD = 0; lnCarregouEm = 0; lnTeto(null);
+  lnTrocarVideo(lnClipe, true);
 }
 
 /**
@@ -5067,27 +5152,107 @@ function lnMapinha(l){
   <div class="lnDeAte">${a ? `<b>${esc(a.nome)}</b> <i>→</i> ` : ''}<b>${esc(b.nome)}</b>${b.aproximado ? ' <small>(ponto aproximado)</small>' : ''}</div>`;
 }
 
+/**
+ * Abrir uma lineup. O player NÃO é refeito a cada clique.
+ *
+ * Antes, todo clique jogava fora o iframe e montava outro: era buscar a API, apertar a mão
+ * por postMessage e começar a negociar qualidade do zero, tudo de novo — com o jogo aberto
+ * isso é segundo de tela preta, e é metade do "não carrega direito". Agora o player fica de
+ * pé e só troca o vídeo (loadVideoById); a casca e o mapinha do lado é que são redesenhados.
+ * De quebra, a qualidade que ele já tinha conseguido continua valendo na próxima lineup.
+ */
 function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
-  lnClipe = l;
-  $('#lnPlayer').innerHTML = `
-    <div class="lnDetalhe">
-      <div class="lnVideoCx">
-        <div id="lnYT"></div>
-      </div>
-      <div class="lnLadoDetalhe">
-        <button class="acao lnVoltar" onclick="lnFecharClipe()">← voltar</button>
-        <div class="lnTocandoNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
-        ${lnMapinha(l)}
-        <div class="lnTocandoPe">
-          ${l.habilidade ? `<span class="lnTag">${esc(l.habilidade.nome)}</span>` : ''}
-          ${lnSelo(l)}
-                  </div>
-        <div class="lnCanal">${esc(l.canal)} · clipe de ${lnMMSS(l.segundo)} a ${lnMMSS(l.fim ?? l.segundo)}</div>
-      </div>
-    </div>`;
+  lnClipe = l; lnTentouHD = 0; lnTeto(null);
+  // player que tomou erro do YouTube não se reaproveita: a próxima lineup merece um novo
+  const dePe = !lnPlayerRuim && $('.lnDetalhe') && lnPlayer?.loadVideoById && document.getElementById('lnYT');
+  if (!dePe) {
+    $('#lnPlayer').innerHTML = `
+      <div class="lnDetalhe">
+        <div class="lnVideoCx"><div id="lnYT"></div></div>
+        <div class="lnLadoDetalhe"></div>
+      </div>`;
+  }
+  lnPintarLado(l);
   document.body.classList.add('lnTelaCheia');
-  lnMontarPlayer(l);
+  if (dePe) lnTrocarVideo(l); else lnMontarPlayer(l);
+}
+
+/** O painel do lado: nome, mapinha, selos e de onde veio. Muda a cada lineup; o player não. */
+function lnPintarLado(l){
+  const lado = $('.lnLadoDetalhe'); if (!lado) return;
+  lado.innerHTML = `
+      <button class="acao lnVoltar" onclick="lnFecharClipe()">← voltar</button>
+      <div class="lnTocandoNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>
+      ${lnMapinha(l)}
+      <div class="lnTocandoPe">
+        ${l.habilidade ? `<span class="lnTag">${esc(l.habilidade.nome)}</span>` : ''}
+        ${lnSelo(l)}
+        <button class="lnTag lnQ" id="lnQ" onclick="lnTentarDeNovo()">…</button>
+      </div>
+      <div class="lnCanal">${esc(l.canal)} · clipe de ${lnMMSS(l.segundo)} a ${lnMMSS(l.fim ?? l.segundo)}</div>
+      <a class="lnCanal lnNoYT" target="_blank" rel="noreferrer"
+         href="https://www.youtube.com/watch?v=${encodeURIComponent(l.video)}&t=${Math.max(0, Math.floor(l.segundo))}s">abrir no YouTube ↗</a>`;
+  lnPintarQualidade('');
+}
+
+/** Troca o vídeo no player que já está de pé. `recarregar` força mesmo sendo o mesmo vídeo. */
+function lnTrocarVideo(l, recarregar = false){
+  if (!lnPlayer?.loadVideoById) return lnMontarPlayer(l);
+  let mesmo = false;
+  try { mesmo = lnPlayer.getVideoData?.()?.video_id === l.video; } catch {}
+  try {
+    if (mesmo && !recarregar) { lnPlayer.seekTo(l.segundo, true); lnPlayer.playVideo(); }
+    else lnPlayer.loadVideoById({ videoId: l.video, startSeconds: l.segundo, endSeconds: l.fim ?? undefined });
+    lnPlayer.mute?.();
+  } catch { return lnMontarPlayer(l); }
+  lnCarregouEm = Date.now();
+  lnVigiarClipe(l);
+}
+
+/**
+ * Os três relógios de um clipe tocando: o laço (volta pro começo no fim do trecho), o olho
+ * na qualidade e a paciência pra ele começar.
+ */
+function lnVigiarClipe(l){
+  clearInterval(lnVigia); clearTimeout(lnRelogio); clearInterval(lnOlhoQ);
+  $('.lnErroClipe')?.remove(); $('.lnCarregando')?.remove();
+  // o laço é nosso: o `end` do YouTube só PARA, e pra estudar lineup a gente quer repetir
+  lnVigia = setInterval(() => {
+    if (!lnPlayer?.getCurrentTime || lnClipe !== l) return;
+    const t = lnPlayer.getCurrentTime();
+    if (l.fim && t >= l.fim - 0.05) lnDoComeco();
+  }, 200);
+  lnOlhoQ = setInterval(() => lnOlharQualidade(l), 1500);
+  lnEsperarComecar(l, 9000, false);
+}
+
+/**
+ * Rede ruim e máquina cheia também dão retângulo preto, só que sem evento de erro: o player
+ * nasce e fica lá, parado. Desistir em 9 s era cedo DEMAIS com o jogo rodando — ele via
+ * "esse clipe não abriu" em vídeo que ia abrir. Agora, se está carregando, a tela diz isso
+ * e espera mais 16 s; desistir de verdade, só depois.
+ */
+function lnEsperarComecar(l, ms, ultima){
+  clearTimeout(lnRelogio);
+  lnRelogio = setTimeout(() => {
+    if (lnClipe !== l) return;
+    let estado = -1;
+    try { estado = lnPlayer?.getPlayerState?.() ?? -1; } catch {}
+    if (estado === YT.PlayerState.PLAYING) { $('.lnCarregando')?.remove(); return; }
+    const carregando = estado === YT.PlayerState.BUFFERING || estado === -1 || estado === YT.PlayerState.UNSTARTED;
+    if (carregando && !ultima) {
+      const cx = $('.lnVideoCx');
+      if (cx && !$('.lnCarregando')) {
+        const aviso = document.createElement('div');
+        aviso.className = 'lnCarregando';
+        aviso.textContent = 'carregando o clipe…';
+        cx.appendChild(aviso);
+      }
+      return lnEsperarComecar(l, 16000, true);
+    }
+    lnClipeFalhou(l, carregando ? 'o vídeo está travando pra carregar' : 'o vídeo não começou', false);
+  }, ms);
 }
 
 /**
@@ -5097,7 +5262,8 @@ function lnVer(i){
 /** Fecha o clipe e devolve a barra de filtros. */
 function lnFecharClipe(){
   try { lnPlayer?.destroy?.(); } catch {}
-  lnPlayer = null; lnClipe = null; lnPulos = 0; clearInterval(lnVigia); clearTimeout(lnRelogio);
+  lnPlayer = null; lnClipe = null; lnPulos = 0; lnTentouHD = 0; lnPlayerRuim = false;
+  clearInterval(lnVigia); clearTimeout(lnRelogio); clearInterval(lnOlhoQ);
   $('#lnPlayer').innerHTML = '';
   document.body.classList.remove('lnTelaCheia');
 }
@@ -5130,8 +5296,9 @@ async function lnMontarPlayer(l){
   try { await lnApiYT(); }
   catch { return lnClipeFalhou(l, 'o YouTube não respondeu — clica de novo daqui a pouco'); }
   if (lnClipe !== l) return;                       // ele já clicou em outra
-  clearInterval(lnVigia); clearTimeout(lnRelogio);
+  clearInterval(lnVigia); clearTimeout(lnRelogio); clearInterval(lnOlhoQ);
   try { lnPlayer?.destroy?.(); } catch {}
+  lnPlayerRuim = false;
 
   // dois quadros: o primeiro aplica a tela cheia, o segundo já mede o tamanho final
   await new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)));
@@ -5139,6 +5306,7 @@ async function lnMontarPlayer(l){
   const cx = $('.lnVideoCx'), cr = cx?.getBoundingClientRect();
   const larg = Math.max(854, Math.round(cr?.width || 0));
   const alt = Math.max(480, Math.round(cr?.height || 0));
+  lnCarregouEm = Date.now();
 
   lnPlayer = new YT.Player('lnYT', {
     videoId: l.video, width: larg, height: alt,
@@ -5151,9 +5319,10 @@ async function lnMontarPlayer(l){
     },
     events: {
       onReady: (e) => {
-        lnForcarAlta(e.target); lnVigiarTamanho($('.lnVideoCx'));
+        lnVigiarTamanho($('.lnVideoCx'));
         try { e.target.mute(); } catch {}
         e.target.playVideo();
+        lnVigiarClipe(l);
         // alguns navegadores só aceitam o play um tiquinho depois de montar
         setTimeout(() => { try { if (e.target.getPlayerState() !== YT.PlayerState.PLAYING) e.target.playVideo(); } catch {} }, 700);
       },
@@ -5161,8 +5330,8 @@ async function lnMontarPlayer(l){
       onStateChange: (e) => {
         if (e.data === YT.PlayerState.PLAYING) {
           clearTimeout(lnRelogio); lnPulos = 0;
-          $('.lnErroClipe')?.remove();
-          lnForcarAlta(e.target); lnEncaixar($('.lnVideoCx'));
+          $('.lnErroClipe')?.remove(); $('.lnCarregando')?.remove();
+          lnEncaixar($('.lnVideoCx'));
         }
         if (e.data === YT.PlayerState.ENDED) lnDoComeco();
       },
@@ -5175,27 +5344,14 @@ async function lnMontarPlayer(l){
           150: 'o dono não deixa esse vídeo tocar fora do YouTube',
         })[e.data] ?? 'o YouTube recusou esse vídeo';
         // 100/101/150 é defeito do vídeo, não da internet: some de todas as buscas
+        lnPlayerRuim = true;
         if ([100, 101, 150].includes(e.data)) lnAvisarVideoRuim(l.video, String(e.data));
         lnClipeFalhou(l, porque, [100, 101, 150].includes(e.data));
       },
     },
   });
 
-  /* Rede ruim também dá retângulo preto, só que sem evento de erro: o player nasce e fica
-   * lá, parado. Sem este prazo ele ficava preto pra sempre, sem uma palavra. */
-  lnRelogio = setTimeout(() => {
-    if (lnClipe !== l) return;
-    let estado = -1;
-    try { estado = lnPlayer?.getPlayerState?.() ?? -1; } catch {}
-    if (estado === YT.PlayerState.PLAYING) return;
-    lnClipeFalhou(l, estado === YT.PlayerState.BUFFERING ? 'o vídeo está travando pra carregar' : 'o vídeo não começou', false);
-  }, 9000);
-
-  lnVigia = setInterval(() => {
-    if (!lnPlayer?.getCurrentTime || lnClipe !== l) return;
-    const t = lnPlayer.getCurrentTime();
-    if (l.fim && t >= l.fim - 0.05) lnDoComeco();
-  }, 200);
+  lnVigiarClipe(l);
 }
 
 /** Conta pro app que esse vídeo não toca, pra ele sumir das buscas (inclusive as salvas). */
