@@ -156,16 +156,42 @@ export function lerPresenca(blob) {
   };
 }
 
+/* ---------------------------------------------------- qual presença é a dele
+ *
+ * `/chat/v4/presences` NÃO devolve só a dele: devolve a lista inteira — a dele e a de cada
+ * amigo online, cada uma com o seu próprio blob de partida. O código daqui pegava a
+ * primeira de Valorant que aparecesse, sem conferir de quem era, e a ordem da lista muda
+ * sozinha conforme os amigos entram, saem e trocam de estado.
+ *
+ * Foi isso que trocou o mapa no meio da partida dele: estava jogando uma Haven e virou
+ * Sunset, que era a partida de um amigo. Conferido na máquina dele, com o Valorant
+ * fechado: das 3 presenças, a PRIMEIRA com blob é de um amigo, e a dele é a última.
+ *
+ * E não era só o mapa. Essa mesma leitura alimenta três coisas: o mapa/agente que a aba de
+ * lineups segue, o gatilho da segunda tela, e a trava que impede o app de se atualizar no
+ * meio de uma partida. Com a presença errada, a partida de um amigo abria a segunda tela
+ * dele e segurava a atualização dele.
+ *
+ * Sem saber o próprio puuid só dá pra afirmar quando existe UMA candidata: chutar entre
+ * várias é exatamente o que causava o bug.
+ */
+export function presencaDele(presencas, puuid) {
+  const todas = (presencas?.presences ?? []).filter((p) => p.product === 'valorant' && p.private);
+  if (puuid) return todas.find((p) => p.puuid === puuid) ?? null;
+  return todas.length === 1 ? todas[0] : null;
+}
+
 /* ------------------------------------------------------------------ agente */
 
 /**
  * O agente escolhido. S\u00f3 existe durante a sele\u00e7\u00e3o e a partida, e vem do servi\u00e7o de
  * pr\u00e9-partida da Riot — por isso precisa dos tokens que o cliente local entrega.
  */
-async function agenteEscolhido(lock, estado) {
+async function agenteEscolhido(lock, estado, meuPuuid = null) {
   if (estado !== 'selecao' && estado !== 'jogando') return null;
   const ent = await pedir(lock, '/entitlements/v1/token');
-  const { regiao, shard, puuid } = await regiaoEShard(lock);
+  const { regiao, shard, puuid: doChat } = await regiaoEShard(lock);
+  const puuid = meuPuuid ?? doChat;
   if (!ent?.accessToken || !ent?.token || !puuid) return null;
 
   const sessao = { puuid };
@@ -205,8 +231,12 @@ export async function situacaoDoValorant() {
   const lock = await lerLockfile();
   if (!lock) return { ligado: false, estado: null, mapa: null, agenteId: null };
 
-  const presencas = await pedir(lock, '/chat/v4/presences');
-  const minha = (presencas?.presences ?? []).find((p) => p.product === 'valorant' && p.private);
+  // a sessão vem junto só pra saber qual das presenças é a dele (ver presencaDele)
+  const [sessao, presencas] = await Promise.all([
+    pedir(lock, '/chat/v1/session'),
+    pedir(lock, '/chat/v4/presences'),
+  ]);
+  const minha = presencaDele(presencas, sessao?.puuid ?? null);
   if (!minha) return { ligado: false, estado: null, mapa: null, agenteId: null };
 
   let blob = null;
@@ -214,6 +244,6 @@ export async function situacaoDoValorant() {
   if (!blob) return { ligado: true, estado: null, mapa: null, agenteId: null };
 
   const { estado, mapa, fila } = lerPresenca(blob);
-  const agenteId = await agenteEscolhido(lock, estado).catch(() => null);
+  const agenteId = await agenteEscolhido(lock, estado, sessao?.puuid ?? null).catch(() => null);
   return { ligado: true, estado, mapa, agenteId, fila };
 }
