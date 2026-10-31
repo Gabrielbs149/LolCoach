@@ -5003,7 +5003,7 @@ function lnNomeCurto(l){
  * é ele que tem a imagem em alta — o quadro do cartão é storyboard de 320x180 e nunca vai
  * dar pra ler mira. Com os botões de -0,2 s / +0,2 s dá pra parar no quadro exato. */
 let lnPlayer = null, lnClipe = null, lnVigia = null, lnRelogio = null, lnPulos = 0;
-let lnOlhoQ = null, lnTentouHD = 0, lnCarregouEm = 0, lnPlayerRuim = false;
+let lnOlhoQ = null, lnTentouHD = 0, lnCarregouEm = 0, lnPlayerRuim = false, lnQuerRecarregar = false, lnUltimoPulo = 0;
 
 /** O nome que o YouTube usa pra cada qualidade, em altura de imagem — que é o que dá pra comparar. */
 const LN_ALTURA = { tiny: 144, small: 240, medium: 360, large: 480, hd720: 720, hd1080: 1080, hd1440: 1440, hd2160: 2160 };
@@ -5054,8 +5054,13 @@ function lnVigiarTamanho(cx){ lnEncaixar(cx); }
  *
  * `setPlaybackQuality` e o playerVar `vq` são ignorados desde 2019, e mudar o tamanho só
  * serve pra DESCER. A única coisa que faz o YouTube escolher de novo é RECARREGAR o vídeo.
- * Então: quadro grande + imagem em 360p ou pior = recarrega no mesmo player. Duas vezes por
- * clipe, espaçadas de 6 s; mais que isso vira pisca-pisca na cara dele.
+ * Então: quadro grande + imagem em 360p ou pior = recarrega no mesmo player.
+ *
+ * SÓ QUE RECARREGAR VOLTA O VÍDEO PRO COMEÇO. Fazendo isso no meio da lineup, ele perde a
+ * jogada no meio — e foi o que ele viu: "agora tá voltando o vídeo antes da lineup
+ * terminar", até quatro vezes seguidas, de 6 em 6 s. Agora o olho só ANOTA que precisa
+ * recarregar; quem recarrega é o laço, no instante em que o clipe ia voltar pro começo de
+ * qualquer jeito. Fica invisível: o trecho repete como sempre, e repete melhor.
  */
 function lnOlharQualidade(l){
   if (lnClipe !== l || !lnPlayer?.getPlaybackQuality) return;
@@ -5068,7 +5073,8 @@ function lnOlharQualidade(l){
   if (!ruim || larg < 700 || lnTentouHD >= LN_TETO.length || Date.now() - lnCarregouEm < 6000) return;
   lnTentouHD++;
   lnTeto(LN_TETO[lnTentouHD - 1]);
-  lnTrocarVideo(l, true);
+  lnQuerRecarregar = true;   // o laço recarrega no fim do trecho; nunca no meio da jogada
+  lnPintarQualidade(q);
 }
 
 /**
@@ -5096,9 +5102,10 @@ function lnPintarQualidade(q){
   const e = $('#lnQ'); if (!e) return;
   const alt = lnAltura(q);
   const menor = lnTentouHD >= 3;        // a escada já reduziu o quadro de propósito
-  e.textContent = alt ? `${alt}p${menor ? ' ↓' : ''}` : '…';
+  e.textContent = alt ? `${alt}p${lnQuerRecarregar ? ' ⟳' : menor ? ' ↓' : ''}` : '…';
   e.classList.toggle('ruim', alt > 0 && alt <= 360);
   e.title = !alt ? 'medindo…'
+    : lnQuerRecarregar ? 'tá ruim: vou pedir de novo quando o clipe repetir — recarregar agora te tiraria do meio da jogada (clica pra fazer já)'
     : menor ? 'o quadro foi reduzido de propósito: assim o YouTube manda uma imagem que a máquina segura, em vez de desabar pra 144p — clica pra tentar o tamanho cheio de novo'
     : 'quem escolhe a qualidade é o YouTube, pelo tamanho do player e pelo quanto a máquina está dando conta — clica pra ele escolher de novo';
 }
@@ -5106,7 +5113,7 @@ function lnPintarQualidade(q){
 /** O botão do selo: zera as tentativas e recarrega, que é o que faz o YouTube reavaliar. */
 function lnTentarDeNovo(){
   if (!lnClipe) return;
-  lnTentouHD = 0; lnCarregouEm = 0; lnTeto(null);
+  lnTentouHD = 0; lnCarregouEm = 0; lnTeto(null); lnQuerRecarregar = false;
   lnTrocarVideo(lnClipe, true);
 }
 
@@ -5336,7 +5343,7 @@ function lnBotoesDeMarcar(l){
  */
 function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
-  lnClipe = l; lnTentouHD = 0; lnTeto(null); lnMarcando = null;
+  lnClipe = l; lnTentouHD = 0; lnTeto(null); lnMarcando = null; lnQuerRecarregar = false;
   // player que tomou erro do YouTube não se reaproveita: a próxima lineup merece um novo
   const dePe = !lnPlayerRuim && $('.lnDetalhe') && lnPlayer?.loadVideoById && document.getElementById('lnYT');
   if (!dePe) {
@@ -5394,7 +5401,15 @@ function lnVigiarClipe(l){
   lnVigia = setInterval(() => {
     if (!lnPlayer?.getCurrentTime || lnClipe !== l) return;
     const t = lnPlayer.getCurrentTime();
-    if (l.fim && t >= l.fim - 0.05) lnDoComeco();
+    if (l.fim && t >= l.fim - 0.05) return lnDoComeco();
+    /* Rede de segurança: o clipe NUNCA toca fora do trecho dele. Se por qualquer motivo o
+     * player for parar antes do começo (recarga que não obedeceu, anúncio, o YouTube
+     * resolvendo sozinho), isto traz de volta em até 200 ms em vez de deixar ele assistindo
+     * outra parte do vídeo até o fim do trecho. */
+    if (t < l.segundo - 1.5 && Date.now() - lnUltimoPulo > 700) {
+      lnUltimoPulo = Date.now();
+      try { lnPlayer.seekTo(l.segundo, true); } catch {}
+    }
   }, 200);
   lnOlhoQ = setInterval(() => lnOlharQualidade(l), 1500);
   lnEsperarComecar(l, 9000, false);
@@ -5435,7 +5450,7 @@ function lnEsperarComecar(l, ms, ultima){
 /** Fecha o clipe e devolve a barra de filtros. */
 function lnFecharClipe(){
   try { lnPlayer?.destroy?.(); } catch {}
-  lnPlayer = null; lnClipe = null; lnPulos = 0; lnTentouHD = 0; lnPlayerRuim = false; lnMarcando = null;
+  lnPlayer = null; lnClipe = null; lnPulos = 0; lnTentouHD = 0; lnPlayerRuim = false; lnMarcando = null; lnQuerRecarregar = false;
   clearInterval(lnVigia); clearTimeout(lnRelogio); clearInterval(lnOlhoQ);
   $('#lnPlayer').innerHTML = '';
   document.body.classList.remove('lnTelaCheia');
@@ -5571,7 +5586,23 @@ function lnClipeFalhou(l, porque, pular = false){
   if (proxima >= 0) setTimeout(() => { if (lnClipe === l) { lnPulos++; lnVer(proxima); } }, 1600);
 }
 
-function lnDoComeco(){ if (lnClipe && lnPlayer?.seekTo) { lnPlayer.seekTo(lnClipe.segundo, true); lnPlayer.playVideo?.(); } }
+/**
+ * Volta pro começo do trecho. É aqui, e só aqui, que a melhora de qualidade acontece: o
+ * clipe ia voltar de qualquer jeito, então recarregar neste instante não tira ele de nada.
+ *
+ * E a ORDEM importa, isto foi medido: volta pro começo PRIMEIRO, recarrega depois. Pedir a
+ * recarga com o vídeo parado no fim do trecho faz o YouTube ignorar o `startSeconds` — o
+ * trecho de 41 s a 65 s voltava a tocar do segundo 0, e ele ficava vendo outra parte do
+ * vídeo. Voltando primeiro, o player está no meio do vídeo e a recarga obedece: medido, um
+ * piscar de 0,2 s no instante em que o clipe ia repetir de qualquer forma.
+ */
+function lnDoComeco(){
+  const l = lnClipe; if (!l) return;
+  try { lnPlayer?.seekTo?.(l.segundo, true); lnPlayer?.playVideo?.(); } catch {}
+  if (!lnQuerRecarregar) return;
+  lnQuerRecarregar = false;
+  setTimeout(() => { if (lnClipe === l) lnTrocarVideo(l, true); }, 150);
+}
 
 /* ---------------------------------------------------------------- o acervo
  * "pra parar de ter q ficar pesquisando toda vez e organizar tudo": mostra o que já está
