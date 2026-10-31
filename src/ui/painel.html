@@ -5509,6 +5509,11 @@ async function lnOlharOJogo(){
    * seleção os dois não chegam juntos — dá pra já ter travado o agente antes de o mapa
    * aparecer na presença, e nesse intervalo o cartão do agente ficava parado no antigo.
    * Agora cada um entra assim que aparece, e a busca só dispara quando os dois estão de pé. */
+  /* Mapa detectado que não existe no catálogo não troca nada: a tabela que traduzia o
+   * caminho interno do jogo já devolveu "Summit" pra uma partida de Corrode, e aqui isso
+   * virava uma busca inteira no mapa errado. Se o nome não é um dos mapas de verdade, é erro
+   * de tradução ou mapa novo — e nesses dois casos é melhor ficar no que ele escolheu. */
+  if (j.mapa && lnCatalogo?.mapas?.length && !lnCatalogo.mapas.some(m => m.nome === j.mapa)) j.mapa = null;
   const marca = `${j.mapa ?? ''}|${j.agenteNome ?? ''}`;
   if (marca === '|' || marca === lnUltimoDetectado) return;     // nada novo
   lnUltimoDetectado = marca;

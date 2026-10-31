@@ -118,16 +118,44 @@ async function regiaoEShard(lock) {
 
 /* ------------------------------------------------------------------ mapa */
 
-/** O caminho interno do mapa vira o nome que a gente usa ("/Game/Maps/Triad/Triad" → Bind). */
+/**
+ * O caminho interno do mapa vira o nome que a gente usa ("/Game/Maps/Triad/Triad" → Bind).
+ *
+ * A TABELA À MÃO ESTAVA ERRADA, e errada do pior jeito: em vez de não achar o mapa, ela
+ * achava o mapa de OUTRO. Conferido contra a lista oficial (valorant-api, a mesma que serve
+ * mapa e agente pra aba de lineups):
+ *  - `rook` era "Summit". /Game/Maps/Rook/Rook é CORRODE. Jogando Corrode, o app mostrava
+ *    lineup de Summit — mapa inteiro errado, não um canto errado.
+ *  - "Summit" é `plummet`, e não estava na tabela: jogando Summit, o app não achava mapa
+ *    nenhum e a aba ficava parada no último que ele tinha escolhido.
+ *  - `hurm` era "Corrode". HURM é o prefixo dos mapas de Deathmatch (District, Kasbah,
+ *    Drift, Glitch, Piazza). Deathmatch virava Corrode.
+ * E a busca era por `includes('/' + chave)`, que casa pedaço de caminho: "/HURM/HURM_Alley"
+ * casava `hurm` em qualquer posição. Agora o codinome sai do lugar certo do caminho.
+ *
+ * Mas tabela à mão envelhece — esta envelheceu em dois mapas. Então quem manda, quando dá, é
+ * o CATÁLOGO: o valorant-api entrega o `mapUrl` de cada mapa junto com o nome, por patch, e
+ * é isso que `mapas` traz. A tabela fica só pra quando o catálogo não chegou (primeira
+ * execução sem internet), e com o catálogo em mãos um caminho que não casa com nenhum mapa
+ * de partida é mapa de Deathmatch, Range ou modo novo: aí é null, de propósito.
+ */
 const MAPAS = {
-  ascent: 'Ascent', triad: 'Haven', duality: 'Bind', bonsai: 'Split', port: 'Icebox',
-  foxtrot: 'Breeze', canyon: 'Fracture', pitt: 'Pearl', jam: 'Lotus', juliett: 'Sunset',
-  infinity: 'Abyss', rook: 'Summit', hurm: 'Corrode',
+  ascent: 'Ascent', bonsai: 'Split', canyon: 'Fracture', duality: 'Bind', foxtrot: 'Breeze',
+  infinity: 'Abyss', jam: 'Lotus', juliett: 'Sunset', pitt: 'Pearl', plummet: 'Summit',
+  port: 'Icebox', rook: 'Corrode', triad: 'Haven',
 };
-export function mapaPeloCaminho(caminho) {
-  const p = String(caminho ?? '').toLowerCase();
-  for (const [chave, nome] of Object.entries(MAPAS)) if (p.includes(`/${chave}`)) return nome;
-  return null;
+const CODINOME = /\/game\/maps\/([^/]+)/;
+export function mapaPeloCaminho(caminho, mapas = null) {
+  const p = String(caminho ?? '').trim().toLowerCase();
+  if (!p) return null;
+  const doCatalogo = (mapas ?? []).filter((m) => m?.nome && m?.caminho);
+  for (const m of doCatalogo) {
+    const c = String(m.caminho).toLowerCase();
+    if (p === c || p.startsWith(`${c}/`)) return m.nome;
+  }
+  // catálogo em mãos e nenhum casou: não é mapa de partida (Deathmatch, Range, modo novo)
+  if (doCatalogo.length) return null;
+  return MAPAS[p.match(CODINOME)?.[1] ?? ''] ?? null;
 }
 
 /** Em que ponto do jogo ele está, em palavra nossa. */
@@ -143,15 +171,26 @@ const ESTADOS = { MENUS: 'menu', PREGAME: 'selecao', INGAME: 'jogando' };
  *
  * Ordem de procura: o lugar novo, depois a raiz (formato antigo), e por último o que o dono
  * do grupo reporta — que é o que aparece quando a partida é do grupo e não sua.
+ *
+ * Duas regras sobre o mapa, as duas pra ele não ver o mapa de outra partida:
+ *  - o mapa do DONO DO GRUPO só vale quando o estado também é dele. Amigo que convida pro
+ *    grupo no meio de uma partida publica `partyOwnerMatchMap` daquela partida; ele está no
+ *    menu, e o app trocava a aba de lineups pro mapa do amigo.
+ *  - no MENU não existe mapa. O campo costuma vir vazio, mas quando vem sobrando é mapa de
+ *    partida que acabou, e dizer "você está na Bind" no menu é mentira.
+ * Vazio conta como ausente (`||`, não `??`): `matchMap` vem como "" fora de partida, e com
+ * `??` o "" era um valor válido que bloqueava o resto da procura.
  */
-export function lerPresenca(blob) {
+export function lerPresenca(blob, mapas = null) {
   const md = blob?.matchPresenceData ?? {};
   const pd = blob?.partyPresenceData ?? {};
-  const laco = md.sessionLoopState ?? blob?.sessionLoopState ?? pd.partyOwnerSessionLoopState ?? null;
-  const ondeEstaOMapa = md.matchMap ?? blob?.matchMap ?? pd.partyOwnerMatchMap ?? null;
+  const meuLaco = md.sessionLoopState || blob?.sessionLoopState || null;
+  const laco = meuLaco || pd.partyOwnerSessionLoopState || null;
+  const ondeEstaOMapa = md.matchMap || blob?.matchMap || (meuLaco ? null : pd.partyOwnerMatchMap) || null;
+  const estado = ESTADOS[laco] ?? null;
   return {
-    estado: ESTADOS[laco] ?? null,
-    mapa: mapaPeloCaminho(ondeEstaOMapa),
+    estado,
+    mapa: estado === 'menu' ? null : mapaPeloCaminho(ondeEstaOMapa, mapas),
     fila: md.queueId ?? blob?.queueId ?? null,
   };
 }
@@ -227,7 +266,7 @@ async function agenteEscolhido(lock, estado, meuPuuid = null) {
  * O que está acontecendo no Valorant agora. Devolve sempre um objeto; quando o jogo está
  * fechado, vem tudo nulo e `ligado: false` — nunca estoura, porque isso roda em laço.
  */
-export async function situacaoDoValorant() {
+export async function situacaoDoValorant({ mapas = null } = {}) {
   const lock = await lerLockfile();
   if (!lock) return { ligado: false, estado: null, mapa: null, agenteId: null };
 
@@ -243,7 +282,7 @@ export async function situacaoDoValorant() {
   try { blob = JSON.parse(Buffer.from(minha.private, 'base64').toString('utf8')); } catch { /* formato novo */ }
   if (!blob) return { ligado: true, estado: null, mapa: null, agenteId: null };
 
-  const { estado, mapa, fila } = lerPresenca(blob);
+  const { estado, mapa, fila } = lerPresenca(blob, mapas);
   const agenteId = await agenteEscolhido(lock, estado, sessao?.puuid ?? null).catch(() => null);
   return { ligado: true, estado, mapa, agenteId, fila };
 }

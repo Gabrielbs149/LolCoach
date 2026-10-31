@@ -902,10 +902,65 @@ test('partida do grupo: cai pro que o dono reporta', async () => {
   const { lerPresenca } = await import('../src/valorant/jogo.js');
   const r = lerPresenca({
     matchPresenceData: {},
-    partyPresenceData: { partyOwnerSessionLoopState: 'INGAME', partyOwnerMatchMap: '/Game/Maps/Hurm/Hurm' },
+    partyPresenceData: { partyOwnerSessionLoopState: 'INGAME', partyOwnerMatchMap: '/Game/Maps/Rook/Rook' },
   });
   assert.equal(r.estado, 'jogando');
   assert.equal(r.mapa, 'Corrode');
+});
+
+/* O mapa dele vinha errado, e errado do pior jeito: em vez de "não sei", o app dizia o nome
+ * de OUTRO mapa e buscava lineup dele. Três erros na tabela à mão que traduzia o caminho
+ * interno do jogo, todos conferidos contra a lista oficial do valorant-api. */
+test('mapa: Corrode não é Summit, Summit existe, e Deathmatch não é mapa de lineup', async () => {
+  const { mapaPeloCaminho } = await import('../src/valorant/jogo.js');
+  // 1. /Game/Maps/Rook/Rook é Corrode. A tabela dizia Summit: jogando Corrode ele via Summit.
+  assert.equal(mapaPeloCaminho('/Game/Maps/Rook/Rook'), 'Corrode');
+  // 2. Summit é `plummet`, e não estava na tabela: jogando Summit, não achava mapa nenhum.
+  assert.equal(mapaPeloCaminho('/Game/Maps/Plummet/Plummet'), 'Summit');
+  // 3. HURM é o prefixo dos mapas de Deathmatch, e a tabela traduzia isso como Corrode.
+  //    Pior: a busca era por pedaço de caminho, então casava em qualquer posição.
+  for (const m of ['HURM_Alley', 'HURM_Bowl', 'HURM_Helix', 'HURM_HighTide', 'HURM_Yard']) {
+    assert.equal(mapaPeloCaminho(`/Game/Maps/HURM/${m}/${m}`), null, `${m} não é mapa de lineup`);
+  }
+  // Range e os modos avulsos também não são
+  assert.equal(mapaPeloCaminho('/Game/Maps/Poveglia/Range'), null);
+  assert.equal(mapaPeloCaminho('/Game/Maps/AbilityDraft/AbilityDraft'), null);
+  // e o resto da tabela continua de pé
+  assert.equal(mapaPeloCaminho('/Game/Maps/Triad/Triad'), 'Haven');
+  assert.equal(mapaPeloCaminho('/Game/Maps/Duality/Duality'), 'Bind');
+  assert.equal(mapaPeloCaminho(''), null);
+  assert.equal(mapaPeloCaminho(null), null);
+});
+
+test('mapa: o catálogo manda mais que a tabela à mão', async () => {
+  const { mapaPeloCaminho } = await import('../src/valorant/jogo.js');
+  // é o catálogo (valorant-api, por patch) que carrega o caminho interno de cada mapa:
+  // mapa novo passa a ser reconhecido sem ninguém precisar atualizar o app
+  const mapas = [
+    { nome: 'Corrode', caminho: '/Game/Maps/Rook/Rook' },
+    { nome: 'MapaNovo', caminho: '/Game/Maps/Codinome/Codinome' },
+  ];
+  assert.equal(mapaPeloCaminho('/Game/Maps/Codinome/Codinome', mapas), 'MapaNovo');
+  assert.equal(mapaPeloCaminho('/Game/Maps/Rook/Rook', mapas), 'Corrode');
+  // com catálogo em mãos, caminho que não casa com mapa de partida é null de propósito
+  assert.equal(mapaPeloCaminho('/Game/Maps/HURM/HURM_Yard/HURM_Yard', mapas), null);
+  // catálogo velho, sem o caminho: cai na tabela em vez de ficar sem mapa
+  assert.equal(mapaPeloCaminho('/Game/Maps/Triad/Triad', [{ nome: 'Haven' }]), 'Haven');
+});
+
+/* Amigo que convida pro grupo no meio de uma partida publica o mapa DELE em
+ * partyOwnerMatchMap. Gabriel está no menu, e a aba de lineups trocava pro mapa do amigo. */
+test('mapa: o do dono do grupo só vale quando o estado também é dele', async () => {
+  const { lerPresenca } = await import('../src/valorant/jogo.js');
+  const r = lerPresenca({
+    matchPresenceData: { sessionLoopState: 'MENUS', matchMap: '' },
+    partyPresenceData: { partyOwnerSessionLoopState: 'INGAME', partyOwnerMatchMap: '/Game/Maps/Juliett/Juliett' },
+  });
+  assert.equal(r.estado, 'menu', 'o estado é o DELE: menu');
+  assert.equal(r.mapa, null, 'no menu não existe mapa — e o do amigo não é o dele');
+  // e no menu não sobra mapa de partida que acabou
+  const s = lerPresenca({ matchPresenceData: { sessionLoopState: 'MENUS', matchMap: '/Game/Maps/Ascent/Ascent' } });
+  assert.equal(s.mapa, null);
 });
 
 /* ------------------------------------------------------------------ Valorant: de quem é
@@ -1190,6 +1245,29 @@ test('acervo: busca salva com poucos vídeos se marca velha, sem ser descartada'
  * publicarem um mapa sem eles, o mapa volta a ficar na orientação da planta sem avisar —
  * e foi exatamente isso que o incomodava. Este teste olha o catálogo que está em disco.
  * -------------------------------------------------------------------------- */
+/* A tabela à mão de codinome→mapa dentro de jogo.js envelheceu e passou a apontar Corrode
+ * como Summit. Ela só é usada quando o catálogo não chegou, mas é justo aí que ninguém olha.
+ * Este teste confere a tabela contra o catálogo de verdade: se a Riot lançar mapa novo ou eu
+ * digitar errado, cai aqui em vez de cair no meio de uma partida dele. */
+test('mapa: a tabela de reserva concorda com o catálogo em disco', async (t) => {
+  const { readFile } = await import('node:fs/promises');
+  const { resolve } = await import('node:path');
+  const { pastaBase } = await import('../src/caminhos.js');
+  const { mapaPeloCaminho } = await import('../src/valorant/jogo.js');
+  let cat;
+  try { cat = JSON.parse(await readFile(resolve(pastaBase(), 'dados', 'valorant', 'catalogo.json'), 'utf8')); }
+  catch { return t.skip('sem catálogo em disco'); }
+  const comCaminho = (cat?.mapas ?? []).filter((m) => m.caminho);
+  if (!comCaminho.length) return t.skip('catálogo antigo, sem o caminho dos mapas');
+
+  const errados = [];
+  for (const m of comCaminho) {
+    const daTabela = mapaPeloCaminho(m.caminho);     // sem catálogo: força a tabela
+    if (daTabela !== m.nome) errados.push(`${m.caminho} → tabela diz ${daTabela ?? 'nada'}, catálogo diz ${m.nome}`);
+  }
+  assert.deepEqual(errados, [], 'tabela de reserva desencontrada do catálogo');
+});
+
 test('mapa: todo mapa do catálogo tem os dois spawns, senão o giro não acontece', async (t) => {
   const { readFile } = await import('node:fs/promises');
   const { resolve } = await import('node:path');

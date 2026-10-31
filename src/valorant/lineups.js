@@ -81,7 +81,7 @@ const VALIDADE_CATALOGO = 7 * 24 * 60 * 60 * 1000;   // o jogo muda de patch, ma
  * aconteceu quando os callouts entraram — o mapa abria sem nenhum pino porque o catálogo
  * em disco tinha só nome/ícone/planta e a validade por idade não notava a diferença.
  */
-const FORMATO_CATALOGO = 4;
+const FORMATO_CATALOGO = 5;
 
 /**
  * Mapas e agentes oficiais, do valorant-api.com (público, sem chave, atualizado por patch).
@@ -110,6 +110,9 @@ export async function catalogo({ forcar = false } = {}) {
       .filter((x) => x.displayName && x.tacticalDescription)    // só mapa de partida: tira Campo de Treino e afins
       .map((x) => ({
         nome: x.displayName,
+        // o caminho interno ("/Game/Maps/Rook/Rook"): é com ele que a presença do jogo diz
+        // em que mapa ele está, e a tabela à mão que fazia essa tradução estava errada
+        caminho: x.mapUrl ?? null,
         icone: x.listViewIcon ?? x.splash ?? null,
         arte: x.splash ?? x.listViewIcon ?? null,      // a arte grande, pro seletor em grade
         planta: x.displayIcon ?? null,

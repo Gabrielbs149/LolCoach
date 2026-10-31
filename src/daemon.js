@@ -26,6 +26,25 @@ async function versaoDoApp() {
   try { return JSON.parse(await readFile(resolve(fileURLToPath(import.meta.url), '..', '..', 'package.json'), 'utf8')).version; } catch { return '?'; }
 }
 
+/**
+ * Os mapas do catálogo do Valorant, guardados em memória.
+ *
+ * Quem pergunta é a detecção de mapa, de 5 em 5 segundos, e ela só precisa da lista
+ * nome↔caminho interno. O catálogo já fica em disco por 7 dias; isto evita até a leitura de
+ * disco e, mais importante, evita virar chamada de rede em laço quando ele estiver sem
+ * internet: deu certo, vale 1 h; deu errado, só tenta de novo em 5 min e nesse meio-tempo a
+ * detecção usa a tabela de reserva.
+ */
+let catMapas = { lista: null, quando: 0 };
+async function mapasDoCatalogo() {
+  const validade = catMapas.lista ? 60 * 60 * 1000 : 5 * 60 * 1000;
+  if (catMapas.quando && Date.now() - catMapas.quando < validade) return catMapas.lista;
+  catMapas.quando = Date.now();
+  const cat = await Lineups.catalogo().catch(() => null);
+  if (cat?.mapas?.length) catMapas.lista = cat.mapas.map((m) => ({ nome: m.nome, caminho: m.caminho ?? null }));
+  return catMapas.lista;
+}
+
 export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, aoFase, aoConfig } = {}) {
   const config = configDada ?? await carregarConfig();
   const lcu = new LcuClient();
@@ -2530,8 +2549,14 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     valSalvar: (p = {}) => Lineups.salvar(p),
     valApagar: (p = {}) => Lineups.apagar(String(p.id ?? '')),
     /* O que está rolando no Valorant agora (mapa e agente), lido do cliente local.
-       Só leitura: nada é escrito no cliente nem desenhado por cima do jogo. */
-    valSituacao: () => situacaoDoValorant(),
+       Só leitura: nada é escrito no cliente nem desenhado por cima do jogo.
+
+       Os mapas do catálogo vão junto porque é de lá que sai o caminho interno de cada um
+       ("/Game/Maps/Rook/Rook" = Corrode): a tabela à mão dentro de jogo.js dizia Summit, e
+       jogando Corrode ele via lineup de Summit. Isto aqui é consultado a cada 5 s, então o
+       catálogo fica guardado em memória por 1 h — e, se ele falhar, só tenta de novo depois
+       de 5 min, pra não virar chamada de rede em laço. */
+    valSituacao: async () => situacaoDoValorant({ mapas: await mapasDoCatalogo() }),
     valLinks: (p = {}) => ({
       youtube: Lineups.linkYoutube(Lineups.termoDaBusca(p)),
       strats: Lineups.linkStrats(p),
