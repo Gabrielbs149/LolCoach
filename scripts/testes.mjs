@@ -747,6 +747,98 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
   assert.deepEqual(n, [{ lado: null, pista: null }]);
 });
 
+/* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
+ * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('pontas: seta, parêntese e CT viram lugar; e o alvo não rouba o lugar de saída', async () => {
+  const { pontasDaLineup } = await import('../src/valorant/lineups.js');
+  const cs = [
+    { nome: 'A Site', regiao: 'Site', grande: 'A', site: 'A', x: 0.3, y: 0.3 },
+    { nome: 'A Lobby', regiao: 'Lobby', grande: 'A', site: 'A', x: 0.8, y: 0.8 },
+    { nome: 'B Long', regiao: 'Long', grande: 'B', site: 'B', x: 0.2, y: 0.7 },
+    { nome: 'Defender Side Spawn', regiao: 'Spawn', grande: 'Defender Side', site: null, x: 0.1, y: 0.1 },
+    { nome: 'Attacker Side Spawn', regiao: 'Spawn', grande: 'Attacker Side', site: null, x: 0.9, y: 0.9 },
+    { nome: 'A Wine', regiao: 'Wine', grande: 'A', site: 'A', x: 0.4, y: 0.5 },
+  ];
+  const ler = (nome, site = null) => {
+    const { alvo, posicao } = pontasDaLineup(nome, cs, site);
+    return [alvo?.nome ?? null, posicao?.nome ?? null];
+  };
+
+  // a seta é o mesmo que "to": sai do A Lobby, cai no A Site
+  assert.deepEqual(ler('A Lobby → A Site'), ['A Site', 'A Lobby']);
+  assert.deepEqual(ler('A Lobby -> A Site'), ['A Site', 'A Lobby']);
+  /* O parêntese era pior que não achar: a palavra entre parênteses não casava o separador,
+   * o nome INTEIRO ia pro casamento de alvo, e a lineup aparecia caindo no lugar de onde
+   * ela sai — o contrário do que ele quer ver no mapa. */
+  assert.deepEqual(ler('A Site 4 Close Flash (From B Long)'), ['A Site', 'B Long']);
+  // "CT" é o spawn do defensor pra qualquer canal; o catálogo da Riot só conhece o nome longo
+  assert.deepEqual(ler('A Site Default from CT'), ['A Site', 'Defender Side Spawn']);
+  assert.deepEqual(ler('A Site from T spawn'), ['A Site', 'Attacker Side Spawn']);
+  // mas só quando o lugar INTEIRO é isso: "CT Wine" é outro lugar, não o spawn do defensor
+  assert.deepEqual(ler('B default from CT Wine'), [null, 'A Wine']);
+  /* E o alvo sai SÓ da metade do alvo. Lendo o nome inteiro de volta, "Single shock from
+   * A Wine" virava uma lineup que CAI no A Wine, e a posição ainda era descartada por ser
+   * igual ao alvo: o lugar de onde se joga virava o ponto de queda. */
+  assert.deepEqual(ler('Single shock from A Wine'), [null, 'A Wine']);
+  // sabendo o site, o que sobra é o centro do site, e marcado como aproximado
+  const { alvo } = pontasDaLineup('Single shock from A Wine', cs, 'A');
+  assert.equal(alvo?.nome, 'A Site');
+  assert.equal(alvo?.aproximado, true, 'centro do site é palpite, e tem que se declarar');
+});
+
+/* 39,4% das lineups do acervo dele caem num ponto aproximado e 65,4% não dizem de onde se
+ * joga. O nome do capítulo é tudo o que existe, então o ponto EXATO só pode vir dele. */
+test('ponto marcado por ele ganha do que foi deduzido do nome, e sobrevive à busca', async () => {
+  const { mkdtemp, mkdir } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-ponto-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    await mkdir(resolve(base, 'dados', 'valorant'), { recursive: true });
+    const L = await import(`../src/valorant/lineups.js?ponto=${Date.now()}`);
+    const busca = () => ({
+      callouts: [{ nome: 'A Lobby', regiao: 'Lobby', grande: 'A', x: 0.8, y: 0.8 }],
+      lineups: [{ video: 'abc', segundo: 12, nome: 'A Site', ponto: { nome: 'A Site', x: 0.3, y: 0.3, aproximado: true }, posicao: null }],
+    });
+
+    assert.equal((await L.comMeusPontos(busca())).lineups[0].posicao, null, 'sem marca, nada muda');
+
+    await L.marcarPonto({ video: 'abc', segundo: 12, qual: 'posicao', x: 0.77, y: 0.81 });
+    const r = await L.comMeusPontos(busca());
+    assert.equal(r.lineups[0].posicao?.x, 0.77);
+    assert.equal(r.lineups[0].posicao?.meu, true);
+    assert.equal(r.lineups[0].posicao?.nome, 'A Lobby', 'o nome vem do callout mais perto');
+
+    // o alvo também, e deixa de ser aproximado
+    await L.marcarPonto({ video: 'abc', segundo: 12, qual: 'alvo', x: 0.31, y: 0.34 });
+    const r2 = await L.comMeusPontos(busca());
+    assert.equal(r2.lineups[0].ponto.y, 0.34);
+    assert.equal(r2.lineups[0].ponto.aproximado, false);
+
+    // fora do mapa não existe: 0..1 e ponto final
+    await L.marcarPonto({ video: 'abc', segundo: 12, qual: 'posicao', x: 9, y: -3 });
+    const r3 = await L.comMeusPontos(busca());
+    assert.deepEqual([r3.lineups[0].posicao.x, r3.lineups[0].posicao.y], [1, 0]);
+
+    // apagar uma ponta deixa a outra de pé
+    await L.esquecerPonto({ video: 'abc', segundo: 12, qual: 'posicao' });
+    const r4 = await L.comMeusPontos(busca());
+    assert.equal(r4.lineups[0].posicao, null);
+    assert.equal(r4.lineups[0].ponto.meu, true);
+    assert.equal(await L.quantosPontosMeus(), 1);
+
+    await L.esquecerPonto({ video: 'abc', segundo: 12 });
+    assert.equal(await L.quantosPontosMeus(), 0);
+
+    assert.ok((await L.marcarPonto({ video: 'abc', segundo: 12, qual: 'chute', x: 0.5, y: 0.5 })).erro);
+    assert.ok((await L.marcarPonto({ video: '', segundo: 12, qual: 'alvo', x: 0.5, y: 0.5 })).erro);
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
 /* A primeira versão media distância até os dois spawns, e media errado: "A Main to A Site"
  * no Pearl fica mais perto do spawn do defensor e virava defesa; no Fracture o atacante
  * nasce dos dois lados e a conta não quer dizer nada. Território em vez de distância. */
@@ -830,6 +922,7 @@ test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
       mapas: [{ nome: 'Ascent', planta: null, callouts: [
         { nome: 'Attacker Side Spawn', grande: 'Attacker Side', regiao: 'Spawn', x: 0.82, y: 0.57 },
         { nome: 'Defender Side Spawn', grande: 'Defender Side', regiao: 'Spawn', x: 0.13, y: 0.43 },
+        { nome: 'A Lobby', grande: 'A', regiao: 'Lobby', site: 'A', x: 0.75, y: 0.62 },
       ] }],
       agentes: [{ nome: 'Sova', icone: null, habilidades: [] }, { nome: 'Fade', icone: null, habilidades: [] }],
     }), 'utf8');
@@ -842,7 +935,8 @@ test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
       lineups: [
         l('Attacking', 10), l('A Site Dart', 20),
         l('Defense', 30), l('A Main Dart', 40),
-        l('Mid Dart', 50, { nome: 'Attacker Side Spawn' }),
+        // esta diz de onde se joga: o A Lobby, que é lugar de atacante
+        l('Mid Dart from A Lobby', 50),
         l('Fade Haunt A Site', 60),
       ],
     }), 'utf8');
@@ -855,14 +949,16 @@ test('lado: busca já salva ganha o lado sem tocar na rede', async () => {
       ['A Site Dart', 'atacando', 'bloco'],
       ['Defense', 'defendendo', 'nome'],
       ['A Main Dart', 'defendendo', 'bloco'],
-      // esta herdaria defesa da seção, mas se joga do spawn do atacante: o lugar é fato,
-      // a seção é dedução, então o lugar manda
-      ['Mid Dart', 'atacando', 'lugar'],
+      // esta herdaria defesa da seção, mas se joga do A Lobby, que é de atacante: o lugar
+      // é fato, a seção é dedução, então o lugar manda
+      ['Mid Dart from A Lobby', 'atacando', 'lugar'],
       // e a do Fade saiu: busca de Sova não mostra lineup de Fade
     ]);
+    // e a migração releu as duas pontas do nome: o lugar saiu do arquivo, não de palpite
+    assert.equal(g.lineups[4].posicao?.nome, 'A Lobby', 'o lugar tinha que ser lido do nome');
     assert.equal(g.em, ontem, 'a data original não pode virar "agora"');
     const salvo = JSON.parse(await readFile(resolve(val, 'buscas', 'ascent__sova_____atacando.json'), 'utf8'));
-    assert.ok(salvo.formato >= 6, 'o lado tem que ficar gravado, não ser recalculado toda vez');
+    assert.ok(salvo.formato >= 7, 'o lado tem que ficar gravado, não ser recalculado toda vez');
     assert.equal(salvo.lineups[1].lado, 'atacando');
   } finally {
     if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;

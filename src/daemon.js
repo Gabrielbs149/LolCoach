@@ -2546,6 +2546,16 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     valLimparSobra: () => Lineups.limparSobra(),
     // a tela avisa quando o player não conseguiu tocar: o vídeo sai de todas as buscas
     valVideoRuim: (p = {}) => Lineups.marcarVideoRuim(String(p.video ?? ''), String(p.motivo ?? '')),
+    /* O ponto que ELE marcou vendo o clipe, parado no lugar dentro do jogo. É o único
+       jeito de o ponto ser EXATO: o nome do capítulo diz "A Site", e A Site é um site
+       inteiro. Fica guardado por vídeo+segundo, então sobrevive a refazer a busca. */
+    valMarcarPonto: (p = {}) => Lineups.marcarPonto({
+      video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0),
+      qual: String(p.qual ?? ''), x: Number(p.x), y: Number(p.y),
+    }),
+    valEsquecerPonto: (p = {}) => Lineups.esquecerPonto({
+      video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0), qual: p.qual ? String(p.qual) : null,
+    }),
     valSalvar: (p = {}) => Lineups.salvar(p),
     valApagar: (p = {}) => Lineups.apagar(String(p.id ?? '')),
     /* O que está rolando no Valorant agora (mapa e agente), lido do cliente local.
@@ -2584,4 +2594,5 @@ const ACOES_DO_PAINEL = [
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
+  'valMarcarPonto', 'valEsquecerPonto',
 ];

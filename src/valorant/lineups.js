@@ -412,19 +412,152 @@ const DE_ONDE = /^(.*?)\s+(?:from|at|@|desde)\s+(.+)$/i;
 // aparecem; sem o segundo, título assim ficava sem linha no mapa.
 const PARA_ONDE = /^(.*?)\s+(?:to|para|pro)\s+(.+)$/i;
 
+/* Os outros dois jeitos de escrever a mesma coisa, que ficavam de fora:
+ *  - a seta: "A Lobby → A Site";
+ *  - o parêntese, como em "Mid (de B site)" e "B Site 4 Close Flash (De B Long)". Este era
+ *    pior que não achar a posição: a palavra entre parênteses não casava o `\s+…\s+` que
+ *    separa as pontas, e aí o nome INTEIRO ia pro casamento de alvo — uma lineup escrita
+ *    "C site (de C long)" virava uma lineup que CAI no C Long. Agora o parêntese sai da
+ *    frente e o nome vira "C site de C long", que é a mesma frase na ordem que o resto lê.
+ * Medido no acervo dele: +105 lineups com lugar de verdade e 5 alvos consertados, nenhuma
+ * perdida. */
+const SETAS = /\s*(?:→|->|=>|➔|➜|⇒|»)\s*/g;
+const DE_ENTRE_PARENTESES = /[([{]\s*(?:from|de|desde)\s+([^)\]}]+)[)\]}]/i;
+function arrumarPontas(nome) {
+  let n = String(nome).replace(SETAS, ' to ');
+  const m = n.match(DE_ENTRE_PARENTESES);
+  if (m) n = `${n.replace(m[0], ' ').trim()} from ${m[1].trim()}`;
+  return n.replace(/\s{2,}/g, ' ').trim();
+}
+
+/* "CT" é como todo mundo chama o spawn do defensor, e "T spawn" o do atacante — e o
+ * catálogo da Riot só conhece "Defender Side Spawn" e "Attacker Side Spawn". São 39 nomes
+ * do acervo dele, todos de defesa, que ficavam sem lugar nenhum no mapa.
+ *
+ * Só vale quando o lugar INTEIRO é isso: "CT Alley" e "B left wall ct" são outros lugares,
+ * e trocar ali mandava a lineup pro spawn errado. Por isso o `^...$`. */
+const SO_CT = /^(?:[abc]\s+)?ct(?:\s*spawn)?$/i;
+const SO_T_SPAWN = /^(?:[abc]\s+)?t[\s-]*spawn$/i;
+const comApelidoDeSpawn = (t) => (SO_CT.test(t) ? 'defender spawn' : SO_T_SPAWN.test(t) ? 'attacker spawn' : t);
+
 export function pontasDaLineup(nome, callouts = [], site = null) {
-  let m = String(nome).match(DE_ONDE), invertido = false;
-  if (!m) { m = String(nome).match(PARA_ONDE); invertido = !!m; }
-  if (!m) return { alvo: pontoDaLineup(nome, callouts, site), posicao: null };
+  const inteiro = arrumarPontas(nome);
+  let m = inteiro.match(DE_ONDE), invertido = false;
+  if (!m) { m = inteiro.match(PARA_ONDE); invertido = !!m; }
+  if (!m) return { alvo: pontoDaLineup(inteiro, callouts, site), posicao: null };
   const [, um, dois] = m;
   const [alvoTxt, posTxt] = invertido ? [dois, um] : [um, dois];
   // "(Crosshair)" e afins no fim não são lugar
   const limpo = posTxt.replace(/\s*\((?:crosshair|hud|mira|game\s*hud)\)\s*$/i, '').trim();
-  const posicao = pontoDaLineup(limpo, callouts, null);
-  const alvo = pontoDaLineup(alvoTxt, callouts, site) ?? pontoDaLineup(nome, callouts, site);
+  const posicao = pontoDaLineup(comApelidoDeSpawn(limpo), callouts, null);
+  /* O alvo sai SÓ da metade do alvo. Antes, quando essa metade não casava lugar nenhum, a
+   * conta voltava e lia o nome INTEIRO — e o nome inteiro contém a outra metade, a do lugar
+   * de onde se joga. Resultado: "Single shock from A-wine" virava uma lineup que CAI no A
+   * Wine, e como alvo e posição ficavam iguais, a posição ainda era descartada. O lugar de
+   * onde se joga virava o ponto no mapa, que é o contrário do que ele quer ver. Sem a volta,
+   * essas ficam sem ponto de queda — que é a verdade: o nome não diz onde cai. */
+  const alvo = pontoDaLineup(alvoTxt, callouts, site);
   // posição igual ao alvo não acrescenta nada — e linha de um ponto pra ele mesmo confunde
   if (posicao && alvo && posicao.nome === alvo.nome) return { alvo, posicao: null };
   return { alvo, posicao: posicao && !posicao.aproximado ? posicao : null };
+}
+
+/* ------------------------------------------------- o ponto que ELE marcou
+ *
+ * MEDIDO no acervo dele, 8686 lineups: 39,4% caem num ponto APROXIMADO — o centro do site,
+ * que é o que sobra quando o nome do capítulo só diz "A Site" — e 65,4% não dizem de onde
+ * se joga, e por isso nem ponto de partida têm. Não é falha de leitura: o nome do capítulo
+ * é tudo o que existe, e "A Site" é um site inteiro, enquanto o lugar de uma lineup é um
+ * tijolo específico. Palpite nenhum fecha essa distância, e fingir que fecha é justo a
+ * reclamação dele: ponto que parece aleatório.
+ *
+ * Então quem sabe é ele. Vendo o clipe, parado no lugar dentro do jogo, um clique no mapa
+ * marca o ponto EXATO — e fica. A marca é por vídeo + segundo, que é o que identifica a
+ * lineup de verdade: sobrevive a refazer a busca, a trocar de lado, a subir de formato do
+ * acervo, a limpar o acervo inteiro.
+ */
+const arqMeusPontos = () => resolve(pasta(), 'meus-pontos.json');
+const FORMATO_PONTOS = 1;
+const chaveDoPonto = (video, segundo) => `${String(video ?? '').trim()}#${Math.round(Number(segundo) || 0)}`;
+const entre0e1 = (n) => Math.min(1, Math.max(0, Math.round(Number(n) * 1000) / 1000));
+
+let pontosDele = null;
+async function meusPontos() {
+  if (!pontosDele) {
+    const g = await lerJson(arqMeusPontos(), null);
+    pontosDele = (g?.formato === FORMATO_PONTOS && g.pontos) ? g.pontos : {};
+  }
+  return pontosDele;
+}
+
+/** Marca (ou remarca) uma das duas pontas de uma lineup. `qual`: 'posicao' ou 'alvo'. */
+export async function marcarPonto({ video, segundo, qual, x, y } = {}) {
+  if (!video) return { erro: 'faltou o vídeo' };
+  if (qual !== 'posicao' && qual !== 'alvo') return { erro: 'ponto tem que ser posicao ou alvo' };
+  if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(y))) return { erro: 'ponto sem coordenada' };
+  const pontos = { ...(await meusPontos()) };
+  const chave = chaveDoPonto(video, segundo);
+  pontos[chave] = { ...(pontos[chave] ?? {}), [qual]: { x: entre0e1(x), y: entre0e1(y) }, em: Date.now() };
+  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  pontosDele = pontos;
+  return { ok: true, ponto: pontos[chave] };
+}
+
+/** Apaga uma ponta marcada (ou as duas, sem `qual`). */
+export async function esquecerPonto({ video, segundo, qual } = {}) {
+  const pontos = { ...(await meusPontos()) };
+  const chave = chaveDoPonto(video, segundo);
+  if (!pontos[chave]) return { ok: true };
+  if (qual === 'posicao' || qual === 'alvo') {
+    pontos[chave] = { ...pontos[chave] };
+    delete pontos[chave][qual];
+    if (!pontos[chave].posicao && !pontos[chave].alvo) delete pontos[chave];
+  } else delete pontos[chave];
+  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  pontosDele = pontos;
+  return { ok: true };
+}
+
+/** Quantas lineups ele já marcou — a tela usa pra contar. */
+export async function quantosPontosMeus() {
+  const p = await meusPontos();
+  return Object.keys(p).length;
+}
+
+/** O callout mais perto, só pra dar nome ao ponto que ele marcou ("perto do A Lobby"). */
+export function calloutMaisPerto(p, callouts = []) {
+  let melhor = null, menor = Infinity;
+  for (const c of callouts) {
+    const d = Math.hypot(c.x - p.x, c.y - p.y);
+    if (d < menor) { menor = d; melhor = c; }
+  }
+  return melhor;
+}
+
+/**
+ * Põe por cima do resultado da busca os pontos que ele marcou. Marca dele ganha sempre do
+ * que foi deduzido do nome: ele estava parado no lugar quando marcou.
+ */
+export async function comMeusPontos(r) {
+  const pontos = await meusPontos();
+  if (!r?.lineups?.length || !Object.keys(pontos).length) return r;
+  const callouts = r.callouts ?? [];
+  let mexeu = 0;
+  const lineups = r.lineups.map((l) => {
+    const meu = pontos[chaveDoPonto(l.video, l.segundo)];
+    if (!meu?.posicao && !meu?.alvo) return l;
+    mexeu++;
+    const batizar = (p, antes) => ({
+      nome: calloutMaisPerto(p, callouts)?.nome ?? antes?.nome ?? 'o ponto que você marcou',
+      x: p.x, y: p.y, aproximado: false, meu: true,
+    });
+    return {
+      ...l,
+      ponto: meu.alvo ? batizar(meu.alvo, l.ponto) : l.ponto,
+      posicao: meu.posicao ? batizar(meu.posicao, l.posicao) : l.posicao,
+    };
+  });
+  return mexeu ? { ...r, lineups } : r;
 }
 
 /* ------------------------------------------------------------------ busca */
@@ -791,7 +924,8 @@ const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 4: antes do filtro de mapa, o que estava em disco tinha lineup de mapa errado dentro
 // 5: cada lineup passou a saber se é de ataque ou de defesa
 // 6: filtro de agente (tinha lineup de Sova dentro de busca de Fade) e lado mais exigente
-const FORMATO_BUSCA = 6;
+// 7: as duas pontas lidas de novo — seta, parêntese e "CT" passaram a virar lugar no mapa
+const FORMATO_BUSCA = 7;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
@@ -853,6 +987,27 @@ function comOLado(mapa, lineups, cat) {
   });
 }
 
+/**
+ * 6 -> 7: refaz as duas pontas de cada lineup com a leitura nova de nome.
+ *
+ * Também é de graça: o nome do capítulo, o site e os callouts do mapa estão todos no
+ * arquivo. Isso leva os 105 lugares novos (seta, parêntese, "CT") e os 5 alvos consertados
+ * pras 72 buscas que ele já tem salvas, sem uma chamada de rede — refazer tudo custaria
+ * ~7000 unidades de cota do YouTube.
+ */
+function comAsPontas(mapa, lineups, cat) {
+  const callouts = cat?.mapas?.find((x) => x.nome === mapa)?.callouts ?? [];
+  if (!callouts.length) return lineups;
+  return lineups.map((l) => {
+    const { alvo, posicao } = pontasDaLineup(l.nome, callouts, l.site);
+    return {
+      ...l,
+      ponto: alvo ? { nome: alvo.nome, x: alvo.x, y: alvo.y, aproximado: alvo.aproximado === true } : null,
+      posicao: posicao ? { nome: posicao.nome, x: posicao.x, y: posicao.y } : null,
+    };
+  });
+}
+
 /** 5 -> 6: tira do arquivo o capítulo que era de outro agente. */
 function soDesteAgente(agente, lineups, nomes) {
   const fica = new Set();
@@ -875,7 +1030,7 @@ function soDesteAgente(agente, lineups, nomes) {
  * formato sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
  */
 async function migrarBusca(p, g) {
-  if (![3, 4, 5].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
+  if (![3, 4, 5, 6].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
   const cat = await catalogo().catch(() => null);
   const nomes = (cat?.mapas ?? []).map((x) => x.nome);
   const agentes = (cat?.agentes ?? []).map((x) => x.nome);
@@ -887,6 +1042,8 @@ async function migrarBusca(p, g) {
   }
   lineups = soDesteAgente(p.agente, lineups, agentes);
   if (!lineups.length) return null;        // era tudo de outro agente: melhor procurar de novo
+  // as pontas primeiro: é do LUGAR de onde se joga que o lado sai, quando o nome não diz
+  lineups = comAsPontas(p.mapa, lineups, cat);
   lineups = comOLado(p.mapa, lineups, cat);
   const novo = { ...g, lineups, formato: FORMATO_BUSCA };
   await guardarBusca(p, novo, g.em ?? Date.now());
@@ -946,9 +1103,11 @@ function aquecerDepois(p) {
  * velho aparece na mesma e a atualização acontece por baixo; na próxima vez já é a nova.
  */
 export async function lineupsDe(p = {}) {
+  // os pontos que ELE marcou entram por último, por cima de tudo: é o único lugar por onde
+  // a tela recebe lineup, então marca dele vale tanto pro que veio do disco quanto do YouTube
   if (!p.forcar) {
     const g = await buscaGuardada(p);
-    if (g) { if (g.velho) revalidarDepois(p); aquecerDepois(p); return semOsRuins(g); }
+    if (g) { if (g.velho) revalidarDepois(p); aquecerDepois(p); return comMeusPontos(await semOsRuins(g)); }
   }
   const r = await buscarLineups(p);
   await guardarBusca(p, r);
@@ -956,9 +1115,9 @@ export async function lineupsDe(p = {}) {
   // deu ruim agora mas tem coisa velha guardada? melhor velho que vazio
   if (!r.lineups?.length) {
     const g = await buscaGuardada(p);
-    if (g) return semOsRuins({ ...g, aviso: 'não consegui atualizar agora; mostrando o que já estava salvo' });
+    if (g) return comMeusPontos(await semOsRuins({ ...g, aviso: 'não consegui atualizar agora; mostrando o que já estava salvo' }));
   }
-  return semOsRuins(r);
+  return comMeusPontos(await semOsRuins(r));
 }
 
 export async function buscarLineups(p = {}) {

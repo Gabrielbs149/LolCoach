@@ -1059,8 +1059,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPino{z-index:1}
 .lnPino:hover{z-index:2}
 .lnPino.on{z-index:4}
-.lnDeMapa,.lnTiro{z-index:10}
-.lnDeMapa:hover,.lnTiro:hover{z-index:12}
+.lnDeMapa{z-index:10}
+.lnDeMapa:hover{z-index:12}
 
 .lnLeque{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}
 .lnRota{stroke:#49d6c0;stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.75;fill:none;
@@ -1084,23 +1084,33 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .acBarra i{display:block;height:100%;background:var(--ouro)}
 .acAndando{font-size:12px;color:var(--fraco);padding:6px 2px}
 
- /* a lineup como marcador, pra quando nao existe "de onde jogar" */
-.lnTiro{position:absolute;transform:translate(-50%,-50%);width:clamp(17px, 4.6%, 28px);height:auto;aspect-ratio:1;border-radius:50%;
-  border:2px solid var(--ouro);background:#11161fee;padding:0;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;font-family:inherit;color:var(--ouro-claro);
-  font-size:11px;font-weight:700;box-shadow:0 0 8px #0008;transition:transform .1s}
-.lnTiro img{width:64%;height:64%;object-fit:contain;filter:brightness(1.35)}
-/* lado nao dito: borda tracejada e apagada, pra ele ver NO MAPA que o video nao disse */
-.lnTiro.semLado,.lnDeMapa.semLado{border-style:dashed;border-color:#7a8495;box-shadow:0 0 6px #0008}
-.lnTiro:hover{transform:translate(-50%,-50%) scale(1.25);border-color:#49d6c0}
-.lnTiro .lnDeNome{opacity:0;transition:opacity .12s}
-.lnTiro:hover .lnDeNome{opacity:1}
+ /* lado nao dito: borda tracejada e apagada, pra ele ver NO MAPA que o video nao disse */
+.lnDeMapa.semLado{border-style:dashed;border-color:#7a8495;box-shadow:0 0 6px #0008}
 
 .lnDeMapa{position:absolute;transform:translate(-50%,-50%);width:clamp(18px, 4.9%, 30px);height:auto;aspect-ratio:1;border-radius:50%;
   border:2px solid #49d6c0;background:#11161f;padding:0;cursor:pointer;overflow:visible;
   box-shadow:0 0 9px #49d6c055;transition:transform .1s}
 .lnDeMapa img{width:100%;height:100%;object-fit:cover;object-position:top center;border-radius:50%}
 .lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.22)}
+/* ponto que ELE marcou: o único que é exato de verdade, então é o que mais aparece */
+.lnDeMapa.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 12px var(--ouro)}
+.lnPino.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 10px #f0b90b66}
+.lnMeuSelo{position:absolute;right:-6px;bottom:-5px;font-style:normal;font-size:9px;line-height:1;
+  background:var(--ouro);color:#0b1016;border-radius:50%;padding:2px 3px;font-weight:900}
+
+/* a tira de baixo: as lineups daqui que NÃO dizem de onde se joga. Ficavam espalhadas num
+   anel inventado em volta do ponto; aqui elas estão juntas, com o motivo escrito. */
+.lnSemLugar{margin:10px 0 0;padding:9px 11px;border:1px dashed #38414f;
+  border-radius:10px;background:#0e131bcc}
+.lnSemLugar b{display:block;font-size:12px;color:var(--fraco)}
+.lnSemLugar small{display:block;font-size:11px;color:#6b7280;margin-top:1px}
+.lnChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.lnChip{display:flex;align-items:center;gap:5px;max-width:230px;padding:4px 9px 4px 5px;border-radius:999px;
+  border:1px solid var(--borda);background:#11161f;color:var(--texto);cursor:pointer;font-family:inherit;font-size:11.5px}
+.lnChip img{width:16px;height:16px;object-fit:contain;filter:brightness(1.3)}
+.lnChip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lnChip:hover{border-color:#49d6c0;background:#16202b}
+.lnChip.semLado{border-style:dashed;border-color:#7a8495}
 .lnDeNome{position:absolute;top:32px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font-size:9.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 3px #000;opacity:0;pointer-events:none}
 .lnDeMapa:hover .lnDeNome{opacity:1}
@@ -1199,6 +1209,18 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnCai{width:28px;height:28px;background:#11161fee;border:2px solid #49d6c0;box-shadow:0 0 10px #49d6c066}
 .lnCai img{width:17px;height:17px;object-fit:contain;filter:brightness(1.5)}
 .lnCai.aprox{border-style:dashed;box-shadow:none}
+/* ponto marcado por ele: dourado, que no app inteiro quer dizer "isto é seu" */
+.lnDe.meu,.lnCai.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 12px #f0b90b66}
+/* o mapa esperando o clique */
+.lnMini.marcando{cursor:crosshair;border-color:var(--ouro);box-shadow:inset 0 0 0 1px #f0b90b55}
+.lnMira{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#f0b90b99;
+  font-size:19px;line-height:1;pointer-events:none}
+.lnMarcaAviso{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px}
+.lnMarcaAviso b{color:var(--ouro-claro);font-weight:600}
+.lnMarcar{display:flex;flex-wrap:wrap;gap:6px}
+.lnMarcar .acao{padding:4px 9px;font-size:11px}
+.lnMarcado{font-size:11.5px;color:var(--ouro-claro);align-self:center}
+.lnMeusN{color:var(--ouro-claro);font-weight:600}
 /* o ponto do meio do caminho, igual ao do site */
 .lnMeio{position:absolute;transform:translate(-50%,-50%);width:11px;height:11px;border-radius:50%;
   background:#ffd93b;box-shadow:0 0 0 2px #0b1016}
@@ -4342,8 +4364,13 @@ function lnEscolherHab(v){
   if (!lnTodas.length) return lnProcurarLogo();      // nada carregado ainda: aí sim procura
   lnPinoAtivo = null;
   lnFiltrarEDedupar();
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  lnPintarResumo();
   lnDesenharMapa();
+}
+
+/** A linha de cima do mapa. Num lugar só: ela muda quando ele marca um ponto também. */
+function lnPintarResumo(){
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
 }
 
 /** "83 de Incendiário · 7 canais · 40 de ataque · 18 sem lado · 24 de defesa fora". */
@@ -4365,7 +4392,10 @@ function lnQuantas(){
     ? ` · <button class="lnMisturar on" onclick="lnTrocarMudas()" title="mostrar de novo as que não dizem o lado">${lnMudasFora} sem lado fora</button>`
     : mudas ? ` · <button class="lnMisturar" onclick="lnTrocarMudas()" title="esconder as que não dizem de que lado são">${mudas} sem lado</button>` : '';
   const conf = certas ? ` · ${certas} de ${LADO_NOME[lnLadoAtual]}` : '';
-  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${semLado}${fora}`;
+  // o que ele mesmo marcou: é o único ponto exato que existe, então merece ser contado
+  const meusN = lnAchadas.filter(l => l.posicao?.meu || l.ponto?.meu).length;
+  const meus = meusN ? ` · <b class="lnMeusN">${meusN} com ponto seu</b>` : '';
+  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${meus}${semLado}${fora}`;
 }
 
 /** Mostra/esconde as que não dizem o lado. Filtro no que já está carregado, instantâneo. */
@@ -4373,7 +4403,7 @@ function lnTrocarMudas(){
   lnEsconderMudas = !lnEsconderMudas;
   lnPinoAtivo = null;
   lnFiltrarEDedupar();
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  lnPintarResumo();
   lnDesenharMapa();
 }
 
@@ -4382,7 +4412,7 @@ function lnTrocarMistura(){
   lnMisturarLados = !lnMisturarLados;
   lnPinoAtivo = null;
   lnFiltrarEDedupar();
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  lnPintarResumo();
   lnDesenharMapa();
 }
 
@@ -4472,7 +4502,7 @@ async function lnProcurar(forcar){
     $('#lnAviso').innerHTML = `<div class="vazio">${esc(porque)}</div>` + dica;
     return;
   }
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  lnPintarResumo();
   lnDesenharMapa();
 }
 
@@ -4568,7 +4598,8 @@ function lnFiltrarEDedupar(){
  * lineup que DIZ ser de defesa e uma que não disse nada, com ele defendendo, a primeira é
  * melhor aposta — mesmo que a outra tenha ponto mais exato.
  */
-const lnNota = (l) => (l.lado === lnLadoAtual ? 8 : 0)
+const lnNota = (l) => (l.posicao?.meu || l.ponto?.meu ? 16 : 0)     // marcada por ele: é a que ele já conferiu
+  + (l.lado === lnLadoAtual ? 8 : 0)
   + (l.ponto && !l.ponto.aproximado ? 4 : 0) + (l.posicao ? 2 : 0) + (l.fim > l.segundo ? 1 : 0);
 
 const LADO_NOME = { atacando: 'ataque', defendendo: 'defesa' };
@@ -4622,8 +4653,11 @@ function lnPinos(){
   const por = new Map();
   for (const l of lnAchadas) {
     if (!l.ponto) continue;
-    const k = l.ponto.nome;
-    if (!por.has(k)) por.set(k, { nome: k, x: l.ponto.x, y: l.ponto.y, aproximado: l.ponto.aproximado, lista: [] });
+    /* Ponto que ELE marcou ganha pino próprio, no lugar exato onde ele marcou. Juntar com o
+     * resto do callout seria jogar fora justo a precisão que ele foi lá pôr: o callout "A
+     * Site" é o site inteiro, e a marca dele é o tijolo. */
+    const k = l.ponto.meu ? `${l.ponto.nome}#${l.video}#${l.segundo}` : l.ponto.nome;
+    if (!por.has(k)) por.set(k, { chave: k, nome: l.ponto.nome, x: l.ponto.x, y: l.ponto.y, aproximado: l.ponto.aproximado, meu: l.ponto.meu === true, lista: [] });
     const p = por.get(k); p.lista.push(l);
     if (!l.ponto.aproximado) p.aproximado = false;
   }
@@ -4648,39 +4682,29 @@ function lnDesenharMapa(){
   }
   // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
   let nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
-  const aberto = pinos.find(p => p.nome === lnPinoAtivo) ?? null;
+  const aberto = pinos.find(p => p.chave === lnPinoAtivo) ?? null;
   const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
 
-  /* UM MARCADOR POR LINEUP, ate 12, variadas por canal.
+  /* UM MARCADOR POR LINEUP, ate 12, variadas por canal — mas SÓ pras que têm lugar.
    *
-   * Antes eram duas coisas separadas e as duas escondiam opcao: um retrato por LUGAR de
-   * onde se joga (o A Lobby do Bind juntava 23 lineups atras de um retrato so, e clicar
-   * abria sempre a primeira), e, quando nenhum titulo dizia o lugar, um anel das lineups.
-   * Agora e um marcador por lineup e pronto: a que sabe de onde se joga fica desenhada NO
-   * lugar de onde se joga (retrato do agente), a que nao sabe fica no anel em volta do
-   * ponto (icone da habilidade). Clicar em qualquer um abre o clipe dela.
+   * Até aqui, a lineup que não diz de onde se joga ganhava uma vaga num ANEL em volta do
+   * ponto. Esse lugar era inventado: o ângulo saía da ordem da lista, nada mais. E são 65%
+   * do acervo dele, então o que ele via na tela era quase tudo ponto que não quer dizer
+   * nada — "pra mim tá sendo aleatório", nas palavras dele, e estava certo.
+   *
+   * Agora ponto desenhado no chão é ponto que alguém AFIRMOU: o nome do capítulo ("A
+   * default from A Short") ou ele mesmo, marcando no mapa enquanto vê o clipe. As outras
+   * vão pra uma tira embaixo do mapa, que diz com todas as letras que o vídeo não falou de
+   * onde sai — e que é de lá que ele marca, se quiser trazer pro mapa.
    */
   const rec = lnJanelaDoMapa();
   const escolhidas = aberto ? lnVariadas(aberto.lista ?? [], 12) : [];
-  const soltas = escolhidas.filter(l => !l.posicao).length;
-  let vaga = 0;
+  const comLugar = escolhidas.filter(l => l.posicao);
+  const semLugar = escolhidas.filter(l => !l.posicao);
   const marcas = aberto ? lnDesempilhar(
-    escolhidas.map((l) => {
-      const lugar = Boolean(l.posicao);
-      // sem lugar conhecido: cai numa vaga do anel, que e so o ponto de partida —
-      // o desempilhamento abaixo e que decide onde cada uma termina
-      const ang = (-Math.PI / 2) + (vaga / Math.max(1, soltas)) * Math.PI * 2;
-      if (!lugar) vaga++;
-      return {
-        l, lugar, i: lnAchadas.indexOf(l),
-        de: lugar ? { x: l.posicao.x, y: l.posicao.y } : {
-          x: aberto.dx + Math.cos(ang) * rec.lx * 0.135,
-          y: aberto.dy + Math.sin(ang) * rec.ly * 0.135,
-        },
-      };
-    }),
+    comLugar.map((l) => ({ l, lugar: true, i: lnAchadas.indexOf(l), de: { x: l.posicao.x, y: l.posicao.y } })),
     { x: aberto.dx, y: aberto.dy },
-    pinos.filter(p => p.nome !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })),
+    pinos.filter(p => p.chave !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })),
   ) : [];
 
   // Nome de canto embaixo de marcador só atrapalha — e isso vale SEMPRE, não só com um ponto
@@ -4711,35 +4735,44 @@ function lnDesenharMapa(){
             const d = `M ${RX(x.dx, x.dy)} ${RY(x.dx, x.dy)} L ${RX(aberto.dx, aberto.dy)} ${RY(aberto.dx, aberto.dy)}`;
             // a bolinha correndo so vale quando a rota e de verdade (a lineup diz de onde
             // sai). No anel o lugar e arbitrario, entao animar seria inventar trajetoria.
-            return x.lugar
-              ? `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
+            return `<path id="lnRota${k}" class="lnRota" data-k="${k}" d="${d}" />
                  <circle class="lnBola" data-k="${k}" r="1.7">
                    <animateMotion dur="2.3s" repeatCount="indefinite" rotate="auto" begin="${(k * 0.28).toFixed(2)}s">
                      <mpath href="#lnRota${k}"/>
                    </animateMotion>
-                 </circle>`
-              : `<path class="lnRota" data-k="${k}" d="${d}" />`;
+                 </circle>`;
           }).join('')}
         </svg>` : ''}
       ${marcas.map((x, k) => `
-        <button class="${x.lugar ? 'lnDeMapa' : 'lnTiro'}${x.l.lado ? '' : ' semLado'}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
-          title="${esc(x.l.nome)}${x.lugar ? ` — de ${esc(x.l.posicao.nome)}` : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}${x.l.lado ? ` · ${LADO_NOME[x.l.lado]}` : ' · lado não dito'}"
+        <button class="lnDeMapa${x.l.lado ? '' : ' semLado'}${x.l.posicao?.meu ? ' meu' : ''}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
+          title="${esc(x.l.nome)} — de ${esc(x.l.posicao.nome)}${x.l.posicao.meu ? ' (ponto que você marcou)' : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}${x.l.lado ? ` · ${LADO_NOME[x.l.lado]}` : ' · lado não dito'}"
           onclick="event.stopPropagation();lnVer(${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
-          ${x.lugar && agente?.icone ? `<img src="${esc(agente.icone)}" alt="">`
+          ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">`
             : x.l.habilidade?.icone ? `<img src="${esc(x.l.habilidade.icone)}" alt="">` : '<b>•</b>'}
+          ${x.l.posicao?.meu ? '<i class="lnMeuSelo">✓</i>' : ''}
           <span class="lnDeNome">${esc(lnNomeCurto(x.l))}</span>
         </button>`).join('')}
       ${pinos.map(p => `
-        <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${lnPinoAtivo === p.nome ? 'on' : ''}"
+        <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${p.meu ? 'meu' : ''} ${lnPinoAtivo === p.chave ? 'on' : ''}"
           style="left:${RX(p.dx, p.dy)}%;top:${RY(p.dx, p.dy)}%"
-          title="${esc(p.nome)}${p.aproximado ? ' (posição aproximada)' : ''}" onclick="lnClicarPino('${esc(p.nome)}')">
+          title="${esc(p.nome)}${p.meu ? ' (ponto que você marcou)' : p.aproximado ? ' — aproximado: o vídeo só disse o site, não o canto' : ''}" onclick="lnClicarPino('${esc(p.chave)}')">
           ${p.icone ? `<img src="${esc(p.icone)}" alt="">` : `<b>${p.lista.length}</b>`}
           ${p.icone ? `<i class="lnPinoN">${p.lista.length}</i>` : ''}
-          ${lnPinoAtivo === p.nome ? '<i class="lnPinoX">✕</i>' : ''}
+          ${lnPinoAtivo === p.chave ? '<i class="lnPinoX">✕</i>' : ''}
           <span class="lnPinoNome">${esc(p.nome)}</span>
         </button>`).join('')}
     </div>
+    ${aberto && semLugar.length ? `
+      <div class="lnSemLugar">
+        <b>${semLugar.length === 1 ? 'esta não diz' : `estas ${semLugar.length} não dizem`} de onde sai</b>
+        <small>o vídeo só falou onde cai — abre, vê o clipe e marca o ponto: aí ela passa a aparecer no mapa</small>
+        <div class="lnChips">
+          ${semLugar.map(l => `<button class="lnChip${l.lado ? '' : ' semLado'}" onclick="lnVer(${lnAchadas.indexOf(l)})"
+            title="${esc(l.nome)}${l.canal ? ` · ${esc(l.canal)}` : ''}${l.lado ? ` · ${LADO_NOME[l.lado]}` : ' · lado não dito'}">
+            ${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}<span>${esc(lnNomeCurto(l))}</span></button>`).join('')}
+        </div>
+      </div>` : ''}
     `;
 }
 
@@ -4930,13 +4963,13 @@ function lnDesencalhar(itens, obstaculos, minimo = longe(LN_LONGE_PINO)){
 function lnFocarRota(k){
   const mapa = document.querySelector('.lnMapa'); if (!mapa) return;
   mapa.classList.toggle('comFoco', k != null);
-  for (const el of mapa.querySelectorAll('.lnRota,.lnBola,.lnDeMapa,.lnTiro')) {
+  for (const el of mapa.querySelectorAll('.lnRota,.lnBola,.lnDeMapa')) {
     el.classList.toggle('apagado', k != null && Number(el.dataset.k) !== k);
   }
 }
 
-function lnClicarPino(nome){
-  lnPinoAtivo = lnPinoAtivo === nome ? null : nome;
+function lnClicarPino(chave){
+  lnPinoAtivo = lnPinoAtivo === chave ? null : chave;
   lnDesenharMapa();
 }
 
@@ -5124,8 +5157,127 @@ function lnRecorte(a, b){
   return { x: x0, y: y0, lado: Math.min(lado, 1) };
 }
 
+/* --------------------------------------------- marcar o ponto exato
+ *
+ * Isto existe porque o dado NÃO existe. Medido no acervo dele: 39,4% das lineups caem num
+ * ponto aproximado (o centro do site, que é o que sobra quando o capítulo só diz "A Site")
+ * e 65,4% não dizem de onde se joga. O nome do capítulo é tudo o que o YouTube dá, e "A
+ * Site" é um site inteiro — o lugar de uma lineup é um tijolo.
+ *
+ * Quem sabe o tijolo é ele, parado nele, vendo o clipe. Então: dois cliques. O primeiro
+ * aproxima o mapa, o segundo marca. Dois, e não um, porque num mapinha de 168 px um pixel
+ * de erro é meio metro de jogo; com a aproximação o segundo clique vale uns 20 cm. A marca
+ * vai pro disco por vídeo+segundo e volta em toda busca, pra sempre.
+ */
+let lnMarcando = null;
+
+/** Uma janela quadrada de lado `lado` centrada no ponto, sem sair do mapa. */
+function lnRecorteEm(p, lado){
+  const d = Math.min(1, lado);
+  return {
+    x: Math.max(0, Math.min(1 - d, p.x - d / 2)),
+    y: Math.max(0, Math.min(1 - d, p.y - d / 2)),
+    lado: d,
+  };
+}
+
+function lnMarcar(qual){
+  const l = lnClipe; if (!l) return;
+  /* Começa no MAPA INTEIRO quando ainda não há ponto desse tipo: de onde se joga pode ser
+   * do outro lado do mapa (lineup de post-plant sai de trás de tudo), e abrir já aproximado
+   * no alvo deixaria o lugar certo fora da janela. Só quando é pra CORRIGIR um ponto que já
+   * existe é que vale abrir perto dele. */
+  const corrigindo = qual === 'posicao' ? l.posicao : (l.ponto?.meu ? l.ponto : null);
+  lnMarcando = { qual, passo: 1, r: corrigindo ? lnRecorteEm(corrigindo, 0.5) : { x: 0, y: 0, lado: 1 } };
+  lnPintarLado(l);
+}
+
+function lnPararDeMarcar(){
+  lnMarcando = null;
+  if (lnClipe) lnPintarLado(lnClipe);
+}
+
+/** O callout mais perto, só pra dar nome ao ponto que ele marcou. */
+function lnCalloutPerto(p){
+  let melhor = null, menor = Infinity;
+  for (const c of lnCallouts ?? []) {
+    const d = Math.hypot(c.x - p.x, c.y - p.y);
+    if (d < menor) { menor = d; melhor = c; }
+  }
+  return melhor;
+}
+
+function lnCliqueNoMapinha(ev){
+  if (!lnMarcando || !lnClipe) return;
+  const cx = ev.currentTarget.getBoundingClientRect();
+  if (!cx.width || !cx.height) return;
+  const x = lnMarcando.r.x + ((ev.clientX - cx.left) / cx.width) * lnMarcando.r.lado;
+  const y = lnMarcando.r.y + ((ev.clientY - cx.top) / cx.height) * lnMarcando.r.lado;
+  if (lnMarcando.passo === 1) {   // primeiro clique: aproxima
+    lnMarcando = { ...lnMarcando, passo: 2, r: lnRecorteEm({ x, y }, 0.2) };
+    lnPintarLado(lnClipe);
+    return;
+  }
+  const l = lnClipe, qual = lnMarcando.qual;
+  lnMarcando = null;
+  const certo = { nome: lnCalloutPerto({ x, y })?.nome ?? 'onde você marcou', x, y, aproximado: false, meu: true };
+  if (qual === 'posicao') l.posicao = certo; else l.ponto = certo;
+  try {
+    fetch('/api/val/marcar-ponto', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ video: l.video, segundo: l.segundo, qual, x, y }),
+    }).catch(() => {});
+  } catch {}
+  lnPintarLado(l);
+  lnDesenharMapa();
+  lnPintarResumo();
+}
+
+function lnEsquecerMeuPonto(qual){
+  const l = lnClipe; if (!l) return;
+  try {
+    fetch('/api/val/esquecer-ponto', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ video: l.video, segundo: l.segundo, qual }),
+    }).catch(() => {});
+  } catch {}
+  /* O ponto deduzido do nome volta na próxima busca; aqui só tiro o que ele apagou, porque
+   * refazer a dedução na tela seria repetir a leitura que o servidor já faz. */
+  if (qual === 'posicao') l.posicao = null; else if (l.ponto?.meu) l.ponto = { ...l.ponto, meu: false, aproximado: true };
+  lnPintarLado(l);
+  lnDesenharMapa();
+  lnPintarResumo();
+}
+
+/** O mapa em modo de marcar: inteiro (ou aproximado), esperando o clique. */
+function lnMapaDeMarcar(l){
+  const r = lnMarcando.r;
+  const onde = (p) => ({ x: ((p.x - r.x) / r.lado) * 100, y: ((p.y - r.y) / r.lado) * 100 });
+  const fundo = `background-image:url('${esc(lnPlanta)}');background-size:${(100 / r.lado).toFixed(2)}% ${(100 / r.lado).toFixed(2)}%;`
+    + `background-position:${((r.x / (1 - r.lado || 1)) * 100).toFixed(3)}% ${((r.y / (1 - r.lado || 1)) * 100).toFixed(3)}%;background-repeat:no-repeat`;
+  const dentro = (p) => p && p.x >= r.x && p.x <= r.x + r.lado && p.y >= r.y && p.y <= r.y + r.lado;
+  const nomes = (lnCallouts ?? []).filter(dentro);
+  const b = l.ponto, a = l.posicao;
+  const oQue = lnMarcando.qual === 'posicao' ? 'de onde você joga' : 'onde a habilidade cai';
+  return `<div class="lnMini marcando" style="${fundo}" onclick="lnCliqueNoMapinha(event)" title="clica no ponto">
+      ${nomes.map(c => { const q = onde(c); return `<span class="lnCallout" style="left:${q.x.toFixed(2)}%;top:${q.y.toFixed(2)}%">${esc(c.nome)}</span>`; }).join('')}
+      ${dentro(b) && lnMarcando.qual !== 'alvo' ? `<span class="lnCai" style="left:${onde(b).x.toFixed(2)}%;top:${onde(b).y.toFixed(2)}%">${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}</span>` : ''}
+      ${dentro(a) && lnMarcando.qual !== 'posicao' ? `<span class="lnDe" style="left:${onde(a).x.toFixed(2)}%;top:${onde(a).y.toFixed(2)}%"></span>` : ''}
+      <span class="lnMira">+</span>
+    </div>
+    <div class="lnMarcaAviso">
+      <b>${lnMarcando.passo === 1 ? `1 de 2 — clica mais ou menos ${oQue}` : `2 de 2 — agora o ponto exato`}</b>
+      <button class="acao" onclick="lnPararDeMarcar()">cancelar</button>
+    </div>`;
+}
+
 function lnMapinha(l){
-  if (!lnPlanta || !l.ponto) return '<div class="vazio">sem ponto no mapa</div>';
+  if (!lnPlanta) return '<div class="vazio">sem planta do mapa</div>';
+  if (lnMarcando) return lnMapaDeMarcar(l);
+  if (!l.ponto) {
+    // sem ponto de queda e sem lugar: dá pra marcar os dois, e é o que tira ela do limbo
+    return `<div class="vazio">o vídeo não disse nem onde cai nem de onde sai</div>${lnBotoesDeMarcar(l)}`;
+  }
   const b = l.ponto, a = l.posicao;
   const r = lnRecorte(a, b);
   const onde = (p) => ({ x: ((p.x - r.x) / r.lado) * 100, y: ((p.y - r.y) / r.lado) * 100 });
@@ -5144,12 +5296,33 @@ function lnMapinha(l){
             <line x1="${pa.x.toFixed(2)}" y1="${pa.y.toFixed(2)}" x2="${pb.x.toFixed(2)}" y2="${pb.y.toFixed(2)}" />
           </svg>` : ''}
     ${meio ? `<span class="lnMeio" style="left:${meio.x.toFixed(2)}%;top:${meio.y.toFixed(2)}%"></span>` : ''}
-    ${pa ? `<span class="lnDe" style="left:${pa.x.toFixed(2)}%;top:${pa.y.toFixed(2)}%" title="você fica aqui: ${esc(a.nome)}">
+    ${pa ? `<span class="lnDe ${a.meu ? 'meu' : ''}" style="left:${pa.x.toFixed(2)}%;top:${pa.y.toFixed(2)}%" title="você fica aqui: ${esc(a.nome)}${a.meu ? ' (você marcou)' : ''}">
             ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">` : ''}</span>` : ''}
-    <span class="lnCai ${b.aproximado ? 'aprox' : ''}" style="left:${pb.x.toFixed(2)}%;top:${pb.y.toFixed(2)}%" title="cai aqui: ${esc(b.nome)}">
+    <span class="lnCai ${b.aproximado ? 'aprox' : ''} ${b.meu ? 'meu' : ''}" style="left:${pb.x.toFixed(2)}%;top:${pb.y.toFixed(2)}%" title="cai aqui: ${esc(b.nome)}${b.meu ? ' (você marcou)' : ''}">
       ${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}</span>
   </div>
-  <div class="lnDeAte">${a ? `<b>${esc(a.nome)}</b> <i>→</i> ` : ''}<b>${esc(b.nome)}</b>${b.aproximado ? ' <small>(ponto aproximado)</small>' : ''}</div>`;
+  <div class="lnDeAte">${a ? `<b>${esc(a.nome)}</b> <i>→</i> ` : ''}<b>${esc(b.nome)}</b>${
+    b.meu || a?.meu ? ' <small>(ponto seu)</small>' : b.aproximado ? ' <small>(aproximado: o vídeo só disse o site)</small>' : ''}</div>
+  ${lnBotoesDeMarcar(l)}`;
+}
+
+/**
+ * Os botões de marcar, embaixo do mapinha. O texto muda com o que já existe, porque o que
+ * ele quer saber é diferente em cada caso: sem lugar nenhum é "de onde é isso?", com lugar
+ * aproximado é "é por ali, mas onde exatamente?".
+ */
+function lnBotoesDeMarcar(l){
+  const a = l.posicao, b = l.ponto;
+  return `<div class="lnMarcar">
+    ${a?.meu
+      ? `<span class="lnMarcado">📍 lugar marcado por você</span>
+         <button class="acao" onclick="lnMarcar('posicao')">mudar</button>
+         <button class="acao" onclick="lnEsquecerMeuPonto('posicao')">apagar</button>`
+      : `<button class="acao" onclick="lnMarcar('posicao')">📍 ${a ? 'marcar o ponto exato de onde se joga' : 'marcar de onde eu jogo'}</button>`}
+    ${b?.meu
+      ? `<button class="acao" onclick="lnEsquecerMeuPonto('alvo')">apagar onde cai</button>`
+      : (b?.aproximado || !b) ? `<button class="acao" onclick="lnMarcar('alvo')">🎯 marcar onde cai</button>` : ''}
+  </div>`;
 }
 
 /**
@@ -5163,7 +5336,7 @@ function lnMapinha(l){
  */
 function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
-  lnClipe = l; lnTentouHD = 0; lnTeto(null);
+  lnClipe = l; lnTentouHD = 0; lnTeto(null); lnMarcando = null;
   // player que tomou erro do YouTube não se reaproveita: a próxima lineup merece um novo
   const dePe = !lnPlayerRuim && $('.lnDetalhe') && lnPlayer?.loadVideoById && document.getElementById('lnYT');
   if (!dePe) {
@@ -5262,7 +5435,7 @@ function lnEsperarComecar(l, ms, ultima){
 /** Fecha o clipe e devolve a barra de filtros. */
 function lnFecharClipe(){
   try { lnPlayer?.destroy?.(); } catch {}
-  lnPlayer = null; lnClipe = null; lnPulos = 0; lnTentouHD = 0; lnPlayerRuim = false;
+  lnPlayer = null; lnClipe = null; lnPulos = 0; lnTentouHD = 0; lnPlayerRuim = false; lnMarcando = null;
   clearInterval(lnVigia); clearTimeout(lnRelogio); clearInterval(lnOlhoQ);
   $('#lnPlayer').innerHTML = '';
   document.body.classList.remove('lnTelaCheia');
@@ -5537,6 +5710,8 @@ for (const b of document.querySelectorAll('#lnLados button')) {
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape') return;
   if (!$('#lnModal').hidden) lnFecharSeletor();
+  // marcando, o Esc cancela a marca — fechar o clipe junto seria perder o lugar na lista
+  else if (lnMarcando) lnPararDeMarcar();
   else if (document.body.classList.contains('lnTelaCheia')) lnFecharClipe();
 });
 

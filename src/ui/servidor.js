@@ -783,8 +783,9 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         return enviar(200, 'application/json', JSON.stringify(await acoes.atualizar()));
       }
 
-      // POST: salvar e apagar lineup, e mexer no acervo (guardar um agente, esquecer um agente)
-      for (const [caminho, nome] of [['/api/val/salvar', 'valSalvar'], ['/api/val/apagar', 'valApagar'], ['/api/val/guardar-agente', 'valGuardarAgente'], ['/api/val/esquecer-agente', 'valEsquecerAgente'], ['/api/val/limpar-sobra', 'valLimparSobra'], ['/api/val/video-ruim', 'valVideoRuim']]) {
+      // POST: salvar e apagar lineup, mexer no acervo (guardar/esquecer agente) e marcar
+      // no mapa o ponto exato de uma lineup, que é coisa que só ele sabe
+      for (const [caminho, nome] of [['/api/val/salvar', 'valSalvar'], ['/api/val/apagar', 'valApagar'], ['/api/val/guardar-agente', 'valGuardarAgente'], ['/api/val/esquecer-agente', 'valEsquecerAgente'], ['/api/val/limpar-sobra', 'valLimparSobra'], ['/api/val/video-ruim', 'valVideoRuim'], ['/api/val/marcar-ponto', 'valMarcarPonto'], ['/api/val/esquecer-ponto', 'valEsquecerPonto']]) {
         if (req.method !== 'POST' || url.pathname !== caminho || !acoes[nome]) continue;
         const pedacos = []; for await (const p of req) pedacos.push(p);
         try {
