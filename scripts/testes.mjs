@@ -1345,23 +1345,27 @@ test('acervo: busca salva com poucos vídeos se marca velha, sem ser descartada'
  * como Summit. Ela só é usada quando o catálogo não chegou, mas é justo aí que ninguém olha.
  * Este teste confere a tabela contra o catálogo de verdade: se a Riot lançar mapa novo ou eu
  * digitar errado, cai aqui em vez de cair no meio de uma partida dele. */
-test('mapa: a tabela de reserva concorda com o catálogo em disco', async (t) => {
-  const { readFile } = await import('node:fs/promises');
-  const { resolve } = await import('node:path');
-  const { pastaBase } = await import('../src/caminhos.js');
+test('mapa: a tabela de reserva concorda com a lista oficial', async (t) => {
   const { mapaPeloCaminho } = await import('../src/valorant/jogo.js');
-  let cat;
-  try { cat = JSON.parse(await readFile(resolve(pastaBase(), 'dados', 'valorant', 'catalogo.json'), 'utf8')); }
-  catch { return t.skip('sem catálogo em disco'); }
-  const comCaminho = (cat?.mapas ?? []).filter((m) => m.caminho);
-  if (!comCaminho.length) return t.skip('catálogo antigo, sem o caminho dos mapas');
+  let dados;
+  try {
+    const r = await fetch('https://valorant-api.com/v1/maps?language=en-US', { signal: AbortSignal.timeout(12000) });
+    dados = r.ok ? (await r.json()).data : null;
+  } catch { /* sem internet */ }
+  if (!dados?.length) return t.skip('sem internet pra conferir a lista oficial');
 
+  // mapa de partida é o que tem tacticalDescription — o mesmo filtro que o catálogo usa
   const errados = [];
-  for (const m of comCaminho) {
-    const daTabela = mapaPeloCaminho(m.caminho);     // sem catálogo: força a tabela
-    if (daTabela !== m.nome) errados.push(`${m.caminho} → tabela diz ${daTabela ?? 'nada'}, catálogo diz ${m.nome}`);
+  for (const m of dados.filter((x) => x.displayName && x.tacticalDescription && x.mapUrl)) {
+    const daTabela = mapaPeloCaminho(m.mapUrl);     // sem catálogo: força a tabela
+    if (daTabela !== m.displayName) errados.push(`${m.mapUrl} → tabela diz ${daTabela ?? 'nada'}, a Riot diz ${m.displayName}`);
   }
-  assert.deepEqual(errados, [], 'tabela de reserva desencontrada do catálogo');
+  assert.deepEqual(errados, [], 'tabela de reserva desencontrada da lista oficial');
+
+  // e o contrário: o que NÃO é mapa de partida não pode virar mapa de lineup
+  const inventados = dados.filter((x) => !x.tacticalDescription && x.mapUrl && mapaPeloCaminho(x.mapUrl))
+    .map((x) => `${x.mapUrl} virou ${mapaPeloCaminho(x.mapUrl)}`);
+  assert.deepEqual(inventados, [], 'Deathmatch e Range não são mapa de lineup');
 });
 
 test('mapa: todo mapa do catálogo tem os dois spawns, senão o giro não acontece', async (t) => {
