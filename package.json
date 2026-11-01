@@ -1,6 +1,6 @@
 {
   "name": "lolcoach",
-  "version": "2.28.274",
+  "version": "2.28.275",
   "private": true,
   "type": "module",
   "description": "LolCoach: automação do client de LoL + análise das suas partidas + builds do op.gg",
