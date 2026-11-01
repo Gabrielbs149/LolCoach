@@ -202,6 +202,21 @@ const ESTADOS = { MENUS: 'menu', PREGAME: 'selecao', INGAME: 'jogando' };
  * Vazio conta como ausente (`||`, não `??`): `matchMap` vem como "" fora de partida, e com
  * `??` o "" era um valor válido que bloqueava o resto da procura.
  */
+/* EM FILA é um estado que o `sessionLoopState` não conta: procurando partida, ele continua
+ * em MENUS. Quem conta é o `partyState`, que vira MATCHMAKING.
+ *
+ * Isso importa de verdade: a instalação de uma atualização REINICIA o app, e o registro já
+ * prometia esperar "fila, seleção ou partida" — mas o código só sabia ver seleção e
+ * partida. Reiniciar no meio de uma fila de três minutos custa a fila inteira.
+ *
+ * Vem como campo SEPARADO, e não como um `estado: 'fila'` novo, de propósito: assim tudo
+ * que já compara com 'menu'/'selecao'/'jogando' continua funcionando igual. */
+function emFilaAgora(blob) {
+  const pd = blob?.partyPresenceData ?? {};
+  const estado = String(pd.partyState ?? blob?.partyState ?? '').toUpperCase();
+  return estado === 'MATCHMAKING' || estado === 'MATCHMADE_GAME_STARTING';
+}
+
 export function lerPresenca(blob, mapas = null) {
   const md = blob?.matchPresenceData ?? {};
   const pd = blob?.partyPresenceData ?? {};
@@ -211,6 +226,7 @@ export function lerPresenca(blob, mapas = null) {
   const estado = ESTADOS[laco] ?? null;
   return {
     estado,
+    emFila: emFilaAgora(blob),
     mapa: estado === 'menu' ? null : mapaPeloCaminho(ondeEstaOMapa, mapas),
     fila: md.queueId ?? blob?.queueId ?? null,
   };
@@ -300,7 +316,7 @@ async function agenteEscolhido(lock, estado, meuPuuid = null) {
  */
 export async function situacaoDoValorant({ mapas = null } = {}) {
   const lock = await lerLockfile();
-  if (!lock) return { ligado: false, estado: null, mapa: null, agenteId: null };
+  if (!lock) return { ligado: false, estado: null, emFila: false, mapa: null, agenteId: null };
 
   // a sessão vem junto só pra saber qual das presenças é a dele (ver presencaDele)
   const [sessao, presencas] = await Promise.all([
@@ -308,13 +324,13 @@ export async function situacaoDoValorant({ mapas = null } = {}) {
     pedir(lock, '/chat/v4/presences'),
   ]);
   const minha = presencaDele(presencas, sessao?.puuid ?? null);
-  if (!minha) return { ligado: false, estado: null, mapa: null, agenteId: null };
+  if (!minha) return { ligado: false, estado: null, emFila: false, mapa: null, agenteId: null };
 
   let blob = null;
   try { blob = JSON.parse(Buffer.from(minha.private, 'base64').toString('utf8')); } catch { /* formato novo */ }
-  if (!blob) return { ligado: true, estado: null, mapa: null, agenteId: null };
+  if (!blob) return { ligado: true, estado: null, emFila: false, mapa: null, agenteId: null };
 
-  const { estado, mapa, fila } = lerPresenca(blob, mapas);
+  const { estado, emFila, mapa, fila } = lerPresenca(blob, mapas);
   const agenteId = await agenteEscolhido(lock, estado, sessao?.puuid ?? null).catch(() => null);
-  return { ligado: true, estado, mapa, agenteId, fila };
+  return { ligado: true, estado, emFila, mapa, agenteId, fila };
 }

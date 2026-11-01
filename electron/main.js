@@ -158,7 +158,12 @@ function ligarAtualizacao() {
     const valorantOcupado = async () => {
       try {
         const v = await situacaoDoValorant();
-        return v.estado === 'selecao' || v.estado === 'jogando';
+        // guarda o que acabou de ser lido: é de graça, e é esta leitura que decide se a
+        // instalação espera. Quem for conferir depois por que o app não atualizou vê aqui.
+        estado.set('valorant', { ...v, em: Date.now() });
+        // a FILA conta: reiniciar no meio de uma fila de tres minutos custa a fila inteira,
+        // e o registro ja prometia esperar por ela
+        return v.estado === 'selecao' || v.estado === 'jogando' || v.emFila === true;
       } catch { return false; }          // na dúvida não trava o app na versão velha
     };
     const tranquilo = async () => foraDeJogoNoLol() && !(await valorantOcupado());

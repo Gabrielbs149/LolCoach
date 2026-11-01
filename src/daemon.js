@@ -2566,7 +2566,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
        jogando Corrode ele via lineup de Summit. Isto aqui é consultado a cada 5 s, então o
        catálogo fica guardado em memória por 1 h — e, se ele falhar, só tenta de novo depois
        de 5 min, pra não virar chamada de rede em laço. */
-    valSituacao: async () => situacaoDoValorant({ mapas: await mapasDoCatalogo() }),
+    /* E o que foi lido fica guardado no estado. Não custa uma pergunta a mais: é o MESMO
+       resultado que acabou de ser calculado aqui. Serve pra quem olha o `/api/estado` —
+       diagnóstico, registro, e qualquer coisa que precise saber se ele está em partida —
+       sem precisar de um laço próprio batendo no cliente do Valorant. */
+    valSituacao: async () => {
+      const v = await situacaoDoValorant({ mapas: await mapasDoCatalogo() });
+      estado?.set?.('valorant', { ...v, em: Date.now() });
+      return v;
+    },
     valLinks: (p = {}) => ({
       youtube: Lineups.linkYoutube(Lineups.termoDaBusca(p)),
       strats: Lineups.linkStrats(p),

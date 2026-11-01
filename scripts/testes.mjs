@@ -749,6 +749,47 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
 
 /* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
  * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('valorant: em fila conta como ocupado, e nao mexe no estado', async () => {
+  const { lerPresenca } = await import('../src/valorant/jogo.js');
+
+  /* Procurando partida, o `sessionLoopState` continua em MENUS — quem conta a fila e o
+     `partyState`. Lido do cliente ao vivo: fora da fila vem DEFAULT; na fila, MATCHMAKING.
+     Isso importa porque instalar atualizacao REINICIA o app, e o registro ja prometia
+     esperar "fila, selecao ou partida" — mas o codigo so sabia ver as duas ultimas.
+     Reiniciar no meio de uma fila de tres minutos custa a fila inteira. */
+
+  const noMenu = lerPresenca({
+    matchPresenceData: { sessionLoopState: 'MENUS', matchMap: '', queueId: 'unrated' },
+    partyPresenceData: { partyState: 'DEFAULT' },
+  });
+  assert.equal(noMenu.estado, 'menu');
+  assert.equal(noMenu.emFila, false);
+
+  const naFila = lerPresenca({
+    matchPresenceData: { sessionLoopState: 'MENUS', matchMap: '', queueId: 'competitive' },
+    partyPresenceData: { partyState: 'MATCHMAKING' },
+  });
+  // o estado continua 'menu' DE PROPOSITO: quem ja compara com menu/selecao/jogando nao muda
+  assert.equal(naFila.estado, 'menu');
+  assert.equal(naFila.emFila, true);
+
+  // achou partida e esta entrando: ainda nao pode reiniciar
+  const entrando = lerPresenca({
+    matchPresenceData: { sessionLoopState: 'MENUS', matchMap: '' },
+    partyPresenceData: { partyState: 'MATCHMADE_GAME_STARTING' },
+  });
+  assert.equal(entrando.emFila, true);
+
+  // e em partida a fila nao esta mais em jogo
+  const jogando = lerPresenca({
+    matchPresenceData: { sessionLoopState: 'INGAME', matchMap: '/Game/Maps/Triad/Triad' },
+    partyPresenceData: { partyState: 'DEFAULT' },
+  });
+  assert.equal(jogando.estado, 'jogando');
+  assert.equal(jogando.emFila, false);
+  assert.equal(jogando.mapa, 'Haven');
+});
+
 test('corretor de telas: cada verificacao dispara mesmo, numa tela quebrada de proposito', async () => {
   const { conferirTela } = await import('../scripts/conferir-tela.mjs');
   const { writeFileSync, rmSync } = await import('node:fs');
