@@ -61,6 +61,9 @@ marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 ## Feito
 
+- **2.28.278** — os 3 últimos `JSON.parse` sem guarda (o pior deles no diagnóstico, que
+  morria justo quando servia) e o laço do Valorant recuando pra 30 s com o jogo fechado.
+
 - **2.28.277** — a trava da instalação passou a ver a fila do Valorant (o `partyState`, que
   o `sessionLoopState` não conta), e o estado lido fica guardado em `estado.valorant`.
   Achado porque a MINHA conferência lia um campo inexistente a noite toda.
