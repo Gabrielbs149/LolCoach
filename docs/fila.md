@@ -61,6 +61,10 @@ marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 ## Feito
 
+- **2.28.275** — o corretor ganhou id repetido (e achou um real: `#evolucao` duas vezes,
+  mandando a tabela de temporadas pra aba errada), o passeio ganhou o modo `lento`, e
+  agora existe um teste que prova que cada verificação do corretor dispara mesmo.
+
 - **2.28.274** — M marca de onde sai, N marca onde cai, ← → pulam pela lista do mesmo
   ponto sem fechar o clipe. Marcar deixou de ser ida e volta pro mapa.
 

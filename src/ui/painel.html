@@ -1470,7 +1470,7 @@ h2{letter-spacing:1px}
       <select class="contaSel" id="pCamp" style="margin:0;width:180px" onchange="mostrando = POR_PAGINA; desenharPartidas()"></select>
     </div>
     <div class="filtros temporadas" id="temporadas"></div>
-    <div id="evolucao"></div>
+    <div id="evolucaoTemporadas"></div>
     <div class="filtros" id="filtros"></div>
     <div id="lista"></div>
   </section>
@@ -2082,11 +2082,15 @@ function trocarTemporada(t){ temporada = temporada === t ? '' : t; mostrando = P
 /* Splits: um chip por split (jogos · winrate) e a tabela de evolução. */
 function desenharTemporadas(){
   const el = $('#temporadas'); if(!el) return;
-  if(temporadas.length < 2){ el.innerHTML = ''; $('#evolucao').innerHTML = ''; return; }
+  /* Este bloco e o carregarEvolucao() das Estatisticas escreviam no MESMO id, e
+     `$('#evolucao')` devolve sempre o primeiro do documento — o da aba de Estatisticas.
+     Resultado: a tabela de temporadas da aba de Partidas ia parar na aba errada, e quem
+     escrevesse por último apagava o outro. Cada um com o seu nome agora. */
+  if(temporadas.length < 2){ el.innerHTML = ''; $('#evolucaoTemporadas').innerHTML = ''; return; }
   el.innerHTML = `<button class="${temporada===''?'on':''}" onclick="trocarTemporada('')">Todos os splits<small>${todasPartidas.length} jogos</small></button>` +
     temporadas.map(t => `<button class="${temporada===t.chave?'on':''}" onclick="trocarTemporada('${t.chave}')">${esc(t.nome)}<small>${t.jogos} · ${t.winrate}%</small></button>`).join('');
   const delta = (d) => d == null ? '' : `<span class="d ${d > 0 ? 'mais' : d < 0 ? 'menos' : 'igual'}">${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${Math.abs(d)}</span>`;
-  $('#evolucao').innerHTML = `<div style="overflow-x:auto;margin-bottom:var(--e2)"><table class="amTabela evolucao" style="margin:0">
+  $('#evolucaoTemporadas').innerHTML = `<div style="overflow-x:auto;margin-bottom:var(--e2)"><table class="amTabela evolucao" style="margin:0">
     <tr><th>Split</th><th>Jogos</th><th>Winrate</th><th>KDA</th><th>CS/min</th><th>Part.</th><th>Erros graves</th><th>Main</th><th>Mais jogados</th></tr>
     ${temporadas.map(t => `<tr class="${temporada===t.chave?'on':''}" onclick="trocarTemporada('${t.chave}')">
       <td>${esc(t.nome)}</td><td>${t.jogos}</td>
