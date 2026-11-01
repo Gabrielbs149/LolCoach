@@ -31,15 +31,25 @@ dá pra conferir (o callout mais perto do ponto que o nome sugere), ou aceitar q
 pra frente quem fecha a conta é ele marcando no mapa — que já funciona desde a 2.28.262.
 
 ### 2. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
-Hoje o estado do Valorant é lido de 6 em 6 segundos. O cliente local tem websocket, que
-avisa na hora e gasta menos.
+**Depende do Valorant aberto pra conferir.** O estado do Valorant é lido de 6 em 6 s; o
+cliente local tem websocket, que avisa na hora e gasta menos. Mexer sem o jogo rodando
+seria publicar no escuro — e o jeito certo é manter a espiada como plano B e pôr o
+websocket como caminho rápido, nunca trocar um pelo outro.
 
 ### 3. Composição inimiga a partir do `core-game` que já é baixado
-O dado já vem na resposta e é jogado fora.
+**Depende do Valorant aberto pra conferir.** O dado já vem na resposta e é jogado fora.
+
+### 4. Varrer o registro do app atrás de mais padrão
+A primeira varredura achou que 43% do registro era uma falha só (virou a 2.28.271). Vale
+repetir de tempos em tempos: é o único lugar com dado do uso REAL dele.
 
 ---
 
 ## Feito
+
+- **2.28.271** — a atualização parou de bater no GitHub em rajada: uma corrente só, espera
+  que dobra até 30 min, e a mesma falha virando contagem. Achado no registro dele, onde
+  43% das linhas eram a mesma mensagem.
 
 - **2.28.270** — o passeio passou a visitar as quatro telas (inclusive as três que ficam
   abertas durante a partida) e a passear duas vezes, com `{erro}` e com `{}`. O modo `{}`
