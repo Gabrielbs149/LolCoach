@@ -36,7 +36,10 @@ async function baixar(url) {
 function dadosDaPagina(html) {
   const m = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
   if (!m) throw new Error('a página não veio no formato esperado');
-  return JSON.parse(m[1]);
+  // a marca existir não garante que o conteúdo seja JSON válido: a Riot já mexeu nessa
+  // página sem avisar. Mesmo problema, mesma mensagem — e não um SyntaxError solto.
+  try { return JSON.parse(m[1]); }
+  catch { throw new Error('a página não veio no formato esperado'); }
 }
 
 /** Primeira ocorrência, em profundidade, de um nó que satisfaça `teste`. */

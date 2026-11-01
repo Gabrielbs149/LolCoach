@@ -2,6 +2,8 @@ import { criarPartida } from '../analise/partida.js';
 import { analisar } from '../analise/detectores.js';
 import { zonaRelativa } from '../analise/mapa.js';
 
+const lerDano = (bruto) => { try { return bruto ? JSON.parse(bruto) : null; } catch { return null; } };
+
 /**
  * Roda os detectores de novo em cima do que já está no banco, sem tocar na API.
  *
@@ -58,7 +60,9 @@ export function reprocessarTudo(db, { fila = null, aoProgresso } = {}) {
         monstro: e.monstro, predio: e.predio, torre: e.torre, rota: e.rota,
         timeVitima: e.timeVitima, wardType: e.wardType, itemId: e.itemId,
         skillSlot: e.skillSlot,
-        danoRecebido: e.danoRecebido ? JSON.parse(e.danoRecebido) : null,
+        // uma linha torta no banco derrubava o reprocessamento INTEIRO; agora só essa
+        // perde o detalhe do dano, e as outras novecentas partidas seguem
+        danoRecebido: lerDano(e.danoRecebido),
       }));
 
       const partida = criarPartida({

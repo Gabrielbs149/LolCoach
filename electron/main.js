@@ -76,7 +76,14 @@ const ARQUIVOS_BACKUP = ['config.json', 'dados/partidas.db', 'dados/contas.json'
  * as fases recentes e a última partida gravada (contagens). Quem tem problema manda esse arquivo pro Gabriel.
  */
 async function diagnostico() {
-  const semChaves = (o) => JSON.parse(JSON.stringify(o ?? {}, (k, v) => (/apiKey|token|senha|password/i.test(k) ? '***' : v)));
+  /* Este arquivo e o que ele manda quando ALGO DEU ERRADO. Se o `stringify` estourar aqui
+     — objeto que se referencia, que acontece em estado de erro — o diagnostico inteiro
+     morre justo na hora em que mais serve. Na duvida, diz que nao conseguiu e segue. */
+  const semChaves = (o) => {
+    try {
+      return JSON.parse(JSON.stringify(o ?? {}, (k, v) => (/apiKey|token|senha|password/i.test(k) ? '***' : v)));
+    } catch { return { erro: 'nao consegui ler este pedaco' }; }
+  };
   const linhas = [];
   linhas.push(`LolCoach ${app.getVersion()} · ${process.platform} ${process.arch} · Windows ${os.release()} · ${os.cpus()[0]?.model ?? ''} (${os.cpus().length} núcleos) · RAM ${Math.round(os.totalmem() / 1e9)} GB`);
   linhas.push(`gerado em ${new Date().toISOString()} · fase ${faseAtual ?? '?'} · pasta ${pastaDados()}`);
@@ -359,14 +366,17 @@ function fecharLineups() {
  * entra ou sai de partida. */
 let valEstado = null;
 function olharValorant() {
-  situacaoDoValorant().then((v) => {
+  // devolve se o jogo está ABERTO: é isso que decide o ritmo da próxima olhada
+  return situacaoDoValorant().then((v) => {
     const antes = valEstado;
     valEstado = v?.estado ?? null;
-    if (antes === valEstado) return;
-    const emPartida = (e) => e === 'selecao' || e === 'jogando';
-    if (emPartida(valEstado)) { estado.log(`Valorant ${valEstado}: abrindo as lineups na segunda tela`); abrirLineups(); }
-    else if (emPartida(antes)) fecharLineups();
-  }).catch(() => {});
+    if (antes !== valEstado) {
+      const emPartida = (e) => e === 'selecao' || e === 'jogando';
+      if (emPartida(valEstado)) { estado.log(`Valorant ${valEstado}: abrindo as lineups na segunda tela`); abrirLineups(); }
+      else if (emPartida(antes)) fecharLineups();
+    }
+    return v?.ligado === true;
+  }).catch(() => false);
 }
 
 function abrirVivo({ focar = true } = {}) {
@@ -662,7 +672,20 @@ app.whenReady().then(async () => {
         if (antes === 'InProgress' && fase !== 'InProgress' && app.isPackaged) autoUpdater.checkForUpdates().catch(() => {});
       },
     });
-    setInterval(olharValorant, 6000);
+    /* De 6 em 6 s enquanto o Valorant esta ABERTO, porque ai o estado muda e a abertura
+       das lineups na segunda tela tem que ser rapida. Com o jogo FECHADO nao ha nada pra
+       mudar depressa: o cliente leva muito mais que 30 s pra subir, entao olhar a cada
+       30 s nao atrasa nada e corta 480 voltas por hora que nunca acham nada. */
+    let ritmoVal = null;
+    const marcarRitmo = (ms) => {
+      if (ritmoVal?.ms === ms) return;
+      clearInterval(ritmoVal?.id);
+      ritmoVal = { ms, id: setInterval(async () => {
+        const aberto = await olharValorant();
+        marcarRitmo(aberto ? 6000 : 30000);
+      }, ms) };
+    };
+    marcarRitmo(6000);
     ({ url: endereco } = await criarServidor({
       db: daemon.db, estado, porta: 8770,
       acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, diagnostico, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },
