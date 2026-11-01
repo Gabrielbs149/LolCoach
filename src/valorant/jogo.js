@@ -97,23 +97,44 @@ const SHARD = { na: 'na', latam: 'na', br: 'na', eu: 'eu', ap: 'ap', kr: 'kr' };
  * não é pior do que não tentar, e na próxima volta tenta de novo.
  */
 let versaoCache = { valor: null, quando: 0 };
+/* A FALHA também espera. Antes só o SUCESSO era guardado: com a valorant-api fora do ar,
+ * cada volta do laço refazia a busca — uma ida à internet de 6 em 6 segundos, com 6 s de
+ * paciência, no meio da partida dele. É o mesmo erro que encheu 43% do registro na
+ * atualização: insistir no mesmo ritmo numa coisa que não está respondendo. */
+let versaoEspera = 0;
+const ESPERA_VERSAO = 5 * 60 * 1000;
 async function versaoDoCliente() {
   if (versaoCache.valor && Date.now() - versaoCache.quando < 6 * 60 * 60 * 1000) return versaoCache.valor;
+  if (Date.now() < versaoEspera) return versaoCache.valor;
   try {
     const r = await fetch('https://valorant-api.com/v1/version', { signal: AbortSignal.timeout(6000) });
     const j = r.ok ? await r.json() : null;
     const v = j?.data?.riotClientVersion ?? null;
-    if (v) versaoCache = { valor: v, quando: Date.now() };
+    if (v) { versaoCache = { valor: v, quando: Date.now() }; versaoEspera = 0; }
+    else versaoEspera = Date.now() + ESPERA_VERSAO;
     return v;
-  } catch { return versaoCache.valor; }
+  } catch {
+    versaoEspera = Date.now() + ESPERA_VERSAO;
+    return versaoCache.valor;
+  }
 }
 
+/* Região e shard não mudam enquanto o cliente está aberto — são duas perguntas ao cliente
+ * local a cada volta do laço, de 6 em 6 segundos, pra sempre a mesma resposta. Fica
+ * guardado por lockfile: trocou de conta ou reabriu o cliente, o lockfile muda e a conta
+ * é refeita. */
+let shardCache = { chave: null, valor: null };
 async function regiaoEShard(lock) {
+  const chave = `${lock?.porta ?? ''}:${lock?.senha ?? ''}`;
+  if (shardCache.chave === chave && shardCache.valor) return shardCache.valor;
   // /riotclient/region-locale devolve "BR" limpo; o chat devolve "br1"
   const local = await pedir(lock, '/riotclient/region-locale');
   const sessao = await pedir(lock, '/chat/v1/session');
   const regiao = String(local?.region ?? sessao?.region ?? 'na').toLowerCase().replace(/\d+$/, '') || 'na';
-  return { regiao, shard: String(SHARD[regiao] ?? sessao?.shard ?? regiao).toLowerCase(), puuid: sessao?.puuid ?? null };
+  const valor = { regiao, shard: String(SHARD[regiao] ?? sessao?.shard ?? regiao).toLowerCase(), puuid: sessao?.puuid ?? null };
+  // só guarda quando veio completo: resposta pela metade não vira verdade permanente
+  if (valor.puuid) shardCache = { chave, valor };
+  return valor;
 }
 
 /* ------------------------------------------------------------------ mapa */
@@ -249,13 +270,24 @@ async function agenteEscolhido(lock, estado, meuPuuid = null) {
     } catch { return null; }
   };
 
-  const jogador = await buscar(`${glz}/pregame/v1/players/${sessao.puuid}`)
-    ?? await buscar(`${glz}/core-game/v1/players/${sessao.puuid}`);
+  /* A ORDEM SAI DO ESTADO, não é mais fixa.
+   *
+   * `pregame` é a seleção de agentes e `core-game` é a partida rodando; um responde 404
+   * enquanto o outro responde. Perguntando sempre pro pregame primeiro, a partida inteira
+   * era DUAS perguntas jogadas fora a cada volta do laço — e o laço roda de 6 em 6
+   * segundos. Numa competitiva de 40 min isso dá ~800 pedidos à Riot pra nada, cada um
+   * com 5 s de paciência pendurados.
+   *
+   * O estado já estava aqui, de parâmetro, só não era usado. A ordem inversa fica de
+   * reserva porque o estado pode estar meio passo atrasado na virada. */
+  const ordem = estado === 'jogando' ? ['core-game', 'pregame'] : ['pregame', 'core-game'];
+  const jogador = await buscar(`${glz}/${ordem[0]}/v1/players/${sessao.puuid}`)
+    ?? await buscar(`${glz}/${ordem[1]}/v1/players/${sessao.puuid}`);
   const idPartida = jogador?.MatchID;
   if (!idPartida) return null;
 
-  const partida = await buscar(`${glz}/pregame/v1/matches/${idPartida}`)
-    ?? await buscar(`${glz}/core-game/v1/matches/${idPartida}`);
+  const partida = await buscar(`${glz}/${ordem[0]}/v1/matches/${idPartida}`)
+    ?? await buscar(`${glz}/${ordem[1]}/v1/matches/${idPartida}`);
   const meu = (partida?.AllyTeam?.Players ?? partida?.Players ?? []).find((j) => j.Subject === sessao.puuid);
   return meu?.CharacterID || null;
 }
