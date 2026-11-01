@@ -70,6 +70,10 @@ marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 ## Feito
 
+- **2.28.282** — a migração passou a alcançar as 23 buscas antigas sem `pedido`, lendo os
+  parâmetros do nome do arquivo; e o `remontarIndice` parou de escrever lado torto no
+  índice. Provado contra os 72 nomes reais: 72 de 72 fecham o círculo.
+
 - **2.28.281** — o laço do Valorant em partida caiu de 500 ms pra 50 ms (o agente não muda
   no meio do jogo e era perguntado de 6 em 6 s), e o acervo passou a se atualizar sozinho
   em segundo plano, parando na hora se ele entrar em jogo.
