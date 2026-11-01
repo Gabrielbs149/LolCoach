@@ -331,6 +331,26 @@ export async function situacaoDoValorant({ mapas = null } = {}) {
   if (!blob) return { ligado: true, estado: null, emFila: false, mapa: null, agenteId: null };
 
   const { estado, emFila, mapa, fila } = lerPresenca(blob, mapas);
-  const agenteId = await agenteEscolhido(lock, estado, sessao?.puuid ?? null).catch(() => null);
+  const agenteId = await agenteDaVez(lock, estado, mapa, sessao?.puuid ?? null);
   return { ligado: true, estado, emFila, mapa, agenteId, fila };
+}
+
+/* O AGENTE NÃO MUDA NO MEIO DA PARTIDA — e era perguntado de 6 em 6 segundos mesmo assim.
+ *
+ * MEDIDO no cliente dele, jogando uma competitiva na Bind: uma volta do laço custa ~500 ms
+ * em partida contra 49 ms no menu, e a diferença são duas idas aos servidores da Riot pra
+ * descobrir um agente que ele travou antes de a partida começar. Numa partida de 40 min
+ * isso dá ~400 idas pra buscar sempre a mesma resposta.
+ *
+ * Na SELEÇÃO continua perguntando toda vez, porque ali o valor muda de verdade — é dele
+ * que sai a busca de lineups. Sair de 'jogando' joga fora o que estava guardado, então
+ * duas partidas seguidas no mesmo mapa não se confundem. */
+let agenteDaPartida = { mapa: null, agente: null };
+async function agenteDaVez(lock, estado, mapa, puuid) {
+  if (estado !== 'jogando') agenteDaPartida = { mapa: null, agente: null };
+  else if (agenteDaPartida.agente && agenteDaPartida.mapa === mapa) return agenteDaPartida.agente;
+
+  const agente = await agenteEscolhido(lock, estado, puuid).catch(() => null);
+  if (estado === 'jogando' && agente) agenteDaPartida = { mapa, agente };
+  return agente;
 }
