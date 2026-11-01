@@ -1026,6 +1026,45 @@ test('pontas: seta, parêntese e CT viram lugar; e o alvo não rouba o lugar de 
 
 /* 39,4% das lineups do acervo dele caem num ponto aproximado e 65,4% não dizem de onde se
  * joga. O nome do capítulo é tudo o que existe, então o ponto EXATO só pode vir dele. */
+test('acervo: o pedido lido do nome do arquivo fecha o circulo', async () => {
+  const { pedidoDoNome, chaveDaBusca } = await import('../src/valorant/lineups.js');
+  const cat = {
+    mapas: [{ nome: 'Ascent' }, { nome: 'Bind' }, { nome: 'Split' }],
+    agentes: [{ nome: 'Fade' }, { nome: 'KAY/O' }, { nome: 'Kayo Teste' }],
+  };
+  const ler = (chave) => pedidoDoNome(chave, cat);
+
+  /* As buscas salvas antes do acervo existir nao tem o campo `pedido`, e sem ele a
+   * migracao automatica nao sabe o que pedir — eram 23 dos 72 arquivos dele, com ~2.000
+   * lineups presas num formato antigo. O nome do arquivo tem tudo, mas PARTIR POR `__`
+   * se perde: com a habilidade vazia (que vira `_`), `ascent__fade_____defendendo` daria
+   * lado `_defendendo`, que nao e lado nenhum — e com o lado errado o nome recalculado da
+   * outro arquivo, e a migracao nao acha o que ela mesma acabou de ler. */
+  assert.deepEqual(ler('ascent__fade_____defendendo'),
+    { mapa: 'Ascent', agente: 'Fade', habilidade: null, lado: 'defendendo' });
+
+  // agente cujo slug tem `_` dentro (KAY/O vira kay_o) e habilidade com espaco
+  assert.deepEqual(ler('ascent__kay_o__zero_point__atacando'),
+    { mapa: 'Ascent', agente: 'KAY/O', habilidade: 'zero_point', lado: 'atacando' });
+
+  // sem habilidade e sem lado
+  assert.deepEqual(ler('ascent__fade______'),
+    { mapa: 'Ascent', agente: 'Fade', habilidade: null, lado: null });
+
+  // slug de um agente que COMECA o slug de outro: ganha o mais longo
+  assert.equal(ler('bind__kayo_teste_____atacando')?.agente, 'Kayo Teste');
+
+  // mapa que nao esta no catalogo nao vira palpite
+  assert.equal(ler('mapaquenaoexiste__fade_____atacando'), null);
+
+  /* E a prova que importa: o nome recalculado tem que dar o MESMO arquivo. Rodado tambem
+   * contra os 72 arquivos reais do acervo dele: 72 de 72 fecham. */
+  for (const chave of ['ascent__fade_____defendendo', 'ascent__kay_o__zero_point__atacando',
+    'ascent__fade______', 'bind__kayo_teste_____atacando', 'split__fade_____atacando']) {
+    assert.equal(chaveDaBusca(ler(chave)), chave, `nao fechou: ${chave}`);
+  }
+});
+
 test('acervo: a migracao de fundo para na hora se ele entrar em partida', async () => {
   const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

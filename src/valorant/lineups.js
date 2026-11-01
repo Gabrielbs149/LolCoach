@@ -1051,7 +1051,7 @@ const FORMATO_BUSCA = 9;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
-const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
+export const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
   .map((x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).join('__');
 
 /** O que já está em disco pra essa combinação, ou null. */
@@ -1415,6 +1415,50 @@ function anotarNoAcervo(chave, linha) {
 const comoSlug = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
 
 /**
+ * Os parâmetros da busca lidos do NOME DO ARQUIVO.
+ *
+ * As buscas salvas antes do acervo existir não têm o campo `pedido` — e sem ele a
+ * migração automática não sabe o que pedir, então aqueles arquivos ficam com os pontos
+ * velhos pra sempre. Medido no acervo dele: 23 dos 72 estavam nessa situação, com ~2.000
+ * lineups presas num formato antigo.
+ *
+ * Mas o nome do arquivo tem tudo: é `mapa__agente__habilidade__lado`, cada pedaço em
+ * minúsculo com o que não é letra virando `_`.
+ *
+ * E partir isso por `__` NÃO funciona, que é onde o `remontarIndice` se perdia: quando a
+ * habilidade é vazia ela vira `_`, e aí `ascent__fade_____defendendo` partido por `__`
+ * devolve lado `_defendendo` — um lado que não existe. Pior: com o lado errado, o nome do
+ * arquivo recalculado dá outro, e a migração não acha o arquivo que ela mesma leu.
+ *
+ * Então a leitura é da ESQUERDA, por nome conhecido: acha o mapa do catálogo que começa a
+ * chave, depois o agente, e o que sobra é `habilidade__lado` com o lado valendo só
+ * "atacando" ou "defendendo". Nada de adivinhar onde está a divisão.
+ */
+const LADOS_NO_NOME = ['atacando', 'defendendo'];
+
+export function pedidoDoNome(chave, cat) {
+  const acha = (nomes, resto) => nomes
+    .map((nome) => ({ nome, slug: comoSlug(nome) }))
+    .filter((x) => x.slug && (resto === x.slug || resto.startsWith(`${x.slug}__`)))
+    // o mais LONGO primeiro: há agente cujo slug é começo do slug de outro
+    .sort((a, b) => b.slug.length - a.slug.length)[0] ?? null;
+
+  const mapa = acha((cat?.mapas ?? []).map((x) => x.nome), chave);
+  if (!mapa) return null;
+  let resto = chave.slice(mapa.slug.length).replace(/^__/, '');
+
+  const agente = acha((cat?.agentes ?? []).map((x) => x.nome), resto);
+  if (!agente) return null;
+  resto = resto.slice(agente.slug.length).replace(/^__/, '');
+
+  const lado = LADOS_NO_NOME.find((l) => resto === l || resto.endsWith(`__${l}`)) ?? null;
+  const habilidade = (lado ? resto.slice(0, resto.length - lado.length) : resto)
+    .replace(/^_+|_+$/g, '') || null;
+
+  return { mapa: mapa.nome, agente: agente.nome, habilidade, lado };
+}
+
+/**
  * Põe TODO o acervo no formato novo, devagar, sem rede e sem atrapalhar.
  *
  * O acervo já migra sozinho — mas só quando ele abre AQUELE mapa e agente. Medido:
@@ -1433,6 +1477,7 @@ const comoSlug = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_'
  *  - `podeAgora()` decide se continua. Entrou em partida no meio, para e fica pro próximo.
  */
 export async function migrarAcervo({ podeAgora = () => true, pausa = 500, log = () => {} } = {}) {
+  const cat = await catalogo().catch(() => null);
   const arquivos = (await readdir(resolve(pasta(), 'buscas')).catch(() => [])).filter((n) => n.endsWith('.json'));
   const atrasados = [];
   for (const arq of arquivos) {
@@ -1440,8 +1485,10 @@ export async function migrarAcervo({ podeAgora = () => true, pausa = 500, log = 
     // só o que é MAIS VELHO. Formato mais novo que o atual existe quando ele volta uma
     // versão: o migrador não sabe ler, devolveria null, e isso viraria uma tentativa
     // frustrada a cada abertura do app, pra sempre.
-    if (!g?.lineups?.length || !g.pedido || !(Number(g.formato) < FORMATO_BUSCA)) continue;
-    atrasados.push(g.pedido);
+    if (!g?.lineups?.length || !(Number(g.formato) < FORMATO_BUSCA)) continue;
+    // sem `pedido` (busca salva antes do acervo existir) o nome do arquivo diz tudo
+    const pedido = g.pedido ?? pedidoDoNome(arq.replace(/\.json$/, ''), cat);
+    if (pedido) atrasados.push(pedido);
   }
   if (!atrasados.length) return { olhados: arquivos.length, migrados: 0 };
 
@@ -1474,14 +1521,14 @@ async function remontarIndice(cat) {
     const g = await lerJson(resolve(pasta(), 'buscas', arq), null);
     if (!g?.lineups?.length) continue;
     // o nome do arquivo é slug; o `pedido` só existe nos gravados a partir do acervo
-    const [m, a, hab, lado] = chave.split('__');
-    ix[chave] = g.pedido ? { ...g.pedido, lineups: g.lineups.length, em: g.em ?? 0 } : {
-      mapa: mapas.find(([sl]) => sl === m)?.[1] ?? m,
-      agente: agentes.find(([sl]) => sl === a)?.[1] ?? a,
-      habilidade: hab && hab !== '-' ? hab : null,
-      lado: lado && lado !== '-' ? lado : null,
-      lineups: g.lineups.length, em: g.em ?? 0,
-    };
+    /* Partir a chave por `__` se perdia: com a habilidade vazia (que vira `_`),
+       `ascent__fade_____defendendo` devolvia lado `_defendendo`, que não é lado nenhum.
+       A leitura por nome conhecido não tem esse problema. */
+    const doNome = pedidoDoNome(chave, cat);
+    ix[chave] = g.pedido
+      ? { ...g.pedido, lineups: g.lineups.length, em: g.em ?? 0 }
+      : { ...(doNome ?? { mapa: chave, agente: null, habilidade: null, lado: null }),
+          lineups: g.lineups.length, em: g.em ?? 0 };
   }
   await gravarJson(arqAcervo(), ix);
   return ix;
