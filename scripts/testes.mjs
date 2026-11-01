@@ -1026,6 +1026,37 @@ test('pontas: seta, parêntese e CT viram lugar; e o alvo não rouba o lugar de 
 
 /* 39,4% das lineups do acervo dele caem num ponto aproximado e 65,4% não dizem de onde se
  * joga. O nome do capítulo é tudo o que existe, então o ponto EXATO só pode vir dele. */
+test('lado: "defend" conta, "defender" nao, e "rush" ficou de fora', async () => {
+  const { ladoPeloTexto } = await import('../src/valorant/lineups.js');
+
+  /* MEDIDO no acervo dele: 50 lineups diziam "defend" com todas as letras e ficavam sem
+   * lado, porque a regra pedia sufixo (`defending`) ou um c/s depois de "defen". */
+  assert.equal(ladoPeloTexto('Aggressive flashes to defend A site'), 'defendendo');
+  assert.equal(ladoPeloTexto('Flash to help teammates defend B site while rotating'), 'defendendo');
+  assert.equal(ladoPeloTexto('defends'), 'defendendo');
+  assert.equal(ladoPeloTexto('defended'), 'defendendo');
+  // e o que ja funcionava continua
+  assert.equal(ladoPeloTexto('DEF A Main Slow Knife'), 'defendendo');
+  assert.equal(ladoPeloTexto('A Site Defensive Molly'), 'defendendo');
+
+  /* A ARMADILHA: o conserto obvio seria `defen[cds]\\w*`, que passa a casar "defendER" —
+   * e quando ELE ataca, o defensor e o INIMIGO. Isto aqui e um caso real do acervo que
+   * trocava de lado com o conserto ingenuo. */
+  assert.equal(ladoPeloTexto('A Attack - Shock to clear defender utilities'), 'atacando');
+  assert.equal(ladoPeloTexto('smoke to block defenders'), null);
+
+  // entrar no site e ataque: `exec` abreviado e "take A/B/mid" entraram (+10, 0 trocadas)
+  assert.equal(ladoPeloTexto('A Site Exec Knife Lineup'), 'atacando');
+  assert.equal(ladoPeloTexto('Flash to take B main (op pixel angle)'), 'atacando');
+
+  /* `rush` ficou de FORA de proposito: ganhava 2 e trocava o lado de 2, e eram as mesmas.
+   * "Help Team at A Site Rush" tanto pode ser ajudar o time a rushar quanto cobrir um rush
+   * inimigo. Palavra que nao decide nao entra. */
+  assert.equal(ladoPeloTexto('A Site Rush'), null);
+  // mas o anti-rush decide, e continua decidindo
+  assert.equal(ladoPeloTexto('Molly anti-rush A main'), 'defendendo');
+});
+
 test('acervo: o pedido lido do nome do arquivo fecha o circulo', async () => {
   const { pedidoDoNome, chaveDaBusca } = await import('../src/valorant/lineups.js');
   const cat = {

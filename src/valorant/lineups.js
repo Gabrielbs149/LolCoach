@@ -294,13 +294,26 @@ const PISTAS_DE_LADO = [
   // impedir o desarme é de quem plantou
   [/\bdefuse\b|\bdesarm\w*/i, 'atacando'],
   // o lado dito com todas as letras (o "DEF"/"ATT" na frente do nome é o formato de 276 capítulos dele)
-  [/\bdefen[cs]\w*\b|\bdefend(?:ing|endo|iendo)\b|\bdef\b|수비|守り|守備/i, 'defendendo'],
+  /* `defen[cs]\w*` pega defence/defense/defensive, e `defend(?:ing|endo|iendo)` exigia
+     sufixo — então a palavra "defend" SOZINHA não casava nada. Medido no acervo dele: 50
+     lineups que dizem "defend" com todas as letras ficavam sem lado, do tipo "Aggressive
+     flashes to defend A site".
+     E o conserto óbvio — pôr o `d` no grupo, `defen[cds]\w*` — ESTRAGA, porque passa a
+     casar "defendER": em "A Attack - Shock to clear defender utilities" o defensor é o
+     INIMIGO, e a lineup é de ataque. Medido: duas lineups trocavam de lado. Então o verbo
+     entra com as formas dele, e o substantivo fica de fora. */
+  [/\bdefen[cs]\w*\b|\bdefend(?:s|ed|ing|endo|iendo)?\b|\bdef\b|수비|守り|守備/i, 'defendendo'],
   [/\battack\w*\b|\batk\b|\batt\b|\bataques?\b|\batacand\w*|\bofensiv\w*|\boffens\w*|공격|攻め|攻撃/i, 'atacando'],
   // de onde se joga: o spawn de um lado só é daquele lado ("CT" é como o pessoal chama o spawn do defensor)
   [/\bdefender(?:'?s)?\s*(?:side\s*)?spawn\b|\bct\b/i, 'defendendo'],
   [/\battacker(?:'?s)?\s*(?:side\s*)?spawn\b|\bt\s*-?\s*spawn\b/i, 'atacando'],
   // entrar no site é de atacante; segurar é de defensor
-  [/\bentry\b|\bentrada\b|\bexecut\w*|\bejecu\w*|진입|エントリー/i, 'atacando'],
+  /* `exec` abreviado e "take A/B/mid" são a mesma ideia de entrar no site: +10 lineups
+     com lado, nenhuma trocada.
+     `rush` ficou de FORA de propósito. Ganhava 2 e trocava o lado de 2 — e são as mesmas:
+     "Help Team at A Site Rush" tanto pode ser ajudar o seu time a rushar quanto cobrir um
+     rush inimigo. Palavra que não decide não entra: lado errado é pior que lado nenhum. */
+  [/\bentry\b|\bentrada\b|\bexecut\w*|\bexec\b|\bejecu\w*|\btake\s+(?:a|b|c|mid|site)\b|진입|エントリー/i, 'atacando'],
   [/\bhold(?:s|ing)?\b|\bsegurar\b|\bstall\w*/i, 'defendendo'],
 ];
 
@@ -1047,7 +1060,7 @@ const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 5: cada lineup passou a saber se é de ataque ou de defesa
 // 6: filtro de agente (tinha lineup de Sova dentro de busca de Fade) e lado mais exigente
 // 7: as duas pontas lidas de novo — seta, parêntese e "CT" passaram a virar lugar no mapa
-const FORMATO_BUSCA = 9;
+const FORMATO_BUSCA = 10;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
@@ -1172,7 +1185,7 @@ function soDesteAgente(agente, lineups, nomes) {
  * formato sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
  */
 async function migrarBusca(p, g) {
-  if (![3, 4, 5, 6, 7, 8].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
+  if (![3, 4, 5, 6, 7, 8, 9].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
   const cat = await catalogo().catch(() => null);
   const nomes = (cat?.mapas ?? []).map((x) => x.nome);
   const agentes = (cat?.agentes ?? []).map((x) => x.nome);
