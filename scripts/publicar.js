@@ -82,6 +82,11 @@ if (existente.status === 404) {
 // existe, com var(--cor) que ninguém define ou com duas classes de mesmo nome brigando —
 // e é daí que vinha a maior parte do "arrumei um, apareceu outro". Só os ERROS travam.
 { const c = spawnSync(process.execPath, ['scripts/conferir-tela.mjs', '--erros'], { stdio: 'inherit' }); if (c.status) { console.error('tela com erro — não publica'); process.exit(c.status); } }
+// trava 4: o PASSEIO. As três anteriores leem o arquivo; esta ABRE o painel numa janela
+// oculta do Electron, passa por todas as abas com a API respondendo erro — que é o que
+// acontece quando a Riot cai — e falha se o console reclamar. Pegou cinco telas que
+// quebravam nesse cenário na primeira vez que rodou.
+{ const c = spawnSync('npx', ['electron', 'scripts/passeio.js'], { stdio: 'inherit', shell: true }); if (c.status) { console.error('passeio falhou — não publica'); process.exit(c.status); } }
 console.log(`publicando LolCoach v${pkg.version} em ${owner}/${repo}…`);
 const r = spawnSync('npx', ['electron-builder', '--win', 'nsis', '--publish', 'always'], {
   stdio: 'inherit', shell: true,

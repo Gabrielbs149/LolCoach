@@ -1714,7 +1714,12 @@ function desenharContaSel(){
 }
 
 async function carregarContas(logada){
-  try { contasConhecidas = await pegar('/api/contas'); } catch { contasConhecidas = []; }
+  // `pegar` só estoura quando a rede cai; servidor que responde `{erro: ...}` resolve
+  // normalmente, e aí o que chega aqui NÃO é lista — o `.map()` lá embaixo morria.
+  try {
+    const r = await pegar('/api/contas');
+    contasConhecidas = Array.isArray(r) ? r : [];
+  } catch { contasConhecidas = []; }
   if(!contaEscolhidaPeloUsuario){
     const nomeLogado = logada ? String(logada).split('#')[0] : null;
     const doConfig = cfg?.riot?.gameName ?? null;
@@ -1795,6 +1800,14 @@ async function carregarVisao(){
   const [r, ps, perfil] = await Promise.all([
     pegar(comConta('/api/resumo')), pegar(comConta('/api/partidas')), pegar(comConta('/api/perfil')).catch(() => null),
   ]);
+  /* Resposta ruim não é exceção: `pegar` só estoura quando a rede CAI. Servidor que
+     responde `{erro: ...}` — Riot fora do ar, chave vencida, análise ainda rodando —
+     resolve normalmente, e aí `r.geral` não existe e a tela inteira morria em silêncio,
+     com o erro só no console. Agora ela diz o que houve. */
+  if (!r?.geral?.n) {
+    $('#visao').innerHTML = `<div class="aviso">${esc(r?.erro ?? 'as partidas ainda não foram analisadas')}</div>`;
+    return;
+  }
   const g = r.geral, derrotas = g.n - g.v, taxa = Math.round(g.v/g.n*100);
 
   /* ---- cabeçalho: quem é você, direto da Riot ---- */
@@ -2107,8 +2120,15 @@ function maisPartidas(){ mostrando += POR_PAGINA; desenharPartidas(); }
 async function carregarPartidas(){
   carregarCoachIds().then(() => { if (Array.isArray(todasPartidas) && todasPartidas.length) desenharPartidas(); });   // marca 🎧 nos cards gravados pelo coach (chega depois, sem travar)
   const [ps, m, ts] = await Promise.all([pegar(comConta('/api/partidas')), pegar('/api/marcadas').catch(() => []), pegar(comConta('/api/temporadas')).catch(() => [])]);
-  todasPartidas = ps; marcadasIds = new Set(m); temporadas = ts;
-  if(temporada && !ts.some(t => t.chave === temporada)) temporada = '';
+  // tres respostas, tres chances de vir `{erro: ...}` em vez de lista
+  if (!Array.isArray(ps)) {
+    $('#lista').innerHTML = `<div class="aviso">${esc(ps?.erro ?? 'as partidas não vieram agora')}</div>`;
+    return;
+  }
+  todasPartidas = ps;
+  marcadasIds = new Set(Array.isArray(m) ? m : []);
+  temporadas = Array.isArray(ts) ? ts : [];
+  if(temporada && !temporadas.some(t => t.chave === temporada)) temporada = '';
   desenharSeletorCamp();
   desenharPartidas();
 }
@@ -2356,6 +2376,23 @@ function colunas(itens, {minimo = 1} = {}){
   }).join('')}</div>`;
 }
 
+/* O `fmt` de cada eixo do estilo nascia em `src/analise/estilo.js` como FUNÇÃO — e função
+ * não atravessa JSON. Do outro lado do /api ela chega `undefined`, e `x.fmt(x.meu)`
+ * estourava: a tabela "contra o seu elo" nunca aparecia, e como o erro derrubava o resto
+ * do `carregarEstat` junto, as TENDÊNCIAS logo abaixo também não eram desenhadas. Ficou
+ * assim desde que a tabela foi escrita, calado, porque o erro só saía no console.
+ * Formatar é trabalho da tela, então a régua mora aqui, achada pela chave do eixo. */
+const FMT_EIXO = {
+  csm: (v) => v.toFixed(1),
+  part: (v) => `${Math.round(v * 100)}%`,
+  dpm: (v) => String(Math.round(v)),
+  vspm: (v) => v.toFixed(2),
+  mortes: (v) => v.toFixed(1),
+};
+const fmtEixo = (eixo, v) => (Number.isFinite(Number(v))
+  ? (FMT_EIXO[eixo?.chave] ?? ((n) => String(Math.round(n * 10) / 10)))(Number(v))
+  : '—');
+
 async function carregarEstat(){
   carregarEvolucao().catch(() => {});
   carregarOutrosModos().catch(() => {});
@@ -2403,7 +2440,7 @@ async function carregarEstat(){
   $('#eRadar').innerHTML = desenharRadar(e.radar) + (e.estilo ? `<div class="estilo"><div class="rot">SEU ESTILO · ÚLTIMOS 45 DIAS</div><div class="nome">${esc(e.estilo.nome)}</div>
     <div class="rot" style="margin-top:10px">CONTRA O ${esc(nomeTier(e.estilo.tier))} E O ${esc(nomeTier(e.estilo.tierCima))} (APROX.)</div>
     <table class="cmpElo"><tr><th></th><th>você</th><th>${esc(nomeTier(e.estilo.tier))}</th><th>${esc(nomeTier(e.estilo.tierCima))}</th><th title="melhor que X% do seu elo (aprox.)">top</th></tr>
-    ${e.estilo.eixos.map(x => `<tr><td>${esc(x.rotulo)}</td><td class="${x.razao >= 1.05 ? 'v' : x.razao <= 0.95 ? 'd' : ''}"><b>${x.fmt(x.meu)}</b></td><td>${x.fmt(x.ref)}</td><td class="${x.acimaDoDeCima ? 'v' : ''}">${x.fmt(x.cima)}</td><td class="${x.percentil >= 60 ? 'v' : x.percentil <= 40 ? 'd' : ''}">${x.percentil != null ? x.percentil + '%' : ''}</td></tr>`).join('')}</table>
+    ${e.estilo.eixos.map(x => `<tr><td>${esc(x.rotulo)}</td><td class="${x.razao >= 1.05 ? 'v' : x.razao <= 0.95 ? 'd' : ''}"><b>${fmtEixo(x, x.meu)}</b></td><td>${fmtEixo(x, x.ref)}</td><td class="${x.acimaDoDeCima ? 'v' : ''}">${fmtEixo(x, x.cima)}</td><td class="${x.percentil >= 60 ? 'v' : x.percentil <= 40 ? 'd' : ''}">${x.percentil != null ? x.percentil + '%' : ''}</td></tr>`).join('')}</table>
     <div class="txt">Ponto forte: <b>${esc(e.estilo.forte ?? '—')}</b> · pra subir: <b>${esc(e.estilo.fraco ?? '—')}</b></div></div>` : '');
   const legendaColunas = '';
   {
@@ -2649,6 +2686,10 @@ const NOME_TIPO = {
 
 async function carregarPadroes(){
   const r = await pegar(comConta('/api/padroes'));
+  if (!Array.isArray(r?.tipos)) {
+    $('#treino').innerHTML = `<div class="aviso">${esc(r?.erro ?? 'ainda não dá pra ver padrão nenhum')}</div>`;
+    return;
+  }
 
   const plano = r.tipos.filter(t => TREINO[t.tipo] && t.jogos/r.total >= 0.25).slice(0,3);
   $('#treino').innerHTML = plano.length ? `<h2>Plano de treino</h2>${plano.map((t,i) => {
@@ -2689,6 +2730,10 @@ const MEIA_HORA = 30 * 60 * 1000;
 async function carregarAmigos(forcar = false){
   if(!amDados) $('#amGrade').innerHTML = carregando();
   amDados = await pegar(comConta('/api/amigos'));
+  // a lista some quando a resposta é um `{erro: ...}`, e daí pra frente tudo aqui itera
+  // em cima dela. Normaliza UMA vez, aqui, em vez de espalhar `?? []` por cinco lugares.
+  if (!amDados || typeof amDados !== 'object') amDados = {};
+  if (!Array.isArray(amDados.amigos)) amDados.amigos = [];
   // Se você mesmo estiver na lista de amigos, sai da lista.
   if(amDados.eu?.tag) amDados.amigos = amDados.amigos.filter(a => chaveAm(a) !== chaveAm(amDados.eu));
   desenharAmigos();
@@ -2887,7 +2932,8 @@ function desenharAmigos(){
     : (eu && !eu.tag ? '<div class="aviso amAviso">Abre o League com essa conta uma vez pra entrar na comparação.</div>' : '');
 
   const peso = (p) => ({ chat: 0, away: 1, dnd: 0, mobile: 2 })[p.online] ?? 3;
-  const todos = [...(eu ? [eu] : []), ...[...d.amigos].sort((a, b) => peso(a) - peso(b))];   // quem está online vem primeiro
+  // `d.amigos` some quando a resposta é um `{erro: ...}`; sem o `?? []` a tela inteira caía
+  const todos = [...(eu ? [eu] : []), ...[...(d.amigos ?? [])].sort((a, b) => peso(a) - peso(b))];   // quem está online vem primeiro
   $('#amGrade').innerHTML = todos.length
     ? todos.map(p => cartaoDeAmigo(p, { eu: p === eu })).join('')
     : '<div class="vazio">ninguém ainda</div>';
@@ -4241,8 +4287,8 @@ async function carregarLineups(){
   // o que ele escolheu da última vez: na hora de jogar ninguém quer remontar o filtro
   try {
     const g = JSON.parse(localStorage.getItem('lineups') || '{}');
-    if (lnCatalogo.mapas.some(m => m.nome === g.mapa)) lnMapaAtual = g.mapa;
-    if (lnCatalogo.agentes.some(a => a.nome === g.agente)) lnAgenteAtual = g.agente;
+    if (lnCatalogo.mapas?.some(m => m.nome === g.mapa)) lnMapaAtual = g.mapa;
+    if (lnCatalogo.agentes?.some(a => a.nome === g.agente)) lnAgenteAtual = g.agente;
     if (g.lado) lnLadoAtual = g.lado;
     if (g.habilidade) lnHabAtual = g.habilidade;
   } catch {}
@@ -4259,8 +4305,8 @@ function lnDesenharLados(){
   for (const b of document.querySelectorAll('#lnLados button')) b.classList.toggle('on', b.dataset.lado === lnLadoAtual);
 }
 
-const lnMapaDe = () => lnCatalogo?.mapas.find(x => x.nome === lnMapaAtual) ?? null;
-const lnAgenteDe = () => lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual) ?? null;
+const lnMapaDe = () => lnCatalogo?.mapas?.find(x => x.nome === lnMapaAtual) ?? null;
+const lnAgenteDe = () => lnCatalogo?.agentes?.find(x => x.nome === lnAgenteAtual) ?? null;
 
 function lnDesenharCartoes(){
   const m = lnMapaDe();
@@ -4301,7 +4347,7 @@ function lnPintarResumo(){
 /** "83 de Incendiário · 7 canais · 40 de ataque · 18 sem lado · 24 de defesa fora". */
 function lnQuantas(){
   const n = lnAchadas.length;
-  const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
+  const ag = lnCatalogo?.agentes?.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
   const quais = hab ? ` de ${esc(hab.nome)}` : '';
   const canais = new Set(lnAchadas.map(l => l.canal).filter(Boolean)).size;
@@ -4346,6 +4392,8 @@ function lnTrocarMistura(){
 /** Escolher mapa e agente pela arte, não por lista: é assim que ele reconhece na hora. */
 function lnAbrirSeletor(qual){
   const m = $('#lnModal');
+  // sem catálogo (Valorant fora do ar, primeira abertura) não há o que escolher
+  if (!lnCatalogo?.mapas?.length || !lnCatalogo?.agentes?.length) return;
   const itens = qual === 'mapa'
     ? lnCatalogo.mapas.map(x => ({ nome: x.nome, arte: x.arte ?? x.icone, on: x.nome === lnMapaAtual }))
     : lnCatalogo.agentes.map(x => ({ nome: x.nome, arte: x.icone, on: x.nome === lnAgenteAtual, pe: x.funcao }));
@@ -4476,7 +4524,7 @@ function lnJanelaDoMapa(){
  * de não lotar a tela é o anel, que escolhe 12 variadas por canal.
  */
 function lnFiltrarEDedupar(){
-  const ag = lnCatalogo?.agentes.find(a => a.nome === lnAgenteAtual);
+  const ag = lnCatalogo?.agentes?.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
   const base = hab ? lnTodas.filter(l => l.habilidade?.nome === hab.nome) : lnTodas;
 
@@ -4608,7 +4656,7 @@ function lnDesenharMapa(){
   // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
   let nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
   const aberto = pinos.find(p => p.chave === lnPinoAtivo) ?? null;
-  const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
+  const agente = lnCatalogo?.agentes?.find(x => x.nome === lnAgenteAtual);
 
   /* UM MARCADOR POR LINEUP, ate 12, variadas por canal — mas SÓ pras que têm lugar.
    *
@@ -5271,7 +5319,7 @@ function lnMapinha(l){
   const onde = (p) => ({ x: ((p.x - r.x) / r.lado) * 100, y: ((p.y - r.y) / r.lado) * 100 });
   const pb = onde(b), pa = a ? onde(a) : null;
   const meio = pa ? { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 } : null;
-  const agente = lnCatalogo?.agentes.find(x => x.nome === lnAgenteAtual);
+  const agente = lnCatalogo?.agentes?.find(x => x.nome === lnAgenteAtual);
   // a planta ampliada: o recorte vira background-size/position
   const fundo = `background-image:url('${esc(lnPlanta)}');background-size:${(100 / r.lado).toFixed(2)}% ${(100 / r.lado).toFixed(2)}%;`
     + `background-position:${((r.x / (1 - r.lado || 1)) * 100).toFixed(3)}% ${((r.y / (1 - r.lado || 1)) * 100).toFixed(3)}%;background-repeat:no-repeat`;
@@ -5686,7 +5734,7 @@ async function lnOlharOJogo(){
   let j;
   try { j = await pegar('/api/val/situacao'); } catch { return; }
   if (!j) return;
-  j.agenteNome = j.agenteId ? (lnCatalogo?.agentes.find(a => a.id === j.agenteId)?.nome ?? null) : null;
+  j.agenteNome = j.agenteId ? (lnCatalogo?.agentes?.find(a => a.id === j.agenteId)?.nome ?? null) : null;
   const cx = $('#lnJogo');
   if (cx) { cx.hidden = false; cx.className = 'lnJogo' + (j.ligado ? ' ligado' : ''); cx.innerHTML = lnTextoDoJogo(j); }
 
