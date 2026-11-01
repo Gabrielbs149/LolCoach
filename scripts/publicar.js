@@ -78,6 +78,10 @@ if (existente.status === 404) {
 // trava 2: os testes têm que passar. Sintaxe passa em código errado — o canhão na
 // onda errada e o suporte medido por CS passariam pelo --check sem reclamar.
 { const c = spawnSync(process.execPath, ['--test', 'scripts/testes.mjs'], { stdio: 'inherit' }); if (c.status) { console.error('teste falhou — não publica'); process.exit(c.status); } }
+// trava 3: as TELAS. Sintaxe e testes passam numa tela com botão que chama função que não
+// existe, com var(--cor) que ninguém define ou com duas classes de mesmo nome brigando —
+// e é daí que vinha a maior parte do "arrumei um, apareceu outro". Só os ERROS travam.
+{ const c = spawnSync(process.execPath, ['scripts/conferir-tela.mjs', '--erros'], { stdio: 'inherit' }); if (c.status) { console.error('tela com erro — não publica'); process.exit(c.status); } }
 console.log(`publicando LolCoach v${pkg.version} em ${owner}/${repo}…`);
 const r = spawnSync('npx', ['electron-builder', '--win', 'nsis', '--publish', 'always'], {
   stdio: 'inherit', shell: true,

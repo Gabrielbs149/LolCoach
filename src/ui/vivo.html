@@ -30,10 +30,10 @@ header{position:relative;display:flex;align-items:center;gap:11px;padding:10px 1
 header::before{content:"";position:absolute;inset:0;
   background:linear-gradient(100deg,var(--f0) 26%,rgba(7,10,15,.9) 56%,rgba(7,10,15,.45))}
 header>*{position:relative}
-.relogio{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;
-  color:var(--ouro);letter-spacing:-.4px;line-height:1}
-.relogio span{display:block;font-size:8.5px;letter-spacing:1px;text-transform:uppercase;
-  color:var(--apagado);font-weight:600;margin-top:3px}
+.relogio{font-family:var(--titulo);font-size:34px;font-weight:400;letter-spacing:1px;
+  color:var(--marca);font-variant-numeric:tabular-nums;line-height:1}
+.relogio span{display:block;font-family:var(--corpo);font-size:9px;letter-spacing:1px;
+  text-transform:uppercase;color:var(--apagado);font-weight:600;margin-top:3px}
 .meu{display:flex;align-items:center;gap:8px}
 .meu img{width:32px;height:32px;border-radius:var(--r-m);border:1px solid var(--ouro);background:var(--f3)}
 .meu .l1{font-weight:700;font-size:13.5px;letter-spacing:-.1px}
@@ -95,7 +95,6 @@ main.largo .col h2.sec:first-child{margin-top:0}
 @media (min-width:1100px){
   main.largo{grid-template-columns:1.1fr 1.3fr 1fr;padding:16px 18px}
   body{font-size:14px}
-  .relogio{font-size:26px}
 }
 h2.sec{display:flex;align-items:center;gap:9px;font-size:10px;text-transform:uppercase;
   letter-spacing:.9px;color:var(--apagado);font-weight:700;margin:var(--e3) 0 var(--e2)}
@@ -222,8 +221,6 @@ h2.sec::after{content:"";flex:1;height:1px;background:var(--borda)}
   --marca:#3ad6c4;--ouro:#3ad6c4;--ouro-claro:#8ef0e4;--ouro-escuro:#1f8f84;--vit:#3ecf8e;--der:#ff5c5c;--u3:#ff5c5c;--u2:#f0b048;--u1:#3ad6c4;
   --titulo:"Bebas Neue","Oswald","Impact","Arial Narrow",sans-serif;--corpo:"Inter","Segoe UI",system-ui,sans-serif}
 body{font:14px/1.5 var(--corpo)}
-.relogio{font-family:var(--titulo);font-size:34px;font-weight:400;letter-spacing:1px;color:var(--marca)}
-.relogio span{font-family:var(--corpo);font-size:9px}
 .meu .l1{font-family:var(--titulo);font-size:20px;letter-spacing:.6px;font-weight:400}
 .meu img{border-color:var(--marca)}
 .numeros div b{font-family:var(--titulo);font-size:22px;font-weight:400;letter-spacing:.6px}

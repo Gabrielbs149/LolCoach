@@ -136,7 +136,6 @@ body.editando [contenteditable="true"]{outline:2px solid var(--ouro);background:
 .campoAdm{width:360px;max-width:50%;background:var(--f0);border:1px solid var(--borda-forte);color:var(--texto);padding:6px 10px;border-radius:var(--r-s);font:inherit;font-size:12.5px}
 .campoAdm.curto{width:120px}
 .campoAdm:focus{outline:none;border-color:var(--ouro)}
-.skItem{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;font-size:12.5px}.skItem:hover{background:rgba(255,255,255,.04)}.skItem.escolhida{background:rgba(120,200,100,.1)}.skNome{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skNome small{color:var(--apagado)}.skAcoes{display:flex;gap:4px}.skAcoes .mini{background:transparent;border:1px solid var(--borda);color:var(--texto);border-radius:4px;padding:1px 6px;cursor:pointer;font-size:11px}.skAcoes .mini:hover{border-color:var(--texto)}
 .admTabela{width:100%;border-collapse:collapse;background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden;font-size:12.5px}
 .admTabela th,.admTabela td{padding:8px 10px;border-bottom:1px solid var(--borda);text-align:left;white-space:nowrap;vertical-align:middle}
 .admTabela th{font-size:10.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado);font-weight:700;background:var(--f2)}
@@ -343,6 +342,11 @@ h2:first-child{margin-top:0}
 .nota .t{font-size:12px;font-weight:650;line-height:1.35}
 .nota .d{font-size:10.5px;color:var(--apagado);margin-top:2px}
 
+/* conferir-tela: externas .artigo
+   O corpo das notas de atualização entra aqui como HTML CRU da Riot, com as classes que
+   ELA escreve (reference-link, ability-title, change-title, content-border, skin-box...).
+   Essas classes não aparecem em lugar nenhum do nosso código e não estão mortas — esta
+   linha avisa o corretor de telas pra não cobrar uso delas. */
 /* Sem rolagem própria: duas barras de rolagem na mesma tela (a da página e a
    do artigo) deixavam a leitura confusa. Quem rola é a página; a lista de notas
    é que gruda no topo pra não sumir. */
@@ -413,7 +417,7 @@ h2:first-child{margin-top:0}
 .tier{display:inline-block;font-size:10px;font-weight:800;padding:2px 7px;border-radius:var(--r-s);
   background:var(--f3);color:var(--fraco);margin-left:8px;vertical-align:2px}
 .tier.t1{background:#3a2a10;color:#f0c060} .tier.t2{background:#1e3a2a;color:#4ed093}
-.tier.t3{background:#1b2534;color:#8ea0b5} .tier.t4,.tier.t5{background:#2a1517;color:#e07070}
+.tier.t3{background:#1b2534;color:#8ea0b5}
 
 .abasRole.builds button .n{color:var(--apagado);font-weight:400;font-size:10.5px;margin-left:5px}
 
@@ -548,17 +552,6 @@ h2:first-child{margin-top:0}
   font-family:inherit;margin-bottom:var(--e2)}
 .voltar:hover{border-color:var(--ouro);color:var(--ouro)}
 
-.heroi{position:relative;display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:var(--e2);
-  padding:16px 18px;border-radius:var(--r-m);border:1px solid var(--borda);overflow:hidden;
-  background:var(--f2);background-size:cover;background-position:center 20%}
-.heroi::before{content:"";position:absolute;inset:0;
-  background:linear-gradient(100deg,var(--f0) 26%,rgba(7,10,15,.88) 54%,rgba(7,10,15,.42))}
-.heroi>*{position:relative}
-.heroi .retrato{width:52px;height:52px;flex:0 0 52px;border-radius:var(--r-m);
-  border:2px solid var(--ouro);background:var(--f3);object-fit:cover}
-.heroi>div{min-width:0}
-.heroi h3{margin:0;font-size:21px;font-weight:700;letter-spacing:-.3px}
-.heroi .meta{color:var(--fraco);font-size:12px;margin-top:3px}
 .marcaRes{font-size:10px;font-weight:800;padding:3px 9px;border-radius:var(--r-s);
   letter-spacing:.7px;margin-left:9px;vertical-align:3px}
 .marcaRes.venceu{background:#123a28;color:#4ed093}
@@ -616,7 +609,6 @@ h2:first-child{margin-top:0}
   text-transform:uppercase;letter-spacing:.8px}
 .resolucao div{margin-bottom:4px}
 .resolucao div:last-child{margin-bottom:0}
-.comojogou{margin-top:9px;font-size:10px;text-transform:uppercase;letter-spacing:.8px;color:var(--apagado)}
 .achado svg{width:100%;height:auto;border-radius:var(--r-m);display:block}
 .cmd{margin-top:9px;font-size:10.5px;color:var(--apagado);font-family:ui-monospace,Consolas,monospace;
   background:var(--f0);border:1px solid var(--borda);border-radius:var(--r-s);padding:5px 8px;overflow-x:auto}
@@ -785,7 +777,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   padding:11px 13px;font-size:11px;line-height:1.75;max-height:520px;overflow:auto;margin:0;
   color:var(--fraco);white-space:pre-wrap;font-family:ui-monospace,Consolas,monospace}
 
-
 .vazio{color:var(--apagado);font-size:12px;padding:30px;text-align:center;background:var(--f1);
   border:1px solid var(--borda);border-radius:var(--r-m)}
 .carregando{display:flex;align-items:center;gap:9px;justify-content:center}
@@ -875,21 +866,8 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   border-top-color:var(--ouro);border-radius:50%;animation:gira .8s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
 
-/* ---------------------------------------------------- lineups (Valorant) */
-.lnFiltros{display:flex;gap:var(--e1);margin-bottom:var(--e2);flex-wrap:wrap;align-items:center}
 .lnCheck{display:flex;align-items:center;gap:6px;color:var(--fraco);font-size:12px;cursor:pointer}
 .lnFora{text-decoration:none;display:inline-flex;align-items:center}
-.lnGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:var(--e2)}
-.lnCard{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);
-  display:flex;flex-direction:column}
-.lnCard .capa{position:relative;aspect-ratio:16/9;background:var(--f3);cursor:pointer}
-.lnCard .capa img{width:100%;height:100%;object-fit:cover;display:block}
-.lnCard .dur{position:absolute;right:6px;bottom:6px;background:#000c;color:#fff;font-size:10.5px;
-  padding:1px 5px;border-radius:4px;font-variant-numeric:tabular-nums}
-.lnCard .corpo{padding:8px 10px 10px;display:flex;flex-direction:column;gap:5px;flex:1}
-.lnCard .tit{font-size:12.5px;line-height:1.35;color:var(--forte)}
-.lnCard .canal{font-size:11px;color:var(--apagado)}
-.lnCard .pe{display:flex;gap:6px;align-items:center;margin-top:auto;flex-wrap:wrap}
 .lnTag{font-size:10.5px;border:1px solid var(--borda);border-radius:4px;padding:1px 6px;color:var(--fraco)}
 .lnTag.pulo{border-color:var(--ouro);color:var(--ouro-claro)}
 /* o lado da lineup: a mesma cor dos botoes Atacante/Defensor, pra ligar na hora */
@@ -900,38 +878,23 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   padding:0;cursor:pointer}
 .lnMisturar:hover{color:#fff}
 .lnMisturar.on{color:var(--fraco)}
-.lnCard video,.lnCard iframe{width:100%;aspect-ratio:16/9;border:0;display:block;background:#000}
 .lnMin{font-variant-numeric:tabular-nums;width:62px;text-align:center}
 
 .lnResumo{color:var(--fraco);font-size:12px;margin-bottom:var(--e1)}
-.lnLista{display:flex;flex-direction:column;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden}
 .lnLinha{display:flex;align-items:center;gap:9px;padding:8px 11px;cursor:pointer;
   border-top:1px solid var(--borda);font-size:12.5px}
 .lnLinha:first-child{border-top:0}
 .lnLinha:hover{background:var(--f3)}
-.lnSite{flex:0 0 26px;text-align:center;font-weight:700;font-size:11px;border-radius:4px;
-  padding:2px 0;background:var(--f3);color:var(--fraco)}
-.lnSite.sA{color:#ff6b6b}.lnSite.sB{color:#4dabf7}.lnSite.sC{color:#9775fa}.lnSite.sMid{color:#ffd43b}
-.lnHabVazia{flex:0 0 15px}
  /* A rota e o que ele le pra escolher ("de onde saio, onde cai"); o nome vem do titulo do
    video e costuma ser "A default" repetido 20 vezes. Entao a rota vai na frente, acesa e
    sem encolher, e o NOME e quem cede espaco e reticencia quando falta largura. */
 .lnNome{flex:1 1 auto;min-width:0;color:var(--fraco);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lnRota2{flex:0 0 auto;color:var(--forte);font-size:11.5px;white-space:nowrap;max-width:none;
-  overflow:hidden;text-overflow:ellipsis}
-.lnRota2 i{font-style:normal;color:#49d6c0}
-.lnRota2.lnSemRota{color:var(--apagado)}
 .lnCanal{flex:0 0 auto;color:var(--apagado);font-size:11px;max-width:200px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
-.lnQuando{flex:0 0 38px;text-align:right;color:var(--apagado);font-size:11px;font-variant-numeric:tabular-nums}
-.lnTag.lnSei{color:var(--apagado);border-style:dashed}
 .lnTocando{display:flex;gap:var(--e2);margin-bottom:var(--e2);flex-wrap:wrap}
-.lnTocando iframe{flex:1 1 440px;aspect-ratio:16/9;border:0;border-radius:var(--r2);background:#000;min-width:300px}
-.lnTocandoLado{flex:1 1 220px;display:flex;flex-direction:column;gap:7px;justify-content:center}
-.lnTocandoNome{font-size:16px;color:var(--forte);line-height:1.3;font-weight:600}
+.lnTocando iframe{flex:1 1 440px;aspect-ratio:16/9;border:0;border-radius:var(--r-m);background:#000;min-width:300px}
+.lnTocandoNome{font-size:16px;color:var(--texto);line-height:1.3;font-weight:600}
 .lnTocandoPe{display:flex;gap:6px;flex-wrap:wrap}
-.lnFiltros button.acao.on{border-color:var(--ouro);color:var(--ouro-claro)}
-.lnFiltros button.acao b{color:var(--apagado);font-weight:600;margin-left:4px}
 
 /* ---------------------------------------------------- lineups: HUD de mapa */
 /* A barra tinha 230px e os cartões 74px de altura: ficava tudo espremido e sem hierarquia.
@@ -945,11 +908,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    lado, a lista rolando por dentro. */
 .lnHud{display:flex;flex-direction:column;gap:12px}
 .lnLado{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:8px;
-  border:1px solid var(--borda);border-radius:var(--r2);background:var(--f1)}
-.lnHud.focoNoClipe .lnLado{display:none}
+  border:1px solid var(--borda);border-radius:var(--r-m);background:var(--f1)}
 .lnEmpurra{flex:1 1 auto;min-width:0}
 /* os cartoes de mapa e agente eram retratos 16/9 de coluna; na barra viram fichas baixas */
-.lnLado .lnCartao{width:108px;height:42px;aspect-ratio:auto;flex:0 0 auto;border-radius:var(--r1)}
+.lnLado .lnCartao{width:108px;height:42px;aspect-ratio:auto;flex:0 0 auto;border-radius:var(--r-s)}
 .lnLado .lnCartao span{padding:4px 7px;font-size:12px}
 .lnLado .lnCartao span small{font-size:9.5px}
 .lnLado .lnCartaoAg{width:104px}
@@ -963,14 +925,14 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 /* o aviso do jogo era um bloco de duas linhas e sozinho empurrava a barra pra mais uma faixa */
 .lnLado .lnJogo{flex:0 0 auto;flex-direction:row;align-items:baseline;gap:6px;padding:5px 9px;font-size:10.5px}
 .lnBloco{display:flex;flex-direction:column;gap:7px}
-.lnJogo{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:var(--r2);
+.lnJogo{display:flex;flex-direction:column;gap:2px;padding:8px 10px;border-radius:var(--r-m);
   border:1px solid var(--borda);background:var(--f1);font-size:12px;color:var(--fraco)}
 .lnJogo.ligado{border-color:#49d6c0;background:#0e1a1acc}
-.lnJogo b{color:var(--forte);font-weight:600;font-size:12.5px}
+.lnJogo b{color:var(--texto);font-weight:600;font-size:12.5px}
 .lnJogo.ligado b{color:#9ff5e4}
 .lnJogo small{color:var(--apagado);font-size:11px}
 .lnRot{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--apagado);font-weight:600}
-.lnCartao{position:relative;aspect-ratio:16/9;border:1px solid var(--borda);border-radius:var(--r2);
+.lnCartao{position:relative;aspect-ratio:16/9;border:1px solid var(--borda);border-radius:var(--r-m);
   overflow:hidden;background:var(--f3);display:flex;align-items:flex-end;width:100%;padding:0;
   cursor:pointer;font-family:inherit;text-align:left}
 .lnCartao:hover{border-color:var(--ouro)}
@@ -984,7 +946,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   background:linear-gradient(transparent,#000a)}
 .lnCartao span small{font-weight:400;font-size:11px;opacity:.85}
 .lnVazioCartao{color:var(--apagado);font-weight:400;text-shadow:none}
-.lnLados{display:flex;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden}
+.lnLados{display:flex;border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden}
 .lnLados button{flex:1;background:var(--f1);border:0;color:var(--fraco);padding:9px 0;
   font-size:12.5px;cursor:pointer;font-family:inherit;font-weight:600}
 .lnLados button.on{background:var(--f3);color:var(--ouro-claro)}
@@ -992,14 +954,13 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnLados button[data-lado="defendendo"].on{background:#15493fcc;color:#c9f4e8}
 .lnHabs{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .lnHab{display:flex;align-items:center;gap:6px;background:var(--f1);border:1px solid var(--borda);
-  border-radius:var(--r1);color:var(--fraco);padding:7px 8px;font-size:11px;cursor:pointer;
+  border-radius:var(--r-s);color:var(--fraco);padding:7px 8px;font-size:11px;cursor:pointer;
   font-family:inherit;min-width:0;text-align:left}
 .lnHab span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lnHab:first-child{grid-column:1 / -1;justify-content:center}
 .lnHab.on{border-color:var(--ouro);color:var(--ouro-claro);background:var(--f3)}
 .lnHab img{width:17px;height:17px;object-fit:contain;flex:0 0 auto}
 .lnBuscarBt{width:100%;justify-content:center;padding:9px 0;font-size:12.5px}
-.lnForaCx{display:flex;gap:6px}
 .lnFora{text-decoration:none;display:inline-flex;align-items:center;justify-content:center;flex:1}
 .lnPalco{display:flex;flex-direction:column;gap:var(--e2);min-width:0}
 /* mapa e lista lado a lado; a lista rola por dentro em vez de esticar a pagina */
@@ -1019,17 +980,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 /* Sem lista nenhuma na tela, o mapa manda sozinho: largura toda e altura até onde a
    janela deixa. Quem escolhe é o mapa — foi o que ele pediu desde o começo. */
 .lnDuplo .lnMapa{max-width:min(760px, calc((100vh - 210px) * var(--ar, 1)))}
- /* Com o ponto aberto o mapa caia pra 320 px fixos, virando um selo numa janela larga —
-   e e no mapa que ele escolhe. Agora o mapa fica com a sobra e a lista e que tem teto. */
 
-
-.lnDuplo .lnLista{max-height:min(680px,calc(100vh - 224px));overflow-y:auto}
  /* sem aspect-ratio fixo: a proporcao agora vem do recorte, inline, por mapa */
 .lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;overflow:hidden;
-  background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2);transition:max-width .18s}
-/* com um clipe aberto o mapão encolhe: o detalhe já mostra o mapa, e quem tem que
-   mandar na tela é o vídeo. Sem isso ficava vídeo pequeno embaixo de mapa gigante. */
-.lnPalco.comClipe .lnMapa{max-width:400px}
+  background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);transition:max-width .18s}
  /* a imagem fica MAIOR que a caixa de proposito e deslocada: a caixa e a janela do recorte */
 .lnMapa img{position:absolute;display:block;opacity:.92;max-width:none}
 /* A caixa que gira. Só a ARTE gira; os marcadores e os nomes de canto ficam de fora dela,
@@ -1127,32 +1081,18 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   font-size:10px;font-weight:600;color:#fff;text-shadow:0 1px 4px #000,0 0 3px #000;pointer-events:none;opacity:0}
 .lnPino:hover .lnPinoNome,.lnPino.on .lnPinoNome{opacity:1}
 
-.lnGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:var(--e2)}
-.lnCard{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);cursor:pointer}
-.lnCard:hover{border-color:var(--ouro)}
-.lnQn{position:absolute;right:5px;bottom:5px;background:#000a;color:#fff;font-size:9.5px;
-  padding:1px 5px;border-radius:3px;font-weight:600;opacity:0;transition:opacity .15s}
-.lnCard:hover .lnQn{opacity:1}
-.lnSemTira{display:flex;align-items:center;justify-content:center}
-.lnSemTira span{color:var(--apagado);font-size:11px;text-align:center;padding:0 12px;line-height:1.5}
-.lnCardCorpo{padding:7px 9px 9px;display:flex;flex-direction:column;gap:5px}
-.lnCardCorpo .lnNome{font-size:12.5px;line-height:1.3;color:var(--forte);white-space:normal}
-.lnCardPe{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-.lnCardPe .lnSite{flex:0 0 26px}
-.lnCardPe .lnQuando{margin-left:auto;flex:0 0 auto}
-
 .lnModal{position:fixed;inset:0;background:#040710cc;backdrop-filter:blur(3px);z-index:60;
   display:flex;align-items:center;justify-content:center;padding:var(--e2)}
-.lnModalCx{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r2);
+.lnModalCx{background:var(--f1);border:1px solid var(--borda);border-radius:var(--r-m);
   width:min(760px,96vw);max-height:86vh;display:flex;flex-direction:column;overflow:hidden}
 .lnModalTopo{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;
-  border-bottom:1px solid var(--borda);color:var(--forte);font-size:13px}
+  border-bottom:1px solid var(--borda);color:var(--texto);font-size:13px}
 .lnX{background:none;border:0;color:var(--fraco);font-size:15px;cursor:pointer;font-family:inherit;padding:0 4px}
-.lnX:hover{color:var(--forte)}
+.lnX:hover{color:var(--texto)}
 .lnModalGrade{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px;
   padding:12px;overflow:auto}
 .lnModalGrade.ag{grid-template-columns:repeat(auto-fill,minmax(104px,1fr))}
-.lnOpcao{position:relative;border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;
+.lnOpcao{position:relative;border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden;
   background:var(--f3);cursor:pointer;padding:0;font-family:inherit;aspect-ratio:16/10}
 .lnModalGrade.ag .lnOpcao{aspect-ratio:1/1}
 .lnOpcao img{width:100%;height:100%;object-fit:cover;display:block;opacity:.9}
@@ -1181,7 +1121,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   .lnDetalhe .lnDeAte,.lnDetalhe .lnCanal{flex:1 1 140px}
   .lnDetalhe .lnTocandoPe{flex:0 0 auto}
 }
-.lnVideoCx{position:relative;min-width:0;overflow:hidden;border-radius:var(--r2);background:#000;
+.lnVideoCx{position:relative;min-width:0;overflow:hidden;border-radius:var(--r-m);background:#000;
   aspect-ratio:16/9}
 .lnVideoCx #lnYT{width:100%;height:100%}
 .lnVideoCx iframe{border:0;display:block}
@@ -1195,7 +1135,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnErroBotoes{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
 .lnLadoDetalhe{display:flex;flex-direction:column;gap:7px;min-width:0}
 .lnMini{position:relative;width:100%;aspect-ratio:1/1;background:var(--f1);border:1px solid var(--borda);
-  border-radius:var(--r2);overflow:hidden}
+  border-radius:var(--r-m);overflow:hidden}
 /* o traço do mapinha. Chamava-se .lnLinha e colidia com a LINHA DA LISTA: como esta regra
    vem depois no arquivo, toda linha da lista virava position:absolute invisivel e flutuava
    por cima da tela. */
@@ -1226,50 +1166,13 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   background:#ffd93b;box-shadow:0 0 0 2px #0b1016}
 .lnVoltar{align-self:flex-start;padding:4px 10px;font-size:11.5px}
 .lnDeAte{font-size:11.5px;color:var(--fraco)}
-.lnDeAte b{color:var(--forte);font-weight:600}
+.lnDeAte b{color:var(--texto);font-weight:600}
 .lnDeAte i{font-style:normal;color:var(--ouro)}
 .lnDeAte small{color:var(--apagado)}
 
-.lnPixels{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:var(--e2)}
-.lnPx{border:1px solid var(--borda);border-radius:var(--r2);overflow:hidden;background:var(--f1);cursor:pointer}
-.lnPx:hover{border-color:var(--ouro)}
-.lnPxLupa{position:absolute;left:50%;bottom:7px;transform:translateX(-50%);background:#000c;color:#fff;
-  font-size:10px;padding:3px 9px;border-radius:4px;opacity:0;transition:opacity .12s;font-weight:600;
-  cursor:zoom-in;border:1px solid #fff3}
-.lnPxLupa:hover{background:#000;border-color:var(--ouro);color:var(--ouro-claro)}
-.lnPx:hover .lnPxLupa{opacity:1}
-.lnPxSemQuadro{display:flex;align-items:center;justify-content:center}
-.lnPxNada{color:var(--apagado);font-size:11px;text-align:center;padding:0 10px;line-height:1.5;
-  display:flex;flex-direction:column;gap:3px}
-.lnPxNada b{color:var(--fraco);font-weight:500;font-size:10.5px}
-.lnPxSemQuadro iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
 .lnDica{margin-top:8px;line-height:1.7;color:var(--fraco)}
 .lnDica code{background:var(--f3);border:1px solid var(--borda);border-radius:4px;padding:1px 5px;
   font-size:11px;color:var(--ouro-claro)}
-.lnTagP{font-size:10.5px;border:1px solid var(--borda);border-radius:4px;padding:1px 6px;color:var(--fraco)}
-.lnAltoCx{width:min(1180px,97vw)}
-.lnAltoVideo{position:relative;background:#000;overflow:hidden;aspect-ratio:16/9}
-.lnAltoVideo #lnAltoYT{width:100%;height:100%}
-.lnAltoVideo iframe{border:0;display:block}
-.lnPxMira.grande{width:34px;height:34px;opacity:.7}
-.lnAltoPe{display:flex;gap:6px;align-items:center;padding:9px 12px;border-top:1px solid var(--borda)}
-.lnAltoPe .acao{padding:3px 9px;font-size:11.5px}
-.lnPxImg{position:relative;aspect-ratio:16/9;background:#000;overflow:hidden}
-.lnPxImg i{position:absolute;inset:0;background-repeat:no-repeat}
-.lnPxImg img{width:100%;height:100%;object-fit:cover;display:block}
-.lnPxAlto{position:absolute;inset:0}
-.lnPxAlto iframe{width:100%;height:100%;border:0;display:block}
-/* a cruz do meio: e onde a mira fica na tela do jogo */
-.lnPxMira{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);
-  pointer-events:none;opacity:.55}
-.lnPxMira::before,.lnPxMira::after{content:"";position:absolute;background:#6cf3c4;box-shadow:0 0 2px #000}
-.lnPxMira::before{left:50%;top:0;width:1px;height:100%;transform:translateX(-50%)}
-.lnPxMira::after{top:50%;left:0;height:1px;width:100%;transform:translateY(-50%)}
-.lnPxPe{padding:7px 9px 9px;display:flex;flex-direction:column;gap:6px}
-.lnPxPe .lnNome{font-size:12.5px;color:var(--forte);white-space:normal;line-height:1.3}
-.lnPxBotoes{display:flex;gap:5px;align-items:center}
-.lnPxBotoes .acao{padding:2px 8px;font-size:11.5px}
-.lnPxSeg{font-size:11px;color:var(--apagado);font-variant-numeric:tabular-nums;min-width:36px;text-align:center}
 
 /* O CLIPE EM TELA CHEIA.
    Medido na janela dele (965 px): com as duas barras laterais sobravam 424 px pro vídeo e
@@ -1285,7 +1188,7 @@ body.lnTelaCheia .lnVideoCx #lnYT,body.lnTelaCheia .lnVideoCx iframe{
   width:100%;height:100%;max-width:calc(100vh * 16 / 9);max-height:calc(100vw * 9 / 16)}
 /* o lado vira um painel por cima, no canto */
 body.lnTelaCheia .lnLadoDetalhe{position:fixed;right:14px;top:14px;width:250px;z-index:71;
-  background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r2);padding:11px;
+  background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r-m);padding:11px;
   flex-direction:column;align-items:stretch;gap:8px;max-height:calc(100vh - 28px);overflow:auto;
   backdrop-filter:blur(4px)}
 body.lnTelaCheia .lnLadoDetalhe .lnMini{width:100%;flex:none}
@@ -1303,10 +1206,10 @@ body.lnTelaCheia #lnMapaCx{display:none}
 /* o selo de qualidade: diz em quanto o YouTube está mandando e dá pra clicar pra ele
    escolher de novo (ver lnOlharQualidade) */
 .lnTag.lnQ{font:inherit;font-size:10.5px;cursor:pointer;background:none;font-variant-numeric:tabular-nums}
-.lnTag.lnQ:hover{border-color:var(--borda-forte);color:var(--forte)}
+.lnTag.lnQ:hover{border-color:var(--borda-forte);color:var(--texto)}
 .lnTag.lnQ.ruim{border-color:#7d5a1f;background:#7d5a1f33;color:#ffe2b0}
 .lnCarregando{position:absolute;left:50%;bottom:16%;transform:translateX(-50%);z-index:72;
-  background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r2);
+  background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r-m);
   padding:7px 13px;font-size:12.5px;color:var(--fraco)}
 
 /* ---------------------------------------------------- acabamento geral */
