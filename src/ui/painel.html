@@ -1290,6 +1290,12 @@ body.lnTelaCheia .lnLadoDetalhe{position:fixed;right:14px;top:14px;width:250px;z
   backdrop-filter:blur(4px)}
 body.lnTelaCheia .lnLadoDetalhe .lnMini{width:100%;flex:none}
 body.lnTelaCheia .lnTocandoNome{font-size:14px}
+/* o voltar sai do painel e vai pro canto de CIMA À ESQUERDA da tela. Dentro da HUD ele
+   roubava altura de uma coluna de 250 px que ja e apertada (nome, mapinha, selos, marcar),
+   e ficava no canto mais longe de onde a mao esta. Fora dela, fica sozinho num canto vazio
+   do video e nao empurra mais nada. z-index acima da HUD pra nunca ficar por baixo. */
+body.lnTelaCheia .lnVoltar{position:fixed;left:14px;top:14px;z-index:72;
+  padding:6px 12px;font-size:12px;background:#0b1016e8;backdrop-filter:blur(4px)}
 /* com o clipe aberto, o mapa grande fica ESCONDIDO de verdade (display:none). Ele continua
    montado, mas para de ser desenhado — e com ele param as 12 bolinhas animadas das rotas.
    Durante a partida essa GPU faz falta: é ela que o player usa pra decodificar o vídeo. */
