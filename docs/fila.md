@@ -30,20 +30,20 @@ saber o lugar de verdade naquele mapa. Próximo passo possível: medir se a arte
 dá pra conferir (o callout mais perto do ponto que o nome sugere), ou aceitar que daqui
 pra frente quem fecha a conta é ele marcando no mapa — que já funciona desde a 2.28.262.
 
-### 2. O mesmo tratamento em olho.html e vivo.html
-O painel levou corretor, limpeza de CSS morto e conferência no navegador. As outras três
-telas só passaram pelo corretor.
-
-### 3. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
+### 2. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
 Hoje o estado do Valorant é lido de 6 em 6 segundos. O cliente local tem websocket, que
 avisa na hora e gasta menos.
 
-### 4. Composição inimiga a partir do `core-game` que já é baixado
+### 3. Composição inimiga a partir do `core-game` que já é baixado
 O dado já vem na resposta e é jogado fora.
 
 ---
 
 ## Feito
+
+- **2.28.270** — o passeio passou a visitar as quatro telas (inclusive as três que ficam
+  abertas durante a partida) e a passear duas vezes, com `{erro}` e com `{}`. O modo `{}`
+  achou mais três telas que quebravam: Calendário, Patch e Admin.
 
 - **2.28.269** — passeio automático pelas telas (janela oculta do Electron, API respondendo
   erro) na trava 4 da publicação; achou 5 telas que quebravam sem rede + o `x.fmt` das
