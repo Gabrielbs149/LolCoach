@@ -160,6 +160,14 @@ body.recolhida .estado .l span:not(.luz),body.recolhida .estado #estFase,body.re
    linhas ficarem quilométricas e os cartões, ocos. */
 main{flex:1;overflow-y:auto;padding:20px 24px 60px}
 main>section{max-width:var(--largura);margin:0 auto;display:none;animation:sobe .16s ease}
+/* A aba de LINEUPS nao obedece esse teto, e e a unica que nao obedece.
+   O teto de 1060 px existe pra texto e tabela: linha longa demais e ruim de ler, e os
+   sites do ramo param em 1016-1080. Mas lineup nao se le, se OLHA — a tela inteira ali
+   e um mapa. Medido na janela que o app abre de verdade na segunda tela (1920x1040):
+   `main` tem 1724 px e o conteudo ficava preso em 1060, com 664 px vazios do lado. E
+   pior: abrindo um ponto, a tira entrava DENTRO dos 1060 e o mapa ENCOLHIA pra caber,
+   com dois tercos de tela livre ali ao lado. */
+main>section#lineups{max-width:none}
 main>section.ativo{display:block}
 @keyframes sobe{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 
@@ -982,7 +990,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    LARGURA, ja descontando a altura disponivel pela proporcao do recorte (--ar). */
 /* Sem lista nenhuma na tela, o mapa manda sozinho: largura toda e altura até onde a
    janela deixa. Quem escolhe é o mapa — foi o que ele pediu desde o começo. */
-.lnDuplo .lnMapa{max-width:min(760px, calc(var(--lnAlt, calc(100vh - 210px)) * var(--ar, 1)))}
+/* O teto de largura do mapa agora sai SO da altura disponivel (ja medida em --lnAlt) e
+   da proporcao do recorte. O 760 px escrito a mao sobrava de quando a secao tinha teto:
+   com 778 px de altura livre ele cortava o mapa em 760 por nada. O 1100 e so pra ele nao
+   virar um mapa gigante e vazio numa tela ultrawide. */
+.lnDuplo .lnMapa{max-width:min(1100px, calc(var(--lnAlt, calc(100vh - 210px)) * var(--ar, 1)))}
 
  /* sem aspect-ratio fixo: a proporcao agora vem do recorte, inline, por mapa */
 .lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;overflow:hidden;
