@@ -17,14 +17,15 @@ Regras que valem pra toda rodada:
 
 ## Aberto
 
-### 1. Só 7% das lineups dizem de onde se joga
-Medido no acervo: no mapa inteiro, 97 lineups e **7** com ponto de saída conhecido. O
-resto só diz onde cai. É o teto de tudo que ele pediu ("quero o ponto da jogada da
-habilidade preciso") — enquanto for 7%, o mapa não tem o que desenhar.
-Próximo passo: separar os nomes de capítulo das 90 sem lugar e procurar o padrão que
-ainda não é lido (já leem: `X from Y`, `X → Y`, `X (de Y)`, `CT`/`T spawn`). Suspeitas:
-"behind X", "on top of X", "X side", nome de canto sem preposição nenhuma.
-Medir antes de mexer: quantas cada padrão novo recupera, e quantas ele estraga.
+### 1. Só 28,5% das lineups dizem de onde se joga (era 27,5%)
+Medido no acervo inteiro (8686 lineups): 2472 com ponto de saída. O resto só diz onde
+cai. É o teto de tudo que ele pediu — enquanto for 28%, o mapa não tem o que desenhar.
+Já lidos: `X from Y`, `X → Y`, `X (de Y)`, `CT`/`T spawn`, carimbo de canal, `from Spawn`
+pelo lado. **O que sobra é mais difícil**: das 6214 sem lugar, ~5300 nem se partem (o
+nome não cita dois lugares), e das que se partem a metade do lugar é gíria que o catálogo
+da Riot não conhece — "Heaven" (o oficial é "A Rafters" no Ascent), "Cat" (é "Mid
+Catwalk"), "Backsite", "Lab", "Market". O caminho é um dicionário de gíria POR MAPA,
+construído dos dados e medido um a um. Mexer só com medida de ganho e de estrago.
 
 ### 2. 22 avisos do corretor de telas
 Classes usadas em markup que não têm regra de CSS nenhuma — cada uma é um elemento que
@@ -50,6 +51,9 @@ O dado já vem na resposta e é jogado fora.
 ---
 
 ## Feito
+
+- **2.28.266** — +82 lugares lidos do nome (carimbo de canal, `from Spawn` pelo lado),
+  0 perdidos. Acervo no formato 8.
 
 - **2.28.265** — o ponto que diz 35 entrega 35 (corte de 12 vinha antes de saber quem tem
   lugar), a tira parou de nascer abaixo da dobra, e foi pro lado do mapa.
