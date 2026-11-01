@@ -749,6 +749,45 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
 
 /* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
  * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('ponto: plural nao separa, e apelido so vale se o nome oficial existe no mapa', async () => {
+  const { pontoDaLineup } = await import('../src/valorant/lineups.js');
+  const ascent = [
+    { nome: 'A Site', regiao: 'Site', grande: 'A', site: 'A', x: 0.3, y: 0.3 },
+    { nome: 'A Rafters', regiao: 'Rafters', grande: 'A', site: 'A', x: 0.35, y: 0.25 },
+    { nome: 'Mid Catwalk', regiao: 'Catwalk', grande: 'Mid', site: null, x: 0.5, y: 0.5 },
+    { nome: 'Mid Vent', regiao: 'Vent', grande: 'Mid', site: null, x: 0.55, y: 0.5 },
+    { nome: 'A Ramps', regiao: 'Ramps', grande: 'A', site: 'A', x: 0.4, y: 0.4 },
+    { nome: 'Defender Side Spawn', regiao: 'Spawn', grande: 'Defender Side', site: null, x: 0.1, y: 0.1 },
+    { nome: 'Attacker Side Spawn', regiao: 'Spawn', grande: 'Attacker Side', site: null, x: 0.9, y: 0.9 },
+  ];
+  const onde = (nome, cs = ascent, site = null) => pontoDaLineup(nome, cs, site)?.nome ?? null;
+
+  /* SINGULAR E PLURAL são a mesma coisa num nome de canto. Os canais escrevem "Mid Vents"
+   * e "C Halls"; o catálogo da Riot diz "Mid Vent" e "C Hall". A régua passa nos dois
+   * lados, então vale nas duas direções. */
+  assert.equal(onde('smoke mid vents'), 'Mid Vent');
+  assert.equal(onde('smoke a ramp'), 'A Ramps');
+  // e "Defenders Spawn" (com s) passa a desempatar pela região grande, como "Defender"
+  assert.equal(onde('Slow Orb Defenders Spawn'), 'Defender Side Spawn');
+
+  /* APELIDO DE LUGAR: "Heaven" é o nome que todo mundo usa pro alto do site, e o catálogo
+   * da Riot chama de "Rafters". Vale aqui porque o Ascent TEM Rafters. */
+  assert.equal(onde('A Heaven molly'), 'A Rafters');
+  assert.equal(onde('flash from cat'), 'Mid Catwalk');
+
+  /* E a regra de ouro: num mapa SEM Rafters, "Heaven" continua sem ponto. Inventar um
+   * lugar é pior que não ter — é exatamente a reclamação de "ponto aleatório". */
+  const semRafters = [
+    { nome: 'B Site', regiao: 'Site', grande: 'B', site: 'B', x: 0.7, y: 0.7 },
+    { nome: 'B Tower', regiao: 'Tower', grande: 'B', site: 'B', x: 0.75, y: 0.6 },
+  ];
+  assert.equal(onde('B Heaven molly', semRafters), null);
+  // e com site conhecido cai no centro do site, marcado como aproximado — nunca na Tower
+  const comSite = pontoDaLineup('B Heaven molly', semRafters, 'B');
+  assert.equal(comSite?.nome, 'B Site');
+  assert.equal(comSite?.aproximado, true);
+});
+
 test('pontas: carimbo de canal sai da frente, e "from Spawn" se resolve pelo lado', async () => {
   const { pontasDaLineup } = await import('../src/valorant/lineups.js');
   const cs = [

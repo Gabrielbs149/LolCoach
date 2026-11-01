@@ -181,9 +181,63 @@ const semAcento = (t) => String(t).normalize('NFD').replace(/[\u0300-\u036f]/g, 
  * do mapa, do mais específico pro menos: "B default from B Teleporter" acha "B Teleporter"
  * antes de "Teleporter", senão uma lineup do B cairia no teleporter do A.
  */
+/* Singular e plural são a mesma coisa num nome de canto. Os canais escrevem "C Halls",
+ * "Mid Vents", "C Waterfalls"; o catálogo da Riot diz "C Hall", "Mid Vent", "C Waterfall".
+ * Tirar o "s" do fim das palavras dos DOIS lados resolve sem inventar nada — e como a
+ * mesma régua passa no texto e no callout, "A Ramp" acha "A Ramps" e vice-versa. */
+const semPlural = (s) => s.replace(/([a-z]{3,})s\b/g, '$1');
+const arrumadoPraCasar = (s) => semPlural(semAcento(s).replace(/[^a-z0-9]+/g, ' '));
+
+/* APELIDOS DE LUGAR: o que os canais escrevem e o catálogo da Riot não conhece.
+ *
+ * A regra de ouro está na terceira coluna: o apelido SÓ vale quando a palavra oficial
+ * existe NAQUELE mapa. "Heaven" vira "Rafters" no Ascent e no Split, que têm Rafters; no
+ * Corrode, que não tem, "B Heaven" continua sem ponto — que é a verdade, e é muito melhor
+ * que fincar a lineup num lugar errado do mapa.
+ *
+ * Medido no acervo dele: "heaven" aparece 50 vezes como lugar de saída que não casa nada,
+ * "backsite" 32, "cat" 12, "showers" 8. */
+const APELIDOS_DE_LUGAR = [
+  [/\bheaven\b/g, 'rafters', 'rafters'],        // Ascent e Split chamam o alto de Rafters
+  [/\bcat\b/g, 'catwalk', 'catwalk'],           // "Cat" é o Mid Catwalk do Ascent
+  [/\bback\s?site\b/g, 'back', 'back'],         // "A Backsite" é o "A Back" do Split e do Haven
+  [/\bshower\b/g, 'bath', 'bath'],              // o chuveiro do Bind é o "A Bath"
+  // "from Defender Side" é o spawn dele; sem isto não casa nem o nome nem a região
+  [/\b(defender|attacker)\s+side\b(?!\s+spawn)/g, '$1 side spawn', 'spawn'],
+];
+
+/** Os jeitos de escrever o mesmo texto com os apelidos que ESTE mapa aceita. */
+function comApelidos(t, callouts) {
+  const oficiais = callouts.map((c) => arrumadoPraCasar(c.nome)).join(' ');
+  const saidas = [];
+  for (const [de, para, precisa] of APELIDOS_DE_LUGAR) {
+    // a tabela está escrita como se fala ("rafters"), mas aqui já se compara sem plural
+    // ("rafter"): sem passar a mesma régua nos dois lados o apelido nunca casava
+    if (!de.test(t) || !oficiais.includes(semPlural(precisa))) continue;
+    saidas.push(semPlural(t.replace(de, para)));
+  }
+  return saidas;
+}
+
 export function pontoDaLineup(nome, callouts = [], site = null) {
-  const t = ` ${semAcento(nome).replace(/[^a-z0-9]+/g, ' ')} `;
-  const contem = (alvo) => t.includes(` ${semAcento(alvo).replace(/[^a-z0-9]+/g, ' ').trim()} `);
+  const achado = casarCallout(arrumadoPraCasar(nome), callouts, site)
+    ?? comApelidos(arrumadoPraCasar(nome), callouts)
+      .map((t) => casarCallout(t, callouts, site)).find(Boolean);
+  if (achado) return achado;
+  // 3. nada de específico: o centro do site, se a gente souber qual é
+  if (site) {
+    const doSite = callouts.filter((c) => c.site === site);
+    const alvo = doSite.find((c) => /site/i.test(c.regiao)) ?? doSite[0];
+    if (alvo) return { ...alvo, aproximado: true };
+  }
+  return null;
+}
+
+/** Os passos 1 e 2: casar o texto contra os callouts. Sem o centro do site, que é o
+ *  último recurso e tem que vir DEPOIS de tentar os apelidos. */
+function casarCallout(texto, callouts, site) {
+  const t = ` ${texto} `;
+  const contem = (alvo) => t.includes(` ${arrumadoPraCasar(alvo).trim()} `);
   // 1. nome completo do callout ("A Lobby") — o mais específico
   const completos = callouts.filter((c) => c.nome !== c.regiao && contem(c.nome))
     .sort((a, b) => b.nome.length - a.nome.length);
@@ -207,12 +261,6 @@ export function pontoDaLineup(nome, callouts = [], site = null) {
    * site certo (passo 3) do que fincar no lugar errado. */
   const soUm = soRegiao.length === 1 ? soRegiao[0] : null;
   if (soUm && !(site && soUm.site && soUm.site !== site)) return soUm;
-  // 3. nada de específico: o centro do site, se a gente souber qual é
-  if (site) {
-    const doSite = callouts.filter((c) => c.site === site);
-    const alvo = doSite.find((c) => /site/i.test(c.regiao)) ?? doSite[0];
-    if (alvo) return { ...alvo, aproximado: true };
-  }
   return null;
 }
 
@@ -959,7 +1007,7 @@ const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 5: cada lineup passou a saber se é de ataque ou de defesa
 // 6: filtro de agente (tinha lineup de Sova dentro de busca de Fade) e lado mais exigente
 // 7: as duas pontas lidas de novo — seta, parêntese e "CT" passaram a virar lugar no mapa
-const FORMATO_BUSCA = 8;
+const FORMATO_BUSCA = 9;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
@@ -1041,9 +1089,10 @@ function comOLado(mapa, lineups, cat) {
  * Isso leva os lugares novos pras 72 buscas que ele já tem salvas sem uma chamada de
  * rede — refazer tudo custaria ~7000 unidades de cota do YouTube.
  *
- * O 7 trouxe 105 lugares (seta, parêntese, "CT") e 5 alvos consertados. O 8 traz mais 82,
- * medidos no acervo dele com 0 perdidos e 0 trocados: o carimbo de canal no começo do
- * nome e o "from Spawn" resolvido pelo lado da lineup.
+ * O 7 trouxe 105 lugares (seta, parêntese, "CT") e 5 alvos consertados. O 8 trouxe mais
+ * 82: carimbo de canal e "from Spawn" pelo lado. O 9 traz mais 151 (233 no total desde o
+ * 7), e ainda leva 159 alvos de APROXIMADO pra exato: plural e apelido de lugar. Medidos
+ * no acervo dele, sempre com 0 perdidos e 0 trocados pra pior.
  */
 function comAsPontas(mapa, lineups, cat) {
   const callouts = cat?.mapas?.find((x) => x.nome === mapa)?.callouts ?? [];
@@ -1083,7 +1132,7 @@ function soDesteAgente(agente, lineups, nomes) {
  * formato sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
  */
 async function migrarBusca(p, g) {
-  if (![3, 4, 5, 6, 7].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
+  if (![3, 4, 5, 6, 7, 8].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
   const cat = await catalogo().catch(() => null);
   const nomes = (cat?.mapas ?? []).map((x) => x.nome);
   const agentes = (cat?.agentes ?? []).map((x) => x.nome);
