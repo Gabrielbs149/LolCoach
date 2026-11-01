@@ -30,11 +30,20 @@ saber o lugar de verdade naquele mapa. Próximo passo possível: medir se a arte
 dá pra conferir (o callout mais perto do ponto que o nome sugere), ou aceitar que daqui
 pra frente quem fecha a conta é ele marcando no mapa — que já funciona desde a 2.28.262.
 
-### 2. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
-**Depende do Valorant aberto pra conferir.** O estado do Valorant é lido de 6 em 6 s; o
-cliente local tem websocket, que avisa na hora e gasta menos. Mexer sem o jogo rodando
-seria publicar no escuro — e o jeito certo é manter a espiada como plano B e pôr o
-websocket como caminho rápido, nunca trocar um pelo outro.
+### 2. Mostrar as lineups do LADO em que ele está jogando
+Hoje ele troca Atacante/Defensor na mão. Durante a partida isso é metade do que ele vê
+sem serventia.
+**Medido no cliente ao vivo, em partida:** a presença NÃO tem o lado. Tem o placar
+(`partyOwnerMatchScoreAllyTeam` / `EnemyTeam`) e o estado, mais nada.
+O caminho que sobra: o `core-game` — que desde a 2.28.281 é baixado UMA vez por partida —
+traz `Players[].TeamID` ("Blue"/"Red"), e o número de rodadas sai do placar. Blue ataca
+nas 12 primeiras; depois troca. **Cuidado com a prorrogação**, onde a troca muda de regra,
+e com Deathmatch/Escalada, que não têm lado. Só mexer com os dois medidos de verdade numa
+partida que chegue lá — senão é adivinhação, e adivinhar lado é pior que não mostrar.
+
+### 2b. ~~Websocket no lugar da espiada de 6 s~~ — MEDIDO E DESCARTADO
+Depois do cache do agente (2.28.281) a volta do laço custa 50 ms. O websocket economizaria
+0,8% e traria reconexão, autenticação e um estado a mais pra manter. Não vale.
 
 ### 3. Composição inimiga a partir do `core-game` que já é baixado
 **Depende do Valorant aberto pra conferir.** O dado já vem na resposta e é jogado fora.
