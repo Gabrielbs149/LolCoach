@@ -47,12 +47,22 @@ olho são ~50 por dia — diagnóstico, não enchente. Vale repetir de tempos em
 único lugar com dado do uso REAL dele.
 
 ### 5. Continuar medindo o custo do painel durante a partida
-A varredura de minuto já foi (2.28.273: 446 ms → 0). Falta olhar o `tick()` de 2 s (que
-já respeita a aba escondida) e o peso do desenho do mapa de lineups com o clipe tocando.
+A varredura de minuto já foi (2.28.273: 446 ms → 0). O `tick()` de 2 s foi **medido e
+descartado**: 17 ms e uma ida à API, 0,85% do tempo. Falta só o peso do desenho do mapa
+de lineups com o clipe tocando — e o mapa grande já fica `display:none` em tela cheia,
+então o provável é que também não sobre nada. Medir antes de mexer.
+
+### 6. O parser de nome chegou no teto
+Medido: 38% dos alvos caem no centro do site, e 1.119 deles têm "from" e 641 têm
+"default" — o capítulo diz mesmo só "A site". Daqui pra frente quem fecha a conta é ele
+marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 ---
 
 ## Feito
+
+- **2.28.274** — M marca de onde sai, N marca onde cai, ← → pulam pela lista do mesmo
+  ponto sem fechar o clipe. Marcar deixou de ser ida e volta pro mapa.
 
 - **2.28.273** — a varredura de minuto do painel só mexe na aba aberta: 446 ms, 2.062 nós
   de DOM e 4 idas à API por minuto viraram 0 enquanto ele está nas Lineups.
