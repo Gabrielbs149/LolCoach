@@ -749,6 +749,41 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
 
 /* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
  * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('registro: guarda contra enchente segura a repetida sem apagar informacao', async () => {
+  const { guardaDeEnchente } = await import('../src/dados/sem-enchente.js');
+  const g = guardaDeEnchente({ limite: 3, janela: 10 * 60 * 1000 });
+  let t = 1_000_000;
+
+  /* MEDIDO no registro dele: de 21.066 linhas, 18.009 (85%) eram DUAS mensagens se
+   * alternando por causa de uma release quebrada. O registro gira com 2 MB, então essa
+   * enchente empurrou semanas de histórico de verdade pra fora do arquivo. */
+
+  // as primeiras passam; depois do limite, segura
+  const r = [1, 2, 3, 4, 5].map(() => g.deixar('falhou de novo', t));
+  assert.deepEqual(r.map((x) => x.escrever), [true, true, true, false, false]);
+  // e avisa UMA vez que vai segurar, pra ninguém achar que a linha sumiu
+  assert.equal(r[3].aviso !== null, true);
+  assert.equal(r[4].aviso, null);
+
+  // outra mensagem não é afetada pela primeira — o limite é POR mensagem
+  assert.equal(g.deixar('outra coisa', t).escrever, true);
+
+  /* E o caso que importa aqui: as duas se ALTERNAVAM. Juntar linha repetida seguida não
+   * teria resolvido nada; o limite por mensagem resolve. */
+  const alternado = [];
+  for (let i = 0; i < 6; i++) {
+    alternado.push(g.deixar('procurando atualização…', t).escrever);
+    alternado.push(g.deixar('falhou de novo', t).escrever);
+  }
+  assert.equal(alternado.filter(Boolean).length <= 6, true);
+
+  // passada a janela, a conta fecha dizendo quantas foram seguradas, e recomeça
+  t += 11 * 60 * 1000;
+  const depois = g.deixar('falhou de novo', t);
+  assert.equal(depois.escrever, true);
+  assert.match(depois.aviso ?? '', /repetiu mais \d+/);
+});
+
 test('tentar de novo: uma corrente so, espera que dobra, e registro que da pra ler', async () => {
   const { quandoTentarDeNovo } = await import('../src/dados/tentar-de-novo.js');
   const q = quandoTentarDeNovo({ minimo: 2, maximo: 16, avisarACada: 3 });

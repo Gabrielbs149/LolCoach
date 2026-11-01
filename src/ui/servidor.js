@@ -7,6 +7,7 @@ import { temporadaDe, resumoPorTemporada } from '../dados/temporadas.js';
 import { notasDaPartida, laningPct, selosDaPartida } from '../analise/nota.js';
 import { elosGuardados } from '../dados/elo-partida.js';
 import { temporadasDoOpgg, topPorcento } from '../dados/opgg-perfil.js';
+import { guardaDeEnchente } from '../dados/sem-enchente.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 
@@ -1064,12 +1065,18 @@ export function criarEstado({ aoAvisar } = {}) {
   const dados = { conectado: false, conta: null, fase: null, config: null };
 
   const fila = []; let gravando = false;
+  // 85% do registro dele era duas mensagens se alternando por causa de uma release
+  // quebrada, e isso empurrou semanas de histórico de verdade pra fora do arquivo
+  const guarda = guardaDeEnchente();
   return {
     set(chave, valor) { dados[chave] = valor; },
     // Notificação do Windows — quem decide se pode (fora de partida) é o main.
     avisar(titulo, texto) { try { aoAvisar?.(titulo, texto, dados.fase); } catch { /* sem notificação */ } },
-    log(texto) {
+    log: function log(texto) {
       const em = new Date().toISOString();
+      const { escrever, aviso } = guarda.deixar(texto);
+      if (aviso) log(aviso);
+      if (!escrever) return;
       linhas.unshift({ em, texto });
       if (linhas.length > 200) linhas.pop();
       // Também em disco (dados/registro.log, vira registro.1.log com 2 MB): o registro na memória some quando o app

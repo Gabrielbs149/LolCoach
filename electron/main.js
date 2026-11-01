@@ -137,6 +137,11 @@ function ligarAtualizacao() {
   autoUpdater.on('checking-for-update', () => { if (primeiraBusca) estado.log('procurando atualização…'); });
   autoUpdater.on('update-available', (i) => estado.log(`atualização ${i.version} encontrada — baixando em segundo plano`));
   autoUpdater.on('update-not-available', () => { if (primeiraBusca) estado.log(`você está na versão mais recente (${app.getVersion()})`); primeiraBusca = false; });
+  /* `primeiraBusca` só caía no `update-not-available`. Durante a tempestade da v2.28.219
+   * esse evento NUNCA aconteceu — era erro toda vez — e o "procurando atualização…" foi
+   * escrito 9.027 vezes. A primeira busca acaba quando ELA ACABA, dê no que der. */
+  autoUpdater.on('update-available', () => { primeiraBusca = false; });
+  autoUpdater.on('error', () => { primeiraBusca = false; });
   autoUpdater.on('download-progress', (p) => { if (Math.round(p.percent) % 25 === 0) estado.set('atualizacao', { baixando: Math.round(p.percent) }); });
   autoUpdater.on('update-downloaded', async (i) => {
     baixada = i.version;
