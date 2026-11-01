@@ -749,6 +749,45 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
 
 /* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
  * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('pontas: carimbo de canal sai da frente, e "from Spawn" se resolve pelo lado', async () => {
+  const { pontasDaLineup } = await import('../src/valorant/lineups.js');
+  const cs = [
+    { nome: 'A Site', regiao: 'Site', grande: 'A', site: 'A', x: 0.3, y: 0.3 },
+    { nome: 'A Main', regiao: 'Main', grande: 'A', site: 'A', x: 0.6, y: 0.6 },
+    { nome: 'A Short', regiao: 'Short', grande: 'A', site: 'A', x: 0.5, y: 0.4 },
+    { nome: 'C Long', regiao: 'Long', grande: 'C', site: 'C', x: 0.2, y: 0.7 },
+    { nome: 'Defender Side Spawn', regiao: 'Spawn', grande: 'Defender Side', site: null, x: 0.1, y: 0.1 },
+    { nome: 'Attacker Side Spawn', regiao: 'Spawn', grande: 'Attacker Side', site: null, x: 0.9, y: 0.9 },
+  ];
+  const ler = (nome, site = null, lado = null) => {
+    const { alvo, posicao } = pontasDaLineup(nome, cs, site, lado);
+    return [alvo?.nome ?? null, posicao?.nome ?? null];
+  };
+
+  /* O CARIMBO DO CANAL. "[Recon] A CT to A Main" não casava o spawn: o apelido de "CT" só
+   * vale quando o texto inteiro é "CT", e com o carimbo colado na frente nunca era. */
+  assert.deepEqual(ler('[Recon] A CT to A Main'), ['A Main', 'Defender Side Spawn']);
+  assert.deepEqual(ler('[Def Eye] A Site from A Short'), ['A Site', 'A Short']);
+  // o de dois pontos só sai quando o pedaço antes tem "/" ou "," — a assinatura do carimbo
+  assert.deepEqual(ler('FLASH/drive: A Short to A Site'), ['A Site', 'A Short']);
+  assert.deepEqual(ler('Defense, ZERO/point: A Short to A Site'), ['A Site', 'A Short']);
+  /* E NÃO sai quando é carinha no meio do nome. Isto aqui é um caso real do acervo dele:
+   * "...ever :D)" casava a regra antiga e levava o nome inteiro embora, e a lineup que caía
+   * no C Long passava a cair no centro do site. */
+  assert.deepEqual(ler('C Long Cubby 1 (Retake, craziest Brim lineup ever :D)', 'C')[0], 'C Long');
+  // nome legítimo com dois pontos continua inteiro
+  assert.deepEqual(ler('A Site: default from A Short'), ['A Site', 'A Short']);
+
+  /* "from Spawn" sem dizer qual: casa a região "Spawn" nos dois e empata. O LADO resolve
+   * sem adivinhar — quem ataca sai do spawn do atacante, e o spawn "inimigo" de quem
+   * ataca é o do defensor. */
+  assert.deepEqual(ler('A Site Flash from Spawn', 'A', 'atacando'), ['A Site', 'Attacker Side Spawn']);
+  assert.deepEqual(ler('A Site Flash from Spawn', 'A', 'defendendo'), ['A Site', 'Defender Side Spawn']);
+  assert.deepEqual(ler('A Site Flash from enemy spawn', 'A', 'atacando'), ['A Site', 'Defender Side Spawn']);
+  // sem saber o lado continua empatado e sem ponto, que é a resposta honesta
+  assert.deepEqual(ler('A Site Flash from Spawn', 'A'), ['A Site', null]);
+});
+
 test('pontas: seta, parêntese e CT viram lugar; e o alvo não rouba o lugar de saída', async () => {
   const { pontasDaLineup } = await import('../src/valorant/lineups.js');
   const cs = [

@@ -423,8 +423,23 @@ const PARA_ONDE = /^(.*?)\s+(?:to|para|pro)\s+(.+)$/i;
  * perdida. */
 const SETAS = /\s*(?:→|->|=>|➔|➜|⇒|»)\s*/g;
 const DE_ENTRE_PARENTESES = /[([{]\s*(?:from|de|desde)\s+([^)\]}]+)[)\]}]/i;
+
+/* O CARIMBO DO CANAL, que vem antes do nome de verdade.
+ *
+ * Alguns canais numeram tudo com uma marca: "[Def Eye] CT Spawn", "FLASH/drive: Showers
+ * to A", "Defense, ZERO/point: A Backsite to Hookah", "frag/ment: CT". O carimbo não é
+ * lugar nenhum e ainda ATRAPALHA a leitura: o apelido de "CT" só vale quando o texto
+ * inteiro é "CT", e "[Def Eye] CT Spawn" não é.
+ *
+ * O de colchete sai sempre — colchete no começo nunca é nome de canto. O de dois pontos
+ * só sai quando o pedaço antes dele tem "/" ou ",", que é a assinatura do carimbo: um
+ * nome legítimo como "A Site: smoke" não tem nem um nem outro e fica como está. */
+const CARIMBO_COLCHETE = /^\s*\[[^\]]{1,28}\]\s*/;
+const CARIMBO_DOIS_PONTOS = /^[^:\s][^:]{0,32}[/,][^:]{0,32}[^:\s]:\s+/;
+
 function arrumarPontas(nome) {
-  let n = String(nome).replace(SETAS, ' to ');
+  let n = String(nome).replace(CARIMBO_COLCHETE, '').replace(CARIMBO_DOIS_PONTOS, '');
+  n = n.replace(SETAS, ' to ');
   const m = n.match(DE_ENTRE_PARENTESES);
   if (m) n = `${n.replace(m[0], ' ').trim()} from ${m[1].trim()}`;
   return n.replace(/\s{2,}/g, ' ').trim();
@@ -438,9 +453,28 @@ function arrumarPontas(nome) {
  * e trocar ali mandava a lineup pro spawn errado. Por isso o `^...$`. */
 const SO_CT = /^(?:[abc]\s+)?ct(?:\s*spawn)?$/i;
 const SO_T_SPAWN = /^(?:[abc]\s+)?t[\s-]*spawn$/i;
-const comApelidoDeSpawn = (t) => (SO_CT.test(t) ? 'defender spawn' : SO_T_SPAWN.test(t) ? 'attacker spawn' : t);
 
-export function pontasDaLineup(nome, callouts = [], site = null) {
+/* "from Spawn", sem dizer qual.
+ *
+ * "Spawn" sozinho casa a região dos DOIS spawns, empata, e a lineup fica sem ponto de
+ * saída — eram 29 nomes só no Ascent. Mas o LADO da lineup resolve sem adivinhar nada:
+ * quem está atacando sai do spawn do atacante, e o "spawn inimigo" de quem ataca é o do
+ * defensor. Sem saber o lado, continua empatado e sem ponto, que é a resposta honesta. */
+const SO_SPAWN = /^(?:(?:our|my|team|nosso|meu)\s*'?s?\s+)?spawn$/i;
+const SO_SPAWN_DELES = /^(?:enem(?:y|ies)|inimigo|deles)\s*'?s?\s+spawn$/i;
+
+function comApelidoDeSpawn(t, lado = null) {
+  if (SO_CT.test(t)) return 'defender spawn';
+  if (SO_T_SPAWN.test(t)) return 'attacker spawn';
+  if (!lado) return t;
+  const meu = lado === 'atacando' ? 'attacker spawn' : 'defender spawn';
+  const deles = lado === 'atacando' ? 'defender spawn' : 'attacker spawn';
+  if (SO_SPAWN.test(t)) return meu;
+  if (SO_SPAWN_DELES.test(t)) return deles;
+  return t;
+}
+
+export function pontasDaLineup(nome, callouts = [], site = null, lado = null) {
   const inteiro = arrumarPontas(nome);
   let m = inteiro.match(DE_ONDE), invertido = false;
   if (!m) { m = inteiro.match(PARA_ONDE); invertido = !!m; }
@@ -449,7 +483,7 @@ export function pontasDaLineup(nome, callouts = [], site = null) {
   const [alvoTxt, posTxt] = invertido ? [dois, um] : [um, dois];
   // "(Crosshair)" e afins no fim não são lugar
   const limpo = posTxt.replace(/\s*\((?:crosshair|hud|mira|game\s*hud)\)\s*$/i, '').trim();
-  const posicao = pontoDaLineup(comApelidoDeSpawn(limpo), callouts, null);
+  const posicao = pontoDaLineup(comApelidoDeSpawn(limpo, lado), callouts, null);
   /* O alvo sai SÓ da metade do alvo. Antes, quando essa metade não casava lugar nenhum, a
    * conta voltava e lia o nome INTEIRO — e o nome inteiro contém a outra metade, a do lugar
    * de onde se joga. Resultado: "Single shock from A-wine" virava uma lineup que CAI no A
@@ -925,7 +959,7 @@ const VALIDADE_BUSCA = 30 * 24 * 60 * 60 * 1000;
 // 5: cada lineup passou a saber se é de ataque ou de defesa
 // 6: filtro de agente (tinha lineup de Sova dentro de busca de Fade) e lado mais exigente
 // 7: as duas pontas lidas de novo — seta, parêntese e "CT" passaram a virar lugar no mapa
-const FORMATO_BUSCA = 7;
+const FORMATO_BUSCA = 8;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
@@ -973,33 +1007,52 @@ function soDesteMapa(mapa, lineups, nomes) {
  * todos no arquivo. A ordem original da lista não muda — o lado é calculado na ordem do
  * tempo de cada vídeo (que é o que a herança por bloco precisa) e devolvido por lineup.
  */
-function comOLado(mapa, lineups, cat) {
-  const callouts = cat?.mapas?.find((x) => x.nome === mapa)?.callouts ?? [];
+/**
+ * O lado que o TEXTO diz, capítulo a capítulo, sem olhar posição nenhuma.
+ *
+ * Sai daqui de propósito, separado do `comOLado`: ele é a entrada das DUAS contas, e as
+ * duas se enroscavam. O ponto de saída precisa do lado pra saber qual spawn é "from
+ * Spawn"; o lado final precisa do ponto de saída pra se confirmar. Com o lado do texto
+ * no meio a ordem fica reta: texto → ponto de saída → lado final.
+ */
+function ladoDosCapitulos(lineups) {
   const achado = new Map();
   for (const ls of porVideoNaOrdem(lineups).values()) {
     const ordem = ls.slice().sort((a, b) => a.segundo - b.segundo);
     const lados = ladosDosCapitulos(ordem, ordem[0]?.titulo ?? '');
     ordem.forEach((l, i) => achado.set(l, lados[i]));
   }
+  return achado;
+}
+
+function comOLado(mapa, lineups, cat) {
+  const callouts = cat?.mapas?.find((x) => x.nome === mapa)?.callouts ?? [];
+  const doTexto = ladoDosCapitulos(lineups);
   return lineups.map((l) => {
-    const { lado, pista } = juntarLado(achado.get(l), l.posicao, callouts);
+    const { lado, pista } = juntarLado(doTexto.get(l), l.posicao, callouts);
     return { ...l, lado, ladoPista: pista };
   });
 }
 
 /**
- * 6 -> 7: refaz as duas pontas de cada lineup com a leitura nova de nome.
+ * 6 -> 7 -> 8: refaz as duas pontas de cada lineup com a leitura nova de nome.
  *
- * Também é de graça: o nome do capítulo, o site e os callouts do mapa estão todos no
- * arquivo. Isso leva os 105 lugares novos (seta, parêntese, "CT") e os 5 alvos consertados
- * pras 72 buscas que ele já tem salvas, sem uma chamada de rede — refazer tudo custaria
- * ~7000 unidades de cota do YouTube.
+ * É de graça: o nome do capítulo, o site e os callouts do mapa estão todos no arquivo.
+ * Isso leva os lugares novos pras 72 buscas que ele já tem salvas sem uma chamada de
+ * rede — refazer tudo custaria ~7000 unidades de cota do YouTube.
+ *
+ * O 7 trouxe 105 lugares (seta, parêntese, "CT") e 5 alvos consertados. O 8 traz mais 82,
+ * medidos no acervo dele com 0 perdidos e 0 trocados: o carimbo de canal no começo do
+ * nome e o "from Spawn" resolvido pelo lado da lineup.
  */
 function comAsPontas(mapa, lineups, cat) {
   const callouts = cat?.mapas?.find((x) => x.nome === mapa)?.callouts ?? [];
   if (!callouts.length) return lineups;
+  // o acervo antigo nem tem o campo `lado` ainda (ele nasce no comOLado, logo depois):
+  // pro "from Spawn" não ficar sem resposta na migração, o lado vem do texto aqui mesmo
+  const doTexto = ladoDosCapitulos(lineups);
   return lineups.map((l) => {
-    const { alvo, posicao } = pontasDaLineup(l.nome, callouts, l.site);
+    const { alvo, posicao } = pontasDaLineup(l.nome, callouts, l.site, l.lado ?? doTexto.get(l) ?? null);
     return {
       ...l,
       ponto: alvo ? { nome: alvo.nome, x: alvo.x, y: alvo.y, aproximado: alvo.aproximado === true } : null,
@@ -1030,7 +1083,7 @@ function soDesteAgente(agente, lineups, nomes) {
  * formato sem uma única chamada de rede. A data original fica, senão tudo pareceria novo.
  */
 async function migrarBusca(p, g) {
-  if (![3, 4, 5, 6].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
+  if (![3, 4, 5, 6, 7].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
   const cat = await catalogo().catch(() => null);
   const nomes = (cat?.mapas ?? []).map((x) => x.nome);
   const agentes = (cat?.agentes ?? []).map((x) => x.nome);
@@ -1195,7 +1248,10 @@ export async function buscarLineups(p = {}) {
       if (!daqui[i]) { deOutroMapa++; continue; }       // capítulo de outro mapa: não é deste mapa
       if (!dele[i]) { deOutroAgente++; continue; }      // capítulo de outro agente: não é dele
       const c = caps[i];
-      const { alvo: ponto, posicao } = pontasDaLineup(c.nome, callouts, c.site);
+      // o lado vem do capítulo (`lados[i]`), que é lido do texto e não depende da posição:
+      // é ele que diz qual spawn é "from Spawn". O `juntarLado` lá embaixo é que faz o
+      // caminho contrário, usando a posição pra refinar o lado.
+      const { alvo: ponto, posicao } = pontasDaLineup(c.nome, callouts, c.site, lados[i]);
       // de onde sai a habilidade, na ordem: o nome do capítulo; o título do vídeo (quase sempre
       // é lá que está, porque o vídeo inteiro é sobre uma só — "Brimstone Molly Lineups"); e por
       // fim a que ele filtrou, que é o que ele pediu. Só 2 de 111 casavam só pelo capítulo.
