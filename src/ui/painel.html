@@ -1173,6 +1173,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnMarcar{display:flex;flex-wrap:wrap;gap:6px}
 .lnMarcar .acao{padding:4px 9px;font-size:11px}
 .lnMarcado{font-size:11.5px;color:var(--ouro-claro);align-self:center}
+/* as teclas da mao esquerda: marcar os 70% sem ponto e uma por uma, e com o mouse so
+   pro clique no mapa. Sem este lembrete ninguem descobre que existem. */
+.lnTeclas{font-size:10.5px;color:var(--apagado);margin-top:2px;line-height:1.5}
+.lnTeclas b{display:inline-block;min-width:15px;text-align:center;padding:0 3px;border:1px solid var(--borda-forte);
+  border-radius:3px;color:var(--fraco);font-weight:600;font-size:10px}
 .lnMeusN{color:var(--ouro-claro);font-weight:600}
 /* o ponto do meio do caminho, igual ao do site */
 .lnMeio{position:absolute;transform:translate(-50%,-50%);width:11px;height:11px;border-radius:50%;
@@ -5224,6 +5229,25 @@ function lnRecorteEm(p, lado){
   };
 }
 
+/**
+ * Pular pra próxima (ou anterior) lineup DO MESMO PONTO, sem fechar o clipe.
+ *
+ * Marcar ponto é o único caminho pros 70% de lineups que não dizem de onde saem — e é ele
+ * que tem que fazer isso, uma por uma. Antes, cada uma custava: fechar o clipe, achar a
+ * ficha na tira, abrir, ver, marcar. Com a seta, vira: ver, marcar, seta.
+ */
+function lnIrPara(passo){
+  if (!lnClipe) return;
+  const pino = lnPinos().find(p => p.chave === lnPinoAtivo);
+  // as lineups do ponto aberto; sem ponto aberto, a lista inteira que a busca achou
+  const lista = pino?.lista?.length ? pino.lista : lnAchadas;
+  const i = lista.indexOf(lnClipe);
+  const prox = i >= 0 ? lista[i + passo] : null;
+  if (!prox) return;
+  const j = lnAchadas.indexOf(prox);
+  if (j >= 0) lnVer(j);
+}
+
 function lnMarcar(qual){
   const l = lnClipe; if (!l) return;
   /* Começa no MAPA INTEIRO quando ainda não há ponto desse tipo: de onde se joga pode ser
@@ -5365,7 +5389,8 @@ function lnBotoesDeMarcar(l){
     ${b?.meu
       ? `<button class="acao" onclick="lnEsquecerMeuPonto('alvo')">apagar onde cai</button>`
       : (b?.aproximado || !b) ? `<button class="acao" onclick="lnMarcar('alvo')">🎯 marcar onde cai</button>` : ''}
-  </div>`;
+  </div>
+  <div class="lnTeclas"><b>M</b> de onde sai · <b>N</b> onde cai · <b>←</b> <b>→</b> pula pra próxima daqui</div>`;
 }
 
 /**
@@ -5775,11 +5800,25 @@ for (const b of document.querySelectorAll('#lnLados button')) {
   b.onclick = () => { lnLadoAtual = b.dataset.lado; lnDesenharLados(); lnLinks(); lnProcurarLogo(); };
 }
 document.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape') return;
-  if (!$('#lnModal').hidden) lnFecharSeletor();
-  // marcando, o Esc cancela a marca — fechar o clipe junto seria perder o lugar na lista
-  else if (lnMarcando) lnPararDeMarcar();
-  else if (document.body.classList.contains('lnTelaCheia')) lnFecharClipe();
+  if (e.key === 'Escape') {
+    if (!$('#lnModal').hidden) lnFecharSeletor();
+    // marcando, o Esc cancela a marca — fechar o clipe junto seria perder o lugar na lista
+    else if (lnMarcando) lnPararDeMarcar();
+    else if (document.body.classList.contains('lnTelaCheia')) lnFecharClipe();
+    return;
+  }
+  /* COM O CLIPE ABERTO, as teclas da mão esquerda fazem o trabalho repetitivo: M marca de
+   * onde se joga, N marca onde cai, e as setas pulam pra próxima do mesmo ponto. É o
+   * caminho dos 70% de lineups que não dizem de onde saem, e é ele que marca uma por uma. */
+  if (!document.body.classList.contains('lnTelaCheia')) return;
+  if (e.ctrlKey || e.altKey || e.metaKey) return;
+  // nunca roubar tecla de quem está digitando num campo
+  if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
+  const acao = { m: () => lnMarcar('posicao'), n: () => lnMarcar('alvo'),
+                 ArrowRight: () => lnIrPara(1), ArrowLeft: () => lnIrPara(-1) }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+  if (!acao) return;
+  e.preventDefault();
+  acao();
 });
 
 const CARREGADORES = {
