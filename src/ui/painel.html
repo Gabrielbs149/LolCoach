@@ -5793,6 +5793,8 @@ abrirAba = function(nome){
   abrirAbaOriginal(nome);
   // o vigia do Valorant só roda com a aba aberta: não faz sentido bater no cliente à toa
   if (typeof lnVigiarJogo === 'function') lnVigiarJogo(nome === 'lineups');
+  // o que envelheceu com a aba fechada se atualiza AGORA, que é quando serve pra algo
+  if (velhas.delete(nome)) NO_MINUTO[nome]?.();
   if(CARREGADORES[nome] && !jaCarregou.has(nome)){
     jaCarregou.add(nome);
     Promise.resolve(CARREGADORES[nome]()).catch((e) => {
@@ -5847,7 +5849,34 @@ for(const el of ['#cartoes','#roles','#campeoes','#lista','#tipos','#elos','#mae
 // do ao vivo dentro do painel dobrava a leitura da API do jogo.
 const visivel = () => document.visibilityState === 'visible';
 setInterval(() => { if (visivel()) tick(); }, 2000);
-setInterval(() => { if (visivel()) { carregarVisao(); carregarPartidas(); carregarPadroes(); } }, 60000);
+/* A VARREDURA DE MINUTO SÓ MEXE NA ABA QUE ESTÁ ABERTA.
+ *
+ * Antes ela refazia Perfil, Partidas e Padrões SEMPRE — mesmo com a aba de Lineups
+ * aberta no meio de uma partida. MEDIDO no navegador com os dados dele: 446 ms de
+ * trabalho e 2.062 nós de DOM refeitos, uma vez por minuto, numa tela que ele nem está
+ * olhando. Durante a partida isso é processador tirado do jogo, de graça, e mais quatro
+ * idas à API a cada minuto.
+ *
+ * Agora: a aba aberta atualiza; as outras ficam marcadas como velhas e se atualizam
+ * quando ele abrir — que é o único momento em que a atualização serve pra alguma coisa.
+ */
+const NO_MINUTO = {
+  visao: () => carregarVisao(),
+  partidas: () => carregarPartidas(),
+  estat: () => carregarPadroes(),   // o plano de treino mora dentro da aba de estatísticas
+};
+const velhas = new Set();
+// a aba VISÍVEL, não a `abaAtual`: no detalhe de uma partida a `abaAtual` continua sendo
+// a de origem, que está escondida — atualizar ela seria o mesmo desperdício de antes
+const abaNaTela = () => document.querySelector('main>section.ativo')?.id ?? null;
+setInterval(() => {
+  if (!visivel()) return;
+  const aberta = abaNaTela();
+  for (const aba of Object.keys(NO_MINUTO)) {
+    if (aba === aberta) NO_MINUTO[aba]();
+    else velhas.add(aba);
+  }
+}, 60000);
 document.addEventListener('visibilitychange', () => { if (visivel()) tick(); });
 </script>
 </body>
