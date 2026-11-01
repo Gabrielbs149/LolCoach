@@ -17,6 +17,15 @@ Regras que valem pra toda rodada:
 
 ## Aberto
 
+### 0. Marcar lineup como "confirmei essa" (ideia dele)
+Ele sugeriu usar o Valorant dele pra testar todas as lineups e gravar pela tela. Controlar
+o jogo está FORA: mandar clique/tecla sintética pro Valorant é o que o Vanguard bane, e não
+vale a conta dele. Mas a metade boa da ideia dá: ele treina num jogo personalizado e marca
+a lineup como confirmada — separando "um vídeo disse" de "eu fiz e funcionou". Encaixa nas
+teclas que já existem (M/N/setas, 2.28.274) e usa o mesmo arquivo `meus-pontos.json`.
+Captura de tela é autorizada e já é usada pelo olho do LoL; o que não entra é input.
+
+
 ### 1. Só 30,2% das lineups dizem de onde se joga (era 27,5% ontem)
 Medido no acervo inteiro (8686 lineups): 2623 com ponto de saída. É o teto de tudo que ele
 pediu — enquanto não subir, o mapa não tem o que desenhar.
@@ -60,6 +69,9 @@ marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 ---
 
 ## Feito
+
+- **2.28.279** — o mapa de lineups passou a usar a janela inteira da segunda tela: 760 → 812 px,
+  e parou de encolher quando um ponto é aberto.
 
 - **2.28.278** — os 3 últimos `JSON.parse` sem guarda (o pior deles no diagnóstico, que
   morria justo quando servia) e o laço do Valorant recuando pra 30 s com o jogo fechado.
