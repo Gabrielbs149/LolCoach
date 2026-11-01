@@ -1026,6 +1026,56 @@ test('pontas: seta, parêntese e CT viram lugar; e o alvo não rouba o lugar de 
 
 /* 39,4% das lineups do acervo dele caem num ponto aproximado e 65,4% não dizem de onde se
  * joga. O nome do capítulo é tudo o que existe, então o ponto EXATO só pode vir dele. */
+test('confirmar: "eu fiz essa" sobrevive a busca, e nao se perde ao apagar o ponto', async () => {
+  const { mkdtemp, mkdir } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-confirmar-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    await mkdir(resolve(base, 'dados', 'valorant'), { recursive: true });
+    const L = await import(`../src/valorant/lineups.js?confirmar=${Date.now()}`);
+    const busca = () => ({
+      callouts: [{ nome: 'A Lobby', regiao: 'Lobby', grande: 'A', x: 0.8, y: 0.8 }],
+      lineups: [{ video: 'abc', segundo: 12, nome: 'A Site', ponto: { nome: 'A Site', x: 0.3, y: 0.3, aproximado: true } }],
+    });
+
+    /* Ideia dele: testar as lineups no jogo. Dirigir o Valorant esta fora (tecla ou clique
+     * sintetico e o que o Vanguard bane), mas treinar no personalizado e marcar a que deu
+     * certo e a parte que vale: e a unica informacao do acervo que nao saiu de um video. */
+    assert.equal((await L.comMeusPontos(busca())).lineups[0].confirmei, undefined, 'sem confirmar, nada muda');
+
+    await L.confirmarLineup({ video: 'abc', segundo: 12 });
+    const depois = await L.comMeusPontos(busca());
+    assert.ok(depois.lineups[0].confirmei, 'a confirmacao volta na busca seguinte');
+    assert.equal(await L.quantasConfirmadas(), 1);
+
+    // marcar um ponto na MESMA lineup nao atrapalha a confirmacao
+    await L.marcarPonto({ video: 'abc', segundo: 12, qual: 'posicao', x: 0.5, y: 0.5 });
+    const comPonto = await L.comMeusPontos(busca());
+    assert.ok(comPonto.lineups[0].confirmei, 'marcar ponto nao apaga a confirmacao');
+    assert.equal(comPonto.lineups[0].posicao?.meu, true);
+
+    // e apagar o ponto TAMBEM nao: sao duas coisas diferentes
+    await L.esquecerPonto({ video: 'abc', segundo: 12, qual: 'posicao' });
+    const semPonto = await L.comMeusPontos(busca());
+    assert.ok(semPonto.lineups[0].confirmei, 'apagar o ponto nao leva a confirmacao junto');
+    assert.equal(semPonto.lineups[0].posicao, undefined);
+
+    // nem apagar a lineup inteira do arquivo de pontos
+    await L.marcarPonto({ video: 'abc', segundo: 12, qual: 'alvo', x: 0.2, y: 0.2 });
+    await L.esquecerPonto({ video: 'abc', segundo: 12 });
+    assert.equal(await L.quantasConfirmadas(), 1, 'a confirmacao fica mesmo apagando os dois pontos');
+
+    // e tirar a confirmacao tira so ela
+    await L.confirmarLineup({ video: 'abc', segundo: 12, confirmada: false });
+    assert.equal(await L.quantasConfirmadas(), 0);
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
 test('ponto marcado por ele ganha do que foi deduzido do nome, e sobrevive à busca', async () => {
   const { mkdtemp, mkdir } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');

@@ -585,6 +585,41 @@ export async function marcarPonto({ video, segundo, qual, x, y } = {}) {
   return { ok: true, ponto: pontos[chave] };
 }
 
+/**
+ * "Eu fiz essa e funcionou" — a única informação do acervo que não saiu de um vídeo.
+ *
+ * Ideia dele: usar o Valorant pra testar as lineups de verdade. Controlar o jogo está
+ * fora (mandar clique ou tecla sintética é o que o Vanguard bane, e não vale a conta
+ * dele), mas a metade que importa dá: ele treina no personalizado e marca a que deu
+ * certo. Uma lineup confirmada por ele vale mais que dez de vídeo, e o app não tinha
+ * como saber disso.
+ *
+ * Mora no mesmo arquivo e na mesma chave dos pontos marcados (vídeo + segundo), então
+ * sobrevive a refazer a busca, trocar de lado, subir de formato e limpar o acervo.
+ */
+export async function confirmarLineup({ video, segundo, confirmada = true } = {}) {
+  if (!video) return { erro: 'faltou o vídeo' };
+  const pontos = { ...(await meusPontos()) };
+  const chave = chaveDoPonto(video, segundo);
+  const antes = pontos[chave] ?? {};
+  if (confirmada) {
+    pontos[chave] = { ...antes, confirmei: Date.now() };
+  } else {
+    const { confirmei, ...resto } = antes;
+    // tirar a confirmação não pode levar junto um ponto que ele marcou
+    if (resto.posicao || resto.alvo) pontos[chave] = resto;
+    else delete pontos[chave];
+  }
+  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  pontosDele = pontos;
+  return { ok: true, confirmada: !!pontos[chave]?.confirmei };
+}
+
+/** Quantas ele já confirmou — pro resumo da tela. */
+export async function quantasConfirmadas() {
+  return Object.values(await meusPontos()).filter((p) => p?.confirmei).length;
+}
+
 /** Apaga uma ponta marcada (ou as duas, sem `qual`). */
 export async function esquecerPonto({ video, segundo, qual } = {}) {
   const pontos = { ...(await meusPontos()) };
@@ -593,7 +628,10 @@ export async function esquecerPonto({ video, segundo, qual } = {}) {
   if (qual === 'posicao' || qual === 'alvo') {
     pontos[chave] = { ...pontos[chave] };
     delete pontos[chave][qual];
-    if (!pontos[chave].posicao && !pontos[chave].alvo) delete pontos[chave];
+    // a confirmação ("eu fiz essa") não é ponto: apagar o ponto não pode levá-la junto
+    if (!pontos[chave].posicao && !pontos[chave].alvo && !pontos[chave].confirmei) delete pontos[chave];
+  } else if (pontos[chave].confirmei) {
+    pontos[chave] = { confirmei: pontos[chave].confirmei };
   } else delete pontos[chave];
   await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
   pontosDele = pontos;
@@ -627,7 +665,7 @@ export async function comMeusPontos(r) {
   let mexeu = 0;
   const lineups = r.lineups.map((l) => {
     const meu = pontos[chaveDoPonto(l.video, l.segundo)];
-    if (!meu?.posicao && !meu?.alvo) return l;
+    if (!meu?.posicao && !meu?.alvo && !meu?.confirmei) return l;
     mexeu++;
     const batizar = (p, antes) => ({
       nome: calloutMaisPerto(p, callouts)?.nome ?? antes?.nome ?? 'o ponto que você marcou',
@@ -635,6 +673,8 @@ export async function comMeusPontos(r) {
     });
     return {
       ...l,
+      // "eu fiz essa e funcionou" é a única informação aqui que não saiu de um vídeo
+      confirmei: meu.confirmei ?? null,
       ponto: meu.alvo ? batizar(meu.alvo, l.ponto) : l.ponto,
       posicao: meu.posicao ? batizar(meu.posicao, l.posicao) : l.posicao,
     };

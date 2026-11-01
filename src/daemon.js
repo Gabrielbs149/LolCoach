@@ -2553,6 +2553,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0),
       qual: String(p.qual ?? ''), x: Number(p.x), y: Number(p.y),
     }),
+    /* "Eu fiz essa e funcionou". E unica informacao do acervo que nao saiu de um video. */
+    valConfirmar: (p = {}) => Lineups.confirmarLineup({
+      video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0),
+      confirmada: p.confirmada !== false,
+    }),
     valEsquecerPonto: (p = {}) => Lineups.esquecerPonto({
       video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0), qual: p.qual ? String(p.qual) : null,
     }),
@@ -2602,5 +2607,5 @@ const ACOES_DO_PAINEL = [
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
-  'valMarcarPonto', 'valEsquecerPonto',
+  'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar',
 ];

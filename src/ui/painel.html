@@ -1191,6 +1191,15 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnTeclas b{display:inline-block;min-width:15px;text-align:center;padding:0 3px;border:1px solid var(--borda-forte);
   border-radius:3px;color:var(--fraco);font-weight:600;font-size:10px}
 .lnMeusN{color:var(--ouro-claro);font-weight:600}
+/* CONFIRMADA POR ELE: verde, e nao dourado. O dourado ja quer dizer "isto e seu" (o ponto
+   que ele marcou); confirmar e outra coisa — e a unica informacao do acervo que nao saiu
+   de um video, e merece cor propria. */
+.lnConfirmada{font-size:11.5px;color:var(--vit);align-self:center;font-weight:600}
+.lnConfirmar:hover{border-color:var(--vit);color:var(--vit)}
+.lnConfirmadasN{color:var(--vit);font-weight:600}
+.lnDeMapa.confirmada{border-color:var(--vit);box-shadow:0 0 12px #3ecf8e77}
+.lnChip.confirmada{border-color:#2f6b4e;background:#10201a}
+.lnChip.confirmada:hover{border-color:var(--vit)}
 /* o ponto do meio do caminho, igual ao do site */
 .lnMeio{position:absolute;transform:translate(-50%,-50%);width:11px;height:11px;border-radius:50%;
   background:#ffd93b;box-shadow:0 0 0 2px #0b1016}
@@ -4393,7 +4402,9 @@ function lnQuantas(){
   const conf = certas ? ` · ${certas} de ${LADO_NOME[lnLadoAtual]}` : '';
   // o que ele mesmo marcou: é o único ponto exato que existe, então merece ser contado
   const meusN = lnAchadas.filter(l => l.posicao?.meu || l.ponto?.meu).length;
-  const meus = meusN ? ` · <b class="lnMeusN">${meusN} com ponto seu</b>` : '';
+  const confirmadasN = lnAchadas.filter(l => l.confirmei).length;
+  const meus = (meusN ? ` · <b class="lnMeusN">${meusN} com ponto seu</b>` : '')
+    + (confirmadasN ? ` · <b class="lnConfirmadasN">${confirmadasN} que você fez</b>` : '');
   return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${meus}${semLado}${fora}`;
 }
 
@@ -4599,7 +4610,8 @@ function lnFiltrarEDedupar(){
  * lineup que DIZ ser de defesa e uma que não disse nada, com ele defendendo, a primeira é
  * melhor aposta — mesmo que a outra tenha ponto mais exato.
  */
-const lnNota = (l) => (l.posicao?.meu || l.ponto?.meu ? 16 : 0)     // marcada por ele: é a que ele já conferiu
+const lnNota = (l) => (l.confirmei ? 40 : 0)                        // ele FEZ essa e funcionou: ganha de tudo
+  + (l.posicao?.meu || l.ponto?.meu ? 16 : 0)     // marcada por ele: é a que ele já conferiu
   + (l.lado === lnLadoAtual ? 8 : 0)
   + (l.ponto && !l.ponto.aproximado ? 4 : 0) + (l.posicao ? 2 : 0) + (l.fim > l.segundo ? 1 : 0);
 
@@ -4761,7 +4773,7 @@ function lnDesenharMapa(){
           }).join('')}
         </svg>` : ''}
       ${marcas.map((x, k) => `
-        <button class="lnDeMapa${x.l.lado ? '' : ' semLado'}${x.l.posicao?.meu ? ' meu' : ''}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
+        <button class="lnDeMapa${x.l.lado ? '' : ' semLado'}${x.l.posicao?.meu ? ' meu' : ''}${x.l.confirmei ? ' confirmada' : ''}" data-k="${k}" style="left:${RX(x.dx, x.dy)}%;top:${RY(x.dx, x.dy)}%"
           title="${esc(x.l.nome)} — de ${esc(x.l.posicao.nome)}${x.l.posicao.meu ? ' (ponto que você marcou)' : ''}${x.l.canal ? ` · ${esc(x.l.canal)}` : ''}${x.l.lado ? ` · ${LADO_NOME[x.l.lado]}` : ' · lado não dito'}"
           onclick="event.stopPropagation();lnVer(${x.i})"
           onmouseenter="lnFocarRota(${k})" onmouseleave="lnFocarRota(null)">
@@ -4787,7 +4799,7 @@ function lnDesenharMapa(){
           ? `${semLugarN === semLugar.length ? (semLugarN === 1 ? 'ela não diz' : 'nenhuma diz') : `${semLugarN} não ${semLugarN === 1 ? 'diz' : 'dizem'}`} de onde sai — abre, vê o clipe e marca o ponto: aí passa a aparecer no mapa`
           : 'têm lugar, só não couberam no mapa — abre daqui mesmo'}</small>
         <div class="lnChips">
-          ${semLugar.map(l => `<button class="lnChip${l.posicao ? ' temLugar' : ''}${l.lado ? '' : ' semLado'}" onclick="lnVer(${lnAchadas.indexOf(l)})"
+          ${semLugar.map(l => `<button class="lnChip${l.confirmei ? ' confirmada' : ''}${l.posicao ? ' temLugar' : ''}${l.lado ? '' : ' semLado'}" onclick="lnVer(${lnAchadas.indexOf(l)})"
             title="${esc(l.nome)}${l.canal ? ` · ${esc(l.canal)}` : ''}${l.lado ? ` · ${LADO_NOME[l.lado]}` : ' · lado não dito'}">
             ${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}<span>${esc(lnNomeCurto(l))}</span></button>`).join('')}
         </div>
@@ -5264,6 +5276,29 @@ function lnIrPara(passo){
   if (j >= 0) lnVer(j);
 }
 
+/**
+ * "Eu fiz essa e funcionou" — a única coisa no acervo que não saiu de um vídeo.
+ *
+ * Ideia dele: testar as lineups no jogo de verdade. Dirigir o Valorant está fora (tecla
+ * ou clique sintético é o que o Vanguard bane), mas treinar no personalizado e marcar a
+ * que deu certo não tem nada a ver com isso — e é a parte que vale. Uma lineup que ELE
+ * confirmou vale mais que dez de vídeo, e vai pra frente da fila.
+ */
+async function lnConfirmar(sim){
+  const l = lnClipe; if (!l) return;
+  try {
+    const r = await fetch('/api/val/confirmar', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ video: l.video, segundo: l.segundo, confirmada: !!sim }),
+    }).then(x => x.json());
+    if (r?.erro) return;
+    l.confirmei = r.confirmada ? Date.now() : null;
+  } catch { return; }
+  lnPintarLado(l);
+  lnDesenharMapa();
+  lnPintarResumo();
+}
+
 function lnMarcar(qual){
   const l = lnClipe; if (!l) return;
   /* Começa no MAPA INTEIRO quando ainda não há ponto desse tipo: de onde se joga pode ser
@@ -5406,7 +5441,13 @@ function lnBotoesDeMarcar(l){
       ? `<button class="acao" onclick="lnEsquecerMeuPonto('alvo')">apagar onde cai</button>`
       : (b?.aproximado || !b) ? `<button class="acao" onclick="lnMarcar('alvo')">🎯 marcar onde cai</button>` : ''}
   </div>
-  <div class="lnTeclas"><b>M</b> de onde sai · <b>N</b> onde cai · <b>←</b> <b>→</b> pula pra próxima daqui</div>`;
+  <div class="lnMarcar">
+    ${l.confirmei
+      ? `<span class="lnConfirmada">✔ você fez essa e funcionou</span>
+         <button class="acao" onclick="lnConfirmar(false)">tirar</button>`
+      : `<button class="acao lnConfirmar" onclick="lnConfirmar(true)">✔ fiz essa e funcionou</button>`}
+  </div>
+  <div class="lnTeclas"><b>M</b> de onde sai · <b>N</b> onde cai · <b>C</b> fiz essa · <b>←</b> <b>→</b> pula pra próxima daqui</div>`;
 }
 
 /**
@@ -5830,7 +5871,7 @@ document.addEventListener('keydown', (e) => {
   if (e.ctrlKey || e.altKey || e.metaKey) return;
   // nunca roubar tecla de quem está digitando num campo
   if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
-  const acao = { m: () => lnMarcar('posicao'), n: () => lnMarcar('alvo'),
+  const acao = { m: () => lnMarcar('posicao'), n: () => lnMarcar('alvo'), c: () => lnConfirmar(!lnClipe?.confirmei),
                  ArrowRight: () => lnIrPara(1), ArrowLeft: () => lnIrPara(-1) }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
   if (!acao) return;
   e.preventDefault();
