@@ -30,30 +30,28 @@ saber o lugar de verdade naquele mapa. Próximo passo possível: medir se a arte
 dá pra conferir (o callout mais perto do ponto que o nome sugere), ou aceitar que daqui
 pra frente quem fecha a conta é ele marcando no mapa — que já funciona desde a 2.28.262.
 
-### 2. 22 avisos do corretor de telas
-Classes usadas em markup que não têm regra de CSS nenhuma — cada uma é um elemento que
-aparece sem estilo. Ver uma a uma: ou ganha CSS, ou o markup para de pedir.
-`node scripts/conferir-tela.mjs`
-
-### 3. Passeio automático pelas telas na trava da publicação
+### 2. Passeio automático pelas telas na trava da publicação
 O corretor lê o arquivo, mas não EXECUTA a tela. Falta um teste que abra o painel com
 dados de mentira, passe por todas as abas e falhe se o console reclamar. É o que pegaria
 erro de execução que nenhuma leitura pega.
 
-### 4. O mesmo tratamento em olho.html e vivo.html
+### 3. O mesmo tratamento em olho.html e vivo.html
 O painel levou corretor, limpeza de CSS morto e conferência no navegador. As outras três
 telas só passaram pelo corretor.
 
-### 5. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
+### 4. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
 Hoje o estado do Valorant é lido de 6 em 6 segundos. O cliente local tem websocket, que
 avisa na hora e gasta menos.
 
-### 6. Composição inimiga a partir do `core-game` que já é baixado
+### 5. Composição inimiga a partir do `core-game` que já é baixado
 O dado já vem na resposta e é jogado fora.
 
 ---
 
 ## Feito
+
+- **2.28.268** — corretor de telas de 22 avisos pra 0 (quatro falsos positivos meus + ganchos
+  de JS), e o aviso de @media virou erro quando a regra base vem DEPOIS da do @media.
 
 - **2.28.267** — plural e apelido de lugar: +233 lugares, +50 alvos, 159 alvos que eram
   centro do site viraram exatos. 0 perdidos.
