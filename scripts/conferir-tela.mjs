@@ -161,17 +161,45 @@ function idsCriados(txt) {
 }
 
 /* ── 4. classes: quem é usada e quem tem regra ────────────────────────────────────── */
+/* Nem todo `class="..."` que aparece no arquivo é markup de verdade: o painel explica
+ * muita coisa em comentário, e `<span class="edT">` dentro de um /* ... *​/ virava aviso de
+ * classe sem CSS. Comentário fora antes de procurar. */
+const semComentarios = (txt) => txt
+  .replace(/\/\*[\s\S]*?\*\//g, (c) => c.replace(/[^\n]/g, ' '))
+  .replace(/(^|[^:])\/\/[^\n]*/g, (c, a) => a + ' '.repeat(c.length - a.length));
+
 function classesUsadas(txt) {
   const r = [];
-  for (const m of txt.matchAll(/\bclass\s*=\s*"([^"]*)"/g)) {
+  const prefixos = new Set();
+  for (const m of semComentarios(txt).matchAll(/\bclass\s*=\s*"([^"]*)"/g)) {
     // tira as interpolações, mas aproveita as strings de dentro delas:
     //   class="fala ${v ? 'mudada' : ''}"  →  fala, mudada
     const deDentro = [];
     const corpo = m[1].replace(/\$\{[\s\S]*?\}/g, (pedaco) => {
-      for (const s of pedaco.matchAll(/['"`]([^'"`]*)['"`]/g)) deDentro.push(s[1]);
-      return ' ';
+      /* Mas nem toda string de dentro é nome de classe. Duas que enganavam:
+       *   ${d.chave === 'perfeito' ? 'boa' : ''}  → 'perfeito' é COMPARAÇÃO, só 'boa' é classe
+       *   ${'g' + (e.gravidade ?? 1)}             → 'g' é PEDAÇO de um nome montado na hora
+       * As duas saem antes da varredura; o que sobra é string que vira classe de verdade. */
+      const limpo = pedaco
+        .replace(/[=!]==?\s*['"`][^'"`]*['"`]/g, ' ')
+        .replace(/['"`][^'"`]*['"`]\s*\+|\+\s*['"`][^'"`]*['"`]/g, ' ');
+      for (const s of limpo.matchAll(/['"`]([^'"`]*)['"`]/g)) deDentro.push(s[1]);
+      // marca onde a interpolação estava, pra saber o que ficou COLADO nela
+      return '\u0001';
     });
-    for (const nome of `${corpo} ${deDentro.join(' ')}`.split(/\s+/)) {
+    for (const nome of corpo.split(/\s+/)) {
+      /* `class="fala u${n}"` não usa a classe `.u`: o nome é `u1`, montado na hora, e o
+       * `u` é só o começo dele. Token colado numa interpolação é pedaço, não classe. */
+      if (nome.includes('\u0001')) {
+        // guarda o começo ("u" de `u${prioridade}`): toda classe que comece assim está
+        // em uso, mesmo que o nome inteiro nunca apareça escrito em lugar nenhum
+        const comeco = nome.slice(0, nome.indexOf('\u0001'));
+        if (/^[A-Za-z][\w-]*$/.test(comeco)) prefixos.add(comeco);
+        continue;
+      }
+      if (/^[A-Za-z][\w-]*$/.test(nome)) r.push({ nome, linha: linhaDe(txt, m.index) });
+    }
+    for (const nome of deDentro) {
       if (/^[A-Za-z][\w-]*$/.test(nome)) r.push({ nome, linha: linhaDe(txt, m.index) });
     }
   }
@@ -180,7 +208,25 @@ function classesUsadas(txt) {
       r.push({ nome: s[1], linha: linhaDe(txt, m.index) });
     }
   }
-  return r;
+  return { usadas: r, prefixos: [...prefixos] };
+}
+
+/**
+ * Classe que serve de GANCHO pro JavaScript, não de estilo.
+ *
+ * `<h2 class="soAdmin" hidden>` não tem CSS nenhum e está certo: quem usa essa classe é
+ * o `querySelectorAll('.soAdmin')` que esconde a seção de quem não é admin. Cobrar CSS
+ * dela é barulho, e corretor barulhento é corretor que ninguém lê.
+ */
+function ganchosDeJs(js) {
+  const s = new Set();
+  for (const m of js.matchAll(/(?:querySelector(?:All)?|closest|matches)\(\s*['"`]([^'"`]*)['"`]/g)) {
+    for (const c of m[1].matchAll(/\.([\w-]+)/g)) s.add(c[1]);
+  }
+  for (const m of js.matchAll(/classList\.(?:add|remove|toggle|contains|replace)\(([^)]*)\)/g)) {
+    for (const c of m[1].matchAll(/['"`]([\w-]+)['"`]/g)) s.add(c[1]);
+  }
+  return s;
 }
 
 /** as regras do CSS, uma a uma, já sabendo dentro de qual @media cada uma está */
@@ -257,9 +303,11 @@ export function conferirTela(caminho) {
   for (const r of [...regras, ...regrasDoCss(emprestado)]) {
     for (const m of r.sel.matchAll(/\.([\w-]+)/g)) comRegra.add(m[1]);
   }
+  const ganchos = ganchosDeJs(js);
   const clsDitas = new Set();
-  for (const u of classesUsadas(txt)) {
-    if (comRegra.has(u.nome) || clsDitas.has(u.nome)) continue;
+  const { usadas, prefixos } = classesUsadas(txt);
+  for (const u of usadas) {
+    if (comRegra.has(u.nome) || ganchos.has(u.nome) || clsDitas.has(u.nome)) continue;
     clsDitas.add(u.nome);
     aviso(u.linha, `usa a classe .${u.nome}, que não tem regra de CSS`);
   }
@@ -284,6 +332,9 @@ export function conferirTela(caminho) {
   for (const [c, linha] of doProprioCss) {
     // conservador de propósito: só é morta se o nome não aparece em NENHUM lugar do código
     if (semCss.includes(c) || codigo.includes(c)) continue;
+    // `.u2` nunca aparece escrita: quem a usa é `class="fala u${prioridade}"`. Classe que
+    // começa com um prefixo montado na hora está em uso, e não dá pra saber qual número.
+    if (prefixos.some((p) => c.startsWith(p) && /^\d+$/.test(c.slice(p.length)))) continue;
     aviso(linha, `.${c} tem CSS mas não é usada em lugar nenhum`);
   }
 
@@ -302,12 +353,23 @@ export function conferirTela(caminho) {
           .filter((k) => pb.has(k) && pa.get(k) !== pb.get(k) && !PROP_INOFENSIVA.has(k));
         if (!briga.length) continue;
         const mesmoLugar = lista[a].dentro === lista[b].dentro;
-        const msg = `${sel} aparece 2x (linhas ${lista[a].linha} e ${lista[b].linha}), `
-          + `brigando por ${briga.join(', ')}`
-          + (mesmoLugar
-            ? ' — quem ganha é a ORDEM do arquivo'
-            : ` — uma delas está em ${lista[b].dentro || lista[a].dentro}`);
-        (mesmoLugar ? erros : avisos).push(`${arq}:${lista[b].linha} ${msg}`);
+        if (mesmoLugar) {
+          erros.push(`${arq}:${lista[b].linha} ${sel} aparece 2x (linhas ${lista[a].linha} e `
+            + `${lista[b].linha}), brigando por ${briga.join(', ')} — quem ganha é a ORDEM do arquivo`);
+          continue;
+        }
+        /* Uma dentro de @media e outra fora é como se escreve CSS que responde ao tamanho
+         * da janela — desde que a regra BASE venha ANTES. Vindo depois, com a mesma força
+         * de seletor, ela ganha sempre e o @media nunca vale nada. Foi exatamente isso com
+         * o `.lnMini`: a regra base vinha depois e o mapa ficava com 619 px numa janela
+         * onde o @media mandava 168. Silencioso, porque o @media *existe*, só não manda. */
+        const base = lista[a].dentro ? lista[b] : lista[a];
+        const noMedia = lista[a].dentro ? lista[a] : lista[b];
+        if (base.linha > noMedia.linha) {
+          erros.push(`${arq}:${base.linha} ${sel} tem regra base na linha ${base.linha}, DEPOIS da `
+            + `de ${noMedia.dentro} (linha ${noMedia.linha}) e com a mesma força: o @media nunca `
+            + `vale pra ${briga.join(', ')}`);
+        }
       }
     }
   }
