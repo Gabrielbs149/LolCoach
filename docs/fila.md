@@ -61,6 +61,10 @@ marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 ## Feito
 
+- **2.28.276** — o laço do Valorant parou de perguntar o que já sabia: ordem dos endpoints
+  pelo estado (~800 pedidos a menos por partida), região/shard guardados, e recuo de 5 min
+  quando a versão do cliente não responde.
+
 - **2.28.275** — o corretor ganhou id repetido (e achou um real: `#evolucao` duas vezes,
   mandando a tabela de temporadas pra aba errada), o passeio ganhou o modo `lento`, e
   agora existe um teste que prova que cada verificação do corretor dispara mesmo.
