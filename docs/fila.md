@@ -30,25 +30,24 @@ saber o lugar de verdade naquele mapa. Próximo passo possível: medir se a arte
 dá pra conferir (o callout mais perto do ponto que o nome sugere), ou aceitar que daqui
 pra frente quem fecha a conta é ele marcando no mapa — que já funciona desde a 2.28.262.
 
-### 2. Passeio automático pelas telas na trava da publicação
-O corretor lê o arquivo, mas não EXECUTA a tela. Falta um teste que abra o painel com
-dados de mentira, passe por todas as abas e falhe se o console reclamar. É o que pegaria
-erro de execução que nenhuma leitura pega.
-
-### 3. O mesmo tratamento em olho.html e vivo.html
+### 2. O mesmo tratamento em olho.html e vivo.html
 O painel levou corretor, limpeza de CSS morto e conferência no navegador. As outras três
 telas só passaram pelo corretor.
 
-### 4. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
+### 3. Trocar a espiada de 6 s no Valorant pelo websocket do cliente local
 Hoje o estado do Valorant é lido de 6 em 6 segundos. O cliente local tem websocket, que
 avisa na hora e gasta menos.
 
-### 5. Composição inimiga a partir do `core-game` que já é baixado
+### 4. Composição inimiga a partir do `core-game` que já é baixado
 O dado já vem na resposta e é jogado fora.
 
 ---
 
 ## Feito
+
+- **2.28.269** — passeio automático pelas telas (janela oculta do Electron, API respondendo
+  erro) na trava 4 da publicação; achou 5 telas que quebravam sem rede + o `x.fmt` das
+  Estatísticas, que escondia a tabela do elo e as tendências desde sempre.
 
 - **2.28.268** — corretor de telas de 22 avisos pra 0 (quatro falsos positivos meus + ganchos
   de JS), e o aviso de @media virou erro quando a regra base vem DEPOIS da do @media.
