@@ -749,6 +749,59 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
 
 /* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
  * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('corretor de telas: cada verificacao dispara mesmo, numa tela quebrada de proposito', async () => {
+  const { conferirTela } = await import('../scripts/conferir-tela.mjs');
+  const { writeFileSync, rmSync } = await import('node:fs');
+  const { join } = await import('node:path');
+  const { tmpdir } = await import('node:os');
+
+  /* POR QUE ISTO EXISTE: ao acrescentar a verificação de id repetido, ela nasceu como um
+   * NO-OP — um caractere invisível entrou na expressão e ela nunca casava nada. O corretor
+   * continuou dizendo "0 erros" com a maior cara de quem trabalhou, e eu só descobri porque
+   * fui conferir contra uma tela quebrada de propósito.
+   *
+   * Corretor que ninguém confere apodrece calado — e este aqui é a trava 3 da publicação.
+   * Então fica a tela quebrada, com um defeito de cada tipo, e a garantia de que cada um
+   * deles continua sendo achado.
+   *
+   * O nome da classe morta é montado na hora, com o número do processo: o corretor procura
+   * uso no PROJETO INTEIRO, e este arquivo de teste é parte do projeto — escrito por
+   * extenso aqui, o nome se acharia usado por si mesmo e a verificação passaria à toa. */
+  const morta = `zzMorta${process.pid}`;
+  const arq = join(tmpdir(), `lolcoach-tela-quebrada-${process.pid}.html`);
+  writeFileSync(arq, [
+    '<!doctype html><html><head><style>',
+    '.zzViva{color:red}',
+    '.zzViva{color:blue}',
+    `.${morta}{color:green}`,
+    '</style></head><body>',
+    '<div id="zzRepetido"></div>',
+    '<div id="zzRepetido"></div>',
+    '<div class="zzViva zzSemRegra"></div>',
+    '<button onclick="zzNaoExiste()">x</button>',
+    '<script>',
+    'function zzOutra(){ }',
+    "const a = document.querySelector('#zzNuncaCriado');",
+    "document.body.style.color = 'var(--zz-nao-definida)';",
+    `</${'script'}>`,
+    '</body></html>',
+  ].join('\n'), 'utf8');
+
+  try {
+    const { erros, avisos } = conferirTela(arq);
+    const tem = (lista, pedaco) => lista.some((x) => x.includes(pedaco));
+    assert.ok(tem(erros, 'zzNaoExiste()'), 'handler órfão');
+    assert.ok(tem(erros, '#zzNuncaCriado'), 'id procurado que ninguém cria');
+    assert.ok(tem(erros, '.zzViva aparece 2x'), 'duas regras brigando pela ordem do arquivo');
+    assert.ok(tem(erros, 'id "zzRepetido" aparece 2x'), 'id repetido na mesma tela');
+    assert.ok(tem(erros, '--zz-nao-definida'), 'variável de CSS que ninguém define');
+    assert.ok(tem(avisos, '.zzSemRegra'), 'classe usada sem regra de CSS');
+    assert.ok(tem(avisos, `.${morta}`), 'regra de CSS que ninguém usa');
+  } finally {
+    rmSync(arq, { force: true });
+  }
+});
+
 test('registro: guarda contra enchente segura a repetida sem apagar informacao', async () => {
   const { guardaDeEnchente } = await import('../src/dados/sem-enchente.js');
   const g = guardaDeEnchente({ limite: 3, janela: 10 * 60 * 1000 });

@@ -374,6 +374,17 @@ export function conferirTela(caminho) {
     }
   }
 
+  /* O MESMO id DUAS VEZES na mesma tela. `$('#x')` devolve o PRIMEIRO e ignora o outro:
+     metade do que a tela escreve ali some, sem erro nenhum no console. */
+  const idVisto = new Map();
+  for (const m of txt.matchAll(/\bid\s*=\s*"([^"${}]+)"/g)) {
+    const linha = linhaDe(txt, m.index);
+    if (idVisto.has(m[1])) {
+      erro(linha, `id "${m[1]}" aparece 2x (linhas ${idVisto.get(m[1])} e ${linha}) — `
+        + `$('#${m[1]}') pega só o primeiro e o outro fica morto`);
+    } else idVisto.set(m[1], linha);
+  }
+
   /* var(--x) que ninguém define: a declaração inteira morre e o valor volta pro inicial —
      borda que era arredondada vira quadrada, cor clara vira a cor herdada, e ninguém vê */
   const definidas = new Set();

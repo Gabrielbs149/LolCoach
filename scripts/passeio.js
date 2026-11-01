@@ -69,7 +69,14 @@ const ESTADO = {
 const RESPOSTAS = {
   erro: () => ({ erro: 'sem rede (passeio de teste)' }),
   vazio: () => ({}),
+  /* LENTO: a resposta chega, mas tarde e fora de ordem. É o cenário que nenhuma das duas
+   * de cima testa, e é de onde vem o erro intermitente — aquele que ele nunca consegue
+   * descrever direito. Pedido disparado numa aba, ele troca de aba antes de chegar, a
+   * resposta volta e escreve numa tela que não existe mais. Com a internet dele rápida
+   * isso é raro; com a Riot lerda no horário de pico, não é. */
+  lento: () => ({}),
 };
+const ATRASO = { erro: 0, vazio: 0, lento: () => 80 + Math.random() * 900 };
 let modo = 'erro';
 
 // 1x1 transparente: as telas pedem muita imagem e o que importa aqui não é a arte
@@ -94,8 +101,13 @@ function servidor() {
     }
     if (caminho.startsWith('/api/')) {
       const corpo = caminho === '/api/estado' ? ESTADO : RESPOSTAS[modo]();
-      res.writeHead(200, { 'content-type': 'application/json' });
-      return res.end(JSON.stringify(corpo));
+      const espera = typeof ATRASO[modo] === 'function' ? ATRASO[modo]() : 0;
+      const responder = () => {
+        res.writeHead(200, { 'content-type': 'application/json' });
+        res.end(JSON.stringify(corpo));
+      };
+      if (espera) setTimeout(responder, espera); else responder();
+      return;
     }
     res.writeHead(200, { 'content-type': 'image/png' });
     return res.end(PNG);
@@ -168,8 +180,12 @@ app.whenReady().then(async () => {
           `(() => { try { abrirAba(${JSON.stringify(aba)}); return 'ok'; }
                     catch (e) { console.error('abrirAba estourou: ' + (e && e.message || e)); return 'erro'; } })()`,
         );
-        await esperar(700);
+        // no modo lento a troca é RÁPIDA de propósito: sai da aba antes da resposta chegar
+        await esperar(modo === 'lento' ? 180 : 700);
       }
+      /* E então espera as respostas atrasadas caírem numa tela que já mudou. É aqui que
+       * aparece quem escreve em elemento que não existe mais. */
+      if (modo === 'lento') await esperar(2500);
 
       /* O que só nasce com clique. Uma tela que abre e uma tela que não abre não é o
        * mesmo teste: metade do código de desenho está atrás de um clique. */
