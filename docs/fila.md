@@ -40,12 +40,20 @@ websocket como caminho rápido, nunca trocar um pelo outro.
 **Depende do Valorant aberto pra conferir.** O dado já vem na resposta e é jogado fora.
 
 ### 4. Varrer o registro do app atrás de mais padrão
-A primeira varredura achou que 43% do registro era uma falha só (virou a 2.28.271). Vale
-repetir de tempos em tempos: é o único lugar com dado do uso REAL dele.
+Duas varreduras feitas (2.28.271 e 2.28.272): juntas tiraram 85% do registro, que eram
+duas mensagens de uma release quebrada. **O que sobrou no topo agora é diagnóstico do
+olho** — ~917 linhas de "olho: vistos N/N · aliados N/N · …" e 123 de "minimapa não
+achado". Não é bug, é diagnóstico detalhado demais pro registro permanente. Avaliar se
+vale só com o modo edição ligado, ou resumido por partida em vez de por leitura.
+Vale repetir a varredura de tempos em tempos: é o único lugar com dado do uso REAL dele.
 
 ---
 
 ## Feito
+
+- **2.28.272** — guarda contra enchente no registro (limite por mensagem, não por linha
+  repetida seguida — elas se alternavam). Medido no registro real: 79% a menos de linha,
+  4,8× mais história nos mesmos 2 MB.
 
 - **2.28.271** — a atualização parou de bater no GitHub em rajada: uma corrente só, espera
   que dobra até 30 min, e a mesma falha virando contagem. Achado no registro dele, onde
