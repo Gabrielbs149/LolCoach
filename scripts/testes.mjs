@@ -749,6 +749,37 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
 
 /* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
  * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('tentar de novo: uma corrente so, espera que dobra, e registro que da pra ler', async () => {
+  const { quandoTentarDeNovo } = await import('../src/dados/tentar-de-novo.js');
+  const q = quandoTentarDeNovo({ minimo: 2, maximo: 16, avisarACada: 3 });
+
+  /* O estrago que isto conserta foi MEDIDO no registro dele: a release v2.28.219 subiu
+   * sem o `latest.yml`, e como cada falha agendava uma tentativa nova SEM cancelar a
+   * anterior, as correntes se acumulavam — 36 pedidos por minuto ao GitHub, de 2 em 2
+   * minutos, por 43 horas. 8.957 linhas de uma falha só, 43% do registro inteiro. */
+
+  // a espera DOBRA a cada falha, até o teto, e não passa dele
+  assert.deepEqual([2, 4, 8, 16, 16, 16].map(() => q.falhou('404').espera), [2, 4, 8, 16, 16, 16]);
+
+  // deu certo uma vez: a próxima falha volta a esperar pouco
+  q.deuCerto();
+  assert.equal(q.falhou('404').espera, 2);
+
+  // a MESMA falha não vira linha nova no registro toda vez; vira contagem
+  const q2 = quandoTentarDeNovo({ minimo: 2, maximo: 16, avisarACada: 3 });
+  const avisos = ['404', '404', '404', '404', '404', '404'].map((f) => q2.falhou(f));
+  assert.deepEqual(avisos.map((a) => a.avisar), [true, false, true, false, false, true]);
+  assert.deepEqual(avisos.map((a) => a.repetidas), [1, 2, 3, 4, 5, 6]);
+
+  // falha DIFERENTE sempre aparece, e reinicia a contagem
+  const q3 = quandoTentarDeNovo({ minimo: 2, maximo: 16, avisarACada: 3 });
+  q3.falhou('404'); q3.falhou('404');
+  const outra = q3.falhou('sem rede');
+  assert.equal(outra.avisar, true);
+  assert.equal(outra.mesma, false);
+  assert.equal(outra.repetidas, 1);
+});
+
 test('ponto: plural nao separa, e apelido so vale se o nome oficial existe no mapa', async () => {
   const { pontoDaLineup } = await import('../src/valorant/lineups.js');
   const ascent = [

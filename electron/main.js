@@ -8,6 +8,7 @@ import electronUpdater from 'electron-updater';
 import { iniciarDaemon } from '../src/daemon.js';
 import { criarServidor, criarEstado } from '../src/ui/servidor.js';
 import { situacaoDoValorant } from '../src/valorant/jogo.js';
+import { quandoTentarDeNovo } from '../src/dados/tentar-de-novo.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 // Notificação do Windows só fora de partida e de seleção — nada de roubar
@@ -168,8 +169,37 @@ function ligarAtualizacao() {
       setTimeout(() => autoUpdater.quitAndInstall(true, true), 1500);
     }, 30_000);
   });
-  // Erro (GitHub fora, latest.yml ainda subindo logo depois de publicar): tenta de novo em 2 min, sem esperar os 5
-  autoUpdater.on('error', (e) => { const msg = String(e?.message ?? e).split(/\r?\n/)[0].slice(0, 160); estado.log(`atualização: ${msg} — tento de novo em 2 min`); setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 2 * 60 * 1000); });
+  /* ERRO AO PROCURAR ATUALIZAÇÃO — e a lição que o registro dele deu.
+   *
+   * Antes, cada erro agendava uma nova tentativa em 2 min. Só que o agendamento ANTERIOR
+   * continuava de pé, e a busca de 5 em 5 min seguia criando correntes novas. As correntes
+   * se acumulavam: cada uma se renovava sozinha pra sempre, nenhuma morria.
+   *
+   * MEDIDO no registro dele: a release v2.28.219, de 15/10, subiu sem o `latest.yml`. A
+   * partir dali o app passou a bater no GitHub 36 VEZES POR MINUTO, de 2 em 2 minutos,
+   * por 43 HORAS seguidas — 8.957 linhas de uma falha só, 43% do registro inteiro. Trinta
+   * e seis correntes vivas ao mesmo tempo. Isso gasta rede dele no meio da partida e ainda
+   * arrisca tomar limite de requisição do GitHub, que faria a atualização parar de vez.
+   *
+   * Agora: UMA corrente só (a anterior é cancelada), espera que DOBRA a cada falha até 30
+   * min, e volta pros 2 min assim que der certo. E a mesma falha repetida não vira linha
+   * nova no registro — vira contagem, pra o registro continuar legível.
+   */
+  const quando = quandoTentarDeNovo();
+  let relogioRetento = null;
+  autoUpdater.on('update-available', () => quando.deuCerto());
+  autoUpdater.on('update-not-available', () => quando.deuCerto());
+  autoUpdater.on('error', (e) => {
+    const msg = String(e?.message ?? e).split(/\r?\n/)[0].slice(0, 160);
+    const { espera, repetidas, avisar, mesma } = quando.falhou(msg);
+    if (avisar) {
+      estado.log(mesma
+        ? `atualização: a mesma falha pela ${repetidas}ª vez — esperando ${Math.round(espera / 60000)} min`
+        : `atualização: ${msg} — tento de novo em ${Math.round(espera / 60000)} min`);
+    }
+    clearTimeout(relogioRetento);     // a corrente é UMA; sem isto elas se multiplicam
+    relogioRetento = setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), espera);
+  });
   autoUpdater.checkForUpdates().catch(() => {});
   // Ninguém fica em versão velha: procura de 5 em 5 min (é um GET pequeno no latest.yml) e sempre que uma
   // partida termina; o que baixou instala sozinho no primeiro momento tranquilo (None/Lobby/EndOfGame).
