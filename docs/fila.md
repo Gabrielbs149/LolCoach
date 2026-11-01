@@ -61,6 +61,10 @@ marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 ## Feito
 
+- **2.28.277** — a trava da instalação passou a ver a fila do Valorant (o `partyState`, que
+  o `sessionLoopState` não conta), e o estado lido fica guardado em `estado.valorant`.
+  Achado porque a MINHA conferência lia um campo inexistente a noite toda.
+
 - **2.28.276** — o laço do Valorant parou de perguntar o que já sabia: ordem dos endpoints
   pelo estado (~800 pedidos a menos por partida), região/shard guardados, e recuo de 5 min
   quando a versão do cliente não responde.
