@@ -17,15 +17,18 @@ Regras que valem pra toda rodada:
 
 ## Aberto
 
-### 1. Só 28,5% das lineups dizem de onde se joga (era 27,5%)
-Medido no acervo inteiro (8686 lineups): 2472 com ponto de saída. O resto só diz onde
-cai. É o teto de tudo que ele pediu — enquanto for 28%, o mapa não tem o que desenhar.
+### 1. Só 30,2% das lineups dizem de onde se joga (era 27,5% ontem)
+Medido no acervo inteiro (8686 lineups): 2623 com ponto de saída. É o teto de tudo que ele
+pediu — enquanto não subir, o mapa não tem o que desenhar.
 Já lidos: `X from Y`, `X → Y`, `X (de Y)`, `CT`/`T spawn`, carimbo de canal, `from Spawn`
-pelo lado. **O que sobra é mais difícil**: das 6214 sem lugar, ~5300 nem se partem (o
-nome não cita dois lugares), e das que se partem a metade do lugar é gíria que o catálogo
-da Riot não conhece — "Heaven" (o oficial é "A Rafters" no Ascent), "Cat" (é "Mid
-Catwalk"), "Backsite", "Lab", "Market". O caminho é um dicionário de gíria POR MAPA,
-construído dos dados e medido um a um. Mexer só com medida de ganho e de estrago.
+pelo lado, plural, e os apelidos heaven/cat/backsite/showers/defender side.
+**O que sobra é mais difícil**: das ~6060 sem lugar, ~5300 nem se partem (o nome não cita
+dois lugares, e aí não há o que ler). Das que se partem, o que falha agora é gíria de UM
+mapa só — "Lab" e "Market" no Bind, "A Yellow" no Breeze, "B Lane", "Tiles" no Ascent,
+"B Hookah" no Bind, "B Quad" no Sunset. Cada uma vale 4 a 12 lineups, e cada uma exige
+saber o lugar de verdade naquele mapa. Próximo passo possível: medir se a arte do mapa
+dá pra conferir (o callout mais perto do ponto que o nome sugere), ou aceitar que daqui
+pra frente quem fecha a conta é ele marcando no mapa — que já funciona desde a 2.28.262.
 
 ### 2. 22 avisos do corretor de telas
 Classes usadas em markup que não têm regra de CSS nenhuma — cada uma é um elemento que
@@ -51,6 +54,9 @@ O dado já vem na resposta e é jogado fora.
 ---
 
 ## Feito
+
+- **2.28.267** — plural e apelido de lugar: +233 lugares, +50 alvos, 159 alvos que eram
+  centro do site viraram exatos. 0 perdidos.
 
 - **2.28.266** — +82 lugares lidos do nome (carimbo de canal, `from Spawn` pelo lado),
   0 perdidos. Acervo no formato 8.
