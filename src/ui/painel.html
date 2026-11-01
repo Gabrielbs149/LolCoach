@@ -979,7 +979,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    LARGURA, ja descontando a altura disponivel pela proporcao do recorte (--ar). */
 /* Sem lista nenhuma na tela, o mapa manda sozinho: largura toda e altura até onde a
    janela deixa. Quem escolhe é o mapa — foi o que ele pediu desde o começo. */
-.lnDuplo .lnMapa{max-width:min(760px, calc((100vh - 210px) * var(--ar, 1)))}
+.lnDuplo .lnMapa{max-width:min(760px, calc(var(--lnAlt, calc(100vh - 210px)) * var(--ar, 1)))}
 
  /* sem aspect-ratio fixo: a proporcao agora vem do recorte, inline, por mapa */
 .lnMapa{position:relative;width:100%;max-width:640px;margin:0 auto;overflow:hidden;
@@ -1058,13 +1058,23 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   border-radius:10px;background:#0e131bcc}
 .lnSemLugar b{display:block;font-size:12px;color:var(--fraco)}
 .lnSemLugar small{display:block;font-size:11px;color:#6b7280;margin-top:1px}
-.lnChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px}
+.lnChips{display:flex;flex-wrap:wrap;gap:6px;margin-top:7px;max-height:148px;overflow:auto}
+/* Com um ponto aberto, a tira vai pro LADO do mapa em vez de embaixo. Empilhada, ela
+   roubava 212 px de altura e o mapa caía de 740 pra 476 px — e numa janela de 1500 px
+   sobrava largura à toa dos dois lados. Abaixo de 1100 px não cabe, aí volta a empilhar. */
+.lnMapaCx.comTira{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px;align-items:start}
+.lnMapaCx.comTira .lnSemLugar{margin:0;display:flex;flex-direction:column;max-height:var(--lnAlt,520px)}
+.lnMapaCx.comTira .lnChips{max-height:none;flex:1 1 auto;min-height:0}
+@media (max-width:1099px){.lnMapaCx.comTira{grid-template-columns:minmax(0,1fr)}}
 .lnChip{display:flex;align-items:center;gap:5px;max-width:230px;padding:4px 9px 4px 5px;border-radius:999px;
   border:1px solid var(--borda);background:#11161f;color:var(--texto);cursor:pointer;font-family:inherit;font-size:11.5px}
 .lnChip img{width:16px;height:16px;object-fit:contain;filter:brightness(1.3)}
 .lnChip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lnChip:hover{border-color:#49d6c0;background:#16202b}
 .lnChip.semLado{border-style:dashed;border-color:#7a8495}
+/* tem lugar, so nao coube no mapa: fica com o tom do mapa pra nao parecer falta de dado */
+.lnChip.temLugar{border-color:#2d6a62;background:#101b1e}
+.lnChip.temLugar:hover{border-color:#49d6c0}
 .lnDeNome{position:absolute;top:32px;left:50%;transform:translateX(-50%);white-space:nowrap;
   font-size:9.5px;font-weight:600;color:#fff;text-shadow:0 1px 3px #000,0 0 3px #000;opacity:0;pointer-events:none}
 .lnDeMapa:hover .lnDeNome{opacity:1}
@@ -4606,10 +4616,23 @@ function lnDesenharMapa(){
    * vão pra uma tira embaixo do mapa, que diz com todas as letras que o vídeo não falou de
    * onde sai — e que é de lá que ele marca, se quiser trazer pro mapa.
    */
+  /* O CORTE DE 12 ERA ANTES DE SABER QUEM TEM LUGAR — e era isso que fazia o mapa
+   * parecer sorteado. O pino do A Site dizia 35, e o corte pegava 12 variadas por canal;
+   * dessas 12, UMA tinha lugar. Resultado na tela: um retrato só, onze fichas na tira, e
+   * 23 lineups que o pino prometeu e que não apareciam em lugar NENHUM.
+   *
+   * Invertido: o corte agora é só das que vão virar RETRATO NO MAPA, que é onde cabe
+   * pouca coisa. As que têm lugar concorrem entre si (as 12 melhores, variadas por canal)
+   * e TODO o resto vai pra tira — nada do que o pino conta some da tela. Na mesma ponta
+   * isso sai de 1 retrato pra até 12, e de 12 lineups alcançáveis pras 35 que ele contou.
+   */
   const rec = lnJanelaDoMapa();
-  const escolhidas = aberto ? lnVariadas(aberto.lista ?? [], 12) : [];
-  const comLugar = escolhidas.filter(l => l.posicao);
-  const semLugar = escolhidas.filter(l => !l.posicao);
+  const todasDaPonta = aberto?.lista ?? [];
+  const comLugar = lnVariadas(todasDaPonta.filter(l => l.posicao), LN_NO_MAPA);
+  const semLugar = todasDaPonta.filter(l => !comLugar.includes(l))
+    // as que têm lugar e só não couberam vêm primeiro: estão a um zoom de virar retrato
+    .sort((a, b) => (b.posicao ? 1 : 0) - (a.posicao ? 1 : 0) || lnNota(b) - lnNota(a));
+  const semLugarN = semLugar.filter(l => !l.posicao).length;
   const marcas = aberto ? lnDesempilhar(
     comLugar.map((l) => ({ l, lugar: true, i: lnAchadas.indexOf(l), de: { x: l.posicao.x, y: l.posicao.y } })),
     { x: aberto.dx, y: aberto.dy },
@@ -4633,6 +4656,9 @@ function lnDesenharMapa(){
   const cy = (giro === 90 || giro === 270) ? rec.lx : rec.ly;
   const deitado = giro === 90 || giro === 270;
 
+  // com tira, a caixa vira duas colunas: mapa grande na esquerda, as outras lineups
+  // daquela ponta na direita. Empilhado, o mapa tinha que encolher pra caber as duas.
+  $('#lnMapaCx').classList.toggle('comTira', !!(aberto && semLugar.length));
   $('#lnMapaCx').innerHTML = `
     <div class="lnMapa ${aberto ? 'comLeque' : ''}" style="aspect-ratio:${(cx / cy).toFixed(4)};--ar:${(cx / cy).toFixed(4)}">
       <div class="lnGiro" style="--g:${giro}deg;width:${deitado ? ((rec.lx / rec.ly) * 100).toFixed(2) : '100'}%;height:${deitado ? ((rec.ly / rec.lx) * 100).toFixed(2) : '100'}%">
@@ -4674,16 +4700,51 @@ function lnDesenharMapa(){
     </div>
     ${aberto && semLugar.length ? `
       <div class="lnSemLugar">
-        <b>${semLugar.length === 1 ? 'esta não diz' : `estas ${semLugar.length} não dizem`} de onde sai</b>
-        <small>o vídeo só falou onde cai — abre, vê o clipe e marca o ponto: aí ela passa a aparecer no mapa</small>
+        <b>${semLugar.length === 1 ? 'mais uma' : `mais ${semLugar.length}`} nesta ponta</b>
+        <small>${semLugarN
+          ? `${semLugarN === semLugar.length ? (semLugarN === 1 ? 'ela não diz' : 'nenhuma diz') : `${semLugarN} não ${semLugarN === 1 ? 'diz' : 'dizem'}`} de onde sai — abre, vê o clipe e marca o ponto: aí passa a aparecer no mapa`
+          : 'têm lugar, só não couberam no mapa — abre daqui mesmo'}</small>
         <div class="lnChips">
-          ${semLugar.map(l => `<button class="lnChip${l.lado ? '' : ' semLado'}" onclick="lnVer(${lnAchadas.indexOf(l)})"
+          ${semLugar.map(l => `<button class="lnChip${l.posicao ? ' temLugar' : ''}${l.lado ? '' : ' semLado'}" onclick="lnVer(${lnAchadas.indexOf(l)})"
             title="${esc(l.nome)}${l.canal ? ` · ${esc(l.canal)}` : ''}${l.lado ? ` · ${LADO_NOME[l.lado]}` : ' · lado não dito'}">
             ${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}<span>${esc(lnNomeCurto(l))}</span></button>`).join('')}
         </div>
       </div>` : ''}
     `;
+  lnCaberNaTela();
 }
+
+/**
+ * O mapa cabe na janela DESCONTANDO o que está em volta — e isso é medido, não chutado.
+ *
+ * O teto era `100vh - 210px`, um número escrito à mão pro que vem acima do mapa. Só que o
+ * que vem acima mede 245 px, e quando um ponto está aberto ainda aparece a tira embaixo
+ * com as outras lineups daquela ponta. Resultado: o mapa passava do pé da janela e a tira
+ * nascia na linha 995 de uma janela de 950 — ele clicava num ponto de 35 lineups e não
+ * via lista nenhuma, porque ela estava fora da tela. (Rolava, mas quem adivinha?)
+ *
+ * Agora a sobra é medida: o topo real do mapa dentro do que rola, mais a altura real da
+ * tira. O que sobra vira a altura do mapa, e a tira fica sempre visível.
+ */
+function lnCaberNaTela(){
+  const cx = $('#lnMapaCx'), mapa = cx?.querySelector('.lnMapa'), rolo = $('main');
+  if (!cx || !mapa || !rolo) return;
+  const acima = mapa.getBoundingClientRect().top - rolo.getBoundingClientRect().top + rolo.scrollTop;
+  // a tira só desconta altura quando está EMBAIXO; ao lado do mapa ela não tira nada
+  const tira = cx.classList.contains('comTira') && innerWidth < LN_LADO_A_LADO
+    ? cx.querySelector('.lnSemLugar') : null;
+  const abaixo = (tira?.getBoundingClientRect().height ?? 0) + 18;
+  // 260 px de piso: numa janela baixa é melhor rolar um pouco do que ter mapa de selo
+  cx.style.setProperty('--lnAlt', `${Math.max(260, Math.round(rolo.clientHeight - acima - abaixo))}px`);
+}
+
+// mudou o tamanho da janela, a conta muda junto. Espera parar de arrastar pra não refazer
+// a conta sessenta vezes por segundo enquanto ele puxa a borda.
+let lnRelogioTamanho = null;
+addEventListener('resize', () => {
+  clearTimeout(lnRelogioTamanho);
+  lnRelogioTamanho = setTimeout(lnCaberNaTela, 120);
+});
 
 /**
  * Clicar no ponto onde a habilidade CAI abre as lineups dali, uma por marcador, ligadas
@@ -4715,6 +4776,11 @@ function lnDesenharMapa(){
  * Agora o número é fração da LARGURA da janela do mapa, e `longe()` converte na hora. */
 const LN_LONGE = 0.090;        // retratos do leque, que têm 30 px
 const LN_LONGE_PINO = 0.078;   // pinos, que têm 26 px
+// Quantos RETRATOS cabem no mapa antes de virar bolo. Este número é só do mapa: o que
+// passar disso vai pra tira, não some da tela.
+const LN_NO_MAPA = 12;
+// abaixo disto a tira nao cabe ao lado do mapa e volta pra baixo (igual ao @media)
+const LN_LADO_A_LADO = 1100;
 const longe = (f) => Math.max(0.015, lnLarguraCrua() * f);
 
 /**
