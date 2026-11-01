@@ -34,6 +34,17 @@ const ABAS = [
   'meta', 'builds', 'patch', 'lineups', 'admin', 'config',
 ];
 
+/* As QUATRO telas do app, não só o painel. As três de baixo são as que ficam abertas
+ * DURANTE a partida — a janela ao vivo, o olho do minimapa e o overlay — e é justamente
+ * aí que um erro é pior: ele não tem como ver o console no meio de um jogo, e a tela
+ * simplesmente para de atualizar. */
+const TELAS_VISITADAS = [
+  { arquivo: 'painel.html', abas: ABAS },
+  { arquivo: 'vivo.html' },
+  { arquivo: 'olho.html' },
+  { arquivo: 'overlay.html', espera: 1200 },
+];
+
 /* ── a API falsa ─────────────────────────────────────────────────────────────────── */
 // O estado é o único que precisa ser plausível: é dele que a tela tira versão, fase do
 // jogo e se é admin. `admin: true` de propósito, pra o passeio também entrar no Admin.
@@ -45,7 +56,21 @@ const ESTADO = {
   registro: [],
   contas: [],
 };
-const RUIM = { erro: 'sem rede (passeio de teste)' };
+/* DUAS formas de resposta ruim, porque elas passam por caminhos DIFERENTES do código.
+ *
+ *  - `erro`: `{erro: ...}`, que é o que a app recebe quando a Riot cai ou a chave vence.
+ *    Quem testa `if (r?.erro)` escapa; quem não testa, estoura no primeiro `.map`.
+ *  - `vazio`: `{}`. Este passa por QUEM TESTA o erro — não tem `erro` nenhum — e só
+ *    estoura lá na frente, no campo que não veio. É o caso mais traiçoeiro dos dois.
+ *
+ * Nenhum dos dois precisa saber o formato de resposta de nada, o que importa: inventar
+ * formato daria confiança falsa, e passar a mão num formato errado é pior que não testar.
+ */
+const RESPOSTAS = {
+  erro: () => ({ erro: 'sem rede (passeio de teste)' }),
+  vazio: () => ({}),
+};
+let modo = 'erro';
 
 // 1x1 transparente: as telas pedem muita imagem e o que importa aqui não é a arte
 const PNG = Buffer.from(
@@ -68,7 +93,7 @@ function servidor() {
       } catch { res.writeHead(404); return res.end('sem tela'); }
     }
     if (caminho.startsWith('/api/')) {
-      const corpo = caminho === '/api/estado' ? ESTADO : RUIM;
+      const corpo = caminho === '/api/estado' ? ESTADO : RESPOSTAS[modo]();
       res.writeHead(200, { 'content-type': 'application/json' });
       return res.end(JSON.stringify(corpo));
     }
@@ -127,44 +152,49 @@ app.whenReady().then(async () => {
       sandbox: false,
     },
   });
-  ouvirConsole(janela.webContents, () => onde);
+  ouvirConsole(janela.webContents, () => `${modo}/${onde}`);
 
-  try {
-    await janela.loadURL(`http://127.0.0.1:${porta}/`);
-    await esperar(1500);
+  for (const qual of Object.keys(RESPOSTAS)) {
+  modo = qual;
+  for (const tela of TELAS_VISITADAS) {
+    try {
+      onde = `${tela.arquivo} abrindo`;
+      await janela.loadURL(`http://127.0.0.1:${porta}/${tela.arquivo}`);
+      await esperar(tela.espera ?? 1500);
 
-    for (const aba of ABAS) {
-      onde = aba;
-      await janela.webContents.executeJavaScript(
-        `(() => { try { abrirAba(${JSON.stringify(aba)}); return 'ok'; }
-                  catch (e) { console.error('abrirAba estourou: ' + (e && e.message || e)); return 'erro'; } })()`,
-      );
-      await esperar(700);
+      for (const aba of tela.abas ?? []) {
+        onde = `${tela.arquivo} · ${aba}`;
+        await janela.webContents.executeJavaScript(
+          `(() => { try { abrirAba(${JSON.stringify(aba)}); return 'ok'; }
+                    catch (e) { console.error('abrirAba estourou: ' + (e && e.message || e)); return 'erro'; } })()`,
+        );
+        await esperar(700);
+      }
+
+      /* O que só nasce com clique. Uma tela que abre e uma tela que não abre não é o
+       * mesmo teste: metade do código de desenho está atrás de um clique. */
+      onde = `${tela.arquivo} · clicando`;
+      await janela.webContents.executeJavaScript(`(() => {
+        const clicaveis = [...document.querySelectorAll('[onclick]')].filter(el => el.offsetParent !== null);
+        let n = 0;
+        for (const el of clicaveis.slice(0, 40)) {
+          try { el.click(); n++; } catch (e) { console.error('clique estourou: ' + (e && e.message || e)); }
+        }
+        return n;
+      })()`);
+      await esperar(1000);
+    } catch (e) {
+      queixas.push(`${onde}: o passeio nem terminou — ${e?.message ?? e}`);
     }
 
-    /* As telas que só nascem com clique. Um painel que abre e um que não abre não é o
-     * mesmo teste: metade do código de desenho está atrás de um clique. */
-    onde = 'clicando no que aparece';
-    await janela.webContents.executeJavaScript(`(() => {
-      const clicaveis = [...document.querySelectorAll('[onclick]')].filter(el => el.offsetParent !== null);
-      let n = 0;
-      for (const el of clicaveis.slice(0, 40)) {
-        try { el.click(); n++; } catch (e) { console.error('clique estourou: ' + (e && e.message || e)); }
-      }
-      return n;
-    })()`);
-    await esperar(1200);
-  } catch (e) {
-    queixas.push(`${onde}: o passeio nem terminou — ${e?.message ?? e}`);
+    // o que o preload juntou, com arquivo e linha. Tem que ser colhido ANTES de trocar
+    // de tela: `window.__erros` morre junto com o documento.
+    try {
+      const comPilha = await janela.webContents.executeJavaScript('window.__erros || []');
+      for (const e of comPilha) queixas.push(`${modo}/${tela.arquivo}: ${e.quem}: ${e.msg}\n          em ${e.pilha}`);
+    } catch { /* janela já foi */ }
   }
-
-  // o que o preload juntou, com arquivo e linha
-  let comPilha = [];
-  try {
-    comPilha = await janela.webContents.executeJavaScript('window.__erros || []');
-  } catch { /* janela já foi */ }
-  for (const e of comPilha) queixas.push(`${e.quem}: ${e.msg}
-          em ${e.pilha}`);
+  }
 
   janela.destroy();
   s.close();
@@ -177,6 +207,6 @@ app.whenReady().then(async () => {
     app.exit(1);
     return;
   }
-  console.log(`passeio ok: ${ABAS.length} abas abertas, console limpo`);
+  console.log(`passeio ok: ${TELAS_VISITADAS.length} telas x ${Object.keys(RESPOSTAS).length} respostas ruins, ${ABAS.length} abas, console limpo`);
   app.exit(0);
 });

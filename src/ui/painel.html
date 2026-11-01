@@ -2585,6 +2585,8 @@ async function carregarPatch(){
   try { notas = await pegar('/api/patch'); }
   catch { $('#patchLista').innerHTML = '<div class="vazio">sem internet pra buscar as notas</div>'; return; }
   if(notas.erro){ $('#patchLista').innerHTML = `<div class="vazio">${esc(notas.erro)}</div>`; return; }
+  // resposta sem `erro` e sem ser lista também existe, e o `notas.map` lá embaixo morria
+  if(!Array.isArray(notas)){ $('#patchLista').innerHTML = '<div class="vazio">as notas não vieram agora</div>'; return; }
 
   desenharListaNotas();
   if(notas[0]) abrirNota(notas[0].slug);
@@ -3303,7 +3305,8 @@ function alternarFuncao(f){
 }
 
 function desenharAdmin(){
-  const { usuarios, controle, eu } = admDados;
+  // resposta pela metade deixa `controle` sem existir, e a primeira linha abaixo morria
+  const { usuarios = [], controle = {}, eu = null } = admDados ?? {};
   if(document.activeElement !== $('#admAvisoGlobal')) $('#admAvisoGlobal').value = controle.aviso ?? '';
   if(document.activeElement !== $('#admVersaoMinima')) $('#admVersaoMinima').value = controle.versaoMinima ?? '';
   if(document.activeElement !== $('#admPopup')) $('#admPopup').value = controle.popup?.texto ?? '';
@@ -3968,7 +3971,11 @@ async function carregarCalendario(mes){
   let c; try { c = await pegar(comConta('/api/calendario' + (mes ? '?mes=' + mes : ''))); } catch { c = null; }
   if(!c || c.erro){ grade.innerHTML = '<div class="vazio">não consegui montar o calendário</div>'; return; }
   calDados = c; calMesAtual = c.mes;
-  $('#calMes').innerHTML = (c.meses ?? [c.mes]).map(m => `<option value="${m}" ${m === c.mes ? 'selected' : ''}>${MES_NOME[Number(m.slice(5, 7)) - 1]} de ${m.slice(0, 4)}</option>`).join('');
+  // `{}` passa pelo teste de erro acima (não tem `erro` nenhum), e aí `[c.mes]` vira
+  // `[undefined]` e o `m.slice` estoura. Só entra mês que é mês.
+  const meses = (c.meses ?? [c.mes]).filter(m => typeof m === 'string' && m.length >= 7);
+  if(!meses.length){ grade.innerHTML = '<div class="vazio">não consegui montar o calendário</div>'; return; }
+  $('#calMes').innerHTML = meses.map(m => `<option value="${m}" ${m === c.mes ? 'selected' : ''}>${MES_NOME[Number(m.slice(5, 7)) - 1]} de ${m.slice(0, 4)}</option>`).join('');
 
   const porDia = new Map(c.dias.map(d => [d.dia, d]));
   const [ano, mesN] = c.mes.split('-').map(Number);
