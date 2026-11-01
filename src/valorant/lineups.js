@@ -1415,6 +1415,50 @@ function anotarNoAcervo(chave, linha) {
 const comoSlug = (x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_');
 
 /**
+ * Põe TODO o acervo no formato novo, devagar, sem rede e sem atrapalhar.
+ *
+ * O acervo já migra sozinho — mas só quando ele abre AQUELE mapa e agente. Medido:
+ * depois de um dia inteiro melhorando a leitura de nome, 66 dos 72 arquivos dele ainda
+ * estavam no formato antigo, e os ~393 pontos de saída e ~163 alvos que o parser novo
+ * acha estavam parados, esperando ele abrir cada combinação uma por uma.
+ *
+ * Isso ia se repetir a cada melhoria do parser. Então o app faz sozinho, uma vez, quando
+ * nota que tem arquivo atrás do formato atual.
+ *
+ * Três cuidados, e os três importam:
+ *  - não custa REDE: `buscaGuardada` só lê o arquivo, relê os nomes e grava de volta;
+ *    quem fala com o YouTube é outra função. Refazer as buscas custaria ~7000 de cota.
+ *  - vai DEVAGAR, um arquivo por vez com respiro entre eles. São 72 leituras e gravações,
+ *    e ele pode estar numa partida — isso não pode competir com o jogo.
+ *  - `podeAgora()` decide se continua. Entrou em partida no meio, para e fica pro próximo.
+ */
+export async function migrarAcervo({ podeAgora = () => true, pausa = 500, log = () => {} } = {}) {
+  const arquivos = (await readdir(resolve(pasta(), 'buscas')).catch(() => [])).filter((n) => n.endsWith('.json'));
+  const atrasados = [];
+  for (const arq of arquivos) {
+    const g = await lerJson(resolve(pasta(), 'buscas', arq), null);
+    // só o que é MAIS VELHO. Formato mais novo que o atual existe quando ele volta uma
+    // versão: o migrador não sabe ler, devolveria null, e isso viraria uma tentativa
+    // frustrada a cada abertura do app, pra sempre.
+    if (!g?.lineups?.length || !g.pedido || !(Number(g.formato) < FORMATO_BUSCA)) continue;
+    atrasados.push(g.pedido);
+  }
+  if (!atrasados.length) return { olhados: arquivos.length, migrados: 0 };
+
+  log(`acervo: ${atrasados.length} de ${arquivos.length} buscas estão no formato antigo — atualizando em segundo plano`);
+  let migrados = 0, parou = false;
+  for (const pedido of atrasados) {
+    if (!podeAgora()) { parou = true; break; }
+    try { if (await buscaGuardada(pedido)) migrados++; } catch { /* uma torta não para as outras */ }
+    await new Promise((ok) => { setTimeout(ok, pausa); });
+  }
+  log(parou
+    ? `acervo: ${migrados} atualizadas, o resto fica pra quando você não estiver jogando`
+    : `acervo: ${migrados} buscas atualizadas, com mais pontos no mapa`);
+  return { olhados: arquivos.length, migrados, parou };
+}
+
+/**
  * Remonta o índice lendo a pasta. Só roda quando o índice não existe ou está atrás da
  * pasta — quem usa o app desde antes do acervo tem arquivo lá sem nenhuma anotação.
  */

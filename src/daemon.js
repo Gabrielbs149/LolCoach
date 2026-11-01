@@ -696,6 +696,30 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   const total = db.prepare('SELECT COUNT(*) n FROM partidas').get().n;
   log(`LolCoach v${await versaoDoApp()} — banco com ${total} partidas`);
 
+  /* O ACERVO DE LINEUPS SE ATUALIZA SOZINHO, uma vez, em segundo plano.
+   *
+   * Ele já migrava — mas só quando ele abria AQUELE mapa e agente. Medido depois de um dia
+   * melhorando a leitura de nome: 66 dos 72 arquivos ainda estavam no formato antigo, e os
+   * ~393 pontos de saída e ~163 alvos que o parser novo acha estavam parados, esperando
+   * ele abrir cada combinação uma por uma. Isso ia se repetir a cada melhoria.
+   *
+   * Começa 40 s depois de abrir (o app tem mais o que fazer na largada), vai devagar, não
+   * gasta rede nenhuma, e para na hora se ele entrar em fila, seleção ou partida — de
+   * League ou de Valorant. O que não deu tempo fica pra próxima abertura. */
+  setTimeout(() => {
+    const emJogo = () => {
+      const i = estado?.instantaneo?.() ?? {};
+      const f = i.fase ?? null;
+      const noLol = f != null && !['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(f);
+      const v = i.valorant ?? null;
+      // leitura velha não serve de permissão: sem notícia recente, trata como se estivesse jogando
+      const recente = v && Date.now() - (v.em ?? 0) < 60_000;
+      const noVal = recente && (v.estado === 'selecao' || v.estado === 'jogando' || v.emFila === true);
+      return noLol || noVal;
+    };
+    Lineups.migrarAcervo({ podeAgora: () => !emJogo(), log }).catch(() => {});
+  }, 40_000).unref?.();
+
   /**
    * A conexão com o client NÃO pode bloquear a inicialização.
    *

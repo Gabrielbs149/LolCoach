@@ -368,6 +368,9 @@ let valEstado = null;
 function olharValorant() {
   // devolve se o jogo está ABERTO: é isso que decide o ritmo da próxima olhada
   return situacaoDoValorant().then((v) => {
+    // guarda o que acabou de ser lido: de graça, e e quem responde "da pra fazer coisa
+    // pesada agora?" sem ninguem precisar abrir outro laco em cima do cliente
+    estado.set('valorant', { ...v, em: Date.now() });
     const antes = valEstado;
     valEstado = v?.estado ?? null;
     if (antes !== valEstado) {

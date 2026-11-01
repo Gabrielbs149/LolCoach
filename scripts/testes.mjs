@@ -1026,6 +1026,50 @@ test('pontas: seta, parêntese e CT viram lugar; e o alvo não rouba o lugar de 
 
 /* 39,4% das lineups do acervo dele caem num ponto aproximado e 65,4% não dizem de onde se
  * joga. O nome do capítulo é tudo o que existe, então o ponto EXATO só pode vir dele. */
+test('acervo: a migracao de fundo para na hora se ele entrar em partida', async () => {
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-migrar-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const buscas = resolve(base, 'dados', 'valorant', 'buscas');
+    await mkdir(buscas, { recursive: true });
+    const umArquivo = (nome, formato) => writeFile(resolve(buscas, nome), JSON.stringify({
+      formato,
+      pedido: { mapa: 'Bind', agente: 'Fade', habilidade: '', lado: 'atacando' },
+      callouts: [{ nome: 'A Site', regiao: 'Site', grande: 'A', site: 'A', x: 0.3, y: 0.3 }],
+      lineups: [{ video: 'abc', segundo: 1, nome: 'A Site molly' }],
+    }), 'utf8');
+
+    const L = await import(`../src/valorant/lineups.js?migrar=${Date.now()}`);
+
+    /* A migracao de fundo le, reprocessa e grava 72 arquivos. Isso nao pode competir com
+     * o jogo dele — e entrar em partida no meio tem que parar na hora, nao no fim. */
+    await umArquivo('bind__fade_____atacando.json', 4);
+    await umArquivo('ascent__fade_____atacando.json', 4);
+
+    const emPartida = await L.migrarAcervo({ podeAgora: () => false, pausa: 0, log: () => {} });
+    assert.equal(emPartida.migrados, 0, 'em partida nao migra nada');
+    assert.equal(emPartida.parou, true, 'e diz que parou, pra tentar de novo depois');
+
+    /* E arquivo que NAO e mais velho que o formato atual nao e tocado. Vale pros dois
+     * lados: o que ja esta em dia (a migracao tem que ser barata de rodar a cada abertura)
+     * e o que esta a FRENTE, que acontece quando ele volta uma versao — o migrador nao
+     * sabe ler, devolveria null, e viraria tentativa frustrada pra sempre. */
+    const novo = await import(`../src/valorant/lineups.js?migrar2=${Date.now()}`);
+    await umArquivo('bind__fade_____atacando.json', 999);
+    await umArquivo('ascent__fade_____atacando.json', 999);
+    let falou = 0;
+    const nadaAFazer = await novo.migrarAcervo({ podeAgora: () => true, pausa: 0, log: () => { falou++; } });
+    assert.equal(nadaAFazer.migrados, 0);
+    assert.equal(falou, 0, 'sem nada atrasado, nao escreve nada no registro');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
 test('confirmar: "eu fiz essa" sobrevive a busca, e nao se perde ao apagar o ponto', async () => {
   const { mkdtemp, mkdir } = await import('node:fs/promises');
   const { tmpdir } = await import('node:os');
