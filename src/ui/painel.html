@@ -4670,7 +4670,7 @@ function lnPinos(){
      * resto do callout seria jogar fora justo a precisão que ele foi lá pôr: o callout "A
      * Site" é o site inteiro, e a marca dele é o tijolo. */
     const k = l.ponto.meu ? `${l.ponto.nome}#${l.video}#${l.segundo}` : l.ponto.nome;
-    if (!por.has(k)) por.set(k, { chave: k, nome: l.ponto.nome, x: l.ponto.x, y: l.ponto.y, aproximado: l.ponto.aproximado, meu: l.ponto.meu === true, lista: [] });
+    if (!por.has(k)) por.set(k, { chave: k, nome: l.ponto.nome, x: l.ponto.x, y: l.ponto.y, aproximado: l.ponto.aproximado, meu: l.ponto.meu === true, fixo: l.ponto.meu === true, lista: [] });
     const p = por.get(k); p.lista.push(l);
     if (!l.ponto.aproximado) p.aproximado = false;
   }
@@ -4728,7 +4728,7 @@ function lnDesenharMapa(){
     .sort((a, b) => (b.posicao ? 1 : 0) - (a.posicao ? 1 : 0) || lnNota(b) - lnNota(a));
   const semLugarN = semLugar.filter(l => !l.posicao).length;
   const marcas = aberto ? lnDesempilhar(
-    comLugar.map((l) => ({ l, lugar: true, i: lnAchadas.indexOf(l), de: { x: l.posicao.x, y: l.posicao.y } })),
+    comLugar.map((l) => ({ l, lugar: true, fixo: l.posicao?.meu === true, i: lnAchadas.indexOf(l), de: { x: l.posicao.x, y: l.posicao.y } })),
     { x: aberto.dx, y: aberto.dy },
     pinos.filter(p => p.chave !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })),
   ) : [];
@@ -4928,6 +4928,9 @@ function lnPrender(p){
   p.dy = Math.max(r.y0 + iy, Math.min(r.y0 + r.ly - iy, p.dy));
 }
 
+/* `fixo` = ponto que ELE marcou a mao. Mesma regra do lnDesempilhar: afastar e pra palpite,
+ * nao pra fato. O pino do "onde cai" sofria do mesmo defeito que o do "de onde sai" — ele
+ * marcava o tijolo e o desenho mostrava a dois metros dali. */
 function lnAfastar(itens, minimo){
   const fora = itens.map(x => ({ ...x, dx: x.x, dy: x.y }));
   for (let volta = 0; volta < 14; volta++) {
@@ -4936,14 +4939,15 @@ function lnAfastar(itens, minimo){
       const a = fora[i], b = fora[j];
       const d = Math.hypot(a.dx - b.dx, a.dy - b.dy);
       if (d >= minimo) continue;
+      if (a.fixo && b.fixo) continue;
       let vx = b.dx - a.dx, vy = b.dy - a.dy, dd = d;
       if (dd < 1e-4) { vx = Math.cos(i); vy = Math.sin(i); dd = 1; }
-      const passo = (minimo - d) / 2;
-      a.dx -= (vx / dd) * passo; a.dy -= (vy / dd) * passo;
-      b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo;
+      const passo = (minimo - d) / (a.fixo || b.fixo ? 1 : 2);
+      if (!a.fixo) { a.dx -= (vx / dd) * passo; a.dy -= (vy / dd) * passo; }
+      if (!b.fixo) { b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo; }
       mexeu = true;
     }
-    for (const p of fora) lnPrender(p);
+    for (const p of fora) if (!p.fixo) lnPrender(p);
     if (!mexeu) break;
   }
   // os que mesmo assim ficaram colados (canto apertado) ganham um lugar, não um empurrão
@@ -4953,7 +4957,14 @@ function lnAfastar(itens, minimo){
 function lnDesempilhar(itens, pino, obstaculos = []){
   const dLeque = longe(LN_LONGE), dPino = longe(LN_LONGE_PINO);
   const fora = itens.map(x => ({ ...x, dx: x.de.x, dy: x.de.y }));
+  /* PONTO MARCADO A MAO NAO SE MEXE (p.fixo).
+   * Este desempilhador existe pro ponto DEDUZIDO do texto, que e aproximado e cabe afastar
+   * pra dar pra clicar. Quando ele marca a mao, aquilo nao e palpite: e o tijolo de onde
+   * ele joga. Relato dele: "varias que jogavam do mesmo lugar e no mapa estavam em lugares
+   * diferentes" — era isto. E duas lineups saindo do MESMO ponto e fato, nao defeito: ele
+   * avisou que pode precisar por uma em cima da outra. */
   const empurrar = (p, ax, ay, minimo) => {
+    if (p.fixo) return false;
     let vx = p.dx - ax, vy = p.dy - ay;
     let d = Math.hypot(vx, vy);
     if (d >= minimo) return false;
@@ -4974,16 +4985,18 @@ function lnDesempilhar(itens, pino, obstaculos = []){
       const a = fora[i], b = fora[j];
       const d = Math.hypot(a.dx - b.dx, a.dy - b.dy);
       if (d >= dLeque) continue;
-      // separa os dois pra cada lado, metade do que falta
+      // dois marcados por ele podem ficar colados: os dois sao fato, nenhum cede
+      if (a.fixo && b.fixo) continue;
       let vx = b.dx - a.dx, vy = b.dy - a.dy, dd = d;
       if (dd < 1e-4) { vx = Math.cos(i); vy = Math.sin(i); dd = 1; }
-      const passo = (dLeque - d) / 2;
-      a.dx -= (vx / dd) * passo; a.dy -= (vy / dd) * passo;
-      b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo;
+      // separa os dois pra cada lado, metade do que falta — ou tudo, se um deles e fixo
+      const passo = (dLeque - d) / (a.fixo || b.fixo ? 1 : 2);
+      if (!a.fixo) { a.dx -= (vx / dd) * passo; a.dy -= (vy / dd) * passo; }
+      if (!b.fixo) { b.dx += (vx / dd) * passo; b.dy += (vy / dd) * passo; }
       mexeu = true;
     }
-    // sem sair da janela do recorte
-    for (const p of fora) lnPrender(p);
+    // sem sair da janela do recorte (o fixo fica onde ele clicou, e ele clicou DENTRO)
+    for (const p of fora) if (!p.fixo) lnPrender(p);
     if (!mexeu) break;
   }
   return lnDesencalhar(fora, [...(pino ? [pino] : []), ...obstaculos]);
@@ -5013,6 +5026,7 @@ function lnDesencalhar(itens, obstaculos, minimo = longe(LN_LONGE_PINO)){
     return pior;
   };
   for (const p of itens) {
+    if (p.fixo) continue;   // marcado a mao: nao ha lugar melhor que o que ele escolheu
     let melhor = { x: p.dx, y: p.dy, folga: folga(p.dx, p.dy, p) };
     if (melhor.folga >= minimo) continue;
     for (let raio = minimo; raio <= minimo * 2.6 && melhor.folga < minimo; raio += minimo * 0.3) {
@@ -5305,7 +5319,11 @@ function lnMarcar(qual){
    * do outro lado do mapa (lineup de post-plant sai de trás de tudo), e abrir já aproximado
    * no alvo deixaria o lugar certo fora da janela. Só quando é pra CORRIGIR um ponto que já
    * existe é que vale abrir perto dele. */
-  const corrigindo = qual === 'posicao' ? l.posicao : (l.ponto?.meu ? l.ponto : null);
+  /* No alvo, qualquer ponto exato serve de ponto de partida (dele ou lido do callout): onde
+   * a habilidade cai é ali por perto, e abrir já aproximado poupa o primeiro clique. Só o
+   * aproximado (centro do site, quando o texto não disse o callout) é que abre o mapa
+   * inteiro, porque esse pode estar a dezenas de metros do lugar certo. */
+  const corrigindo = qual === 'posicao' ? l.posicao : (l.ponto && !l.ponto.aproximado ? l.ponto : null);
   lnMarcando = { qual, passo: 1, r: corrigindo ? lnRecorteEm(corrigindo, 0.5) : { x: 0, y: 0, lado: 1 } };
   lnPintarLado(l);
 }
@@ -5428,6 +5446,12 @@ function lnMapinha(l){
  * Os botões de marcar, embaixo do mapinha. O texto muda com o que já existe, porque o que
  * ele quer saber é diferente em cada caso: sem lugar nenhum é "de onde é isso?", com lugar
  * aproximado é "é por ali, mas onde exatamente?".
+ *
+ * O "onde cai" aparece SEMPRE, em qualquer estado. Antes só aparecia quando o ponto era
+ * aproximado ou não existia — e ponto exato lido do callout é mais da metade do acervo
+ * (53,5%). Nessas, ele simplesmente não tinha botão: "tem q poder mudar o lugar que cai
+ * também, n cosigo mudar isso". E ponto exato tirado do nome do vídeo continua sendo o
+ * callout inteiro, não o tijolo: "A Site" é o site todo. Quem sabe o tijolo é ele.
  */
 function lnBotoesDeMarcar(l){
   const a = l.posicao, b = l.ponto;
@@ -5438,8 +5462,10 @@ function lnBotoesDeMarcar(l){
          <button class="acao" onclick="lnEsquecerMeuPonto('posicao')">apagar</button>`
       : `<button class="acao" onclick="lnMarcar('posicao')">📍 ${a ? 'marcar o ponto exato de onde se joga' : 'marcar de onde eu jogo'}</button>`}
     ${b?.meu
-      ? `<button class="acao" onclick="lnEsquecerMeuPonto('alvo')">apagar onde cai</button>`
-      : (b?.aproximado || !b) ? `<button class="acao" onclick="lnMarcar('alvo')">🎯 marcar onde cai</button>` : ''}
+      ? `<span class="lnMarcado">🎯 onde cai, marcado por você</span>
+         <button class="acao" onclick="lnMarcar('alvo')">mudar</button>
+         <button class="acao" onclick="lnEsquecerMeuPonto('alvo')">apagar</button>`
+      : `<button class="acao" onclick="lnMarcar('alvo')">🎯 ${b ? 'mudar onde cai' : 'marcar onde cai'}</button>`}
   </div>
   <div class="lnMarcar">
     ${l.confirmei

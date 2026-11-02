@@ -91,7 +91,21 @@ origem quase nunca aparece (20%). Parede de Sage se põe onde você está: 2%.
 Marcar com M (2.28.274) rende muito mais em Fade que em Brimstone. Não há conserto de
 parser aqui: o dado não existe no nome.
 
+**E até a 2.28.285 a saída também estava quebrada**: a marca dele era desenhada em média a
+7,5 m de onde ele clicou, e o alvo não tinha nem botão pra mudar em 51,6% do acervo. Ou
+seja, o único caminho que restava pro main dele não entregava. Agora entrega — e o próximo
+passo natural deste item é medir quantas lineups de Fade ele marca por sessão, pra saber se
+o caminho manual dá conta ou se precisa de outra ideia.
+
 ## Feito
+
+- **2.28.285** — o ponto marcado a mão parou de ser empurrado pelo desenho (arrasto de
+  **7,5 m em média e 16,6 m no pior caso → 0 m**, medido nas 20 marcas dele em Lotus/Fade),
+  e o controle de **mudar onde a habilidade cai** passou a existir em todas as lineups —
+  faltava em **2.124 das 4.120** do acervo (51,6%), as de alvo exato lido do callout.
+  Duas marcas no mesmo ponto ficam as duas lá, porque ele avisou que pode precisar pôr uma
+  lineup em cima da outra. Guardado por teste que puxa a função de dentro da tela
+  (`scripts/pegar-funcao.mjs`) — conferido que o teste REPROVA a versão com o defeito.
 
 - **2.28.283** — +60 lineups com lado dito; a armadilha do "defender" (que o conserto óbvio
   teria criado) travada em teste; `rush`, `plant` e `push` descartados por não decidirem.

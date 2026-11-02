@@ -1855,3 +1855,77 @@ test('mapa: todo mapa do catálogo tem os dois spawns, senão o giro não aconte
     assert.ok([0, 90, 180, 270].includes(giro), `${m.nome}: giro ${giro} não é múltiplo de 90`);
   }
 });
+
+/* ------------------------------------------------------- o ponto que ELE marcou
+ *
+ * Duas queixas dele no mesmo dia, e as duas eram a mesma conta: "n ficava exatamente onde
+ * eu colocava" e "várias q iam pro mesmo lugar e jogavam do mesmo lugar, mas no mapa
+ * estavam em lugares diferentes".
+ *
+ * O desempilhador afasta marcadores pra um não cobrir o outro. Pra ponto DEDUZIDO do
+ * título do vídeo isso está certo — é palpite, e palpite empilhado não dá pra clicar. Pra
+ * ponto que ele marcou a mão é errado: ele foi lá e pôs o tijolo. No acervo dele o desenho
+ * arrastava as 20 marcas, em média 7,5 m e a pior a 16,6 m do lugar clicado.
+ *
+ * O teste tira as funções de dentro da tela (elas moram no painel.html, inline) justamente
+ * pra não depender de alguém lembrar de abrir o navegador e medir de novo.
+ */
+const CERCADO_DO_MAPA = `
+  const JANELA = { x0: 0.05, y0: 0.05, lx: 0.9, ly: 0.9 };
+  const lnJanelaDoMapa = () => JANELA;
+  const lnLarguraCrua = () => JANELA.lx;
+  const LN_LONGE = 0.090, LN_LONGE_PINO = 0.078;
+  const longe = (f) => Math.max(0.015, lnLarguraCrua() * f);
+`;
+
+test('lineups: o ponto que ele marcou a mão fica exatamente onde ele clicou', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+  const { lnDesempilhar, lnAfastar } = await funcoesDaTela(
+    'painel.html', ['lnPrender', 'lnDesencalhar', 'lnDesempilhar', 'lnAfastar'], CERCADO_DO_MAPA);
+
+  const pino = { x: 0.5, y: 0.45 };
+  const p = { x: 0.62, y: 0.52 };
+  const dist = (a, b) => Math.hypot(a.dx - b.x, a.dy - b.y);
+  const SEPARACAO = Math.max(0.015, 0.9 * 0.090);
+
+  // duas marcas dele no MESMO ponto: as duas ficam lá. Ele avisou que pode precisar pôr
+  // uma lineup em cima da outra — duas saindo do mesmo tijolo é fato, não defeito.
+  const r = lnDesempilhar([
+    { fixo: true, de: { ...p } },
+    { fixo: true, de: { ...p } },
+    { fixo: false, de: { ...p } },
+  ], pino, []);
+  assert.equal(dist(r[0], p), 0, 'a marca dele não se mexe');
+  assert.equal(dist(r[1], p), 0, 'nem a segunda, empilhada na primeira');
+  assert.ok(dist(r[2], p) >= SEPARACAO * 0.99, 'o deduzido é que sai da frente, inteiro');
+
+  // e nem por estar em cima do próprio pino: o pino é a área, a marca é o tijolo dentro dela
+  const emCima = lnDesempilhar([{ fixo: true, de: { ...pino } }], pino, []);
+  assert.equal(dist(emCima[0], pino), 0, 'marca em cima do pino continua em cima do pino');
+
+  // os deduzidos continuam se afastando — senão viram um retrato só, inclicável
+  const juntos = lnDesempilhar(
+    Array.from({ length: 8 }, (_, i) => ({ fixo: false, de: { x: 0.55 + i * 0.002, y: 0.5 } })), pino, []);
+  let menor = Infinity;
+  for (let i = 0; i < juntos.length; i++) {
+    for (let j = i + 1; j < juntos.length; j++) {
+      menor = Math.min(menor, Math.hypot(juntos[i].dx - juntos[j].dx, juntos[i].dy - juntos[j].dy));
+    }
+  }
+  assert.ok(menor >= SEPARACAO * 0.95, `deduzidos empilhados: ${menor.toFixed(4)} < ${SEPARACAO.toFixed(4)}`);
+
+  // o mesmo vale pro outro lado do mapa: o pino de ONDE CAI passa pelo lnAfastar
+  const pinos = lnAfastar([
+    { fixo: true, x: 0.62, y: 0.52 },
+    { fixo: true, x: 0.62, y: 0.52 },
+    { fixo: false, x: 0.62, y: 0.52 },
+  ], SEPARACAO);
+  assert.equal(dist(pinos[0], p), 0, 'pino marcado por ele também não se mexe');
+  assert.equal(dist(pinos[1], p), 0);
+  assert.ok(dist(pinos[2], p) >= SEPARACAO * 0.99, 'o pino deduzido é que cede');
+
+  // na beirada, onde a correção anterior tinha falhado: prender na janela não pode arrastar
+  const naBorda = { x: 0.051, y: 0.051 };
+  const beira = lnDesempilhar([{ fixo: true, de: { ...naBorda } }], { x: 0.05, y: 0.05 }, []);
+  assert.equal(dist(beira[0], naBorda), 0, 'marca na beirada fica na beirada');
+});
