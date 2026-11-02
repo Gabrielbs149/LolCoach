@@ -2051,3 +2051,64 @@ test('lineups: dois alvos marcados no mesmo tijolo viram um pino, não um pino s
   assert.equal(um.length, 1);
   assert.equal(um[0].lista.length, 2);
 });
+
+test('valorant: jogar uma lineup fora não apaga o que ele marcou, e volta inteira', async () => {
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-esconder-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const L = await import(`../src/valorant/lineups.js?d=${Date.now()}`);
+
+    /* Tudo mora no mesmo arquivo e na mesma chave (vídeo + segundo): o ponto que ele
+     * marcou, o "eu fiz essa" e agora o "joguei fora". São três coisas independentes, e
+     * mexer numa não pode levar as outras — foi exatamente assim que a confirmação quase
+     * se perdeu quando os pontos ganharam o "apagar". */
+    const v = { video: 'abc123', segundo: 42 };
+
+    await L.marcarPonto({ ...v, qual: 'posicao', x: 0.3, y: 0.4 });
+    await L.confirmarLineup({ ...v, confirmada: true });
+    assert.equal(await L.quantasEscondidas(), 0);
+
+    // joga fora: a marca e a confirmação continuam lá
+    assert.equal((await L.esconderLineup(v)).escondida, true);
+    assert.equal(await L.quantasEscondidas(), 1);
+    let r = await L.comMeusPontos({ lineups: [{ ...v, nome: 'x' }], callouts: [] });
+    assert.ok(r.lineups[0].escondida, 'a escondida vem MARCADA, não filtrada: quem tira é a tela');
+    assert.equal(r.lineups[0].posicao?.meu, true, 'o ponto que ele marcou continua');
+    assert.ok(r.lineups[0].confirmei, 'e a confirmação também');
+
+    // traz de volta: some só a marca de escondida
+    assert.equal((await L.esconderLineup({ ...v, esconder: false })).escondida, false);
+    assert.equal(await L.quantasEscondidas(), 0);
+    r = await L.comMeusPontos({ lineups: [{ ...v, nome: 'x' }], callouts: [] });
+    assert.ok(!r.lineups[0].escondida);
+    assert.equal(r.lineups[0].posicao?.meu, true);
+    assert.ok(r.lineups[0].confirmei);
+
+    // apagar o ponto NÃO traz de volta o que ele jogou fora
+    await L.esconderLineup(v);
+    await L.esquecerPonto({ ...v, qual: 'posicao' });
+    assert.equal(await L.quantasEscondidas(), 1, 'apagar o ponto não desfaz o "joguei fora"');
+    assert.equal(await L.quantasConfirmadas(), 1, 'nem a confirmação');
+
+    // tirar a confirmação também não
+    await L.confirmarLineup({ ...v, confirmada: false });
+    assert.equal(await L.quantasEscondidas(), 1);
+
+    /* E uma jogada fora SEM nada marcado some do arquivo ao voltar — senão o
+     * meus-pontos.json vira um cemitério de chaves vazias, uma por lineup que ele olhou. */
+    const so = { video: 'zzz999', segundo: 7 };
+    await L.esconderLineup(so);
+    assert.equal(await L.quantasEscondidas(), 2);
+    await L.esconderLineup({ ...so, esconder: false });
+    assert.equal(await L.quantasEscondidas(), 1);
+    assert.equal(await L.quantosPontosMeus(), 1, 'não deixa chave vazia pra trás');
+
+    assert.equal((await L.esconderLineup({ segundo: 1 })).erro, 'faltou o vídeo');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});

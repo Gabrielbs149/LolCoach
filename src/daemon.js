@@ -2582,6 +2582,13 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0),
       confirmada: p.confirmada !== false,
     }),
+    /* Jogar uma lineup fora. Pedido dele: "me da o poder de excluir lineup do mapa rapido".
+       Antes so dava pra tirar o VIDEO inteiro, o que leva junto as outras do mesmo capitulo.
+       Some da tela, nao do disco: excluir rapido so e seguro se desfazer tambem for. */
+    valEsconder: (p = {}) => Lineups.esconderLineup({
+      video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0),
+      esconder: p.esconder !== false,
+    }),
     valEsquecerPonto: (p = {}) => Lineups.esquecerPonto({
       video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0), qual: p.qual ? String(p.qual) : null,
     }),
@@ -2631,5 +2638,5 @@ const ACOES_DO_PAINEL = [
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
-  'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar',
+  'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar', 'valEsconder',
 ];

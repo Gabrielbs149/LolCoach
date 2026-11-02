@@ -619,13 +619,49 @@ export async function confirmarLineup({ video, segundo, confirmada = true } = {}
     pontos[chave] = { ...antes, confirmei: Date.now() };
   } else {
     const { confirmei, ...resto } = antes;
-    // tirar a confirmação não pode levar junto um ponto que ele marcou
-    if (resto.posicao || resto.alvo) pontos[chave] = resto;
+    // tirar a confirmação não pode levar junto um ponto que ele marcou nem a escondida
+    if (resto.posicao || resto.alvo || resto.escondida) pontos[chave] = resto;
     else delete pontos[chave];
   }
   await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
   pontosDele = pontos;
   return { ok: true, confirmada: !!pontos[chave]?.confirmei };
+}
+
+/**
+ * JOGAR UMA LINEUP FORA.
+ *
+ * Pedido dele: "me da o poder de excluir lineup do mapa rapido". Até aqui só dava pra tirar
+ * o VÍDEO inteiro (`marcarVideoRuim`, que existe pra quando o player não consegue tocar), e
+ * isso leva junto as outras 40 lineups do mesmo canal. O que ele quer é pontual: esta aqui
+ * não presta, some do mapa.
+ *
+ * Mora no mesmo arquivo e na mesma chave dos pontos e das confirmações (vídeo + segundo),
+ * então herda as mesmas garantias: sobrevive a refazer a busca, trocar de lado, subir de
+ * formato e limpar o acervo. E é REVERSÍVEL de propósito — some da tela, não do disco.
+ * Excluir rápido só é seguro se desfazer também for rápido.
+ */
+export async function esconderLineup({ video, segundo, esconder = true } = {}) {
+  if (!video) return { erro: 'faltou o vídeo' };
+  const pontos = { ...(await meusPontos()) };
+  const chave = chaveDoPonto(video, segundo);
+  const antes = pontos[chave] ?? {};
+  if (esconder) {
+    pontos[chave] = { ...antes, escondida: Date.now() };
+  } else {
+    const { escondida, ...resto } = antes;
+    // trazer de volta não pode apagar o ponto que ele marcou nem a confirmação
+    if (resto.posicao || resto.alvo || resto.confirmei) pontos[chave] = resto;
+    else delete pontos[chave];
+  }
+  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  pontosDele = pontos;
+  return { ok: true, escondida: !!pontos[chave]?.escondida };
+}
+
+/** Quantas ele jogou fora — pro resumo da tela. */
+export async function quantasEscondidas() {
+  return Object.values(await meusPontos()).filter((p) => p?.escondida).length;
 }
 
 /** Quantas ele já confirmou — pro resumo da tela. */
@@ -642,9 +678,11 @@ export async function esquecerPonto({ video, segundo, qual } = {}) {
     pontos[chave] = { ...pontos[chave] };
     delete pontos[chave][qual];
     // a confirmação ("eu fiz essa") não é ponto: apagar o ponto não pode levá-la junto
-    if (!pontos[chave].posicao && !pontos[chave].alvo && !pontos[chave].confirmei) delete pontos[chave];
-  } else if (pontos[chave].confirmei) {
-    pontos[chave] = { confirmei: pontos[chave].confirmei };
+    if (!pontos[chave].posicao && !pontos[chave].alvo && !pontos[chave].confirmei && !pontos[chave].escondida) delete pontos[chave];
+  } else if (pontos[chave].confirmei || pontos[chave].escondida) {
+    // apagar os pontos não é desfazer a confirmação nem trazer de volta o que ele jogou fora
+    const { confirmei, escondida } = pontos[chave];
+    pontos[chave] = { ...(confirmei ? { confirmei } : {}), ...(escondida ? { escondida } : {}) };
   } else delete pontos[chave];
   await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
   pontosDele = pontos;
@@ -678,7 +716,7 @@ export async function comMeusPontos(r) {
   let mexeu = 0;
   const lineups = r.lineups.map((l) => {
     const meu = pontos[chaveDoPonto(l.video, l.segundo)];
-    if (!meu?.posicao && !meu?.alvo && !meu?.confirmei) return l;
+    if (!meu?.posicao && !meu?.alvo && !meu?.confirmei && !meu?.escondida) return l;
     mexeu++;
     const batizar = (p, antes) => ({
       nome: calloutMaisPerto(p, callouts)?.nome ?? antes?.nome ?? 'o ponto que você marcou',
@@ -688,6 +726,9 @@ export async function comMeusPontos(r) {
       ...l,
       // "eu fiz essa e funcionou" é a única informação aqui que não saiu de um vídeo
       confirmei: meu.confirmei ?? null,
+      /* A escondida vem MARCADA, não filtrada. Quem tira da tela é a tela, pra "mostrar as
+       * escondidas" e "trazer de volta" serem instantâneos — sem refazer busca nenhuma. */
+      escondida: meu.escondida ?? null,
       ponto: meu.alvo ? batizar(meu.alvo, l.ponto) : l.ponto,
       posicao: meu.posicao ? batizar(meu.posicao, l.posicao) : l.posicao,
     };

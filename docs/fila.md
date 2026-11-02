@@ -109,6 +109,9 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.292** — ✕ no marcador e tecla Delete pra tirar UMA lineup do mapa (antes só dava
+  pra tirar o vídeo inteiro), com coluna "na lixeira" pra trazer de volta.
+
 - **2.28.291** — o filtro da .290 refeito em colunas depois de ele dizer que não conseguiu
   usar. Barra própria com cinco colunas iguais, "todas" entre elas pra desligar à vista.
   **Regra daqui pra frente: controle novo ganha lugar próprio, não entra como mais um

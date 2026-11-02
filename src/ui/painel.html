@@ -1069,6 +1069,7 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    Número em cima, nome embaixo, largura igual — e a ligada em dourado, que no resto da
    tela já quer dizer "isto é seu"; a de confirmada em verde, pelo mesmo motivo. */
 .lnCols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 10px}
+.lnCols.comLixeira{grid-template-columns:repeat(6,minmax(0,1fr))}
 .lnCol{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 6px;
   border:1px solid var(--borda);border-radius:var(--r-m);background:var(--f1);color:var(--fraco);
   font-family:inherit;cursor:pointer;transition:border-color .12s,background .12s,color .12s}
@@ -1079,6 +1080,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnCol.on b{color:var(--ouro)}
 .lnCol.feito.on{border-color:var(--vit);background:#101e18;color:var(--vit)}
 .lnCol.feito.on b{color:var(--vit)}
+/* a lixeira é a única coluna que não é filtro: é desfazer. Fica apagada até ser clicada. */
+.lnCol.jogadaFora{color:var(--apagado)}
+.lnCol.jogadaFora b{color:var(--fraco)}
+.lnCol.jogadaFora.on{border-color:var(--der);background:#1d1113;color:var(--der)}
+.lnCol.jogadaFora.on b{color:var(--der)}
 /* numa janela estreita cinco colunas viram palavra cortada; aí empilha de duas em duas */
 @media (max-width:760px){ .lnCols{grid-template-columns:repeat(2,minmax(0,1fr))} }
 
@@ -1089,9 +1095,21 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    por onde se abre. */
 .lnDeN{position:absolute;left:-7px;top:-6px;font-style:normal;font-size:10px;line-height:1;
   background:var(--ouro);color:#0b1016;border-radius:6px;padding:2px 4px;font-weight:700}
+/* o ✕ que tira a lineup do mapa. Só aparece quando o mouse está em cima do marcador: ele
+   pediu pra ser rápido, não pra ter um ✕ em cima de cada ponto o tempo todo. */
+.lnJogarFora{position:absolute;right:-8px;top:-8px;width:16px;height:16px;font-style:normal;
+  font-size:10px;line-height:16px;text-align:center;border-radius:50%;background:#0b1016;
+  border:1px solid var(--borda-forte);color:var(--fraco);opacity:0;transition:opacity .1s,color .1s,border-color .1s}
+.lnDeMapa:hover .lnJogarFora{opacity:1}
+.lnJogarFora:hover{border-color:var(--der);color:var(--der);background:#1d1113}
 
 /* a tira de baixo: as lineups daqui que NÃO dizem de onde se joga. Ficavam espalhadas num
    anel inventado em volta do ponto; aqui elas estão juntas, com o motivo escrito. */
+/* a lixeira usa a mesma caixa da tira de baixo, com a borda vermelha pra não ser
+   confundida com ela — aqui não se abre lineup, se traz de volta. */
+.lnLixeira{border-style:solid;border-color:#3d2228;background:#140d10}
+.lnLixeira>b{color:var(--der)}
+
 .lnSemLugar{margin:10px 0 0;padding:9px 11px;border:1px dashed #38414f;
   border-radius:10px;background:#0e131bcc}
 .lnSemLugar b{display:block;font-size:12px;color:var(--fraco)}
@@ -4356,7 +4374,10 @@ let lnMudasFora = 0, lnEsconderMudas = false;
  * essa e funcionou", o filtro nasceria vazio e não serviria pra nada. Confirmar é outro
  * eixo — é ter TESTADO no jogo, não ter completado o dado — e por isso tem botão próprio. */
 let lnSoMinhas = '';          // '' | 'mexi' | 'prontas' | 'falta' | 'fiz'
-let lnContaMinhas = { todas: 0, mexi: 0, prontas: 0, falta: 0, fiz: 0 };
+let lnContaMinhas = { todas: 0, mexi: 0, prontas: 0, falta: 0, fiz: 0, escondidas: 0 };
+/* As que ele jogou fora somem da tela, mas não do disco — e a coluna "escondidas" traz de
+ * volta. Excluir rápido só é seguro se desfazer também for rápido. */
+let lnVerEscondidas = false;
 const LN_MEXI = (l) => !!(l.posicao?.meu || l.ponto?.meu || l.confirmei);
 const LN_PRONTA = (l) => !!(l.posicao?.meu && l.ponto?.meu);
 const LN_FILTROS = {
@@ -4485,9 +4506,16 @@ function lnColunasDoFiltro(){
       onclick="lnFiltrarMinhas('${chave === 'todas' ? '' : chave}')" title="${esc(dica)}"
       aria-pressed="${ligado}"><b>${n}</b><span>${esc(nome)}</span></button>`;
   };
-  return `<div class="lnCols">
+  /* A coluna das escondidas só existe quando há alguma, e é ela que desfaz: clicar mostra só
+   * as jogadas fora, cada uma com "trazer de volta". É o par do ✕ — excluir rápido só é
+   * seguro se desfazer também for rápido, e à vista. */
+  const esc0 = c.escondidas ? `<button class="lnCol jogadaFora${lnVerEscondidas ? ' on' : ''}"
+      onclick="lnVerJogadasFora()" title="as que você tirou do mapa — clica pra ver e trazer de volta"
+      aria-pressed="${lnVerEscondidas}"><b>${c.escondidas}</b><span>na lixeira</span></button>` : '';
+  return `<div class="lnCols${c.escondidas ? ' comLixeira' : ''}">
     ${col('todas', c.todas, 'todas', 'sem filtro: tudo o que a busca achou')}
     ${['mexi', 'prontas', 'fiz', 'falta'].map((k) => col(k, c[k], LN_FILTROS[k].nome, LN_FILTROS[k].dica)).join('')}
+    ${esc0}
   </div>`;
 }
 
@@ -4509,6 +4537,46 @@ function lnFiltrarMinhas(qual){
   lnFiltrarEDedupar();
   lnPintarResumo();
   lnDesenharMapa();
+}
+
+/**
+ * JOGAR UMA LINEUP FORA — o ✕ do marcador e a tecla.
+ *
+ * Pedido dele: "me da o poder de excluir lineup do mapa rapido". Até aqui só dava pra tirar
+ * o VÍDEO inteiro, o que leva junto as outras 40 do mesmo canal.
+ *
+ * Some da tela na hora, antes de o servidor responder: ele vai jogar fora em série, e
+ * esperar a rede a cada clique faria cada ✕ custar meio segundo. Se a gravação falhar, a
+ * lineup volta e o registro diz.
+ */
+async function lnJogarFora(i, fora = true){
+  const l = lnAchadas[i];
+  if (!l) return;
+  l.escondida = fora ? Date.now() : null;
+  if (lnClipe === l) lnFecharClipe();
+  /* O pino fica ABERTO. Fechar parecia arrumação e na prática quebrava o pedido dele —
+   * "excluir lineup do mapa rápido" é jogar fora várias seguidas do mesmo leque, e fechar
+   * fazia cada ✕ custar um clique a mais pra reabrir. Medido no teste: de três cliques
+   * seguidos, só o primeiro acontecia. */
+  lnFiltrarEDedupar(); lnPintarResumo(); lnDesenharMapa();
+  try {
+    const r = await fetch('/api/val/esconder', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ video: l.video, segundo: l.segundo, esconder: fora }),
+    }).then(x => x.json());
+    if (r?.erro) throw new Error(r.erro);
+  } catch {
+    l.escondida = fora ? null : Date.now();      // não gravou: desfaz na tela também
+    lnFiltrarEDedupar(); lnPintarResumo(); lnDesenharMapa();
+  }
+}
+
+/** A lixeira: mostra só as que ele jogou fora, pra poder trazer de volta. */
+function lnVerJogadasFora(){
+  lnVerEscondidas = !lnVerEscondidas;
+  if (lnVerEscondidas) lnSoMinhas = '';      // os dois filtros juntos só confundem
+  lnPinoAtivo = null;
+  lnFiltrarEDedupar(); lnPintarResumo(); lnDesenharMapa();
 }
 
 /** Mostra/esconde as do outro lado. Sem refazer busca: é filtro no que já está carregado. */
@@ -4709,13 +4777,18 @@ function lnFiltrarEDedupar(){
   /* E o filtro do que ele mesmo mexeu. Entra aqui junto dos outros, na FONTE, pra valer
    * também no mapa e na tira — filtro que só mexe na lista e deixa o mapa cheio confunde
    * mais do que ajuda. Os contadores saem do que sobrou do lado, não do acervo inteiro. */
-  const doLado = uma.filter(l => (lnMisturarLados || certa(l)) && !(lnEsconderMudas && !l.lado));
+  const todasDoLado = uma.filter(l => (lnMisturarLados || certa(l)) && !(lnEsconderMudas && !l.lado));
+  // o que ele jogou fora sai daqui; ver as escondidas é ver SÓ elas, senão não dá pra achar
+  const doLado = lnVerEscondidas
+    ? todasDoLado.filter(l => l.escondida)
+    : todasDoLado.filter(l => !l.escondida);
   lnContaMinhas = {
     todas: doLado.length,
     mexi: doLado.filter(LN_MEXI).length,
     prontas: doLado.filter(LN_PRONTA).length,
     falta: doLado.filter(l => !LN_MEXI(l)).length,
     fiz: doLado.filter(l => l.confirmei).length,
+    escondidas: todasDoLado.filter(l => l.escondida).length,
   };
   const filtro = LN_FILTROS[lnSoMinhas];
   lnAchadas = filtro ? doLado.filter(filtro.teste) : doLado;
@@ -4848,6 +4921,24 @@ function lnDesenharMapa(){
   // praticamente no mesmo lugar e um cobre o outro. Mesma separação do leque.
   const pinos = lnAfastar(lnPinos(), longe(LN_LONGE_PINO));
   // mapa sem pino nenhum confunde mais do que ajuda: diz o porquê em vez de mostrar vazio
+  /* NA LIXEIRA, LISTA — não mapa.
+   *
+   * O ✕ mora no marcador, e marcador só existe dentro de um leque aberto. Na lixeira isso
+   * deixava o "trazer de volta" inalcançável: sem pino aberto, sem ✕. E mapa de lixeira não
+   * informa nada — o que ele quer ali é ler o nome e decidir se volta. */
+  if (lnVerEscondidas) {
+    $('#lnMapaCx').classList.remove('comTira');
+    $('#lnMapaCx').innerHTML = lnAchadas.length
+      ? `<div class="lnSemLugar lnLixeira">
+          <b>${lnAchadas.length === 1 ? 'uma lineup' : `${lnAchadas.length} lineups`} que você tirou do mapa</b>
+          <small>elas sumiram da tela, não do disco — clica pra trazer de volta</small>
+          <div class="lnChips">${lnAchadas.map((l, k) => `
+            <button class="lnChip" onclick="lnJogarFora(${k}, false)" title="trazer ${esc(l.nome)} de volta pro mapa">
+              ${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}<span>↩ ${esc(lnNomeCurto(l))}</span></button>`).join('')}</div>
+        </div>`
+      : `<div class="vazio">a lixeira deste mapa está vazia</div>`;
+    return;
+  }
   if (!pinos.length) {
     // quem esvaziou o mapa foi o filtro? então diga isso, e não "vieram sem ponto"
     $('#lnMapaCx').innerHTML = lnSoMinhas
@@ -4996,6 +5087,8 @@ function lnDesenharMapa(){
           ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">`
             : x.l.habilidade?.icone ? `<img src="${esc(x.l.habilidade.icone)}" alt="">` : '<b>•</b>'}
           ${x.l.posicao?.meu ? '<i class="lnMeuSelo">✓</i>' : ''}
+          <i class="lnJogarFora" title="${lnVerEscondidas ? 'trazer de volta pro mapa' : 'tirar esta lineup do mapa'}"
+             onclick="event.stopPropagation();lnJogarFora(${x.i}, ${!lnVerEscondidas})">${lnVerEscondidas ? '↩' : '✕'}</i>
           ${x.embaixo ? `<i class="lnDeN" title="mais ${x.embaixo} marcada${x.embaixo > 1 ? 's' : ''} neste mesmo ponto — estão na tira do lado">+${x.embaixo}</i>` : ''}
           <span class="lnDeNome">${esc(lnNomeCurto(x.l))}</span>
         </button>`).join('')}
@@ -6133,6 +6226,8 @@ document.addEventListener('keydown', (e) => {
   // nunca roubar tecla de quem está digitando num campo
   if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
   const acao = { m: () => lnMarcar('posicao'), n: () => lnMarcar('alvo'), c: () => lnConfirmar(!lnClipe?.confirmei),
+                 // Delete joga fora a que está aberta: é a tecla que todo mundo já tenta
+                 Delete: () => lnJogarFora(lnAchadas.indexOf(lnClipe), !lnClipe?.escondida),
                  ArrowRight: () => lnIrPara(1), ArrowLeft: () => lnIrPara(-1) }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
   if (!acao) return;
   e.preventDefault();
