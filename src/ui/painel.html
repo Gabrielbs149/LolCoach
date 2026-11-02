@@ -4429,6 +4429,8 @@ function lnQuantas(){
   const n = lnAchadas.length;
   // com filtro ligado, o total vira "12 de 187": senão some o resto sem dizer que sumiu
   const deQuantas = lnSoMinhas && lnContaMinhas.todas > n ? ` de ${lnContaMinhas.todas}` : '';
+  // "0 de 1 lineups" estava errado: com "de N", quem manda no plural é o N, não o zero
+  const quantasPraPlural = deQuantas ? lnContaMinhas.todas : n;
   const ag = lnCatalogo?.agentes?.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
   const quais = hab ? ` de ${esc(hab.nome)}` : '';
@@ -4469,7 +4471,7 @@ function lnQuantas(){
     + mostra('prontas', c.prontas)
     + mostra('fiz', c.fiz)
     + mostra('falta', c.mexi && c.falta);
-  return `${n}${deQuantas} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${meus}${semLado}${fora}`;
+  return `${n}${deQuantas} lineup${quantasPraPlural === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${meus}${semLado}${fora}`;
 }
 
 /** Mostra/esconde as que não dizem o lado. Filtro no que já está carregado, instantâneo. */
