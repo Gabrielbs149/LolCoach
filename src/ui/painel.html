@@ -1108,9 +1108,14 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnMapa.espiando .lnPino.espiado .lnPinoNome{opacity:1;color:#fff}
 /* o retrato e a linha espiados nascem menores e sem o contorno forte do fixado: o clique
    continua sendo o que compromete a tela */
-.lnMapa.espiando .lnDeMapa{transform:translate(-50%,-50%) scale(.88)}
+/* O `:not(.focado):not(.apagado)` existe porque senão ESTA regra atropela o foco: ela é
+   mais específica (0,3,0) que `.lnRota.focado` e `.lnRota.apagado` (0,2,0), e aí, espiando,
+   passar o mouse num retrato não mudava nada — medido: a rota em foco e a apagada ficavam
+   as duas em 0,55. É a mesma armadilha do pino, que já tinha mordido hoje: regra nova de
+   estado no mapa precisa deixar o foco passar. */
+.lnMapa.espiando .lnDeMapa:not(.focado){transform:translate(-50%,-50%) scale(.88)}
 .lnMapa.espiando .lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.1)}
-.lnMapa.espiando .lnRota{stroke:#cfe9e4;opacity:.55}
+.lnMapa.espiando .lnRota:not(.focado):not(.apagado){stroke:#cfe9e4;opacity:.55}
 .lnMapa.espiando .lnDeNome{opacity:0}
 
 .lnCols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 10px}
