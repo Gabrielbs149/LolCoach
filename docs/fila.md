@@ -109,6 +109,12 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.293** — o mapinha parou de mostrar margem preta da arte: o recorte agora é preso na
+  parte JOGÁVEL (caixa dos callouts), não na borda do PNG. Medido em 1.354 lineups:
+  mediana 5% → 0% de preto, e com mais de 15% de preto **331 → 4**.
+  **Lição: procurei "elemento fora do lugar" em quatro estados e não achei; o defeito só
+  apareceu quando medi a coisa certa (quanto do mapinha era margem preta).**
+
 - **2.28.292** — ✕ no marcador e tecla Delete pra tirar UMA lineup do mapa (antes só dava
   pra tirar o vídeo inteiro), com coluna "na lixeira" pra trazer de volta.
 

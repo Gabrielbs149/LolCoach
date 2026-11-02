@@ -2112,3 +2112,74 @@ test('valorant: jogar uma lineup fora não apaga o que ele marcou, e volta intei
     if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
   }
 });
+
+/* ------------------------------------------- o mapinha cortado
+ *
+ * Ele mandou a foto: "cortou um mapa, testa todos". A arte da Riot vem num quadrado de
+ * 1024 com o mapa no miolo e margem preta em volta -- medido pela caixa dos callouts, o
+ * Lotus usa 49% da imagem. O recorte do mapinha so era preso em 0..1, entao lineup perto
+ * da beirada puxava a janela pra cima da margem e metade do mapinha vinha preta.
+ *
+ * Medido nos 13 mapas, 1.354 lineups: margem preta mediana 5% -> 0%, e as com mais de 15%
+ * de preto 331 -> 4 (as 4 que sobram cruzam o mapa inteiro no Split, onde janela quadrada
+ * nao cabe na area jogavel -- aquilo nao e defeito, e geometria).
+ */
+test('lineups: o recorte do mapinha nao sai da parte jogavel do mapa', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  // uma arte com margem larga, como a do Lotus: o jogavel e um pedaco no meio
+  const cercado = `
+    const JANELA = { x0: 0.20, y0: 0.30, lx: 0.60, ly: 0.40 };
+    const lnJanelaDoMapa = () => JANELA;
+    const LN_FOLGA = 0.06;
+    const extras = { janela: () => JANELA };
+  `;
+  const t = await funcoesDaTela('painel.html',
+    ['lnPrenderNoJogavel', 'lnRecorte', 'lnRecorteEm'], cercado);
+  const j = t.janela();
+
+  /** quanto do recorte cai FORA da parte jogavel (0 = nada de margem preta) */
+  const preto = (r) => {
+    const dx = Math.max(0, Math.min(r.x + r.lado, j.x0 + j.lx) - Math.max(r.x, j.x0));
+    const dy = Math.max(0, Math.min(r.y + r.lado, j.y0 + j.ly) - Math.max(r.y, j.y0));
+    return 1 - (dx * dy) / (r.lado * r.lado);
+  };
+  /* A conta passa por divisao e subtracao, entao "zero" sai -2e-16. Comparar com zero
+   * cravado reprova codigo certo; um decimo de por cento ja e menos que um pixel. */
+  const semPreto = (r, oQue) => assert.ok(preto(r) < 0.001, `${oQue}: ${(preto(r) * 100).toFixed(2)}% de margem preta`);
+
+  // ponto no canto de cima e da esquerda do jogavel: o pior caso do defeito
+  const canto = t.lnRecorte(null, { x: j.x0 + 0.02, y: j.y0 + 0.02 });
+  semPreto(canto, 'lineup na beirada nao pode abrir mapinha meio preto');
+  assert.ok(canto.x >= j.x0 - 1e-9 && canto.y >= j.y0 - 1e-9, 'nao comeca antes do jogavel');
+
+  // e no canto oposto
+  const outro = t.lnRecorte(null, { x: j.x0 + j.lx - 0.02, y: j.y0 + j.ly - 0.02 });
+  semPreto(outro, 'nem no canto oposto');
+  assert.ok(outro.x + outro.lado <= j.x0 + j.lx + 1e-9, 'nem passa do fim do jogavel');
+
+  // o ponto marcado CONTINUA dentro do recorte: prender nao pode empurrar o alvo pra fora
+  for (const p of [{ x: j.x0 + 0.01, y: j.y0 + 0.01 }, { x: j.x0 + j.lx - 0.01, y: j.y0 + j.ly - 0.01 }]) {
+    const r = t.lnRecorte(null, p);
+    assert.ok(p.x >= r.x && p.x <= r.x + r.lado, 'o ponto sumiu do recorte no eixo x');
+    assert.ok(p.y >= r.y && p.y <= r.y + r.lado, 'o ponto sumiu do recorte no eixo y');
+  }
+
+  // as duas pontas de uma rota longa continuam visiveis
+  const a = { x: j.x0 + 0.03, y: j.y0 + 0.03 }, b = { x: j.x0 + j.lx - 0.03, y: j.y0 + j.ly - 0.03 };
+  const rota = t.lnRecorte(a, b);
+  for (const p of [a, b]) {
+    assert.ok(p.x >= rota.x - 1e-9 && p.x <= rota.x + rota.lado + 1e-9, 'ponta fora do recorte');
+    assert.ok(p.y >= rota.y - 1e-9 && p.y <= rota.y + rota.lado + 1e-9, 'ponta fora do recorte');
+  }
+
+  /* Quando a janela quadrada e MAIOR que o jogavel naquele eixo nao ha o que prender:
+   * centraliza. Aqui o jogavel tem 0,40 de altura e o recorte 0,60 -- sobra preto em cima
+   * e embaixo, e isso e geometria, nao defeito. O que nao pode e ficar torto pra um lado. */
+  const grande = t.lnPrenderNoJogavel(0, 0.60, 'y');
+  assert.ok(Math.abs((grande + 0.30) - (j.y0 + j.ly / 2)) < 1e-9, 'recorte maior que o jogavel fica centrado nele');
+
+  // o recorte de marcar usa a mesma conta
+  const marcar = t.lnRecorteEm({ x: j.x0 + 0.01, y: j.y0 + 0.01 }, 0.2);
+  semPreto(marcar, 'marcar na beirada tambem nao pode abrir no escuro');
+});
