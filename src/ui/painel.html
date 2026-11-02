@@ -1064,10 +1064,23 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 /* ponto que ELE marcou: o único que é exato de verdade, então é o que mais aparece */
 .lnDeMapa.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 12px var(--ouro)}
 .lnPino.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 10px #f0b90b66}
-/* o filtro do que é dele usa o dourado, que no resto da tela já quer dizer "isto é seu";
-   o de confirmada usa o verde, pelo mesmo motivo. */
-.lnMeuFiltro.on{border-color:var(--ouro);color:var(--ouro)}
-.lnMeuFiltro.feito.on{border-color:var(--vit);color:var(--vit)}
+/* AS COLUNAS DO FILTRO. Barra própria, fora da frase do resumo: a primeira tentativa foi
+   botão no meio do texto entre pontinhos e ele não conseguiu nem ver o que clicava.
+   Número em cima, nome embaixo, largura igual — e a ligada em dourado, que no resto da
+   tela já quer dizer "isto é seu"; a de confirmada em verde, pelo mesmo motivo. */
+.lnCols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 10px}
+.lnCol{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 6px;
+  border:1px solid var(--borda);border-radius:var(--r-m);background:var(--f1);color:var(--fraco);
+  font-family:inherit;cursor:pointer;transition:border-color .12s,background .12s,color .12s}
+.lnCol:hover{border-color:var(--borda-forte);background:var(--f2)}
+.lnCol b{font-size:17px;line-height:1.1;color:var(--texto);font-weight:700}
+.lnCol span{font-size:11px;line-height:1.2;text-align:center}
+.lnCol.on{border-color:var(--ouro);background:#1a1710;color:var(--ouro)}
+.lnCol.on b{color:var(--ouro)}
+.lnCol.feito.on{border-color:var(--vit);background:#101e18;color:var(--vit)}
+.lnCol.feito.on b{color:var(--vit)}
+/* numa janela estreita cinco colunas viram palavra cortada; aí empilha de duas em duas */
+@media (max-width:760px){ .lnCols{grid-template-columns:repeat(2,minmax(0,1fr))} }
 
 .lnMeuSelo{position:absolute;right:-6px;bottom:-5px;font-style:normal;font-size:9px;line-height:1;
   background:var(--ouro);color:#0b1016;border-radius:50%;padding:2px 3px;font-weight:900}
@@ -4421,7 +4434,8 @@ function lnEscolherHab(v){
 
 /** A linha de cima do mapa. Num lugar só: ela muda quando ele marca um ponto também. */
 function lnPintarResumo(){
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
+  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`
+    + lnColunasDoFiltro();
 }
 
 /** "83 de Incendiário · 7 canais · 40 de ataque · 18 sem lado · 24 de defesa fora". */
@@ -4447,31 +4461,34 @@ function lnQuantas(){
     ? ` · <button class="lnMisturar on" onclick="lnTrocarMudas()" title="mostrar de novo as que não dizem o lado">${lnMudasFora} sem lado fora</button>`
     : mudas ? ` · <button class="lnMisturar" onclick="lnTrocarMudas()" title="esconder as que não dizem de que lado são">${mudas} sem lado</button>` : '';
   const conf = certas ? ` · ${certas} de ${LADO_NOME[lnLadoAtual]}` : '';
-  /* O QUE ELE JÁ MEXEU — e o que falta.
-   *
-   * Antes isto era só texto ("12 com ponto seu"), que informa e não serve pra nada. Agora
-   * cada número é um botão que filtra, porque era isso que ele queria: "adiciona um filtro
-   * pra selecionar as que eu ja mexi e que ja estao perfeitas" — e, no mesmo fôlego, "to
-   * vendo q tem muita mesmo acumulada mas sem correcao".
-   *
-   * O "falta mexer" aparece por último e só quando há alguma mexida: numa combinação em que
-   * ele nunca marcou nada, "falta mexer: 187" seria só repetir o total com outro nome. */
+  return `${n}${deQuantas} lineup${quantasPraPlural === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${semLado}${fora}`;
+}
+
+/**
+ * AS COLUNAS DO FILTRO.
+ *
+ * A primeira tentativa (2.28.290) foi pôr os números como botões DENTRO da frase do resumo,
+ * entre pontinhos, junto de outros três botões e de texto que não clica. Resposta dele:
+ * "meu deus q filtro é esse vei??? nem consegui usar isso de tao estranho, faz um em
+ * colunas normal". Tinha razão — não dava nem pra ver o que era clicável.
+ *
+ * Agora é uma barra própria, fora da frase: uma coluna por filtro, número em cima e nome
+ * embaixo, a ligada em destaque. E "todas" é uma coluna como as outras, porque na versão
+ * anterior desligar o filtro era clicar de novo no mesmo botão — ninguém adivinha isso.
+ */
+function lnColunasDoFiltro(){
   const c = lnContaMinhas;
-  const botao = (chave, n) => {
-    const f = LN_FILTROS[chave];
-    const ligado = lnSoMinhas === chave;
-    return ` · <button class="lnMisturar lnMeuFiltro${chave === 'fiz' ? ' feito' : ''}${ligado ? ' on' : ''}" onclick="lnFiltrarMinhas('${chave}')"
-      title="${esc(ligado ? 'clica de novo pra ver todas' : f.dica)}">${n} ${f.nome}</button>`;
+  if (!c.todas) return '';
+  const col = (chave, n, nome, dica) => {
+    const ligado = (lnSoMinhas || 'todas') === chave;
+    return `<button class="lnCol${chave === 'fiz' ? ' feito' : ''}${ligado ? ' on' : ''}"
+      onclick="lnFiltrarMinhas('${chave === 'todas' ? '' : chave}')" title="${esc(dica)}"
+      aria-pressed="${ligado}"><b>${n}</b><span>${esc(nome)}</span></button>`;
   };
-  /* O botão do filtro LIGADO aparece sempre, mesmo zerado. Senão acontece isto: ele filtra
-   * "prontas", troca de mapa, o mapa novo não tem nenhuma pronta, o botão some — e ele fica
-   * preso numa lista vazia sem nada pra clicar e desligar. */
-  const mostra = (chave, quando) => (quando || lnSoMinhas === chave ? botao(chave, c[chave]) : '');
-  const meus = mostra('mexi', c.mexi)
-    + mostra('prontas', c.prontas)
-    + mostra('fiz', c.fiz)
-    + mostra('falta', c.mexi && c.falta);
-  return `${n}${deQuantas} lineup${quantasPraPlural === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${meus}${semLado}${fora}`;
+  return `<div class="lnCols">
+    ${col('todas', c.todas, 'todas', 'sem filtro: tudo o que a busca achou')}
+    ${['mexi', 'prontas', 'fiz', 'falta'].map((k) => col(k, c[k], LN_FILTROS[k].nome, LN_FILTROS[k].dica)).join('')}
+  </div>`;
 }
 
 /** Mostra/esconde as que não dizem o lado. Filtro no que já está carregado, instantâneo. */
@@ -4485,7 +4502,9 @@ function lnTrocarMudas(){
 
 /** Liga/desliga o filtro do que ele já mexeu. Clicar no que já está ligado volta pra todas. */
 function lnFiltrarMinhas(qual){
-  lnSoMinhas = lnSoMinhas === qual ? '' : qual;
+  // a coluna "todas" manda '' pra cá; as outras mandam a chave e mandam mesmo quando já
+  // estão ligadas — quem desliga é o "todas", que está à vista
+  lnSoMinhas = qual || '';
   lnPinoAtivo = null;
   lnFiltrarEDedupar();
   lnPintarResumo();

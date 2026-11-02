@@ -109,6 +109,11 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.291** — o filtro da .290 refeito em colunas depois de ele dizer que não conseguiu
+  usar. Barra própria com cinco colunas iguais, "todas" entre elas pra desligar à vista.
+  **Regra daqui pra frente: controle novo ganha lugar próprio, não entra como mais um
+  `· botão` no meio da frase do resumo.**
+
 - **2.28.290** — filtro "mexi nelas / prontas / fiz e funcionou / falta mexer" no resumo,
   valendo também no mapa. "Pronta" = os dois pontos marcados à mão (medido: zero das 30
   marcas dele tem os dois MAIS a confirmação, então exigir as três deixaria o filtro vazio).
