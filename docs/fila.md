@@ -109,6 +109,9 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.295** — setas e Delete continuam funcionando quando a lineup aberta sai da lista
+  (dizer o lado contrário ao filtro tirava ela e matava as teclas, calado).
+
 - **2.28.294** — passar o mouse numa lineup apaga o mapa inteiro menos ela (os PINOS também,
   que era o que faltava) e a rota em foco fica branca; mais botões e teclas **A**/**D** pra
   ele dizer se é ataque ou defesa, que resolve as 53,5% do acervo sem lado dito.

@@ -4416,6 +4416,11 @@ let lnContaMinhas = { todas: 0, mexi: 0, prontas: 0, falta: 0, fiz: 0, escondida
 /* As que ele jogou fora somem da tela, mas não do disco — e a coluna "escondidas" traz de
  * volta. Excluir rápido só é seguro se desfazer também for rápido. */
 let lnVerEscondidas = false;
+/* Onde o clipe aberto estava na lista. Existe porque a lineup aberta PODE sair da lista
+ * debaixo dele: dizer "esta é de defesa" com ele no ataque tira a lineup do filtro na
+ * hora, e isso está certo — é o que ele acabou de afirmar. Só que aí `indexOf` dá -1 e as
+ * teclas morriam caladas. Medido: depois de um D, → e Delete não faziam mais nada. */
+let lnOndeEstava = -1;
 const LN_MEXI = (l) => !!(l.posicao?.meu || l.ponto?.meu || l.confirmei);
 const LN_PRONTA = (l) => !!(l.posicao?.meu && l.ponto?.meu);
 const LN_FILTROS = {
@@ -4588,7 +4593,9 @@ function lnFiltrarMinhas(qual){
  * lineup volta e o registro diz.
  */
 async function lnJogarFora(i, fora = true){
-  const l = lnAchadas[i];
+  // aceita o índice (que é o que o marcador e as fichas da lixeira mandam) ou a própria
+  // lineup — o Delete manda o clipe aberto, que pode já ter saído da lista
+  const l = typeof i === 'object' && i ? i : lnAchadas[i];
   if (!l) return;
   l.escondida = fora ? Date.now() : null;
   if (lnClipe === l) lnFecharClipe();
@@ -5700,7 +5707,16 @@ function lnIrPara(passo){
   // as lineups do ponto aberto; sem ponto aberto, a lista inteira que a busca achou
   const lista = pino?.lista?.length ? pino.lista : lnAchadas;
   const i = lista.indexOf(lnClipe);
-  const prox = i >= 0 ? lista[i + passo] : null;
+  /* Clipe fora da lista: ele acabou de dizer um lado que tirou a lineup do filtro, ou
+   * jogou fora a vizinha. A tecla não pode morrer calada — segue da vaga onde ela estava.
+   * Indo pra frente, quem entrou naquela vaga JÁ é a próxima (a lista encurtou), então o
+   * passo é zero; indo pra trás, é a de antes. */
+  let prox;
+  if (i >= 0) prox = lista[i + passo];
+  else {
+    const vaga = Math.max(0, Math.min(lista.length - 1, lnOndeEstava));
+    prox = passo > 0 ? lista[vaga] : lista[vaga - 1] ?? lista[0];
+  }
   if (!prox) return;
   const j = lnAchadas.indexOf(prox);
   if (j >= 0) lnVer(j);
@@ -5932,6 +5948,7 @@ function lnBotoesDeMarcar(l){
  */
 function lnVer(i){
   const l = lnAchadas[i]; if (!l) return;
+  lnOndeEstava = i;
   lnClipe = l; lnTentouHD = 0; lnTeto(null); lnMarcando = null; lnQuerRecarregar = false;
   // player que tomou erro do YouTube não se reaproveita: a próxima lineup merece um novo
   const dePe = !lnPlayerRuim && $('.lnDetalhe') && lnPlayer?.loadVideoById && document.getElementById('lnYT');
@@ -6347,7 +6364,7 @@ document.addEventListener('keydown', (e) => {
   const acao = { m: () => lnMarcar('posicao'), n: () => lnMarcar('alvo'), c: () => lnConfirmar(!lnClipe?.confirmei),
                  a: () => lnDizerLado('atacando'), d: () => lnDizerLado('defendendo'),
                  // Delete joga fora a que está aberta: é a tecla que todo mundo já tenta
-                 Delete: () => lnJogarFora(lnAchadas.indexOf(lnClipe), !lnClipe?.escondida),
+                 Delete: () => lnJogarFora(lnClipe, !lnClipe?.escondida),
                  ArrowRight: () => lnIrPara(1), ArrowLeft: () => lnIrPara(-1) }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
   if (!acao) return;
   e.preventDefault();

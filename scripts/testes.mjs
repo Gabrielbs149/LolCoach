@@ -2243,3 +2243,75 @@ test('valorant: o lado dito por ele ganha da dedução, e desfazer devolve a ded
     if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
   }
 });
+
+/* ------------------------------------ a tecla nao pode morrer calada
+ *
+ * A lineup ABERTA pode sair da lista debaixo dele: dizer "esta e de defesa" com ele no
+ * ataque tira a lineup do filtro na hora, e isso esta certo -- e o que ele acabou de
+ * afirmar. So que ai o indexOf da -1, e o lnIrPara desistia: medido na tela, depois de um
+ * D as setas e o Delete nao faziam mais nada, sem erro e sem aviso.
+ */
+test('lineups: as setas continuam andando quando a lineup aberta sai da lista', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  const cercado = `
+    let lnAchadas = [], lnClipe = null, lnPinoAtivo = null, lnOndeEstava = -1;
+    const vistas = [];
+    const lnPinos = () => [];                 // sem pino aberto: a lista e a da busca
+    const lnVer = (i) => { const l = lnAchadas[i]; if (!l) return; lnOndeEstava = i; lnClipe = l; vistas.push(l.nome); };
+    const extras = {
+      pôr: (ls) => { lnAchadas = ls; lnClipe = null; lnOndeEstava = -1; vistas.length = 0; },
+      abrir: (i) => lnVer(i),
+      tirar: (l) => { lnAchadas = lnAchadas.filter((x) => x !== l); },   // o filtro tirou ela
+      clipe: () => lnClipe,
+      vistas: () => vistas.slice(),
+    };
+  `;
+  const t = await funcoesDaTela('painel.html', ['lnIrPara'], cercado);
+  const lista = () => ['a', 'b', 'c', 'd', 'e'].map((n) => ({ nome: n }));
+
+  // o caminho normal continua igual
+  let ls = lista();
+  t.pôr(ls); t.abrir(2);
+  t.lnIrPara(1);
+  assert.equal(t.clipe().nome, 'd');
+  t.lnIrPara(-1);
+  assert.equal(t.clipe().nome, 'c');
+
+  // a aberta sai da lista e ele aperta ->: vai pra quem entrou na vaga dela
+  ls = lista();
+  t.pôr(ls); t.abrir(2);                 // abriu 'c', na vaga 2
+  const c = t.clipe();
+  t.tirar(c);                            // a lista vira a,b,d,e -- 'd' esta na vaga 2
+  t.lnIrPara(1);
+  assert.equal(t.clipe().nome, 'd', 'a seta tem que andar, nao morrer calada');
+
+  // e pra tras, a de antes da vaga
+  ls = lista();
+  t.pôr(ls); t.abrir(2);
+  t.tirar(t.clipe());
+  t.lnIrPara(-1);
+  assert.equal(t.clipe().nome, 'b');
+
+  // saiu a PRIMEIRA e ele volta: nao pode cair fora da lista nem travar
+  ls = lista();
+  t.pôr(ls); t.abrir(0);
+  t.tirar(t.clipe());
+  t.lnIrPara(-1);
+  assert.ok(t.clipe(), 'voltar da primeira tem que parar em alguma, nao em nada');
+
+  // saiu a ULTIMA e ele avanca: nao existe proxima, e tudo bem -- so nao pode quebrar
+  ls = lista();
+  t.pôr(ls); t.abrir(4);
+  t.tirar(t.clipe());
+  const antes = t.clipe().nome;
+  t.lnIrPara(1);
+  assert.ok(t.clipe().nome !== undefined, 'avancar da ultima nao pode deixar o clipe quebrado');
+  assert.ok([antes, 'e', 'd'].includes(t.clipe().nome));
+
+  // lista de uma so, que sai: nao ha pra onde ir, e isso nao e erro
+  t.pôr([{ nome: 'unica' }]); t.abrir(0);
+  t.tirar(t.clipe());
+  t.lnIrPara(1);
+  assert.equal(t.clipe().nome, 'unica', 'sem pra onde ir, fica onde esta');
+});
