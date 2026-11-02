@@ -109,6 +109,12 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **Clipes do Outplayed — engavetado no ramo `clipes-outplayed`.** Medido: o Outplayed grava
+  Valorant como destaque (1.066 clipes, mediana 14 s, 8–13% de cada partida), não partida
+  inteira. Ele viu os números e disse "esquece, só com esses clipes vai ser impossível".
+  Código pronto e testado no ramo; volta com `git merge clipes-outplayed` se a gravação de
+  partida inteira do Valorant for ligada no Outplayed. **Não reabrir sem esse dado novo.**
+
 - **2.28.289** — o mapa de marcar cresce enquanto ele marca: 226 → 536 px, nomes de canto
   sobrepostos **16 → 1**, precisão do segundo clique de ~10 cm pra 4 cm por pixel.
 
