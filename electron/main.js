@@ -9,6 +9,7 @@ import { iniciarDaemon } from '../src/daemon.js';
 import { criarServidor, criarEstado } from '../src/ui/servidor.js';
 import { situacaoDoValorant } from '../src/valorant/jogo.js';
 import { quandoTentarDeNovo } from '../src/dados/tentar-de-novo.js';
+import { anotarPartida } from '../src/valorant/partidas.js';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 // Notificação do Windows só fora de partida e de seleção — nada de roubar
@@ -371,6 +372,11 @@ function olharValorant() {
     // guarda o que acabou de ser lido: de graça, e e quem responde "da pra fazer coisa
     // pesada agora?" sem ninguem precisar abrir outro laco em cima do cliente
     estado.set('valorant', { ...v, em: Date.now() });
+    /* O diario das partidas: que mapa, que agente, de que hora a que hora. E o que
+       transforma "o clipe das 21:29" nos videos do Outplayed em "Lotus, de Fade" — o app
+       e o unico que sabe isso, e ate agora nao escrevia em lugar nenhum. */
+    anotarPartida({ estado: v?.estado ?? null, mapa: v?.mapa ?? null, agenteId: v?.agenteId ?? null, fila: v?.fila ?? null })
+      .catch(() => {});
     const antes = valEstado;
     valEstado = v?.estado ?? null;
     if (antes !== valEstado) {

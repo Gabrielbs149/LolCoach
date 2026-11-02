@@ -749,6 +749,64 @@ test('lado: cabeçalho de seção passa o lado adiante, nome de lineup não', as
 
 /* As duas pontas de uma lineup: onde a habilidade CAI e de onde ela SAI. O ponto no mapa
  * sai daqui, e é disto que ele reclamou ("pra mim tá sendo aleatório"). */
+test('valorant: o diario de partidas vira a ponte entre a hora do clipe e o mapa', async () => {
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-partidas-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const P = await import(`../src/valorant/partidas.js?d=${Date.now()}`);
+
+    /* O Outplayed grava numa pasta por SESSAO e cada clipe traz a hora no nome
+     * ("VALORANT 11-01-2026 21-29-19-146_7.mp4"), mas nada diz o MAPA. Quem sabe e o app,
+     * que le o estado de 6 em 6 segundos — e ate agora nao escrevia isso em lugar nenhum. */
+    const t0 = 1_700_000_000_000;
+    const min = (n) => t0 + n * 60_000;
+
+    // no menu nao anota nada
+    assert.equal(await P.anotarPartida({ estado: 'menu', mapa: null, agora: min(0) }), null);
+
+    // entrou numa partida: abre
+    const a = await P.anotarPartida({ estado: 'jogando', mapa: 'Lotus', agenteId: 'fade', agora: min(1) });
+    assert.equal(a.mapa, 'Lotus');
+
+    /* Seguiu jogando: NAO cria linha nova, so estica o fim. O laco real olha de 6 em 6
+     * segundos, entao o teste tambem olha de pouco em pouco — pular de 1 pra 30 minutos
+     * seria o app ter FICADO FORA do ar, que e outra coisa e merece linha nova mesmo. */
+    for (let n = 2; n <= 30; n++) {
+      await P.anotarPartida({ estado: 'jogando', mapa: 'Lotus', agenteId: 'fade', agora: min(n) });
+    }
+    assert.equal((await P.partidasGuardadas()).length, 1, 'uma partida, nao uma por volta do laco');
+
+    // a pergunta que o clipe faz: que mapa era as 21:29?
+    assert.equal((await P.partidaEm(min(15)))?.mapa, 'Lotus');
+    assert.equal((await P.partidaEm(min(90))), null, 'fora da partida, nao inventa');
+
+    // a folga cobre o clipe que comeca antes do app ver: o Outplayed guarda os segundos
+    // anteriores ao lance, e o laco so olha de 6 em 6 segundos
+    assert.equal((await P.partidaEm(min(1) - 60_000))?.mapa, 'Lotus', 'um minuto antes ainda conta');
+
+    // saiu e entrou em OUTRO mapa: duas partidas, cada uma com a sua janela
+    await P.anotarPartida({ estado: 'menu', mapa: null, agora: min(32) });
+    for (let n = 40; n <= 70; n++) {
+      await P.anotarPartida({ estado: 'jogando', mapa: 'Bind', agenteId: 'fade', agora: min(n) });
+    }
+    const todas = await P.partidasGuardadas();
+    assert.equal(todas.length, 2);
+    assert.equal(todas[0].mapa, 'Bind', 'a mais nova vem primeiro');
+    assert.equal((await P.partidaEm(min(50)))?.mapa, 'Bind');
+    assert.equal((await P.partidaEm(min(15)))?.mapa, 'Lotus', 'a antiga continua respondendo');
+
+    // e sobrevive a reabrir o app: o que importa esta no disco
+    P.esquecerDiario();
+    assert.equal((await P.partidaEm(min(15)))?.mapa, 'Lotus');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
 test('valorant: em fila conta como ocupado, e nao mexe no estado', async () => {
   const { lerPresenca } = await import('../src/valorant/jogo.js');
 
