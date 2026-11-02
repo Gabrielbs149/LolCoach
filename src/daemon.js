@@ -2589,6 +2589,12 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0),
       esconder: p.esconder !== false,
     }),
+    /* De que lado a lineup e, dito por ele. Metade do acervo nao diz, o parser ja chegou
+       no teto, e quem viu o clipe sabe. Marca dele ganha da deducao. */
+    valMarcarLado: (p = {}) => Lineups.marcarLado({
+      video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0),
+      lado: p.lado === 'atacando' || p.lado === 'defendendo' ? p.lado : null,
+    }),
     valEsquecerPonto: (p = {}) => Lineups.esquecerPonto({
       video: String(p.video ?? ''), segundo: Number(p.segundo ?? 0), qual: p.qual ? String(p.qual) : null,
     }),
@@ -2638,5 +2644,5 @@ const ACOES_DO_PAINEL = [
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
-  'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar', 'valEsconder',
+  'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar', 'valEsconder', 'valMarcarLado',
 ];

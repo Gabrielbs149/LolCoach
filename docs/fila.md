@@ -109,6 +109,12 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.294** — passar o mouse numa lineup apaga o mapa inteiro menos ela (os PINOS também,
+  que era o que faltava) e a rota em foco fica branca; mais botões e teclas **A**/**D** pra
+  ele dizer se é ataque ou defesa, que resolve as 53,5% do acervo sem lado dito.
+  De quebra, achado que o apagar das rotas **nunca funcionou**: `<mpath>` da SMIL apontando
+  pra linha trava a transição CSS de opacidade no Chromium.
+
 - **2.28.293** — o mapinha parou de mostrar margem preta da arte: o recorte agora é preso na
   parte JOGÁVEL (caixa dos callouts), não na borda do PNG. Medido em 1.354 lineups:
   mediana 5% → 0% de preto, e com mais de 15% de preto **331 → 4**.

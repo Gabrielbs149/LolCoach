@@ -659,6 +659,38 @@ export async function esconderLineup({ video, segundo, esconder = true } = {}) {
   return { ok: true, escondida: !!pontos[chave]?.escondida };
 }
 
+/**
+ * DIZER DE QUE LADO É, NA MÃO.
+ *
+ * Pedido dele: "preciso que tu coloque um negocio pra eu defini se é do ataque ou defesa".
+ * O lado hoje sai do texto do capítulo e do vídeo, e **4.358 das 8.150 lineups (53,5%) não
+ * dizem nada** — é metade do acervo aparecendo como "lado não dito". O parser já chegou no
+ * teto (ver o item 6 da fila); quem fecha a conta é ele, que viu o clipe.
+ *
+ * Marca dele ganha de qualquer dedução, igual aos pontos: ele estava vendo o vídeo.
+ * `lado: null` apaga a marca e devolve o que o texto dizia.
+ */
+export async function marcarLado({ video, segundo, lado = null } = {}) {
+  if (!video) return { erro: 'faltou o vídeo' };
+  if (lado !== null && lado !== 'atacando' && lado !== 'defendendo') {
+    return { erro: 'lado tem que ser atacando, defendendo ou nada' };
+  }
+  const pontos = { ...(await meusPontos()) };
+  const chave = chaveDoPonto(video, segundo);
+  const antes = pontos[chave] ?? {};
+  if (lado) {
+    pontos[chave] = { ...antes, lado };
+  } else {
+    const { lado: _fora, ...resto } = antes;
+    // tirar o lado não pode levar junto ponto, confirmação nem o "joguei fora"
+    if (resto.posicao || resto.alvo || resto.confirmei || resto.escondida) pontos[chave] = resto;
+    else delete pontos[chave];
+  }
+  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  pontosDele = pontos;
+  return { ok: true, lado: pontos[chave]?.lado ?? null };
+}
+
 /** Quantas ele jogou fora — pro resumo da tela. */
 export async function quantasEscondidas() {
   return Object.values(await meusPontos()).filter((p) => p?.escondida).length;
@@ -716,7 +748,7 @@ export async function comMeusPontos(r) {
   let mexeu = 0;
   const lineups = r.lineups.map((l) => {
     const meu = pontos[chaveDoPonto(l.video, l.segundo)];
-    if (!meu?.posicao && !meu?.alvo && !meu?.confirmei && !meu?.escondida) return l;
+    if (!meu?.posicao && !meu?.alvo && !meu?.confirmei && !meu?.escondida && !meu?.lado) return l;
     mexeu++;
     const batizar = (p, antes) => ({
       nome: calloutMaisPerto(p, callouts)?.nome ?? antes?.nome ?? 'o ponto que você marcou',
@@ -729,6 +761,8 @@ export async function comMeusPontos(r) {
       /* A escondida vem MARCADA, não filtrada. Quem tira da tela é a tela, pra "mostrar as
        * escondidas" e "trazer de volta" serem instantâneos — sem refazer busca nenhuma. */
       escondida: meu.escondida ?? null,
+      // o lado que ELE disse ganha do deduzido, e a pista vira "você que disse"
+      ...(meu.lado ? { lado: meu.lado, ladoPista: 'meu' } : {}),
       ponto: meu.alvo ? batizar(meu.alvo, l.ponto) : l.ponto,
       posicao: meu.posicao ? batizar(meu.posicao, l.posicao) : l.posicao,
     };

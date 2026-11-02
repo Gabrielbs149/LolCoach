@@ -2183,3 +2183,63 @@ test('lineups: o recorte do mapinha nao sai da parte jogavel do mapa', async () 
   const marcar = t.lnRecorteEm({ x: j.x0 + 0.01, y: j.y0 + 0.01 }, 0.2);
   semPreto(marcar, 'marcar na beirada tambem nao pode abrir no escuro');
 });
+
+test('valorant: o lado dito por ele ganha da dedução, e desfazer devolve a dedução', async () => {
+  const { mkdtemp } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-lado-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const L = await import(`../src/valorant/lineups.js?d=${Date.now()}`);
+
+    /* Pedido dele: "preciso que tu coloque um negocio pra eu defini se é do ataque ou
+     * defesa". Metade do acervo não diz o lado (4.358 de 8.150) e o parser já chegou no
+     * teto; quem viu o clipe sabe. */
+    const v = { video: 'abc123', segundo: 42 };
+    const comoVem = (lado, pista) => ({ lineups: [{ ...v, nome: 'x', lado, ladoPista: pista }], callouts: [] });
+
+    // o vídeo não disse nada: ele diz
+    assert.equal((await L.marcarLado({ ...v, lado: 'defendendo' })).lado, 'defendendo');
+    let r = await L.comMeusPontos(comoVem(null, null));
+    assert.equal(r.lineups[0].lado, 'defendendo');
+    assert.equal(r.lineups[0].ladoPista, 'meu', 'a pista diz que foi ele, pra tela não mentir');
+
+    // o vídeo dizia o CONTRÁRIO: o dele ganha, porque ele viu o clipe
+    r = await L.comMeusPontos(comoVem('atacando', 'nome'));
+    assert.equal(r.lineups[0].lado, 'defendendo');
+    assert.equal(r.lineups[0].ladoPista, 'meu');
+
+    // desmarcar devolve o que o texto dizia, e não deixa a lineup sem lado
+    assert.equal((await L.marcarLado({ ...v, lado: null })).lado, null);
+    r = await L.comMeusPontos(comoVem('atacando', 'nome'));
+    assert.equal(r.lineups[0].lado, 'atacando');
+    assert.equal(r.lineups[0].ladoPista, 'nome');
+
+    // lado inventado não entra
+    assert.ok((await L.marcarLado({ ...v, lado: 'meio' })).erro);
+    assert.ok((await L.marcarLado({ segundo: 1, lado: 'atacando' })).erro);
+
+    /* Os campos do arquivo são independentes: dizer o lado não pode mexer no ponto que ele
+     * marcou nem na confirmação, e tirar o lado não pode levá-los junto. */
+    await L.marcarPonto({ ...v, qual: 'posicao', x: 0.3, y: 0.4 });
+    await L.confirmarLineup({ ...v, confirmada: true });
+    await L.esconderLineup(v);
+    await L.marcarLado({ ...v, lado: 'atacando' });
+    await L.marcarLado({ ...v, lado: null });
+    r = await L.comMeusPontos(comoVem(null, null));
+    assert.equal(r.lineups[0].posicao?.meu, true, 'tirar o lado não apaga o ponto');
+    assert.ok(r.lineups[0].confirmei, 'nem a confirmação');
+    assert.ok(r.lineups[0].escondida, 'nem o "joguei fora"');
+
+    // e um lado sozinho some do arquivo ao ser tirado, sem deixar chave vazia
+    const so = { video: 'zzz999', segundo: 7 };
+    await L.marcarLado({ ...so, lado: 'defendendo' });
+    assert.equal(await L.quantosPontosMeus(), 2);
+    await L.marcarLado({ ...so, lado: null });
+    assert.equal(await L.quantosPontosMeus(), 1, 'não deixa chave vazia pra trás');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});

@@ -1032,13 +1032,44 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnDeMapa:hover{z-index:12}
 
 .lnLeque{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible}
-.lnRota{stroke:#49d6c0;stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.75;fill:none;
-  transition:opacity .15s}
+/* SEM `transition:opacity` AQUI, e o motivo e medido.
+ *
+ * A bolinha que corre pela rota tem um <animateMotion> com <mpath href="#lnRotaN">, ou
+ * seja, a SMIL aponta pra ESTA linha. Com isso o Chromium trava a transicao CSS de
+ * opacidade no path: medido na tela, a linha apagada ficava em 0,75 (o valor base) pra
+ * sempre em vez de ir pra 0,08, enquanto a bolinha, que nao e alvo de mpath, apagava
+ * normal. Tirando a transicao, a linha vai pro valor certo na hora.
+ *
+ * Ou seja: o apagar das rotas nunca tinha funcionado desde que foi escrito. So apareceu
+ * quando ele pediu o destaque ao passar o mouse e eu fui medir elemento por elemento. */
+.lnRota{stroke:#49d6c0;stroke-width:1.8;vector-effect:non-scaling-stroke;opacity:.75;fill:none}
 /* a bolinha corre pela rota, mostrando o caminho da habilidade */
-.lnBola{fill:#9ff5e4;filter:drop-shadow(0 0 3px #49d6c0);transition:opacity .15s}
+/* a bolinha é quem CARREGA o <animateMotion>, então sofre do mesmo que a linha: medido,
+   com transição ela ficava presa no valor base ao apagar. Sem transição o foco é
+   instantâneo, que pra passar o mouse é o que se quer mesmo. */
+.lnBola{fill:#9ff5e4;filter:drop-shadow(0 0 3px #49d6c0)}
 .lnRota.apagado,.lnBola.apagado{opacity:.08}
-.lnDeMapa.apagado{opacity:.3}
-.lnMapa.comFoco .lnCallout{opacity:.35}
+.lnDeMapa.apagado{opacity:.22}
+/* Com o leque aberto o pino já vive a 0,35 por `.lnMapa.comLeque .lnPino:not(.on)`, lá
+   embaixo no arquivo. Aquela regra tem a MESMA especificidade que `.lnMapa.comFoco
+   .lnPino.apagado` (0,4,0) e, empatando, ganha por vir depois — medido: o pino ficava em
+   0,35 em vez de apagar. O `:not(.on)` aqui desempata pela especificidade, que não depende
+   da ordem; mover a regra resolveria hoje e quebraria na próxima vez que alguém mexesse
+   na ordem do arquivo. */
+.lnMapa.comFoco .lnPino.apagado:not(.on){opacity:.14}
+.lnMapa.comFoco .lnCallout{opacity:.3}
+/* A LINEUP EM FOCO. Branca e grossa, porque o verde-água das rotas é a cor de TODAS elas —
+   no foco o que importa é "esta, e não as outras", e branco é o que mais separa do mapa
+   cinza. O retrato e o pino crescem um pouco: no meio de 14 pinos, opacidade sozinha não
+   diz qual é o par. */
+.lnRota.focado{stroke:#fff;stroke-width:2.6;opacity:1}
+.lnBola.focado{fill:#fff;filter:drop-shadow(0 0 5px #fff)}
+.lnDeMapa.focado{opacity:1;border-color:#fff;box-shadow:0 0 0 2px #ffffff55,0 0 14px #ffffff66;
+  transform:translate(-50%,-50%) scale(1.18);z-index:13}
+.lnPino.focado{opacity:1;border-color:#fff;box-shadow:0 0 0 2px #ffffff55,0 0 14px #ffffff66;z-index:5}
+/* o nome do canto da ponta em foco volta a ser legível: é ele que diz ONDE isto acontece */
+.lnMapa.comFoco .lnDeMapa.focado .lnDeNome,
+.lnMapa.comFoco .lnPino.focado .lnPinoNome{opacity:1;color:#fff}
  /* o acervo: o que esta guardado em disco, por agente */
 .acAg{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--borda);
   border-radius:10px;background:#0e131bcc;margin-bottom:6px}
@@ -1109,6 +1140,13 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    confundida com ela — aqui não se abre lineup, se traz de volta. */
 .lnLixeira{border-style:solid;border-color:#3d2228;background:#140d10}
 .lnLixeira>b{color:var(--der)}
+
+/* os botões de dizer o lado: vermelho pro ataque e azul pra defesa, as cores que a
+   tela já usa nos selos de lado. */
+.lnLadoMao{align-items:center;gap:6px;flex-wrap:wrap}
+.lnLadoDiz{font-size:11px;color:var(--fraco);margin-right:2px}
+.lnLadoBt.on.atq{border-color:var(--g3);color:var(--g3);background:#1d1113}
+.lnLadoBt.on.def{border-color:var(--g1);color:var(--g1);background:#101722}
 
 .lnSemLugar{margin:10px 0 0;padding:9px 11px;border:1px dashed #38414f;
   border-radius:10px;background:#0e131bcc}
@@ -4571,6 +4609,32 @@ async function lnJogarFora(i, fora = true){
   }
 }
 
+/**
+ * Dizer o lado na mão. Clicar no que já está marcado desmarca e devolve a dedução.
+ *
+ * Mexe no lado da lineup aberta e redesenha: o lado entra no filtro da tela (as do outro
+ * lado saem) e na nota, então dizer "esta é de defesa" com ele no ataque pode tirar a
+ * lineup da lista na hora — e isso está certo, é o que ele acabou de afirmar.
+ */
+async function lnDizerLado(lado){
+  const l = lnClipe; if (!l) return;
+  const novo = (l.ladoPista === 'meu' && l.lado === lado) ? null : lado;
+  const antes = { lado: l.lado, pista: l.ladoPista };
+  if (novo) { l.lado = novo; l.ladoPista = 'meu'; }
+  else { l.lado = null; l.ladoPista = null; }   // a dedução volta na próxima busca
+  lnPintarLado(l); lnFiltrarEDedupar(); lnPintarResumo(); lnDesenharMapa();
+  try {
+    const r = await fetch('/api/val/lado', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ video: l.video, segundo: l.segundo, lado: novo }),
+    }).then(x => x.json());
+    if (r?.erro) throw new Error(r.erro);
+  } catch {
+    l.lado = antes.lado; l.ladoPista = antes.pista;    // não gravou: desfaz na tela também
+    lnPintarLado(l); lnFiltrarEDedupar(); lnPintarResumo(); lnDesenharMapa();
+  }
+}
+
 /** A lixeira: mostra só as que ele jogou fora, pra poder trazer de volta. */
 function lnVerJogadasFora(){
   lnVerEscondidas = !lnVerEscondidas;
@@ -4812,6 +4876,7 @@ const LADO_PISTA = {
   lugar: 'o lugar de onde se joga é de um lado só',
   bloco: 'a seção do vídeo em que ela está é desse lado',
   video: 'o título do vídeo diz',
+  meu: 'você que disse',
 };
 
 /** O selo de lado da lineup, pra tela nunca afirmar mais do que sabe. */
@@ -5355,11 +5420,30 @@ function lnDesencalhar(itens, obstaculos, minimo = longe(LN_LONGE_PINO)){
   return itens;
 }
 
+/**
+ * Passar o mouse numa lineup acende SÓ ela.
+ *
+ * Ele mandou a imagem do que queria: a rota dela branca e grossa, o retrato no lugar de
+ * onde sai, o ícone da habilidade onde cai — e todo o resto do mapa apagado.
+ *
+ * O foco já existia, mas pela metade: apagava as outras rotas e os outros retratos e
+ * deixava TODOS OS PINOS acesos, que é a maior parte do que se vê num mapa cheio (14 pinos
+ * contra 7 retratos no Lotus dele). Com os pinos acesos, apagar o resto não destacava nada.
+ * Agora apaga os pinos também — menos o aberto, que é a outra ponta da rota em foco.
+ */
 function lnFocarRota(k){
   const mapa = document.querySelector('.lnMapa'); if (!mapa) return;
-  mapa.classList.toggle('comFoco', k != null);
+  const temFoco = k != null;
+  mapa.classList.toggle('comFoco', temFoco);
   for (const el of mapa.querySelectorAll('.lnRota,.lnBola,.lnDeMapa')) {
-    el.classList.toggle('apagado', k != null && Number(el.dataset.k) !== k);
+    const eu = Number(el.dataset.k) === k;
+    el.classList.toggle('apagado', temFoco && !eu);
+    el.classList.toggle('focado', temFoco && eu);
+  }
+  // o pino ABERTO fica: é onde a habilidade cai, a outra ponta da linha que está em foco
+  for (const p of mapa.querySelectorAll('.lnPino')) {
+    p.classList.toggle('apagado', temFoco && !p.classList.contains('on'));
+    p.classList.toggle('focado', temFoco && p.classList.contains('on'));
   }
 }
 
@@ -5819,7 +5903,22 @@ function lnBotoesDeMarcar(l){
          <button class="acao" onclick="lnConfirmar(false)">tirar</button>`
       : `<button class="acao lnConfirmar" onclick="lnConfirmar(true)">✔ fiz essa e funcionou</button>`}
   </div>
-  <div class="lnTeclas"><b>M</b> de onde sai · <b>N</b> onde cai · <b>C</b> fiz essa · <b>←</b> <b>→</b> pula pra próxima daqui</div>`;
+  <div class="lnMarcar lnLadoMao">
+    ${(() => {
+      /* DE QUE LADO É, DITO POR ELE.
+       * Metade do acervo não diz (4.358 de 8.150, 53,5%) e o parser já chegou no teto —
+       * quem viu o clipe sabe. Clicar no lado que já está marcado desmarca e devolve o que
+       * o texto dizia, que é o jeito de desfazer sem um terceiro botão. */
+      const meu = l.ladoPista === 'meu' ? l.lado : null;
+      const bt = (lado) => `<button class="acao lnLadoBt ${lado === 'atacando' ? 'atq' : 'def'}${meu === lado ? ' on' : ''}"
+        onclick="lnDizerLado('${lado}')"
+        title="${meu === lado ? 'clica de novo pra voltar ao que o vídeo disse' : `marcar como ${LADO_NOME[lado]}`}">${LADO_NOME[lado]}</button>`;
+      return `<span class="lnLadoDiz">${meu
+        ? 'lado dito por você'
+        : l.lado ? `${LADO_NOME[l.lado]}, pelo vídeo` : 'ninguém disse o lado'}</span>${bt('atacando')}${bt('defendendo')}`;
+    })()}
+  </div>
+  <div class="lnTeclas"><b>M</b> de onde sai · <b>N</b> onde cai · <b>C</b> fiz essa · <b>A</b>/<b>D</b> ataque ou defesa · <b>Del</b> joga fora · <b>←</b> <b>→</b> pula pra próxima daqui</div>`;
 }
 
 /**
@@ -6246,6 +6345,7 @@ document.addEventListener('keydown', (e) => {
   // nunca roubar tecla de quem está digitando num campo
   if (e.target?.closest?.('input, textarea, select, [contenteditable]')) return;
   const acao = { m: () => lnMarcar('posicao'), n: () => lnMarcar('alvo'), c: () => lnConfirmar(!lnClipe?.confirmei),
+                 a: () => lnDizerLado('atacando'), d: () => lnDizerLado('defendendo'),
                  // Delete joga fora a que está aberta: é a tecla que todo mundo já tenta
                  Delete: () => lnJogarFora(lnAchadas.indexOf(lnClipe), !lnClipe?.escondida),
                  ArrowRight: () => lnIrPara(1), ArrowLeft: () => lnIrPara(-1) }[e.key.length === 1 ? e.key.toLowerCase() : e.key];
