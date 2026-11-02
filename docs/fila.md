@@ -68,6 +68,29 @@ marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 ---
 
+### 7. O teto do ponto de saída é DO AGENTE, não do parser
+Medido no acervo dele, por agente (só os com 40+ lineups):
+
+| agente | lineups | com lugar | alvo exato | com lado |
+|---|---|---|---|---|
+| Brimstone | 1.782 | **65%** | 31% | 36% |
+| KAY/O | 1.601 | 33% | 56% | 30% |
+| Chamber | 102 | 22% | 24% | 26% |
+| Fade | 4.125 | **20%** | 64% | 57% |
+| Sova | 196 | 17% | 56% | 68% |
+| Killjoy | 186 | 10% | 47% | 39% |
+| Sage | 247 | **2%** | 46% | 45% |
+
+O padrão não é do app, é de como o criador nomeia o capítulo. Molly e smoke de Brimstone
+se jogam de um tijolo específico, então o nome diz de onde ("A Site from A Lobby") — 65%.
+Recon de Fade e Sova nomeia o ALVO ("A Site Haunt 03"), então o alvo é exato (64%) e a
+origem quase nunca aparece (20%). Parede de Sage se põe onde você está: 2%.
+
+**Consequência prática:** quando ele joga Brimstone o mapa é ótimo; quando joga Fade — que
+é o main dele — é justamente o pior caso, e é por isso que ele sentiu "ponto aleatório".
+Marcar com M (2.28.274) rende muito mais em Fade que em Brimstone. Não há conserto de
+parser aqui: o dado não existe no nome.
+
 ## Feito
 
 - **2.28.282** — a migração passou a alcançar as 23 buscas antigas sem `pedido`, lendo os
