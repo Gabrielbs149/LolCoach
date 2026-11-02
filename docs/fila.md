@@ -17,6 +17,15 @@ Regras que valem pra toda rodada:
 
 ## Aberto
 
+### 0. ~~Achar a lineup dentro do vídeo da partida dele~~ — NÃO FAZER
+Ele pediu e eu disse que não dou conta sozinho; ele respondeu "se n consegue sozinho
+esquece". **Medido: das 61 confirmações dele, nenhuma cai dentro do vídeo gravado** — ele
+aperta o C navegando no app, não jogando. Sem esse carimbo de hora, achar a lineup exigiria
+reconhecer na imagem o uso da habilidade E ler a posição no minimapa pra saber qual das 92
+lineups era. **Só reabrir com âncora de verdade:** uma tecla apertada DENTRO da partida ou
+o jogo expondo o uso de habilidade com hora.
+
+
 ### 1. Só 30,2% das lineups dizem de onde se joga (era 27,5% ontem)
 Medido no acervo inteiro (8686 lineups): 2623 com ponto de saída. É o teto de tudo que ele
 pediu — enquanto não subir, o mapa não tem o que desenhar.
