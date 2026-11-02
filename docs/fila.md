@@ -119,6 +119,9 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.296** — passar o mouse num pino espia o leque dele no mapa FECHADO (a 2.28.294 só
+  funcionava dentro de leque já aberto, que não é o caso dele). 3,76 ms por pino.
+
 - **2.28.295** — setas e Delete continuam funcionando quando a lineup aberta sai da lista
   (dizer o lado contrário ao filtro tirava ela e matava as teclas, calado).
 

@@ -1099,6 +1099,20 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
    botão no meio do texto entre pontinhos e ele não conseguiu nem ver o que clicava.
    Número em cima, nome embaixo, largura igual — e a ligada em dourado, que no resto da
    tela já quer dizer "isto é seu"; a de confirmada em verde, pelo mesmo motivo. */
+/* ESPIAR com o mouse é mais leve que FIXAR com o clique: o leque espiado aparece inteiro,
+   mas discreto, e o resto do mapa apaga. Assim dá pra varrer os pinos e ver de onde sai
+   cada um sem clicar em nada — era o que ele queria ("deixa bem bonito o hud"). */
+.lnMapa.espiando .lnPino:not(.espiado){opacity:.3}
+.lnMapa.espiando .lnCallout{opacity:.3}
+.lnPino.espiado{border-color:#fff;box-shadow:0 0 0 2px #ffffff44,0 0 12px #ffffff55;z-index:5}
+.lnMapa.espiando .lnPino.espiado .lnPinoNome{opacity:1;color:#fff}
+/* o retrato e a linha espiados nascem menores e sem o contorno forte do fixado: o clique
+   continua sendo o que compromete a tela */
+.lnMapa.espiando .lnDeMapa{transform:translate(-50%,-50%) scale(.88)}
+.lnMapa.espiando .lnDeMapa:hover{transform:translate(-50%,-50%) scale(1.1)}
+.lnMapa.espiando .lnRota{stroke:#cfe9e4;opacity:.55}
+.lnMapa.espiando .lnDeNome{opacity:0}
+
 .lnCols{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:0 0 10px}
 .lnCols.comLixeira{grid-template-columns:repeat(6,minmax(0,1fr))}
 .lnCol{display:flex;flex-direction:column;align-items:center;gap:1px;padding:7px 6px;
@@ -4421,6 +4435,18 @@ let lnVerEscondidas = false;
  * hora, e isso está certo — é o que ele acabou de afirmar. Só que aí `indexOf` dá -1 e as
  * teclas morriam caladas. Medido: depois de um D, → e Delete não faziam mais nada. */
 let lnOndeEstava = -1;
+/* O PINO QUE O MOUSE ESTÁ EM CIMA.
+ *
+ * Pedido dele, com imagem: "quando colocar o mouse em cima de um ponto da lineup e
+ * aparecer o ponto final dessa lineup". O que eu tinha feito na 2.28.294 só valia DENTRO
+ * de um leque já aberto — e ele olha o mapa fechado, antes de clicar. Medido: com o mapa
+ * fechado são 19 pinos, ZERO rotas, ZERO retratos, e os pinos nem tinham evento de mouse.
+ * Ou seja, passar o mouse não fazia nada mesmo.
+ *
+ * Agora passar o mouse num pino desenha o leque dele de leve: a linha até cada lugar de
+ * onde se joga, o retrato lá, e o resto do mapa apagado. Clicar continua sendo o que
+ * FIXA (com a tira do lado e os botões); o mouse só espia. */
+let lnPinoEspiado = null;
 const LN_MEXI = (l) => !!(l.posicao?.meu || l.ponto?.meu || l.confirmei);
 const LN_PRONTA = (l) => !!(l.posicao?.meu && l.ponto?.meu);
 const LN_FILTROS = {
@@ -5021,7 +5047,11 @@ function lnDesenharMapa(){
   }
   // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
   let nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
-  const aberto = pinos.find(p => p.chave === lnPinoAtivo) ?? null;
+  /* Espiar só vale com nenhum pino FIXADO: com um leque aberto, passar o mouse em outro
+   * pino trocaria o mapa inteiro debaixo dele no meio de um clique. */
+  const espiando = !lnPinoAtivo && lnPinoEspiado
+    ? pinos.find(p => p.chave === lnPinoEspiado) ?? null : null;
+  const aberto = pinos.find(p => p.chave === lnPinoAtivo) ?? espiando;
   const agente = lnCatalogo?.agentes?.find(x => x.nome === lnAgenteAtual);
 
   /* UM MARCADOR POR LINEUP, ate 12, variadas por canal — mas SÓ pras que têm lugar.
@@ -5131,9 +5161,11 @@ function lnDesenharMapa(){
 
   // com tira, a caixa vira duas colunas: mapa grande na esquerda, as outras lineups
   // daquela ponta na direita. Empilhado, o mapa tinha que encolher pra caber as duas.
-  $('#lnMapaCx').classList.toggle('comTira', !!(aberto && semLugar.length));
+  // espiando, nada de tira: ela muda a largura do mapa, e o mapa não pode pular com o mouse
+  $('#lnMapaCx').classList.toggle('comTira', !!(aberto && !espiando && semLugar.length));
   $('#lnMapaCx').innerHTML = `
-    <div class="lnMapa ${aberto ? 'comLeque' : ''}" style="aspect-ratio:${(cx / cy).toFixed(4)};--ar:${(cx / cy).toFixed(4)}">
+    <div class="lnMapa ${aberto ? 'comLeque' : ''}${espiando ? ' espiando' : ''}"
+      onmouseover="lnEspiarPino(event)" onmouseleave="lnEspiarPino(null)" style="aspect-ratio:${(cx / cy).toFixed(4)};--ar:${(cx / cy).toFixed(4)}">
       <div class="lnGiro" style="--g:${giro}deg;width:${deitado ? ((rec.lx / rec.ly) * 100).toFixed(2) : '100'}%;height:${deitado ? ((rec.ly / rec.lx) * 100).toFixed(2) : '100'}%">
         <img src="${esc(lnPlanta)}" alt="planta do mapa" style="width:${(100 / rec.lx).toFixed(2)}%;height:${(100 / rec.ly).toFixed(2)}%;left:${((-rec.x0 / rec.lx) * 100).toFixed(2)}%;top:${((-rec.y0 / rec.ly) * 100).toFixed(2)}%">
       </div>
@@ -5165,7 +5197,8 @@ function lnDesenharMapa(){
           <span class="lnDeNome">${esc(lnNomeCurto(x.l))}</span>
         </button>`).join('')}
       ${pinos.map(p => `
-        <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${p.meu ? 'meu' : ''} ${lnPinoAtivo === p.chave ? 'on' : ''}"
+        <button class="lnPino ${p.aproximado ? 'aprox' : ''} ${p.meu ? 'meu' : ''} ${lnPinoAtivo === p.chave ? 'on' : ''}${lnPinoEspiado === p.chave && !lnPinoAtivo ? ' espiado' : ''}"
+          data-pino="${esc(p.chave)}"
           style="left:${RX(p.dx, p.dy)}%;top:${RY(p.dx, p.dy)}%"
           title="${esc(p.nome)}${p.meu ? ' (ponto que você marcou)' : p.aproximado ? ' — aproximado: o vídeo só disse o site, não o canto' : ''}" onclick="lnClicarPino('${esc(p.chave)}')">
           ${p.icone ? `<img src="${esc(p.icone)}" alt="">` : `<b>${p.lista.length}</b>`}
@@ -5454,8 +5487,25 @@ function lnFocarRota(k){
   }
 }
 
+/**
+ * Passar o mouse num pino espia o leque dele; sair do mapa desfaz.
+ *
+ * O evento fica no MAPA e não em cada pino de propósito: espiar redesenha o mapa, o que
+ * destrói o botão que estava sob o cursor — e botão removido nunca dispara o `mouseleave`,
+ * então o estado ficaria presto pra sempre. No container, o `mouseover` acerta tanto o
+ * pino novo quanto o vazio do mapa (que limpa), e o `mouseleave` do mapa fecha a conta.
+ */
+function lnEspiarPino(ev){
+  const chave = ev ? (ev.target?.closest?.('.lnPino')?.dataset?.pino ?? null) : null;
+  if (chave === lnPinoEspiado) return;          // mesmo pino: nada a redesenhar
+  lnPinoEspiado = chave;
+  if (lnPinoAtivo) return;                      // com leque fixo, espiar não muda nada
+  lnDesenharMapa();
+}
+
 function lnClicarPino(chave){
   lnPinoAtivo = lnPinoAtivo === chave ? null : chave;
+  lnPinoEspiado = null;     // o que era espiada virou escolha, ou fechou
   lnDesenharMapa();
 }
 
