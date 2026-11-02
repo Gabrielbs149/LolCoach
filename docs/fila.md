@@ -150,7 +150,12 @@ o caminho manual dá conta ou se precisa de outra ideia.
   marcas dele tem os dois MAIS a confirmação, então exigir as três deixaria o filtro vazio).
   De quebra, consertado o beco sem saída de trocar de mapa com o filtro ligado.
 
-- **Clipes do Outplayed — engavetado no ramo `clipes-outplayed`.** Medido: o Outplayed grava
+- **2.28.297 — os clipes do Outplayed ENTRARAM**, incluindo a partida inteira. Ele ligou a
+  gravação completa (1.077 MB / 23,2 min de Bind) e o ramo voltou por merge. O Outplayed
+  mudou o nome dos arquivos no meio do caminho, e o padrão do ramo não pegava nenhum dos
+  novos — corrigido, 1.076 de 1.076 casam. Toca no app, com arrastar a barra funcionando.
+
+- ~~**Clipes do Outplayed — engavetado no ramo `clipes-outplayed`.**~~ Medido: o Outplayed grava
   Valorant como destaque (1.066 clipes, mediana 14 s, 8–13% de cada partida), não partida
   inteira. Ele viu os números e disse "esquece, só com esses clipes vai ser impossível".
   Código pronto e testado no ramo; volta com `git merge clipes-outplayed` se a gravação de
