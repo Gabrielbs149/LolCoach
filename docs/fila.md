@@ -55,16 +55,26 @@ dar chave por formato ao guarda (números viram N) daria 0,1% a mais, e as ~917 
 olho são ~50 por dia — diagnóstico, não enchente. Vale repetir de tempos em tempos: é o
 único lugar com dado do uso REAL dele.
 
-### 5. Continuar medindo o custo do painel durante a partida
+### 5. ~~Continuar medindo o custo do painel durante a partida~~ — FECHADO
 A varredura de minuto já foi (2.28.273: 446 ms → 0). O `tick()` de 2 s foi **medido e
-descartado**: 17 ms e uma ida à API, 0,85% do tempo. Falta só o peso do desenho do mapa
-de lineups com o clipe tocando — e o mapa grande já fica `display:none` em tela cheia,
-então o provável é que também não sobre nada. Medir antes de mexer.
+descartado**: 17 ms e uma ida à API, 0,85% do tempo. **O pedaço que faltava foi medido em
+02/11 e também não dá nada**: com o clipe de fato tocando e o pino mais cheio do acervo
+aberto (A Site do Lotus, 27 lineups), `lnDesenharMapa` custa **1,83 ms**, `lnPintarLado`
+**0,35 ms**, e do clique até o quadro pronto são **4,9 ms** — contra 16,7 ms de orçamento
+por quadro, e só em clique, não a cada quadro. Confirmado que o mapa grande fica mesmo
+`display:none` em tela cheia. **Não há mais o que medir aqui sem dado novo.**
 
 ### 6. O parser de nome chegou no teto
 Medido: 38% dos alvos caem no centro do site, e 1.119 deles têm "from" e 641 têm
 "default" — o capítulo diz mesmo só "A site". Daqui pra frente quem fecha a conta é ele
 marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
+
+**Agora há gabarito (02/11).** As 26 marcas dele medidas contra o que o parser deduziu:
+de onde se joga, **15 das 22 deduzidas caem no mesmo callout que ele (68%)**, erro mediano
+**6,2 m**; onde a habilidade cai, só **2 de 8 (25%)**, erro mediano **9,5 m**. Lido junto
+com o item 7: o parser acerta a ÁREA e o que a marca acrescenta é o tijolo. Confirma que o
+caminho é marcar, não parsear. O detalhe do lugar escrito com barra (`A Site/Main`, 277
+lineups) foi medido e **descartado** — o porquê está em `melhorias.md`.
 
 ---
 
