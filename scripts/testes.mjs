@@ -2315,3 +2315,76 @@ test('lineups: as setas continuam andando quando a lineup aberta sai da lista', 
   t.lnIrPara(1);
   assert.equal(t.clipe().nome, 'unica', 'sem pra onde ir, fica onde esta');
 });
+
+/* ------------------------------------------- "os mapas estao cortados"
+ *
+ * Ele mandou foto do Sunset com os pinos da direita cortados. Medido: o pino "A Elbow" que
+ * ELE marcou estava em x 0,872 e a caixa desenhada terminava em 0,875 -- 2,7 px da borda
+ * numa caixa de 801 px. Como o pino tem 32 px, METADE dele ficava fora e o overflow:hidden
+ * cortava.
+ *
+ * A caixa saia so dos callouts, e isso bastava enquanto TODO marcador passava pelo
+ * lnPrender (que o mantinha 4,5% pra dentro). Desde a 2.28.285 o ponto marcado a mao pula o
+ * lnPrender de proposito -- e eu escrevi no comentario que "ele clicou DENTRO". Clicou
+ * dentro da caixa; sem espaco pro icone, nao.
+ */
+test('lineups: a caixa do mapa cabe o que ele marcou, inteiro', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  const cercado = `
+    let lnCallouts = [], lnTodas = [];
+    const LN_MARGEM_RECORTE = 0.06;
+    const extras = {
+      pôr: (cs, ls) => { lnCallouts = cs; lnTodas = ls ?? []; },
+    };
+  `;
+  const t = await funcoesDaTela('painel.html', ['lnJanelaDoMapa'], cercado);
+
+  // callouts de um mapa que nao chega nas bordas da arte, como os de verdade
+  const callouts = [
+    { nome: 'a', x: 0.10, y: 0.20 }, { nome: 'b', x: 0.50, y: 0.50 }, { nome: 'c', x: 0.80, y: 0.70 },
+  ];
+  const marca = (x, y) => ({ posicao: { x, y, meu: true }, ponto: null });
+
+  // sem marca nenhuma: a caixa e a dos callouts, como sempre foi
+  t.pôr(callouts, []);
+  const so = t.lnJanelaDoMapa();
+  assert.ok(Math.abs((so.x0 + so.lx) - (0.80 + 0.70 * 0.06)) < 1e-9, 'sem marca, a caixa nao muda');
+
+  /* Marca ALEM do callout mais a direita: a caixa tem que crescer, e com folga pro icone.
+   * O pino tem 32 px; o que se exige aqui e que sobre pelo menos 2% da largura da janela
+   * depois da marca, que num mapa de 800 px da uns 16 px -- meio pino. */
+  t.pôr(callouts, [marca(0.95, 0.50)]);
+  const cresceu = t.lnJanelaDoMapa();
+  const fimX = cresceu.x0 + cresceu.lx;
+  assert.ok(fimX > 0.95, `a caixa tem que passar da marca: terminou em ${fimX.toFixed(3)}`);
+  assert.ok((fimX - 0.95) / cresceu.lx > 0.02,
+    `pouca folga depois da marca: ${(((fimX - 0.95) / cresceu.lx) * 100).toFixed(1)}% da janela`);
+
+  // e nos outros tres lados
+  t.pôr(callouts, [marca(0.02, 0.98)]);
+  const outro = t.lnJanelaDoMapa();
+  assert.ok(outro.x0 <= 0.02, 'cresce pra esquerda');
+  assert.ok(outro.y0 + outro.ly >= 0.98, 'e pra baixo');
+
+  // marca de ONDE CAI conta igual
+  t.pôr(callouts, [{ posicao: null, ponto: { x: 0.97, y: 0.5, meu: true } }]);
+  assert.ok(t.lnJanelaDoMapa().x0 + t.lnJanelaDoMapa().lx > 0.97, 'o alvo marcado tambem cabe');
+
+  // ponto DEDUZIDO (sem `meu`) nao mexe na caixa: esse passa pelo lnPrender e se ajeita
+  t.pôr(callouts, [{ posicao: { x: 0.99, y: 0.5 }, ponto: null }]);
+  const deduzido = t.lnJanelaDoMapa();
+  assert.ok(Math.abs((deduzido.x0 + deduzido.lx) - (so.x0 + so.lx)) < 1e-9,
+    'deducao nao estica a caixa -- so o que ele marcou a mao');
+
+  // a caixa nunca sai da arte, que e 0..1
+  t.pôr(callouts, [marca(1, 1), marca(0, 0)]);
+  const tudo = t.lnJanelaDoMapa();
+  assert.ok(tudo.x0 >= 0 && tudo.y0 >= 0 && tudo.x0 + tudo.lx <= 1 && tudo.y0 + tudo.ly <= 1,
+    'a caixa nao pode passar da imagem');
+
+  // poucos callouts: continua caindo no mapa inteiro, como antes
+  t.pôr([{ x: 0.5, y: 0.5 }], [marca(0.9, 0.9)]);
+  const poucos = t.lnJanelaDoMapa();
+  assert.deepEqual(poucos, { x0: 0, y0: 0, lx: 1, ly: 1 });
+});

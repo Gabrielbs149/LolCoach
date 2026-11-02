@@ -4809,6 +4809,30 @@ function lnJanelaDoMapa(){
   const cs = lnCallouts ?? [];
   if (cs.length < 3) return { x0: 0, y0: 0, lx: 1, ly: 1 };
   const xs = cs.map(c => c.x), ys = cs.map(c => c.y);
+  /* A CAIXA TAMBÉM TEM QUE CABER O QUE ELE MARCOU.
+   *
+   * Ele mandou foto do Sunset com os pinos da direita cortados: "os mapas estao cortados".
+   * Medido: o pino "A Elbow" que ELE marcou está em x 0,872 e a caixa terminava em 0,875
+   * — 2,7 px da borda numa caixa de 801 px. Como o pino tem 32 px, METADE dele ficava fora
+   * e o `overflow:hidden` cortava.
+   *
+   * A caixa saía só dos callouts, e isso bastava enquanto TODO marcador passava pelo
+   * `lnPrender`, que o mantinha 4,5% pra dentro. Desde a 2.28.285 o ponto marcado à mão
+   * pula o `lnPrender` de propósito (ele pôs ali, não se move) — e eu escrevi no comentário
+   * que "ele clicou DENTRO". Clicou dentro da caixa, sim; sem espaço pro ícone, não.
+   *
+   * Em vez de empurrar a marca pra dentro (que é justamente o que ele não quer), a CAIXA
+   * cresce pra caber a marca inteira. A arte é 0..1 e a caixa dos callouts não chega nas
+   * bordas, então quase sempre há para onde crescer de graça. */
+  /* De `lnTodas` e não de `lnAchadas`: senão a caixa mudaria de tamanho a cada filtro ligado
+   * e o mapa daria um pulinho de zoom quando ele clicasse em "prontas". O tamanho do mapa
+   * tem que depender do MAPA, não do que está filtrado no momento. */
+  for (const l of lnTodas ?? []) {
+    for (const p of [l.posicao, l.ponto]) {
+      if (!p?.meu) continue;
+      xs.push(p.x); ys.push(p.y);
+    }
+  }
   let x0 = Math.min(...xs), x1 = Math.max(...xs);
   let y0 = Math.min(...ys), y1 = Math.max(...ys);
   const fx = (x1 - x0) * LN_MARGEM_RECORTE, fy = (y1 - y0) * LN_MARGEM_RECORTE;

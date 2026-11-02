@@ -135,6 +135,11 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.300** — mapa cortado na borda: o pino que ELE marcou ficava metade pra fora porque
+  a caixa saía só dos callouts e o ponto marcado à mão pula o `lnPrender` desde a .285.
+  Agora a caixa cresce pra caber a marca inteira. **0 cortados em 52 estados.**
+  Cuidado futuro: a caixa sai de `lnTodas`, não de `lnAchadas` — senão muda com o filtro.
+
 - **2.28.296** — passar o mouse num pino espia o leque dele no mapa FECHADO (a 2.28.294 só
   funcionava dentro de leque já aberto, que não é o caso dele). 3,76 ms por pino.
 
