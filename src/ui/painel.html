@@ -1137,8 +1137,21 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 
 /* O vídeo é o que importa: ele manda na largura e o mapa acompanha, nunca o contrário.
    Antes, em janela estreita, os dois empatavam em ~620 px e o vídeo ficava pequeno. */
-.lnDetalhe{display:grid;grid-template-columns:minmax(0,1fr) 248px;gap:14px;
+.lnDetalhe{--lnLado:248px;display:grid;grid-template-columns:minmax(0,1fr) var(--lnLado);gap:14px;
   margin-bottom:18px;align-items:start}
+/* ENQUANTO ELE MARCA, O MAPA CRESCE.
+ *
+ * Medido na tela em que ele usa (1920x1040, segunda tela): o mapinha de marcar tem 226 px
+ * e os nomes de canto saem em 9,5 px — 28 nomes no Lotus, com 16 PARES se sobrepondo. E o
+ * nome do canto é justamente o que diz onde ele está no mapa; sobrepostos, não dizem nada.
+ *
+ * Enquanto marca, o vídeo não está sendo lido — ele já viu o clipe e agora está escolhendo
+ * um ponto. Então o painel do lado cresce e devolve o espaço quando ele termina ou cancela.
+ * Em tela cheia o painel flutua por cima do vídeo, então o custo é só tapar mais um pedaço. */
+/* o 60vh e pelos botoes: numa tela de 768 px de altura um mapa de 560 empurrava o
+   "cancelar" e o aviso do passo pra fora, e o painel so chegava la rolando. Na tela dele
+   (1040 px) 60vh da 624, entao o 560 continua mandando e nada muda. */
+.lnDetalhe.aMarcar{--lnLado:min(560px,42vw,60vh)}
 @media (max-width:820px){
   /* Abaixo disso o vídeo lado a lado fica pequeno demais (396 px numa janela de 900).
      Então ele ocupa a largura toda e o mapa vira uma faixa compacta embaixo.
@@ -1231,7 +1244,7 @@ body.lnTelaCheia .lnVideoCx{width:100%;height:100%;aspect-ratio:auto;border-radi
 body.lnTelaCheia .lnVideoCx #lnYT,body.lnTelaCheia .lnVideoCx iframe{
   width:100%;height:100%;max-width:calc(100vh * 16 / 9);max-height:calc(100vw * 9 / 16)}
 /* o lado vira um painel por cima, no canto */
-body.lnTelaCheia .lnLadoDetalhe{position:fixed;right:14px;top:14px;width:250px;z-index:71;
+body.lnTelaCheia .lnLadoDetalhe{position:fixed;right:14px;top:14px;width:var(--lnLado,250px);z-index:71;
   background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r-m);padding:11px;
   flex-direction:column;align-items:stretch;gap:8px;max-height:calc(100vh - 28px);overflow:auto;
   backdrop-filter:blur(4px)}
@@ -5622,6 +5635,8 @@ function lnVer(i){
 /** O painel do lado: nome, mapinha, selos e de onde veio. Muda a cada lineup; o player não. */
 function lnPintarLado(l){
   const lado = $('.lnLadoDetalhe'); if (!lado) return;
+  // marcando = mapa grande; a classe mora no .lnDetalhe porque e ele que manda na coluna
+  lado.closest('.lnDetalhe')?.classList.toggle('aMarcar', !!lnMarcando);
   lado.innerHTML = `
       <button class="acao lnVoltar" onclick="lnFecharClipe()">← voltar</button>
       <div class="lnTocandoNome">${l.habilidade?.icone ? `<img class="lnHabMini" src="${esc(l.habilidade.icone)}" alt="">` : ''}${esc(l.nome)}</div>

@@ -99,6 +99,9 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.289** — o mapa de marcar cresce enquanto ele marca: 226 → 536 px, nomes de canto
+  sobrepostos **16 → 1**, precisão do segundo clique de ~10 cm pra 4 cm por pixel.
+
 - **2.28.288** — a pedido dele, o corte pra juntar alvos marcados passou de meio pino pro
   círculo inteiro: se os dois desenhos se encostam na tela, viram um pino só. Vale só pro
   ponto onde a habilidade CAI; as origens seguem separadas, cada uma no seu tijolo.
