@@ -109,6 +109,11 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.290** — filtro "mexi nelas / prontas / fiz e funcionou / falta mexer" no resumo,
+  valendo também no mapa. "Pronta" = os dois pontos marcados à mão (medido: zero das 30
+  marcas dele tem os dois MAIS a confirmação, então exigir as três deixaria o filtro vazio).
+  De quebra, consertado o beco sem saída de trocar de mapa com o filtro ligado.
+
 - **Clipes do Outplayed — engavetado no ramo `clipes-outplayed`.** Medido: o Outplayed grava
   Valorant como destaque (1.066 clipes, mediana 14 s, 8–13% de cada partida), não partida
   inteira. Ele viu os números e disse "esquece, só com esses clipes vai ser impossível".

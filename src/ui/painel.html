@@ -1064,6 +1064,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 /* ponto que ELE marcou: o único que é exato de verdade, então é o que mais aparece */
 .lnDeMapa.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 12px var(--ouro)}
 .lnPino.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 10px #f0b90b66}
+/* o filtro do que é dele usa o dourado, que no resto da tela já quer dizer "isto é seu";
+   o de confirmada usa o verde, pelo mesmo motivo. */
+.lnMeuFiltro.on{border-color:var(--ouro);color:var(--ouro)}
+.lnMeuFiltro.feito.on{border-color:var(--vit);color:var(--vit)}
+
 .lnMeuSelo{position:absolute;right:-6px;bottom:-5px;font-style:normal;font-size:9px;line-height:1;
   background:var(--ouro);color:#0b1016;border-radius:50%;padding:2px 3px;font-weight:900}
 /* quantas outras marcas estão embaixo desta, no mesmo tijolo. Elas não se afastam de
@@ -1208,13 +1213,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnTeclas{font-size:10.5px;color:var(--apagado);margin-top:2px;line-height:1.5}
 .lnTeclas b{display:inline-block;min-width:15px;text-align:center;padding:0 3px;border:1px solid var(--borda-forte);
   border-radius:3px;color:var(--fraco);font-weight:600;font-size:10px}
-.lnMeusN{color:var(--ouro-claro);font-weight:600}
 /* CONFIRMADA POR ELE: verde, e nao dourado. O dourado ja quer dizer "isto e seu" (o ponto
    que ele marcou); confirmar e outra coisa — e a unica informacao do acervo que nao saiu
    de um video, e merece cor propria. */
 .lnConfirmada{font-size:11.5px;color:var(--vit);align-self:center;font-weight:600}
 .lnConfirmar:hover{border-color:var(--vit);color:var(--vit)}
-.lnConfirmadasN{color:var(--vit);font-weight:600}
 .lnDeMapa.confirmada{border-color:var(--vit);box-shadow:0 0 12px #3ecf8e77}
 .lnChip.confirmada{border-color:#2f6b4e;background:#10201a}
 .lnChip.confirmada:hover{border-color:var(--vit)}
@@ -4327,6 +4330,28 @@ let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual =
 // quantas ficaram de fora por serem do outro lado, e se ele pediu pra ver elas mesmo assim
 let lnDoOutroLado = 0, lnMisturarLados = false;
 let lnMudasFora = 0, lnEsconderMudas = false;
+/* O FILTRO DO QUE ELE JÁ MEXEU.
+ *
+ * Pedido dele: "adiciona um filtro pra selecionar as que eu ja mexi e que ja estao
+ * perfeitas", e logo depois "to vendo q tem muita mesmo acumulada mas sem correcao". São as
+ * duas pontas do mesmo problema: achar o que já está pronto e, principalmente, achar o que
+ * falta no meio de milhares.
+ *
+ * O que conta como PRONTA: os dois pontos marcados à mão. Medido nas 30 marcas dele no
+ * momento em que isto foi escrito — 18 com só o ponto de saída, 11 com os dois, 3
+ * confirmadas e ZERO com os dois mais a confirmação. Se "pronta" exigisse também o "fiz
+ * essa e funcionou", o filtro nasceria vazio e não serviria pra nada. Confirmar é outro
+ * eixo — é ter TESTADO no jogo, não ter completado o dado — e por isso tem botão próprio. */
+let lnSoMinhas = '';          // '' | 'mexi' | 'prontas' | 'falta' | 'fiz'
+let lnContaMinhas = { todas: 0, mexi: 0, prontas: 0, falta: 0, fiz: 0 };
+const LN_MEXI = (l) => !!(l.posicao?.meu || l.ponto?.meu || l.confirmei);
+const LN_PRONTA = (l) => !!(l.posicao?.meu && l.ponto?.meu);
+const LN_FILTROS = {
+  mexi: { teste: LN_MEXI, nome: 'mexi nelas', dica: 'tem algum ponto marcado por você, ou você confirmou' },
+  prontas: { teste: LN_PRONTA, nome: 'prontas', dica: 'os dois pontos marcados por você: de onde sai e onde cai' },
+  falta: { teste: (l) => !LN_MEXI(l), nome: 'falta mexer', dica: 'você ainda não encostou nestas' },
+  fiz: { teste: (l) => !!l.confirmei, nome: 'fiz e funcionou', dica: 'as que você testou no jogo e deu certo' },
+};
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
 async function carregarLineups(){
@@ -4402,6 +4427,8 @@ function lnPintarResumo(){
 /** "83 de Incendiário · 7 canais · 40 de ataque · 18 sem lado · 24 de defesa fora". */
 function lnQuantas(){
   const n = lnAchadas.length;
+  // com filtro ligado, o total vira "12 de 187": senão some o resto sem dizer que sumiu
+  const deQuantas = lnSoMinhas && lnContaMinhas.todas > n ? ` de ${lnContaMinhas.todas}` : '';
   const ag = lnCatalogo?.agentes?.find(a => a.nome === lnAgenteAtual);
   const hab = lnHabAtual ? ag?.habilidades.find(h => h.busca === lnHabAtual) : null;
   const quais = hab ? ` de ${esc(hab.nome)}` : '';
@@ -4418,17 +4445,45 @@ function lnQuantas(){
     ? ` · <button class="lnMisturar on" onclick="lnTrocarMudas()" title="mostrar de novo as que não dizem o lado">${lnMudasFora} sem lado fora</button>`
     : mudas ? ` · <button class="lnMisturar" onclick="lnTrocarMudas()" title="esconder as que não dizem de que lado são">${mudas} sem lado</button>` : '';
   const conf = certas ? ` · ${certas} de ${LADO_NOME[lnLadoAtual]}` : '';
-  // o que ele mesmo marcou: é o único ponto exato que existe, então merece ser contado
-  const meusN = lnAchadas.filter(l => l.posicao?.meu || l.ponto?.meu).length;
-  const confirmadasN = lnAchadas.filter(l => l.confirmei).length;
-  const meus = (meusN ? ` · <b class="lnMeusN">${meusN} com ponto seu</b>` : '')
-    + (confirmadasN ? ` · <b class="lnConfirmadasN">${confirmadasN} que você fez</b>` : '');
-  return `${n} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${meus}${semLado}${fora}`;
+  /* O QUE ELE JÁ MEXEU — e o que falta.
+   *
+   * Antes isto era só texto ("12 com ponto seu"), que informa e não serve pra nada. Agora
+   * cada número é um botão que filtra, porque era isso que ele queria: "adiciona um filtro
+   * pra selecionar as que eu ja mexi e que ja estao perfeitas" — e, no mesmo fôlego, "to
+   * vendo q tem muita mesmo acumulada mas sem correcao".
+   *
+   * O "falta mexer" aparece por último e só quando há alguma mexida: numa combinação em que
+   * ele nunca marcou nada, "falta mexer: 187" seria só repetir o total com outro nome. */
+  const c = lnContaMinhas;
+  const botao = (chave, n) => {
+    const f = LN_FILTROS[chave];
+    const ligado = lnSoMinhas === chave;
+    return ` · <button class="lnMisturar lnMeuFiltro${chave === 'fiz' ? ' feito' : ''}${ligado ? ' on' : ''}" onclick="lnFiltrarMinhas('${chave}')"
+      title="${esc(ligado ? 'clica de novo pra ver todas' : f.dica)}">${n} ${f.nome}</button>`;
+  };
+  /* O botão do filtro LIGADO aparece sempre, mesmo zerado. Senão acontece isto: ele filtra
+   * "prontas", troca de mapa, o mapa novo não tem nenhuma pronta, o botão some — e ele fica
+   * preso numa lista vazia sem nada pra clicar e desligar. */
+  const mostra = (chave, quando) => (quando || lnSoMinhas === chave ? botao(chave, c[chave]) : '');
+  const meus = mostra('mexi', c.mexi)
+    + mostra('prontas', c.prontas)
+    + mostra('fiz', c.fiz)
+    + mostra('falta', c.mexi && c.falta);
+  return `${n}${deQuantas} lineup${n === 1 ? '' : 's'}${quais}${canais > 1 ? ` · ${canais} canais` : ''}${conf}${meus}${semLado}${fora}`;
 }
 
 /** Mostra/esconde as que não dizem o lado. Filtro no que já está carregado, instantâneo. */
 function lnTrocarMudas(){
   lnEsconderMudas = !lnEsconderMudas;
+  lnPinoAtivo = null;
+  lnFiltrarEDedupar();
+  lnPintarResumo();
+  lnDesenharMapa();
+}
+
+/** Liga/desliga o filtro do que ele já mexeu. Clicar no que já está ligado volta pra todas. */
+function lnFiltrarMinhas(qual){
+  lnSoMinhas = lnSoMinhas === qual ? '' : qual;
   lnPinoAtivo = null;
   lnFiltrarEDedupar();
   lnPintarResumo();
@@ -4518,6 +4573,17 @@ async function lnProcurar(forcar){
 
   lnTodas = r.lineups ?? []; lnPlanta = r.planta ?? null; lnCallouts = r.callouts ?? []; lnPinoAtivo = null;
   lnFiltrarEDedupar();
+  /* LISTA VAZIA POR CAUSA DO FILTRO NÃO É "NADA ENCONTRADO".
+   *
+   * Sem isto acontece o seguinte: ele filtra "prontas" no Lotus, troca pro Bind, onde nunca
+   * marcou nada — e a tela diz "nada encontrado" (mentira: achou 187) e sai antes de pintar
+   * o resumo, ou seja, sem os botões do filtro. Aí ele fica preso numa tela vazia sem nada
+   * pra clicar. Achei isto testando a troca de mapa com o filtro ligado, não em produção. */
+  if (!lnAchadas.length && lnSoMinhas && lnContaMinhas.todas) {
+    lnPintarResumo();     // os botões do filtro, com o ligado em destaque
+    lnDesenharMapa();     // e o mapa diz que foi o filtro que esvaziou
+    return;
+  }
   if (!lnAchadas.length) {
     $('#lnMapaCx').innerHTML = '';
     const porque = r.semCapitulo
@@ -4619,7 +4685,19 @@ function lnFiltrarEDedupar(){
    * aparecendo — marcada, com o pino tracejado — mas agora dá pra tirar com um clique. */
   lnMudasFora = lnEsconderMudas ? uma.filter(l => !l.lado).length : 0;
 
-  lnAchadas = uma.filter(l => (lnMisturarLados || certa(l)) && !(lnEsconderMudas && !l.lado));
+  /* E o filtro do que ele mesmo mexeu. Entra aqui junto dos outros, na FONTE, pra valer
+   * também no mapa e na tira — filtro que só mexe na lista e deixa o mapa cheio confunde
+   * mais do que ajuda. Os contadores saem do que sobrou do lado, não do acervo inteiro. */
+  const doLado = uma.filter(l => (lnMisturarLados || certa(l)) && !(lnEsconderMudas && !l.lado));
+  lnContaMinhas = {
+    todas: doLado.length,
+    mexi: doLado.filter(LN_MEXI).length,
+    prontas: doLado.filter(LN_PRONTA).length,
+    falta: doLado.filter(l => !LN_MEXI(l)).length,
+    fiz: doLado.filter(l => l.confirmei).length,
+  };
+  const filtro = LN_FILTROS[lnSoMinhas];
+  lnAchadas = filtro ? doLado.filter(filtro.teste) : doLado;
 }
 
 /**
@@ -4750,7 +4828,11 @@ function lnDesenharMapa(){
   const pinos = lnAfastar(lnPinos(), longe(LN_LONGE_PINO));
   // mapa sem pino nenhum confunde mais do que ajuda: diz o porquê em vez de mostrar vazio
   if (!pinos.length) {
-    $('#lnMapaCx').innerHTML = `<div class="vazio">as lineups vieram sem ponto no mapa — a lista está logo abaixo</div>`;
+    // quem esvaziou o mapa foi o filtro? então diga isso, e não "vieram sem ponto"
+    $('#lnMapaCx').innerHTML = lnSoMinhas
+      ? `<div class="vazio">nenhuma lineup deste mapa está em "${esc(LN_FILTROS[lnSoMinhas].nome)}" —
+         clica no filtro lá em cima pra ver todas</div>`
+      : `<div class="vazio">as lineups vieram sem ponto no mapa — a lista está logo abaixo</div>`;
     return;
   }
   // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
