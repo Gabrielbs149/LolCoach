@@ -1289,6 +1289,9 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnDe.meu,.lnCai.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 12px #f0b90b66}
 /* o mapa esperando o clique */
 .lnMini.marcando{cursor:crosshair;border-color:var(--ouro);box-shadow:inset 0 0 0 1px #f0b90b55}
+/* o ponto que ele está trocando: aparece apagado e tracejado, pra ser referência sem ser
+   confundido com a mira. Escondê-lo era pior — ele clicava sem saber de onde estava saindo. */
+.lnMini.marcando .trocando{opacity:.35;filter:grayscale(1);border-style:dashed}
 .lnMira{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);color:#f0b90b99;
   font-size:19px;line-height:1;pointer-events:none}
 .lnMarcaAviso{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11.5px}
@@ -5826,16 +5829,18 @@ async function lnConfirmar(sim){
 
 function lnMarcar(qual){
   const l = lnClipe; if (!l) return;
-  /* Começa no MAPA INTEIRO quando ainda não há ponto desse tipo: de onde se joga pode ser
-   * do outro lado do mapa (lineup de post-plant sai de trás de tudo), e abrir já aproximado
-   * no alvo deixaria o lugar certo fora da janela. Só quando é pra CORRIGIR um ponto que já
-   * existe é que vale abrir perto dele. */
-  /* No alvo, qualquer ponto exato serve de ponto de partida (dele ou lido do callout): onde
-   * a habilidade cai é ali por perto, e abrir já aproximado poupa o primeiro clique. Só o
-   * aproximado (centro do site, quando o texto não disse o callout) é que abre o mapa
-   * inteiro, porque esse pode estar a dezenas de metros do lugar certo. */
-  const corrigindo = qual === 'posicao' ? l.posicao : (l.ponto && !l.ponto.aproximado ? l.ponto : null);
-  lnMarcando = { qual, passo: 1, r: corrigindo ? lnRecorteEm(corrigindo, 0.5) : { x: 0, y: 0, lado: 1 } };
+  /* SEMPRE COMEÇA NO MAPA INTEIRO.
+   *
+   * Antes, pra CORRIGIR um ponto que já existia, isto abria com zoom de 50% centrado nele —
+   * a ideia era poupar o primeiro dos dois cliques. Ele reclamou: "ta ruim de escolher o
+   * point da lineup pq fica aparecendo so uma parte do mapa algumas vezes". O "algumas
+   * vezes" bate certinho: só acontecia quando havia ponto pra corrigir.
+   *
+   * Poupar um clique não compensa perder a visão do mapa. Os dois passos existem justamente
+   * pra isso — o primeiro é pra se achar, o segundo é pra acertar o tijolo. E o ponto que já
+   * existe aparece desenhado no mapa inteiro (ver `lnMapaDeMarcar`), então ele vê onde está
+   * hoje e clica onde quer que vá, sem perder a referência. */
+  lnMarcando = { qual, passo: 1, r: { x: 0, y: 0, lado: 1 } };
   lnPintarLado(l);
 }
 
@@ -5922,8 +5927,10 @@ function lnMapaDeMarcar(l){
   const oQue = lnMarcando.qual === 'posicao' ? 'de onde você joga' : 'onde a habilidade cai';
   return `<div class="lnMini marcando" style="${fundo}" onclick="lnCliqueNoMapinha(event)" title="clica no ponto">
       ${nomes.map(c => { const q = onde(c); return `<span class="lnCallout" style="left:${q.x.toFixed(2)}%;top:${q.y.toFixed(2)}%">${esc(c.nome)}</span>`; }).join('')}
-      ${dentro(b) && lnMarcando.qual !== 'alvo' ? `<span class="lnCai" style="left:${onde(b).x.toFixed(2)}%;top:${onde(b).y.toFixed(2)}%">${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}</span>` : ''}
-      ${dentro(a) && lnMarcando.qual !== 'posicao' ? `<span class="lnDe" style="left:${onde(a).x.toFixed(2)}%;top:${onde(a).y.toFixed(2)}%"></span>` : ''}
+      ${/* O ponto que está sendo TROCADO também aparece, só que apagado: ele precisa ver onde
+            está hoje pra decidir pra onde vai. Antes era escondido, e aí ele clicava no escuro. */''}
+      ${dentro(b) ? `<span class="lnCai ${lnMarcando.qual === 'alvo' ? 'trocando' : ''}" style="left:${onde(b).x.toFixed(2)}%;top:${onde(b).y.toFixed(2)}%">${l.habilidade?.icone ? `<img src="${esc(l.habilidade.icone)}" alt="">` : ''}</span>` : ''}
+      ${dentro(a) ? `<span class="lnDe ${lnMarcando.qual === 'posicao' ? 'trocando' : ''}" style="left:${onde(a).x.toFixed(2)}%;top:${onde(a).y.toFixed(2)}%"></span>` : ''}
       <span class="lnMira">+</span>
     </div>
     <div class="lnMarcaAviso">
