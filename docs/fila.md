@@ -93,6 +93,9 @@ parser aqui: o dado não existe no nome.
 
 ## Feito
 
+- **2.28.283** — +60 lineups com lado dito; a armadilha do "defender" (que o conserto óbvio
+  teria criado) travada em teste; `rush`, `plant` e `push` descartados por não decidirem.
+
 - **2.28.282** — a migração passou a alcançar as 23 buscas antigas sem `pedido`, lendo os
   parâmetros do nome do arquivo; e o `remontarIndice` parou de escrever lado torto no
   índice. Provado contra os 72 nomes reais: 72 de 72 fecham o círculo.
