@@ -99,6 +99,10 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.288** — a pedido dele, o corte pra juntar alvos marcados passou de meio pino pro
+  círculo inteiro: se os dois desenhos se encostam na tela, viram um pino só. Vale só pro
+  ponto onde a habilidade CAI; as origens seguem separadas, cada uma no seu tijolo.
+
 - **2.28.287** — fechada a conta da .285: marcador/pino marcado a mão não se move, mas
   também não esconde ninguém. Alvos marcados que se cobrem viram um pino só; marcador
   tapado vai pra tira com um **+N** em quem fica; pino deduzido sai de baixo de marcador

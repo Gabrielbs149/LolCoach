@@ -2005,10 +2005,10 @@ test('lineups: dois alvos marcados no mesmo tijolo viram um pino, não um pino s
     const lnLarguraCrua = () => 0.9;
     const LN_LONGE_PINO = 0.078;
     const longe = (f) => Math.max(0.015, lnLarguraCrua() * f);
-    const extras = { pôr: (ls) => { lnAchadas = ls; }, meioPino: () => longe(LN_LONGE_PINO) * 0.5 };
+    const extras = { pôr: (ls) => { lnAchadas = ls; }, pino: () => longe(LN_LONGE_PINO) };
   `;
   const t = await funcoesDaTela('painel.html', ['lnPinos'], cercado);
-  const meio = t.meioPino();
+  const pino = t.pino();   // a largura do próprio desenho do pino
 
   const marcado = (nome, x, y, i) => ({
     video: 'v', segundo: i, nome: `lineup ${i}`,
@@ -2026,9 +2026,14 @@ test('lineups: dois alvos marcados no mesmo tijolo viram um pino, não um pino s
   t.pôr([marcado('B Site', 0.20, 0.20, 1), marcado('A Site', 0.80, 0.80, 2)]);
   assert.equal(t.lnPinos().length, 2, 'marcas distantes seguem sendo pinos distintos');
 
-  // 3. logo depois do corte ainda separa: só junta o que ficaria mesmo sem clique
-  t.pôr([marcado('B Site', 0.5, 0.5, 1), marcado('A Link', 0.5 + meio * 1.1, 0.5, 2)]);
-  assert.equal(t.lnPinos().length, 2, 'fora do raio de cobrir, não junta');
+  /* 3. o corte é o CÍRCULO INTEIRO, não meio. Começou em meio pino (só o que ficava sem
+   *    clique) e ele disse que faltava: "ta ficando um circulo em cima do outro". Dois
+   *    desenhos que se encostam ele não distingue, então valem mais como um pino só. */
+  t.pôr([marcado('B Site', 0.5, 0.5, 1), marcado('A Link', 0.5 + pino * 0.8, 0.5, 2)]);
+  assert.equal(t.lnPinos().length, 1, 'círculos encostados viram um, mesmo sem roubar clique');
+
+  t.pôr([marcado('B Site', 0.5, 0.5, 1), marcado('A Link', 0.5 + pino * 1.2, 0.5, 2)]);
+  assert.equal(t.lnPinos().length, 2, 'separados na tela seguem separados no mapa');
 
   // 4. pino DEDUZIDO não entra na fusão: ele se afasta sozinho e o nome do callout informa
   t.pôr([

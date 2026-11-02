@@ -4695,10 +4695,20 @@ function lnPinos(){
    * lineups com alvo a 0,9 m uma da outra ("Site B Haunt 01" e "Lotus Attack - B Site"),
    * e o pino de uma comia o clique da outra em TODAS as 14 vistas do mapa.
    *
-   * Afastar esta fora de questao: ele marcou ali. Entao juntam-se — e so quando um cobre
-   * mesmo o centro do outro (meio pino), que e exatamente a condicao de ficar sem clique.
-   * A 0,9 m os dois sao o mesmo tijolo pra quem joga; o leque abre as duas lineups. */
-  const juntar = longe(LN_LONGE_PINO) * 0.5;
+   * Afastar esta fora de questao: ele marcou ali. Entao juntam-se.
+   *
+   * O CORTE E O CIRCULO INTEIRO, nao meio. Primeiro usei meio pino (so o que ficava sem
+   * clique), e ele disse que faltava: "quando eu colocar manualmente um ponto da lineup em
+   * cima de outro, ele tem q juntar ja, ta ficando um circulo em cima do outro". Ele nao
+   * esta falando de clique roubado: esta falando do que ENXERGA. Dois circulos que se
+   * encostam ele nao distingue de jeito nenhum, entao valem mais como um pino com duas
+   * lineups no leque. `longe(LN_LONGE_PINO)` e a largura do proprio pino — abaixo disso os
+   * desenhos se sobrepoem na tela.
+   *
+   * Vale SO pro ponto onde a habilidade CAI, que e o que ele disse ser igual ("mas e q so
+   * ponto onde a habilidade cai e igual"). De onde cada uma sai continua sendo um marcador
+   * proprio, no tijolo de cada uma: o leque mostra as duas origens saindo do mesmo alvo. */
+  const juntar = longe(LN_LONGE_PINO);
   const meus = [...por.values()].filter((p) => p.meu)
     .sort((a, b) => b.lista.length - a.lista.length);
   for (const p of meus) {
