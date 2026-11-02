@@ -5637,7 +5637,12 @@ function lnOlharQualidade(l){
   lnPintarQualidade(q);
   if (estado !== YT.PlayerState.PLAYING) return;
   const larg = $('.lnVideoCx')?.getBoundingClientRect().width ?? 0;
-  const ruim = lnAltura(q) > 0 && lnAltura(q) <= 360;
+  /* O PISO É 720p, a pedido dele: "pq tu colocou 360p?? no minimo 720p".
+   *
+   * O app nunca pediu 360p — não há `vq` nem `setPlaybackQuality` em lugar nenhum, quem
+   * escolhe é o YouTube pelo tamanho do player. O que era meu: esta linha só reagia a 360p
+   * OU PIOR, então parar em 480p era considerado bom e ninguém tentava de novo. */
+  const ruim = lnAltura(q) > 0 && lnAltura(q) < 720;
   if (!ruim || larg < 700 || lnTentouHD >= LN_TETO.length || Date.now() - lnCarregouEm < 6000) return;
   lnTentouHD++;
   lnTeto(LN_TETO[lnTentouHD - 1]);
@@ -5656,7 +5661,11 @@ function lnOlharQualidade(l){
  * melhor que 1080 que desaba pra 144 — e foi medido: encolher o quadro pra 640 derruba pra
  * 480p em 6 s, então o tamanho é mesmo o volante da qualidade.
  */
-const LN_TETO = [null, null, 1280, 960];
+/* O ÚLTIMO DEGRAU SAIU. Era `960`, que pede ~480p — ou seja, a própria escada levava o
+ * vídeo pra baixo do piso que ele pediu. Agora o degrau mais baixo é 1.280 px, que é
+ * exatamente a largura de 720p: se nem assim o YouTube mandar 720, o problema não é escolha
+ * e sim máquina ou linha, e aí o selo diz isso em vez de aceitar calado. */
+const LN_TETO = [null, null, 1280];
 
 /** Põe (ou tira) um teto de largura no quadro do vídeo, centralizado. */
 function lnTeto(px){
@@ -5669,12 +5678,14 @@ function lnTeto(px){
 function lnPintarQualidade(q){
   const e = $('#lnQ'); if (!e) return;
   const alt = lnAltura(q);
-  const menor = lnTentouHD >= 3;        // a escada já reduziu o quadro de propósito
-  e.textContent = alt ? `${alt}p${lnQuerRecarregar ? ' ⟳' : menor ? ' ↓' : ''}` : '…';
-  e.classList.toggle('ruim', alt > 0 && alt <= 360);
+  const menor = lnTentouHD >= 3;            // a escada já reduziu o quadro de propósito
+  const desistiu = alt > 0 && alt < 720 && lnTentouHD >= LN_TETO.length && !lnQuerRecarregar;
+  e.textContent = alt ? `${alt}p${lnQuerRecarregar ? ' ⟳' : desistiu ? ' !' : menor ? ' ↓' : ''}` : '…';
+  e.classList.toggle('ruim', alt > 0 && alt < 720);
   e.title = !alt ? 'medindo…'
-    : lnQuerRecarregar ? 'tá ruim: vou pedir de novo quando o clipe repetir — recarregar agora te tiraria do meio da jogada (clica pra fazer já)'
-    : menor ? 'o quadro foi reduzido de propósito: assim o YouTube manda uma imagem que a máquina segura, em vez de desabar pra 144p — clica pra tentar o tamanho cheio de novo'
+    : lnQuerRecarregar ? 'abaixo de 720p: vou pedir de novo quando o clipe repetir — recarregar agora te tiraria do meio da jogada (clica pra fazer já)'
+    : desistiu ? `tentei ${LN_TETO.length}× e o YouTube não passou de ${alt}p: ou o vídeo não tem 720p, ou a máquina/linha não estão dando conta com o jogo aberto — clica pra tentar de novo`
+    : menor ? 'o quadro foi limitado a 1.280 px, que é a largura de 720p: assim o YouTube manda uma imagem firme em vez de desabar — clica pra tentar o tamanho cheio de novo'
     : 'quem escolhe a qualidade é o YouTube, pelo tamanho do player e pelo quanto a máquina está dando conta — clica pra ele escolher de novo';
 }
 

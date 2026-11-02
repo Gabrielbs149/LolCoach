@@ -42,9 +42,23 @@ export function corpoDaFuncao(fonte, nome) {
  * Se o cercado definir `const extras = { ... }`, o que estiver ali vem junto — é por onde
  * o teste mexe no estado que a tela guarda em variável solta (`lnClipe`, `lnMarcando`).
  */
-export async function funcoesDaTela(tela, nomes, cercado = '') {
+/**
+ * A linha `const NOME = ...;` como está escrita na tela.
+ *
+ * Serve pra constante que o teste precisa CONFERIR, não só ter: redeclarar o valor no
+ * cercado faria o teste passar contra um número inventado por ele mesmo. Uma linha só, que
+ * é como essas constantes são escritas no painel.
+ */
+export function constanteDaTela(fonte, nome) {
+  const m = new RegExp(`^const ${nome}\\s*=.*?;\\s*$`, 'm').exec(fonte);
+  if (!m) throw new Error(`não achei "const ${nome} = ...;" numa linha só — foi renomeada ou quebrada em várias linhas?`);
+  return m[0];
+}
+
+export async function funcoesDaTela(tela, nomes, cercado = '', constantes = []) {
   const fonte = await readFile(resolve(AQUI, '..', 'src', 'ui', tela), 'utf8');
-  const corpos = nomes.map((n) => corpoDaFuncao(fonte, n)).join('\n\n');
+  const consts = constantes.map((n) => constanteDaTela(fonte, n)).join('\n');
+  const corpos = [consts, nomes.map((n) => corpoDaFuncao(fonte, n)).join('\n\n')].filter(Boolean).join('\n\n');
   const codigo = `${cercado}\n${corpos}\n`
     + `return Object.assign({}, typeof extras === 'undefined' ? {} : extras, { ${nomes.join(', ')} });`;
   // eslint-disable-next-line no-new-func

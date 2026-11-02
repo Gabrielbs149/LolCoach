@@ -2388,3 +2388,74 @@ test('lineups: a caixa do mapa cabe o que ele marcou, inteiro', async () => {
   const poucos = t.lnJanelaDoMapa();
   assert.deepEqual(poucos, { x0: 0, y0: 0, lx: 1, ly: 1 });
 });
+
+/* ------------------------------------------- o piso de qualidade do video
+ *
+ * Ele cobrou: "pq tu colocou 360p?? no minimo 720p". O app nunca pediu 360p -- nao ha `vq`
+ * nem setPlaybackQuality em lugar nenhum, quem escolhe e o YouTube pelo tamanho do player.
+ * O que era meu: a recuperacao so reagia a 360p OU PIOR, entao parar em 480p era tratado
+ * como bom; e o ultimo degrau da escada limitava o quadro a 960 px, que pede ~480p -- ou
+ * seja, a propria escada levava o video pra baixo do piso que ele queria.
+ */
+test('lineups: a recuperacao de qualidade trata tudo abaixo de 720p como ruim', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  const cercado = `
+    const LN_ALTURA = { tiny: 144, small: 240, medium: 360, large: 480, hd720: 720, hd1080: 1080, hd1440: 1440, hd2160: 2160 };
+    const lnAltura = (q) => LN_ALTURA[q] ?? 0;
+    let lnTentouHD = 0, lnQuerRecarregar = false;
+    const selo = { textContent: '', className: '', title: '', classList: { toggle(c, v) { selo.ruim = v; } } };
+    const $ = () => selo;
+    const extras = {
+      selo, lnAltura,
+      estado: (t, recarregar) => { lnTentouHD = t; lnQuerRecarregar = recarregar; },
+      teto: () => LN_TETO,
+    };
+  `;
+  // LN_TETO vem do arquivo, nao redeclarada aqui: senao o teste conferiria um numero
+  // inventado por ele mesmo em vez da escada de verdade
+  const t = await funcoesDaTela('painel.html', ['lnPintarQualidade'], cercado, ['LN_TETO']);
+
+  /* A ESCADA nao pode pedir menos que 720p. O degrau de 960 px (que dava ~480p) saiu; o
+   * mais baixo e 1.280, que e exatamente a largura de 720p. */
+  const teto = t.teto();
+  for (const px of teto) {
+    assert.ok(px === null || px >= 1280, `degrau de ${px}px pede menos que 720p`);
+  }
+
+  // 480p agora conta como RUIM -- era isso que o app aceitava calado
+  t.estado(0, false);
+  t.lnPintarQualidade('large');
+  assert.equal(t.selo.textContent.startsWith('480p'), true);
+  assert.equal(t.selo.ruim, true, '480p tem que contar como ruim, senao ninguem tenta de novo');
+
+  // 360p, idem
+  t.estado(0, false);
+  t.lnPintarQualidade('medium');
+  assert.equal(t.selo.ruim, true);
+
+  // 720p e bom, e 1080 tambem
+  t.estado(0, false);
+  t.lnPintarQualidade('hd720');
+  assert.equal(t.selo.ruim, false, '720p e o piso: nao pode contar como ruim');
+  t.lnPintarQualidade('hd1080');
+  assert.equal(t.selo.ruim, false);
+
+  /* Quando tentou tudo e nao chegou nos 720, o selo AVISA em vez de aceitar calado -- que
+   * era o comportamento antigo (ficava 480p sem dizer nada). */
+  t.estado(teto.length, false);
+  t.lnPintarQualidade('large');
+  assert.ok(t.selo.textContent.includes('!'), 'desistir tem que aparecer no selo');
+  assert.match(t.selo.title, /não passou de 480p/);
+
+  // enquanto vai tentar de novo, o selo diz isso e nao "desisti"
+  t.estado(1, true);
+  t.lnPintarQualidade('medium');
+  assert.ok(t.selo.textContent.includes('⟳'));
+  assert.match(t.selo.title, /abaixo de 720p/);
+
+  // sem medida ainda, nao inventa numero
+  t.estado(0, false);
+  t.lnPintarQualidade('');
+  assert.equal(t.selo.textContent, '…');
+});
