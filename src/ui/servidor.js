@@ -1,6 +1,5 @@
 import http from 'node:http';
 import { readFile, appendFile, mkdir, stat, rename } from 'node:fs/promises';
-import { createReadStream } from 'node:fs';
 import { pastaBase } from '../caminhos.js';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -838,41 +837,6 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         } catch { return enviar(504, 'text/plain', 'o quadro não veio'); }
       }
 
-      /* O arquivo de um clipe do Outplayed: a miniatura e o vídeo.
-       *
-       * O endereço traz o caminho RELATIVO à pasta dos clipes, nunca o absoluto, e quem
-       * resolve é o `arquivoDeClipe`, que recusa tudo que sair de lá. Sem essa cerca um
-       * `..` no endereço viraria leitura de qualquer arquivo do PC dele pela porta 8770.
-       *
-       * O vídeo responde por FAIXA (Range) porque sem isso o navegador até toca, mas
-       * arrastar a barra não funciona — e num clipe de 20 s de lineup o que ele quer é
-       * justamente voltar três segundos e olhar de novo. */
-      if (url.pathname === '/api/val/clipe' && acoes.valArquivoDeClipe) {
-        const achado = await acoes.valArquivoDeClipe(url.searchParams.get('de') ?? '');
-        if (!achado) return enviar(404, 'text/plain', 'clipe fora da pasta ou inexistente');
-        const { caminho, tamanho, tipo } = achado;
-        const faixa = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? '');
-        try {
-          if (!faixa) {
-            res.writeHead(200, { 'Content-Type': tipo, 'Content-Length': tamanho, 'Accept-Ranges': 'bytes', 'Cache-Control': 'max-age=3600' });
-            return createReadStream(caminho).pipe(res);
-          }
-          let de = faixa[1] ? Number(faixa[1]) : 0;
-          let ate = faixa[2] ? Number(faixa[2]) : tamanho - 1;
-          if (!faixa[1] && faixa[2]) { de = Math.max(0, tamanho - Number(faixa[2])); ate = tamanho - 1; }
-          if (!Number.isFinite(de) || !Number.isFinite(ate) || de > ate || de >= tamanho) {
-            res.writeHead(416, { 'Content-Range': `bytes */${tamanho}` });
-            return res.end();
-          }
-          ate = Math.min(ate, tamanho - 1);
-          res.writeHead(206, {
-            'Content-Type': tipo, 'Content-Length': ate - de + 1, 'Accept-Ranges': 'bytes',
-            'Content-Range': `bytes ${de}-${ate}/${tamanho}`, 'Cache-Control': 'max-age=3600',
-          });
-          return createReadStream(caminho, { start: de, end: ate }).pipe(res);
-        } catch { return enviar(404, 'text/plain', 'nao consegui ler o clipe'); }
-      }
-
       const ic = url.pathname.match(/^\/icone\/(\d+)$/);
       if (ic && acoes.icone) {
         try {
@@ -995,7 +959,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       // GET: catálogo (mapas/agentes), busca de vídeo, as salvas e os links de fora.
       // Tudo devolve JSON e nenhuma derruba a aba: sem internet, a busca volta com aviso
       // e as salvas continuam vindo do disco.
-      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao'], ['/api/val/acervo', 'valAcervo'], ['/api/val/meus-clipes', 'valMeusClipes']]) {
+      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao'], ['/api/val/acervo', 'valAcervo']]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         const p = {
           forcar: url.searchParams.get('forcar') === '1',

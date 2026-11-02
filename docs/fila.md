@@ -17,6 +17,13 @@ Regras que valem pra toda rodada:
 
 ## Aberto
 
+### 0b. Clipes do Outplayed — TIRADOS do app (2.28.298)
+Entraram na 2.28.297 e saíram na 2.28.298, a pedido dele: "falei pra tirar o player do
+vídeo meu". O código está no commit 339afbd e no ramo `clipes-outplayed`. **Não reinstalar
+sem ele pedir** — o que ele queria era achar a lineup DENTRO do vídeo (item 0), e um player
+que ele não pediu só ocupa tela.
+
+
 ### 0. ~~Achar a lineup dentro do vídeo da partida dele~~ — NÃO FAZER
 Ele pediu e eu disse que não dou conta sozinho; ele respondeu "se n consegue sozinho
 esquece". **Medido: das 61 confirmações dele, nenhuma cai dentro do vídeo gravado** — ele
@@ -159,12 +166,7 @@ o caminho manual dá conta ou se precisa de outra ideia.
   marcas dele tem os dois MAIS a confirmação, então exigir as três deixaria o filtro vazio).
   De quebra, consertado o beco sem saída de trocar de mapa com o filtro ligado.
 
-- **2.28.297 — os clipes do Outplayed ENTRARAM**, incluindo a partida inteira. Ele ligou a
-  gravação completa (1.077 MB / 23,2 min de Bind) e o ramo voltou por merge. O Outplayed
-  mudou o nome dos arquivos no meio do caminho, e o padrão do ramo não pegava nenhum dos
-  novos — corrigido, 1.076 de 1.076 casam. Toca no app, com arrastar a barra funcionando.
-
-- ~~**Clipes do Outplayed — engavetado no ramo `clipes-outplayed`.**~~ Medido: o Outplayed grava
+- **Clipes do Outplayed — engavetado no ramo `clipes-outplayed`.** Medido: o Outplayed grava
   Valorant como destaque (1.066 clipes, mediana 14 s, 8–13% de cada partida), não partida
   inteira. Ele viu os números e disse "esquece, só com esses clipes vai ser impossível".
   Código pronto e testado no ramo; volta com `git merge clipes-outplayed` se a gravação de

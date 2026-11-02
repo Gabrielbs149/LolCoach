@@ -1161,29 +1161,6 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnLadoDiz{font-size:11px;color:var(--fraco);margin-right:2px}
 .lnLadoBt.on.atq{border-color:var(--g3);color:var(--g3);background:#1d1113}
 .lnLadoBt.on.def{border-color:var(--g1);color:var(--g1);background:#101722}
-/* a tira dos clipes DELE, do Outplayed. Mesma linguagem da tira de baixo do mapa: borda
-   tracejada pra dizer "isto é um apoio, não o conteúdo principal". */
-.lnClipes{margin:12px 0 0;padding:9px 11px;border:1px dashed #38414f;border-radius:var(--r-m);background:#0d131b}
-.lnClipes>b{display:block;font-size:12px;color:var(--ouro)}
-.lnClipes>small{display:block;color:var(--fraco);font-size:11px;margin:2px 0 8px}
-.lnClipeTiras{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
-.lnClipe{flex:0 0 132px;position:relative;padding:0;border:1px solid var(--borda);border-radius:var(--r-s);
-  background:#070b11;cursor:pointer;overflow:hidden;line-height:0;transition:border-color .12s,transform .12s}
-.lnClipe:hover{border-color:var(--ouro);transform:translateY(-2px)}
-.lnClipe img{width:100%;height:74px;object-fit:cover;display:block}
-.lnClipeSemFoto{display:flex;align-items:center;justify-content:center;height:74px;color:var(--fraco);font-size:18px}
-.lnClipe>span{display:block;padding:4px 0;font-size:11px;line-height:1.2;color:var(--fraco);font-family:inherit}
-.lnClipeTocando{margin-top:10px;display:flex;flex-direction:column;align-items:flex-start;gap:6px}
-.lnClipeTocando video{max-width:100%;max-height:52vh;border-radius:var(--r-s);background:#000}
-/* a partida inteira não é mais uma miniatura na fileira: é uma linha só, larga, em cima.
-   Um lance de 14 s e uma partida de 23 min não podem parecer a mesma coisa. */
-.lnPartidaInteira{display:flex;align-items:center;gap:10px;width:100%;margin:0 0 8px;padding:8px 11px;
-  border:1px solid var(--ouro);border-radius:var(--r-m);background:#171309;color:var(--texto);
-  font-family:inherit;text-align:left;cursor:pointer;transition:background .12s}
-.lnPartidaInteira:hover{background:#1f1a0c}
-.lnPartidaInteira i{font-style:normal;font-size:15px;color:var(--ouro);flex:0 0 auto}
-.lnPartidaInteira span{font-size:11px;color:var(--fraco);line-height:1.35}
-.lnPartidaInteira b{display:block;font-size:12.5px;color:var(--ouro)}
 
 .lnSemLugar{margin:10px 0 0;padding:9px 11px;border:1px dashed #38414f;
   border-radius:10px;background:#0e131bcc}
@@ -1651,7 +1628,6 @@ h2{letter-spacing:1px}
         <div class="lnDuplo">
           <div class="lnMapaCx" id="lnMapaCx"></div>
         </div>
-        <div id="lnMeusClipes"></div>
       </div>
     </div>
 
@@ -4550,8 +4526,6 @@ function lnEscolherHab(v){
 function lnPintarResumo(){
   $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`
     + lnColunasDoFiltro();
-  $('#lnAviso').innerHTML = `<div class="lnResumo">${lnQuantas()} · clica no mapa onde a habilidade tem que cair</div>`;
-  lnCarregarMeusClipes();
 }
 
 /** "83 de Incendiário · 7 canais · 40 de ataque · 18 sem lado · 24 de defesa fora". */
@@ -5905,90 +5879,6 @@ function lnEsquecerMeuPonto(qual){
   lnPintarLado(l);
   lnDesenharMapa();
   lnPintarResumo();
-}
-
-/* ---------------------------------------------------------- os clipes DELE
- *
- * Pedido dele, duas vezes: "o meu outplayed grava toda partida minha, já fiz várias
- * lineups, consegue usar esses vídeos?".
- *
- * A ressalva, medida antes de construir: o Outplayed grava Valorant como DESTAQUE, não
- * partida inteira — 1.066 clipes com mediana de 14 s, cobrindo de 8% a 13% de cada
- * partida. Pra League of Legends e iRacing ele grava tudo; pro Valorant, não. Então o que
- * dá pra oferecer é "seus clipes deste mapa", e a tira diz isso com todas as letras em
- * vez de prometer revisão de partida.
- *
- * O nome do arquivo nunca diz o mapa; quem diz é o diário de partidas. Por isso a tira só
- * tem o que foi jogado DEPOIS da 2.28.284, que é quando o app começou a anotar.
- */
-let lnClipesDe = null;        // de que mapa+agente a tira guardada é
-
-async function lnCarregarMeusClipes(){
-  const cx = $('#lnMeusClipes'); if (!cx) return;
-  const quem = `${lnMapaAtual}|${lnAgenteAtual}`;
-  if (lnClipesDe === quem) return;            // já é desta combinação
-  lnClipesDe = quem;
-  cx.innerHTML = '';
-  if (!lnMapaAtual) return;
-  let r;
-  try {
-    r = await pegar(`/api/val/meus-clipes?mapa=${encodeURIComponent(lnMapaAtual)}&agente=${encodeURIComponent(lnAgenteAtual)}`);
-  } catch { return; }
-  if (lnClipesDe !== quem) return;            // ele trocou de mapa enquanto isto vinha
-  lnPintarMeusClipes(r);
-}
-
-function lnPintarMeusClipes(r){
-  const cx = $('#lnMeusClipes'); if (!cx) return;
-  const n = (r?.clipes ?? []).length;
-  // sem clipe e sem pasta do Outplayed, a tira nem aparece: não é erro dele
-  if (!n && !r?.partidas) { cx.innerHTML = ''; return; }
-  const quantos = r.clipes.reduce((s, c) => s + c.partes.length, 0);
-  /* A PARTIDA INTEIRA GANHA LUGAR PRÓPRIO.
-   *
-   * Quando engavetei isto, só havia destaque de 14 s e por isso ele disse "esquece, so com
-   * esses clipes vai ser impossivel" — e estava certo. Depois ele ligou a gravação de
-   * partida inteira e avisou: "gravei partida completa agora, testa la". São coisas
-   * diferentes e não podem virar a mesma fileira de miniaturas: uma é um lance de 14 s, a
-   * outra é a partida de 23 minutos que dá pra parar, voltar e ver a lineup acontecendo. */
-  const inteiras = r.clipes.filter((c) => c.inteira);
-  const avulsos = r.clipes.filter((c) => !c.inteira);
-  const mm = (b) => `${Math.round(b / 1048576)} MB`;
-  cx.innerHTML = `<div class="lnClipes">
-    <b>seus clipes do ${esc(lnMapaAtual)}${n ? ` — ${quantos} clipe${quantos > 1 ? 's' : ''} de ${r.partidas} partida${r.partidas > 1 ? 's' : ''} sua${r.partidas > 1 ? 's' : ''}` : ''}</b>
-    <small>${n
-      ? (inteiras.length
-        ? `${inteiras.length === 1 ? 'uma partida inteira gravada' : `${inteiras.length} partidas inteiras gravadas`} e o resto são destaques de uns 14 s`
-        : 'o Outplayed está gravando só os destaques (uns 14 s cada), não a partida inteira')
-      : esc(r.porque ?? 'nada por aqui')}</small>
-    ${inteiras.map((c) => `<button class="lnPartidaInteira" onclick="lnVerMeuClipe('${esc(c.partes[0].arquivo)}')"
-        title="abrir a gravação inteira desta partida">
-        <i>▶</i><span><b>partida inteira de ${esc(lnMapaAtual)}</b>
-        ${new Date(c.em).toLocaleString('pt-BR')} · ${mm(c.partes.reduce((s, p) => s + p.tamanho, 0))}</span>
-      </button>`).join('')}
-    ${avulsos.length ? `<div class="lnClipeTiras">${avulsos.map((c) => c.partes.map((p, i) => `
-      <button class="lnClipe" onclick="lnVerMeuClipe('${esc(p.arquivo)}')"
-        title="${new Date(c.em).toLocaleString('pt-BR')}${c.partes.length > 1 ? ` · destaque ${i + 1} de ${c.partes.length}` : ''} · ${(p.tamanho / 1048576).toFixed(0)} MB">
-        ${c.miniatura ? `<img src="/api/val/clipe?de=${encodeURIComponent(c.miniatura)}" alt="" loading="lazy">` : '<span class="lnClipeSemFoto">▶</span>'}
-        <span>${new Date(c.em).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
-      </button>`).join('')).join('')}</div>` : ''}
-  </div>`;
-}
-
-/* Toca no próprio app em vez de abrir o player do Windows: abrir programa de fora com o
- * jogo rodando é janela nova na frente, e isso minimiza o Valorant. O servidor responde
- * por faixa, então arrastar a barra funciona — que é o que ele vai querer num clipe de
- * lineup: voltar três segundos e olhar de novo. */
-function lnVerMeuClipe(arquivo){
-  const cx = $('#lnMeusClipes'); if (!cx) return;
-  const antigo = cx.querySelector('.lnClipeTocando');
-  if (antigo) antigo.remove();
-  const caixa = document.createElement('div');
-  caixa.className = 'lnClipeTocando';
-  caixa.innerHTML = `<video src="/api/val/clipe?de=${encodeURIComponent(arquivo)}" controls autoplay loop playsinline></video>
-    <button class="acao" onclick="this.parentElement.remove()">fechar</button>`;
-  cx.querySelector('.lnClipes')?.appendChild(caixa);
-  caixa.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 /** O mapa em modo de marcar: inteiro (ou aproximado), esperando o clique. */
