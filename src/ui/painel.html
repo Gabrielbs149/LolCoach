@@ -5357,7 +5357,11 @@ function lnCliqueNoMapinha(ev){
   const l = lnClipe, qual = lnMarcando.qual;
   lnMarcando = null;
   const certo = { nome: lnCalloutPerto({ x, y })?.nome ?? 'onde você marcou', x, y, aproximado: false, meu: true };
-  if (qual === 'posicao') l.posicao = certo; else l.ponto = certo;
+  /* O que o VÍDEO dizia fica guardado antes de ser coberto, pra "apagar" devolver aquilo em
+   * vez de deixar buraco. `undefined` e `null` são coisas diferentes aqui: null é "o vídeo
+   * não disse nada", e isso também precisa voltar. Por isso o teste é `in`, não `??`. */
+  if (qual === 'posicao') { if (!('posicaoDoVideo' in l)) l.posicaoDoVideo = l.posicao ?? null; l.posicao = certo; }
+  else { if (!('pontoDoVideo' in l)) l.pontoDoVideo = l.ponto ?? null; l.ponto = certo; }
   try {
     fetch('/api/val/marcar-ponto', {
       method: 'POST', headers: { 'content-type': 'application/json' },
@@ -5377,9 +5381,19 @@ function lnEsquecerMeuPonto(qual){
       body: JSON.stringify({ video: l.video, segundo: l.segundo, qual }),
     }).catch(() => {});
   } catch {}
-  /* O ponto deduzido do nome volta na próxima busca; aqui só tiro o que ele apagou, porque
-   * refazer a dedução na tela seria repetir a leitura que o servidor já faz. */
-  if (qual === 'posicao') l.posicao = null; else if (l.ponto?.meu) l.ponto = { ...l.ponto, meu: false, aproximado: true };
+  /* APAGAR A MARCA NÃO PODE APAGAR JUNTO O QUE O VÍDEO DISSE.
+   *
+   * Antes a posição virava `null` e o alvo virava "aproximado" — e nenhum dos dois era
+   * verdade. Medido no acervo: 1.253 lineups (30,4%) têm ponto de saída deduzido, que sumia
+   * do mapa até a próxima busca; e 2.124 (51,6%) têm alvo exato lido do callout, que a tela
+   * passava a mostrar como palpite. O disco sempre esteve certo; quem mentia era a tela.
+   *
+   * Agora devolvo o que foi guardado no momento da marcação. Sem guardado (marca de outra
+   * sessão, que veio do disco já por cima), caio no comportamento antigo — aí a dedução
+   * realmente só volta na próxima busca, e repetir a leitura aqui seria copiar o servidor. */
+  if (qual === 'posicao') l.posicao = 'posicaoDoVideo' in l ? l.posicaoDoVideo : null;
+  else if ('pontoDoVideo' in l) l.ponto = l.pontoDoVideo;
+  else if (l.ponto?.meu) l.ponto = { ...l.ponto, meu: false, aproximado: true };
   lnPintarLado(l);
   lnDesenharMapa();
   lnPintarResumo();

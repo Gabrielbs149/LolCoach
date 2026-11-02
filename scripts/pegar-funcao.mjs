@@ -38,11 +38,15 @@ export function corpoDaFuncao(fonte, nome) {
 /**
  * Monta um módulo com as funções pedidas da tela, mais o `cercado` que você escrever
  * (as variáveis e funções de que elas dependem). Devolve o objeto com todas elas.
+ *
+ * Se o cercado definir `const extras = { ... }`, o que estiver ali vem junto — é por onde
+ * o teste mexe no estado que a tela guarda em variável solta (`lnClipe`, `lnMarcando`).
  */
 export async function funcoesDaTela(tela, nomes, cercado = '') {
   const fonte = await readFile(resolve(AQUI, '..', 'src', 'ui', tela), 'utf8');
   const corpos = nomes.map((n) => corpoDaFuncao(fonte, n)).join('\n\n');
-  const codigo = `${cercado}\n${corpos}\nreturn { ${nomes.join(', ')} };`;
+  const codigo = `${cercado}\n${corpos}\n`
+    + `return Object.assign({}, typeof extras === 'undefined' ? {} : extras, { ${nomes.join(', ')} });`;
   // eslint-disable-next-line no-new-func
   return new Function(codigo)();
 }

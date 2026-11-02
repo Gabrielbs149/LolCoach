@@ -99,6 +99,12 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.286** — apagar a marca devolve o que o vídeo dizia (1.253 lineups tinham ponto de
+  saída deduzido que sumia do mapa; 2.124 tinham alvo exato que virava "aproximado"). Mais
+  dois negativos registrados em `melhorias.md`: repetir o ponto anterior por tecla (só 5 de
+  190 pares das marcas dele ficam a menos de 2 m) e o falso alarme das 8.987 linhas de
+  `latest.yml` no registro (estouro já consertado; 8.957 são do mesmo segundo de 17/10).
+
 - **2.28.285** — o ponto marcado a mão parou de ser empurrado pelo desenho (arrasto de
   **7,5 m em média e 16,6 m no pior caso → 0 m**, medido nas 20 marcas dele em Lotus/Fade),
   e o controle de **mudar onde a habilidade cai** passou a existir em todas as lineups —

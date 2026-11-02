@@ -1929,3 +1929,66 @@ test('lineups: o ponto que ele marcou a mão fica exatamente onde ele clicou', a
   const beira = lnDesempilhar([{ fixo: true, de: { ...naBorda } }], { x: 0.05, y: 0.05 }, []);
   assert.equal(dist(beira[0], naBorda), 0, 'marca na beirada fica na beirada');
 });
+
+test('lineups: apagar a marca devolve o que o vídeo dizia, não um buraco', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  /* A tela guarda o clipe aberto numa variável solta e fala com o servidor por fetch.
+   * Aqui os dois viram cenário: o que está sob teste é só o que acontece com `l.posicao` e
+   * `l.ponto` entre marcar e apagar. */
+  const cercado = `
+    let lnClipe = null, lnMarcando = null, lnPlanta = '';
+    const lnCallouts = [{ nome: 'A Lobby', x: 0.2, y: 0.2 }, { nome: 'A Main', x: 0.8, y: 0.8 }];
+    const lnCalloutPerto = (p) => lnCallouts
+      .map((c) => ({ c, d: Math.hypot(c.x - p.x, c.y - p.y) }))
+      .sort((a, b) => a.d - b.d)[0].c;
+    const lnRecorteEm = (p, lado) => ({ x: p.x - lado / 2, y: p.y - lado / 2, lado });
+    const fetch = () => ({ catch: () => {} });
+    const lnPintarLado = () => {}, lnDesenharMapa = () => {}, lnPintarResumo = () => {};
+    const extras = {
+      abrir: (l) => { lnClipe = l; },
+      clicar: (qual, x, y) => {
+        lnMarcando = { qual, passo: 2, r: { x: 0, y: 0, lado: 1 } };
+        lnCliqueNoMapinha({ clientX: x * 100, clientY: y * 100,
+          currentTarget: { getBoundingClientRect: () => ({ left: 0, top: 0, width: 100, height: 100 }) } });
+      },
+    };
+  `;
+  const t = await funcoesDaTela('painel.html', ['lnCliqueNoMapinha', 'lnEsquecerMeuPonto'], cercado);
+
+  // 1. o vídeo DIZIA de onde se joga: apagar a marca devolve aquilo, não null
+  const comLugar = { video: 'v', segundo: 1, posicao: { nome: 'A Lobby', x: 0.2, y: 0.2, aproximado: false } };
+  t.abrir(comLugar);
+  t.clicar('posicao', 0.7, 0.7);
+  assert.equal(comLugar.posicao.meu, true, 'marcou');
+  t.lnEsquecerMeuPonto('posicao');
+  assert.equal(comLugar.posicao?.nome, 'A Lobby', 'o que o vídeo dizia volta');
+  assert.ok(!comLugar.posicao.meu, 'e volta como dedução, não como marca dele');
+
+  // 2. o vídeo NÃO dizia: apagar deixa vazio de novo — null é uma resposta, não um erro
+  const semLugar = { video: 'v', segundo: 2, posicao: null };
+  t.abrir(semLugar);
+  t.clicar('posicao', 0.3, 0.3);
+  assert.equal(semLugar.posicao.meu, true);
+  t.lnEsquecerMeuPonto('posicao');
+  assert.equal(semLugar.posicao, null, 'sem dedução, continua sem — não inventa');
+
+  // 3. alvo EXATO lido do callout não pode voltar rebaixado a "aproximado"
+  const exato = { video: 'v', segundo: 3, ponto: { nome: 'A Main', x: 0.8, y: 0.8, aproximado: false } };
+  t.abrir(exato);
+  t.clicar('alvo', 0.1, 0.1);
+  assert.equal(exato.ponto.meu, true);
+  t.lnEsquecerMeuPonto('alvo');
+  assert.equal(exato.ponto.nome, 'A Main');
+  assert.equal(exato.ponto.aproximado, false, 'alvo exato não vira palpite ao apagar a marca');
+  assert.ok(!exato.ponto.meu);
+
+  // 4. marcar DUAS vezes e apagar ainda devolve o original, não a marca do meio
+  const duas = { video: 'v', segundo: 4, posicao: { nome: 'A Lobby', x: 0.2, y: 0.2, aproximado: true } };
+  t.abrir(duas);
+  t.clicar('posicao', 0.6, 0.6);
+  t.clicar('posicao', 0.9, 0.9);
+  t.lnEsquecerMeuPonto('posicao');
+  assert.equal(duas.posicao?.nome, 'A Lobby');
+  assert.equal(duas.posicao.aproximado, true, 'o "aproximado" original também volta');
+});
