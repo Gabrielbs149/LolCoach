@@ -73,7 +73,10 @@ disse o lado à mão, o parser ficou calado em 9 e **acertou as outras 29, sem e
 nenhuma**. As 9 que faltam têm nome que só dá LUGAR ("A Garden", "A Long 1"), e inferir
 lado pelo lugar é chute — defensor segura A Long, atacante entra no A Garden.
 **NÃO MEXER em `PISTAS_DE_LADO` sem gabarito novo:** a precisão está em 100% e toda regra
-nova é risco de trocar o lado de lineup que hoje está certa. Daqui pra frente quem fecha a conta é ele
+nova é risco de trocar o lado de lineup que hoje está certa.
+Segunda medição com 64 lados ditos por ele: **55 de 55, ainda zero erro**, e as 9 que o
+parser não vê são **as mesmas 9** da primeira amostra. Duas amostras independentes
+dizendo a mesma coisa. Daqui pra frente quem fecha a conta é ele
 marcando (ficou rápido na 2.28.274). Só vale voltar ao parser com dado novo.
 
 **Agora há gabarito (02/11).** As 26 marcas dele medidas contra o que o parser deduziu:
