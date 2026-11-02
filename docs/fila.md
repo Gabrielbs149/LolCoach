@@ -99,6 +99,11 @@ o caminho manual dá conta ou se precisa de outra ideia.
 
 ## Feito
 
+- **2.28.287** — fechada a conta da .285: marcador/pino marcado a mão não se move, mas
+  também não esconde ninguém. Alvos marcados que se cobrem viram um pino só; marcador
+  tapado vai pra tira com um **+N** em quem fica; pino deduzido sai de baixo de marcador
+  fixo. Medido: **586 clicáveis em 4 combinações, 15 sem clique → 0**.
+
 - **2.28.286** — apagar a marca devolve o que o vídeo dizia (1.253 lineups tinham ponto de
   saída deduzido que sumia do mapa; 2.124 tinham alvo exato que virava "aproximado"). Mais
   dois negativos registrados em `melhorias.md`: repetir o ponto anterior por tecla (só 5 de

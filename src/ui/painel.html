@@ -1066,6 +1066,11 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
 .lnPino.meu{border-color:var(--ouro);border-width:3px;box-shadow:0 0 10px #f0b90b66}
 .lnMeuSelo{position:absolute;right:-6px;bottom:-5px;font-style:normal;font-size:9px;line-height:1;
   background:var(--ouro);color:#0b1016;border-radius:50%;padding:2px 3px;font-weight:900}
+/* quantas outras marcas estão embaixo desta, no mesmo tijolo. Elas não se afastam de
+   propósito (2.28.285), então o número é o aviso de que tem mais ali — e a tira do lado é
+   por onde se abre. */
+.lnDeN{position:absolute;left:-7px;top:-6px;font-style:normal;font-size:10px;line-height:1;
+  background:var(--ouro);color:#0b1016;border-radius:6px;padding:2px 4px;font-weight:700}
 
 /* a tira de baixo: as lineups daqui que NÃO dizem de onde se joga. Ficavam espalhadas num
    anel inventado em volta do ponto; aqui elas estão juntas, com o motivo escrito. */
@@ -4680,6 +4685,38 @@ function lnPinos(){
     for (const l of p.lista) if (l.habilidade?.icone) cont.set(l.habilidade.icone, (cont.get(l.habilidade.icone) ?? 0) + 1);
     p.icone = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
   }
+  /* DOIS PONTOS MARCADOS A MAO PRATICAMENTE NO MESMO LUGAR VIRAM UM PINO SO.
+   *
+   * Cada marca dele ganha pino proprio, de proposito (o callout e a area, a marca e o
+   * tijolo). Mas desde que pino marcado a mao parou de ser empurrado (2.28.285), dois
+   * tijolos vizinhos se cobrem — e o de baixo fica sem clique, inalcancavel.
+   *
+   * Medido no acervo dele, Lotus/Fade, assim que ele comecou a marcar onde cai: duas
+   * lineups com alvo a 0,9 m uma da outra ("Site B Haunt 01" e "Lotus Attack - B Site"),
+   * e o pino de uma comia o clique da outra em TODAS as 14 vistas do mapa.
+   *
+   * Afastar esta fora de questao: ele marcou ali. Entao juntam-se — e so quando um cobre
+   * mesmo o centro do outro (meio pino), que e exatamente a condicao de ficar sem clique.
+   * A 0,9 m os dois sao o mesmo tijolo pra quem joga; o leque abre as duas lineups. */
+  const juntar = longe(LN_LONGE_PINO) * 0.5;
+  const meus = [...por.values()].filter((p) => p.meu)
+    .sort((a, b) => b.lista.length - a.lista.length);
+  for (const p of meus) {
+    if (!por.has(p.chave)) continue;        // ja foi absorvido por outro
+    for (const o of meus) {
+      if (o === p || !por.has(o.chave)) continue;
+      if (Math.hypot(o.x - p.x, o.y - p.y) >= juntar) continue;
+      p.lista.push(...o.lista);
+      if (!o.aproximado) p.aproximado = false;
+      por.delete(o.chave);
+    }
+  }
+  // o icone do pino juntado e o da habilidade mais comum da lista NOVA
+  for (const p of por.values()) {
+    const cont = new Map();
+    for (const l of p.lista) if (l.habilidade?.icone) cont.set(l.habilidade.icone, (cont.get(l.habilidade.icone) ?? 0) + 1);
+    p.icone = [...cont.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  }
   return [...por.values()].sort((a, b) => b.lista.length - a.lista.length);
 }
 
@@ -4723,15 +4760,68 @@ function lnDesenharMapa(){
   const rec = lnJanelaDoMapa();
   const todasDaPonta = aberto?.lista ?? [];
   const comLugar = lnVariadas(todasDaPonta.filter(l => l.posicao), LN_NO_MAPA);
-  const semLugar = todasDaPonta.filter(l => !comLugar.includes(l))
+  let semLugar = todasDaPonta.filter(l => !comLugar.includes(l))
     // as que têm lugar e só não couberam vêm primeiro: estão a um zoom de virar retrato
     .sort((a, b) => (b.posicao ? 1 : 0) - (a.posicao ? 1 : 0) || lnNota(b) - lnNota(a));
-  const semLugarN = semLugar.filter(l => !l.posicao).length;
+  let semLugarN = semLugar.filter(l => !l.posicao).length;
   const marcas = aberto ? lnDesempilhar(
     comLugar.map((l) => ({ l, lugar: true, fixo: l.posicao?.meu === true, i: lnAchadas.indexOf(l), de: { x: l.posicao.x, y: l.posicao.y } })),
     { x: aberto.dx, y: aberto.dy },
     pinos.filter(p => p.chave !== lnPinoAtivo).map(p => ({ x: p.dx, y: p.dy })),
   ) : [];
+
+  /* MARCADOR TAPADO VAI PRA TIRA.
+   *
+   * Desde que o ponto marcado a mao parou de ser empurrado (2.28.285), duas lineups que ele
+   * marcou no MESMO tijolo ficam as duas la — que e o certo, ele pediu isso. So que o de
+   * cima come o clique do de baixo, e a de baixo some: nao da pra abrir de jeito nenhum.
+   * Medido na tela dele, no pino A Site do Lotus: 2 de 20 marcadores clicaveis sem clique.
+   *
+   * Afastar esta fora de questao. Entao o que fica escondido vai pra TIRA do lado, que ja
+   * e o lugar de "desta ponta, mas nao da pra clicar no mapa" — e o que fica ganha o numero
+   * do que esta embaixo dele, pra ele saber que tem mais ali. O mapa continua mostrando um
+   * marcador no tijolo exato onde ele clicou; nada se move.
+   *
+   * O corte e meio marcador: se o centro de um cai dentro do outro, o clique nao chega. */
+  const tapar = longe(LN_LONGE) * 0.5;
+  const tapadas = [];
+  for (let i = marcas.length - 1; i >= 0; i--) {
+    const eu = marcas[i];
+    // quem manda e a nota: confirmada na frente, depois marcada a mao, e assim por diante
+    const porCima = marcas.find((o, j) => j !== i && Math.hypot(o.dx - eu.dx, o.dy - eu.dy) < tapar
+      && (lnNota(o.l) > lnNota(eu.l) || (lnNota(o.l) === lnNota(eu.l) && j < i)));
+    if (!porCima) continue;
+    porCima.embaixo = (porCima.embaixo ?? 0) + 1;
+    tapadas.push(eu.l);
+    marcas.splice(i, 1);
+  }
+  if (tapadas.length) {
+    // na frente da tira: sao as que ele mesmo pos no mapa, nao as que o video nao explicou
+    semLugar = [...tapadas.reverse(), ...semLugar];
+    semLugarN = semLugar.filter(l => !l.posicao).length;
+  }
+
+  /* E o contrario tambem acontece: um marcador FIXO cai em cima de um PINO deduzido.
+   *
+   * O marcador nao se afasta mais de pino nenhum (2.28.285) — e certo, ele marcou ali. Mas
+   * o pino embaixo some: ele abre um grupo inteiro de lineups e fica sem clique. Quem cede
+   * e o pino, que e deducao e nao escolha dele. So os deduzidos: pino marcado a mao fica.
+   *
+   * Medido: nas 13 vistas do mapa dele sobrava 1 pino assim, e e o ultimo caso de clique
+   * roubado que restava (eram 15 antes desta rodada). */
+  if (marcas.some((m) => m.fixo)) {
+    const fixas = marcas.filter((m) => m.fixo);
+    const meio = longe(LN_LONGE_PINO) * 0.5;
+    const tapados = pinos.filter((p) => !p.fixo
+      && fixas.some((m) => Math.hypot(m.dx - p.dx, m.dy - p.dy) < meio));
+    if (tapados.length) {
+      const atrapalham = [
+        ...marcas.map((m) => ({ x: m.dx, y: m.dy })),
+        ...pinos.filter((p) => !tapados.includes(p)).map((p) => ({ x: p.dx, y: p.dy })),
+      ];
+      lnDesencalhar(tapados, atrapalham, longe(LN_LONGE_PINO));
+    }
+  }
 
   // Nome de canto embaixo de marcador só atrapalha — e isso vale SEMPRE, não só com um ponto
   // aberto. Era por isso que "A Bath" aparecia duplicado: o nome do canto por baixo do
@@ -4780,6 +4870,7 @@ function lnDesenharMapa(){
           ${agente?.icone ? `<img src="${esc(agente.icone)}" alt="">`
             : x.l.habilidade?.icone ? `<img src="${esc(x.l.habilidade.icone)}" alt="">` : '<b>•</b>'}
           ${x.l.posicao?.meu ? '<i class="lnMeuSelo">✓</i>' : ''}
+          ${x.embaixo ? `<i class="lnDeN" title="mais ${x.embaixo} marcada${x.embaixo > 1 ? 's' : ''} neste mesmo ponto — estão na tira do lado">+${x.embaixo}</i>` : ''}
           <span class="lnDeNome">${esc(lnNomeCurto(x.l))}</span>
         </button>`).join('')}
       ${pinos.map(p => `
@@ -4795,7 +4886,9 @@ function lnDesenharMapa(){
     ${aberto && semLugar.length ? `
       <div class="lnSemLugar">
         <b>${semLugar.length === 1 ? 'mais uma' : `mais ${semLugar.length}`} nesta ponta</b>
-        <small>${semLugarN
+        <small>${tapadas.length
+          ? `${tapadas.length === 1 ? 'uma está' : `${tapadas.length} estão`} no mesmo ponto que outra no mapa — abre daqui${semLugarN ? `; o resto não diz de onde sai` : ''}`
+          : semLugarN
           ? `${semLugarN === semLugar.length ? (semLugarN === 1 ? 'ela não diz' : 'nenhuma diz') : `${semLugarN} não ${semLugarN === 1 ? 'diz' : 'dizem'}`} de onde sai — abre, vê o clipe e marca o ponto: aí passa a aparecer no mapa`
           : 'têm lugar, só não couberam no mapa — abre daqui mesmo'}</small>
         <div class="lnChips">

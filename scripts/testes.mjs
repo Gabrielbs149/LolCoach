@@ -1992,3 +1992,57 @@ test('lineups: apagar a marca devolve o que o vídeo dizia, não um buraco', asy
   assert.equal(duas.posicao?.nome, 'A Lobby');
   assert.equal(duas.posicao.aproximado, true, 'o "aproximado" original também volta');
 });
+
+test('lineups: dois alvos marcados no mesmo tijolo viram um pino, não um pino sem clique', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  /* Marca dele ganha pino próprio de propósito — o callout é a área, a marca é o tijolo.
+   * Só que desde que pino marcado a mão parou de ser empurrado (2.28.285), dois tijolos
+   * vizinhos se cobrem e o de baixo fica sem clique. No acervo dele apareceu no mesmo dia:
+   * "Site B Haunt 01" e "Lotus Attack - B Site", alvos a 0,9 m um do outro. */
+  const cercado = `
+    let lnAchadas = [];
+    const lnLarguraCrua = () => 0.9;
+    const LN_LONGE_PINO = 0.078;
+    const longe = (f) => Math.max(0.015, lnLarguraCrua() * f);
+    const extras = { pôr: (ls) => { lnAchadas = ls; }, meioPino: () => longe(LN_LONGE_PINO) * 0.5 };
+  `;
+  const t = await funcoesDaTela('painel.html', ['lnPinos'], cercado);
+  const meio = t.meioPino();
+
+  const marcado = (nome, x, y, i) => ({
+    video: 'v', segundo: i, nome: `lineup ${i}`,
+    ponto: { nome, x, y, aproximado: false, meu: true },
+  });
+
+  // 1. dois alvos marcados colados viram UM pino com as duas lineups
+  t.pôr([marcado('B Site', 0.560, 0.443, 1), marcado('A Link', 0.567, 0.447, 2)]);
+  let p = t.lnPinos();
+  assert.equal(p.length, 1, 'dois tijolos vizinhos marcados a mão são um pino só');
+  assert.equal(p[0].lista.length, 2, 'e o leque abre as duas');
+  assert.equal(p[0].meu, true);
+
+  // 2. marcados LONGE continuam separados — juntar seria jogar fora a precisão dele
+  t.pôr([marcado('B Site', 0.20, 0.20, 1), marcado('A Site', 0.80, 0.80, 2)]);
+  assert.equal(t.lnPinos().length, 2, 'marcas distantes seguem sendo pinos distintos');
+
+  // 3. logo depois do corte ainda separa: só junta o que ficaria mesmo sem clique
+  t.pôr([marcado('B Site', 0.5, 0.5, 1), marcado('A Link', 0.5 + meio * 1.1, 0.5, 2)]);
+  assert.equal(t.lnPinos().length, 2, 'fora do raio de cobrir, não junta');
+
+  // 4. pino DEDUZIDO não entra na fusão: ele se afasta sozinho e o nome do callout informa
+  t.pôr([
+    { video: 'v', segundo: 1, ponto: { nome: 'B Site', x: 0.50, y: 0.50, aproximado: false } },
+    { video: 'v', segundo: 2, ponto: { nome: 'A Link', x: 0.501, y: 0.501, aproximado: false } },
+  ]);
+  assert.equal(t.lnPinos().length, 2, 'dedução colada não se funde — quem se afasta é ela');
+
+  // 5. lineups do MESMO callout deduzido continuam num pino só, como sempre foram
+  t.pôr([
+    { video: 'v', segundo: 1, ponto: { nome: 'B Site', x: 0.5, y: 0.5, aproximado: false } },
+    { video: 'v', segundo: 2, ponto: { nome: 'B Site', x: 0.5, y: 0.5, aproximado: false } },
+  ]);
+  const um = t.lnPinos();
+  assert.equal(um.length, 1);
+  assert.equal(um[0].lista.length, 2);
+});
