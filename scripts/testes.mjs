@@ -2051,3 +2051,99 @@ test('lineups: dois alvos marcados no mesmo tijolo viram um pino, não um pino s
   assert.equal(um.length, 1);
   assert.equal(um[0].lista.length, 2);
 });
+
+/* ------------------------------------------------- os clipes do Outplayed
+ *
+ * Pedido dele: "o meu outplayed grava toda partida minha, ja fiz varias lineups, consegue
+ * usar esses videos?". O nome do arquivo traz a hora, nunca o mapa; quem sabe o mapa e o
+ * diario de partidas. Estes testes cuidam da ponte entre os dois e, principalmente, da
+ * cerca: a tela pede arquivo por caminho RELATIVO, e um `..` ali viraria leitura de
+ * qualquer arquivo do PC dele pela porta 8770.
+ */
+test('valorant: os clipes do Outplayed viram "seus clipes deste mapa"', async () => {
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-clipes-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const C = await import(`../src/valorant/clipes.js?d=${Date.now()}`);
+    const P = await import(`../src/valorant/partidas.js?d=${Date.now()}`);
+
+    // uma sessão do Outplayed, como ele tem no disco: clipes com `_N` e uma miniatura por lote
+    const pasta = resolve(base, 'Outplayed', 'VALORANT');
+    const sessao = resolve(pasta, 'VALORANT_11-01-2026_16-02-40-030');
+    await mkdir(resolve(sessao, 'Thumbnails'), { recursive: true });
+    const clipe = async (n) => writeFile(resolve(sessao, n), 'x');
+    await clipe('VALORANT 11-02-2026 1-38-11-281_0.mp4');
+    await clipe('VALORANT 11-02-2026 1-38-11-281_1.mp4');
+    await clipe('VALORANT 11-02-2026 1-38-11-281_2.mp4');
+    await clipe('VALORANT 11-02-2026 0-55-00-100_0.mp4');
+    await writeFile(resolve(sessao, 'Thumbnails', 'VALORANT 11-02-2026 1-38-11-281.jpg'), 'x');
+    // lixo que não é clipe: não pode virar nada
+    await clipe('qualquer-outra-coisa.mp4');
+
+    const lotes = await C.lotesDeClipes({ pasta, forcar: true });
+    assert.equal(lotes.length, 2, 'dois lotes, não quatro arquivos soltos');
+    assert.equal(lotes[0].partes.length, 3, 'o `_N` é destaque dentro do lote, e eles ficam juntos');
+    assert.ok(lotes[0].miniatura?.endsWith('1-38-11-281.jpg'), 'a miniatura do Outplayed é reaproveitada');
+    assert.equal(lotes[1].miniatura, null, 'lote sem miniatura não inventa uma');
+    assert.ok(lotes[0].em > lotes[1].em, 'o mais novo vem primeiro');
+
+    // o diário: duas partidas da noite, cada uma com a sua janela
+    const h = (hh, mm) => new Date(2026, 10, 2, hh, mm).getTime();
+    /* O laco do app olha o estado de 6 em 6 segundos, entao o `fim` da partida vai sendo
+     * esticado o tempo todo. Marcar so o comeco e o fim faria o diario ver DUAS partidas,
+     * porque buraco de mais de 5 min corta — e ai o teste reprovaria codigo que esta certo.
+     * Aqui as voltas sao de minuto em minuto, que ja e dez vezes mais espacado que a vida
+     * real e continua dentro da regra. */
+    const jogando = async (mapa, de, ate) => {
+      for (let m = de; m <= ate; m++) {
+        await P.anotarPartida({ estado: 'jogando', mapa, agenteId: 'fade', agora: h(0, m) });
+      }
+    };
+    await jogando('Lotus', 51, 79);        // 0:51 -> 1:19
+    await P.anotarPartida({ estado: 'menu', agora: h(1, 20) });
+    await jogando('Haven', 82, 101);       // 1:22 -> 1:41
+
+    C.esquecerClipes();
+    const lotus = await C.meusClipes({ pasta, mapa: 'Lotus' });
+    assert.equal(lotus.clipes.length, 1, 'o clipe de 0:55 é da partida do Lotus');
+    assert.equal(lotus.clipes[0].mapa, 'Lotus');
+
+    C.esquecerClipes();
+    const haven = await C.meusClipes({ pasta, mapa: 'Haven' });
+    assert.equal(haven.clipes.length, 1, 'e o de 1:38 é da partida do Haven');
+
+    // mapa que ele não jogou: diz o porquê em vez de devolver vazio sem explicação
+    C.esquecerClipes();
+    const bind = await C.meusClipes({ pasta, mapa: 'Bind' });
+    assert.equal(bind.clipes.length, 0);
+    assert.match(bind.porque, /diário/);
+
+    // sem pasta do Outplayed, também diz
+    const semPasta = await C.meusClipes({ pasta: null, mapa: 'Lotus' });
+    assert.match(semPasta.porque, /pasta/);
+
+    // o agente filtra, mas partida sem agente anotado não é descartada à toa
+    C.esquecerClipes();
+    assert.equal((await C.meusClipes({ pasta, mapa: 'Lotus', agenteId: 'fade' })).clipes.length, 1);
+    C.esquecerClipes();
+    assert.equal((await C.meusClipes({ pasta, mapa: 'Lotus', agenteId: 'sage' })).clipes.length, 0);
+
+    /* A CERCA. A tela manda caminho relativo; um `..` ali não pode virar leitura de
+     * qualquer arquivo do PC dele pela porta 8770. */
+    assert.ok(C.arquivoDeClipe(pasta, 'VALORANT_11-01-2026_16-02-40-030/VALORANT 11-02-2026 1-38-11-281_0.mp4'),
+      'o clipe de verdade abre');
+    assert.equal(C.arquivoDeClipe(pasta, '../../config.json'), null, 'subir de pasta não');
+    assert.equal(C.arquivoDeClipe(pasta, '..'), null);
+    assert.equal(C.arquivoDeClipe(pasta, 'C:/Windows/System32/drivers/etc/hosts'), null, 'caminho absoluto não');
+    assert.equal(C.arquivoDeClipe(pasta, 'VALORANT_11-01-2026_16-02-40-030/nao-existe.mp4'), null);
+    assert.equal(C.arquivoDeClipe(pasta, 'qualquer-outra-coisa.txt'), null, 'só vídeo e imagem');
+    assert.equal(C.arquivoDeClipe(pasta, ''), null);
+    assert.equal(C.arquivoDeClipe(null, 'x.mp4'), null);
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});

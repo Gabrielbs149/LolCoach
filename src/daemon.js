@@ -4,7 +4,7 @@ import { autoAceitar } from './features/auto-aceitar.js';
 import { autoChampSelect } from './features/champ-select.js';
 import { abrirBanco } from './dados/banco.js';
 import { coletarPendentes } from './dados/coletor.js';
-import { readFile, writeFile, mkdir, readdir, rm, appendFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, rm, appendFile, stat } from 'node:fs/promises';
 import { caminhoConfig, caminhoCampeoes, pastaBase } from './caminhos.js';
 import { resolve, basename } from 'node:path';
 import { F, render as renderFala, personalizar as personalizarFalas, encurtarRepetida, temPersonalizacao } from './vivo/texto.js';
@@ -16,6 +16,7 @@ import { recadoDeSequencia } from './analise/parar.js';
 import { licaoDaPartida } from './analise/licao.js';
 import * as Lineups from './valorant/lineups.js';
 import { situacaoDoValorant } from './valorant/jogo.js';
+import * as Clipes from './valorant/clipes.js';
 
 /**
  * Liga tudo: aceitar fila, seleção de campeão, runas e coleta.
@@ -2562,6 +2563,41 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     /* O acervo: o que já está guardado em disco e o botão de guardar um agente inteiro.
        Só leitura de disco e busca de vídeo — nada toca em janela nem no jogo. */
     valAcervo: () => Lineups.acervo(),
+    /* OS CLIPES DELE, do Outplayed.
+     *
+     * Pedido dele duas vezes. O nome do arquivo traz a hora, nunca o mapa; quem sabe o
+     * mapa e o diario de partidas, que o electron/main.js escreve a cada volta do laco.
+     * Aqui as duas pontas se encontram: "seus clipes deste mapa, com este agente".
+     *
+     * Ressalva medida e registrada em clipes.js: o Outplayed grava Valorant como
+     * DESTAQUE, nao partida inteira — 8% a 13% de cada partida, em pedacos de ~14 s.
+     * Entao o que isto oferece e "seus clipes daqui", nao "reveja a partida". */
+    valMeusClipes: async (p = {}) => {
+      const pasta = Clipes.pastaDosClipes(config);
+      const nome = String(p.agente ?? '').trim();
+      let agenteId = null;
+      if (nome) {
+        try {
+          const cat = await Lineups.catalogo({});
+          agenteId = cat?.agentes?.find((a) => a.nome === nome)?.id ?? null;
+        } catch { /* sem catalogo: so nao filtra por agente */ }
+      }
+      return Clipes.meusClipes({ pasta, mapa: String(p.mapa ?? '') || null, agenteId });
+    },
+    /* O arquivo em si. Devolve so o que esta DENTRO da pasta dos clipes — a conferencia
+       mora no clipes.js e tem teste proprio, porque um `..` solto aqui viraria leitura de
+       qualquer arquivo do PC dele pela porta 8770. */
+    valArquivoDeClipe: async (relativo) => {
+      const pasta = Clipes.pastaDosClipes(config);
+      const caminho = Clipes.arquivoDeClipe(pasta, String(relativo ?? ''));
+      if (!caminho) return null;
+      try {
+        const { size } = await stat(caminho);
+        const tipo = /\.mp4$/i.test(caminho) ? 'video/mp4'
+          : /\.png$/i.test(caminho) ? 'image/png' : 'image/jpeg';
+        return { caminho, tamanho: size, tipo };
+      } catch { return null; }
+    },
     valGuardarAgente: (p = {}) => Lineups.guardarAgente({
       agente: String(p.agente ?? ''), refazer: p.refazer === true || p.refazer === '1',
       chaveYoutube: config.youtube?.chave || null,
@@ -2631,5 +2667,6 @@ const ACOES_DO_PAINEL = [
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
+  'valMeusClipes', 'valArquivoDeClipe',
   'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar',
 ];
