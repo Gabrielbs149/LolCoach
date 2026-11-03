@@ -96,6 +96,12 @@ body[data-jogo="lol"] nav [data-jogo="val"],
 body[data-jogo="val"] nav [data-jogo="lol"]{display:none}
 /* A conta e o aviso de patch são do LoL: no modo Valorant estariam falando do jogo errado. */
 body[data-jogo="val"] .conta,body[data-jogo="val"] .contaSel,body[data-jogo="val"] #estPatch{display:none}
+/* Na barra recolhida o botão tem 31px e "Valorant" pede 36: o nome vaza. Mesmo arranjo do
+ * título do app ali em cima (.longo/.curto), que é o que já se faz aqui quando falta
+ * largura. Medido depois: 25px de texto em 31px de botão. */
+.modos button .curto{display:none}
+body.recolhida .modos button .longo{display:none}
+body.recolhida .modos button .curto{display:inline}
 body.recolhida .modos{flex-direction:column;margin:0 8px 8px}
 body.recolhida .modos button{font-size:9px;padding:5px 0;letter-spacing:0}
 nav{padding:4px 10px;flex:1;overflow-y:auto;overflow-x:hidden}
@@ -1422,8 +1428,8 @@ h2{letter-spacing:1px}
   </div>
   <!-- Qual jogo. O app é dois, então a barra inteira troca — não é uma aba no fim da lista. -->
   <div class="modos" id="modos">
-    <button data-modo="lol" title="League of Legends">LoL</button>
-    <button data-modo="val" title="Valorant">Valorant</button>
+    <button data-modo="lol" title="League of Legends"><span class="longo">LoL</span><span class="curto">LOL</span></button>
+    <button data-modo="val" title="Valorant"><span class="longo">Valorant</span><span class="curto">VAL</span></button>
   </div>
   <nav>
     <div class="grupo" data-jogo="lol">Você</div>
