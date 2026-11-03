@@ -1449,6 +1449,8 @@ h2{letter-spacing:1px}
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg><span class="nome">Lineups</span></button>
     <button data-jogo="val" data-aba="valPartidas" title="Partidas">
       <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="nome">Partidas</span></button>
+    <button data-jogo="val" data-aba="valPatch" title="Patch">
+      <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
     <div class="grupo">App</div>
     <button data-aba="admin" title="Admin" id="navAdmin" hidden>
       <svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/></svg><span class="nome">Admin</span></button>
@@ -1679,6 +1681,16 @@ h2{letter-spacing:1px}
         <h2 style="margin-top:var(--e3)">Por agente</h2><div id="vpAgentes"></div>
       </div>
       <div><h2>Últimas</h2><div id="vpLista"></div></div>
+    </div>
+  </section>
+
+  <!-- Notas de atualização do Valorant: mesmo cano do LoL, com `jogo: 'val'`. -->
+  <section id="valPatch">
+    <div class="titulo">Patch <small>Valorant</small></div>
+    <div id="vpatchTopo"></div>
+    <div class="colunas3">
+      <div><h2>Notas</h2><div id="vpatchLista"></div></div>
+      <div id="vpatchCorpo"></div>
     </div>
   </section>
 
@@ -6566,6 +6578,74 @@ document.addEventListener('keydown', (e) => {
   acao();
 });
 
+/* ================================================ notas de atualização do Valorant
+ *
+ * Mesmo módulo do LoL com `jogo: 'val'` — conferido numa nota de verdade: a página é o
+ * mesmo Next.js e o texto vem no mesmo campo. O que NÃO tem aqui, de propósito, é o
+ * "seus campeões mudaram" do lado do LoL: lá o app sabe quem ele joga (banco de partidas
+ * com 3+ jogos); no Valorant o diário tem 12 partidas e TODAS de Fade, então marcar "seu
+ * agente" com uma amostra de um seria inventar informação.
+ *
+ * No lugar disso, o atalho que a nota do Valorant permite de verdade: ela vem dividida em
+ * seções grandes (agentes, competitivo, loja, armas, correções) e os títulos viram fichas
+ * de pular. Medido na 13.09: 5 seções, 10.293 caracteres — longo o bastante pra pular
+ * importar, curto o bastante pra não precisar de índice do servidor.
+ */
+let vpatchNotas = [], vpatchAberta = null;
+const vpatchTitulo = (t) => String(t ?? '').replace(/\s*do VALORANT$/i, '').replace(/^Notas da\s+/i, '');
+
+async function carregarValPatch(){
+  $('#vpatchLista').innerHTML = carregando();
+  let notas;
+  try { notas = await pegar('/api/val/patch'); }
+  catch { $('#vpatchLista').innerHTML = '<div class="vazio">sem internet pra buscar as notas</div>'; return; }
+  // Os dois guardas abaixo vieram do lado do LoL, onde cada um já quebrou a tela uma vez:
+  // resposta com `erro` e resposta que não é lista (o `.map` morria em cima dela).
+  if (notas?.erro) { $('#vpatchLista').innerHTML = `<div class="vazio">${esc(notas.erro)}</div>`; return; }
+  if (!Array.isArray(notas)) { $('#vpatchLista').innerHTML = '<div class="vazio">as notas não vieram agora</div>'; return; }
+
+  vpatchNotas = notas;
+  desenharListaValPatch();
+  if (notas[0]) abrirNotaVal(notas[0].slug);
+}
+
+function desenharListaValPatch(){
+  $('#vpatchLista').innerHTML = `<div class="notas">${vpatchNotas.map(n => `
+    <div class="nota ${n.slug === vpatchAberta ? 'on' : ''}" onclick="abrirNotaVal('${esc(n.slug)}')">
+      <div class="t">${esc(vpatchTitulo(n.titulo))}</div>
+      <div class="d">${dia(n.data)}</div>
+    </div>`).join('')}</div>`;
+}
+
+async function abrirNotaVal(slug){
+  vpatchAberta = slug;
+  desenharListaValPatch();
+  $('#vpatchCorpo').innerHTML = carregando('baixando as notas…');
+  $('#vpatchTopo').innerHTML = '';
+
+  let n;
+  try { n = await pegar('/api/val/patch/' + slug); } catch { n = null; }
+  if (!n || n.erro) {
+    $('#vpatchCorpo').innerHTML = `<div class="vazio">não consegui abrir esta nota${n?.erro ? ': ' + esc(n.erro) : ''}</div>`;
+    return;
+  }
+
+  $('#vpatchCorpo').innerHTML = `<div class="artigo">${n.corpo}
+    <hr><p><a href="${esc(n.url)}" target="_blank" rel="noopener noreferrer">Ler no site da Riot</a></p></div>`;
+
+  /* As fichas de seção saem do DOM, depois de o corpo entrar, e não de um índice vindo do
+   * servidor: os títulos da Riot não têm `id`, então a âncora é posta aqui mesmo. Fazer
+   * isso no servidor significaria mais um formato de cache pra versionar por nada. */
+  const titulos = [...$('#vpatchCorpo').querySelectorAll('h2, h3')]
+    .filter(h => h.textContent.trim())
+    .map((h, i) => { if (!h.id) h.id = `vpSec${i}`; return h; });
+  $('#vpatchTopo').innerHTML = titulos.length < 2 ? '' : `<div class="patchTopo">
+    <b>${titulos.length} seções nesta atualização</b>
+    <div class="chips2">${titulos.map(h => `
+      <span class="chip2" onclick="irPara('${esc(h.id)}')"><em>${esc(h.textContent.trim())}</em></span>`).join('')}</div>
+  </div>`;
+}
+
 /* ===================================================== partidas de Valorant
  *
  * Isto já estava gravado e não aparecia em lugar nenhum. O app escreve o diário desde que
@@ -6632,7 +6712,7 @@ async function carregarValPartidas(){
 
 const CARREGADORES = {
   estat: carregarEstat, calendario: () => carregarCalendario(), meta: carregarMeta, patch: carregarPatch, builds: carregarBuilds, amigos: carregarAmigos, admin: carregarAdmin, config: carregarNovidades,
-  lineups: carregarLineups, valPartidas: carregarValPartidas,
+  lineups: carregarLineups, valPartidas: carregarValPartidas, valPatch: carregarValPatch,
 };
 const jaCarregou = new Set();
 

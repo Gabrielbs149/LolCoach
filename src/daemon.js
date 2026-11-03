@@ -2106,6 +2106,21 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   setTimeout(vigiarPatch, 20_000);
   setInterval(vigiarPatch, 6 * 60 * 60 * 1000);
 
+  /* As notas do VALORANT saem do mesmo módulo, só com `jogo: 'val'`.
+   *
+   * Sem elenco e sem "seus campeões": no Valorant o que muda é agente, arma e mapa, e o
+   * app não sabe quais agentes ele joga além do atual (medido no diário: 12 partidas,
+   * todas de Fade). Marcar "seu agente" com uma amostra de um só seria inventar. */
+  async function valPatchLista() {
+    const { listarAtualizacoes } = await import('./dados/patchnotes.js');
+    return listarAtualizacoes({ limite: 12, jogo: 'val' });
+  }
+
+  async function valPatchNota(slug) {
+    const { lerAtualizacao } = await import('./dados/patchnotes.js');
+    return lerAtualizacao(slug, { jogo: 'val' });
+  }
+
   async function patchNota(slug) {
     const { lerAtualizacao, mudancasDele } = await import('./dados/patchnotes.js');
     const { elencoCompleto } = await import('./dados/ddragon.js');
@@ -2519,7 +2534,7 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
   const app = {
     lcu, db, config, coletar, reprocessar, historico, detalhe,
     campeoes, lerConfig, salvarConfig, vivo,
-    perfil, estatisticas, sugestoes, patchLista, patchNota,
+    perfil, estatisticas, sugestoes, patchLista, patchNota, valPatchLista, valPatchNota,
     builds, aplicarRunasDaBuild, aplicarBuildsNoLol,
     amigos, amigoPerfil, adicionarAmigo, removerAmigo, convidarAmigo, nicks, vozVozes, vozFalar, vozFalas, olhoFoto,
     adminUsuarios, adminGravarControle, adminEsquecer, sessao, marcadas, marcar, marcarFlash, olho: receberOlho, situacoesPartidas, situacoesIds, situacoesDe, avaliarSituacao, avaliarUltima, overlayTamanho, situacoesResumo,
@@ -2658,6 +2673,7 @@ const ACOES_DO_PAINEL = [
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao', 'valPartidas',
+  'valPatchLista', 'valPatchNota',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
   'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar', 'valEsconder', 'valMarcarLado',
 ];

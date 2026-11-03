@@ -901,7 +901,16 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
-      // Uma nota de atualização específica: /api/patch/{slug}
+      // Uma nota de atualização específica: /api/patch/{slug} (LoL) e /api/val/patch/{slug}.
+      // Os dois padrões são ancorados e não se cruzam; a ordem aqui é só pra ler junto.
+      const vpn = url.pathname.match(/^\/api\/val\/patch\/([a-zA-Z0-9-]+)$/);
+      if (vpn && acoes.valPatchNota) {
+        try {
+          return enviar(200, 'application/json', JSON.stringify(await acoes.valPatchNota(vpn[1])));
+        } catch (erro) {
+          return enviar(503, 'application/json', JSON.stringify({ erro: erro.message }));
+        }
+      }
       const pn = url.pathname.match(/^\/api\/patch\/([a-zA-Z0-9-]+)$/);
       if (pn && acoes.patchNota) {
         try {
@@ -980,6 +989,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         ['/api/estatisticas', 'estatisticas'],
         ['/api/sugestoes', 'sugestoes'],
         ['/api/patch', 'patchLista'],
+        ['/api/val/patch', 'valPatchLista'],
         ['/api/amigos', 'amigos'],
         ['/api/sessao', 'sessao'],
         ['/api/nicks', 'nicks'],

@@ -16,11 +16,29 @@ import { pastaBase } from '../caminhos.js';
  * Passa por uma lista branca de tags e atributos antes de chegar na tela.
  */
 
-const SITE = 'https://www.leagueoflegends.com';
-const INDICE = `${SITE}/pt-br/news/tags/patch-notes/`;
+/**
+ * Os dois jogos saem do MESMO cano.
+ *
+ * Conferido numa nota de verdade (Atualizacao 13.09 do VALORANT, 10.289 caracteres): a
+ * pagina do Valorant e o mesmo Next.js, o indice de `tags/patch-notes` tem o mesmo formato
+ * de item (151 notas, campos iguais) e o texto vem no mesmo campo `body`. O que e do LoL
+ * aqui dentro -- o bloco por campeao (`change-title`), o preambulo (`id="patch-top"`) --
+ * simplesmente nao casa numa nota do Valorant, entao sai corpo limpo e `blocos: []` sem
+ * precisar de um segundo caminho pra manter.
+ *
+ * O indice do Valorant e o de `tags/patch-notes`, nao o de `game-updates`: o segundo
+ * devolve 200 itens com trailer do YouTube no meio (URL absoluta, que nao e nota nenhuma),
+ * o primeiro devolve 151 e todas sao notas.
+ */
+const JOGOS = {
+  lol: { base: 'https://www.leagueoflegends.com', pasta: 'patchnotes' },
+  val: { base: 'https://playvalorant.com', pasta: 'patchnotes-val' },
+};
+const CAMINHO_INDICE = '/pt-br/news/tags/patch-notes/';
+const doJogo = (j) => JOGOS[j] ?? JOGOS.lol;
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)';
 
-const pasta = () => resolve(pastaBase(), 'dados', 'patchnotes');
+const pasta = (jogo) => resolve(pastaBase(), 'dados', doJogo(jogo).pasta);
 const VALIDADE_INDICE = 6 * 60 * 60 * 1000;
 
 async function baixar(url) {
@@ -53,27 +71,27 @@ function procurar(objeto, teste, prof = 0) {
   return null;
 }
 
-async function lerCache(nome) {
-  try { return JSON.parse(await readFile(resolve(pasta(), nome), 'utf8')); } catch { return null; }
+async function lerCache(nome, jogo) {
+  try { return JSON.parse(await readFile(resolve(pasta(jogo), nome), 'utf8')); } catch { return null; }
 }
 
-async function gravarCache(nome, dados) {
+async function gravarCache(nome, dados, jogo) {
   try {
-    await mkdir(pasta(), { recursive: true });
-    await writeFile(resolve(pasta(), nome), JSON.stringify(dados), 'utf8');
+    await mkdir(pasta(jogo), { recursive: true });
+    await writeFile(resolve(pasta(jogo), nome), JSON.stringify(dados), 'utf8');
   } catch { /* sem disco, segue só com a rede */ }
 }
 
 /* ------------------------------------------------------------------ lista */
 
 /** As últimas notas publicadas: título, data, resumo e endereço. */
-export async function listarAtualizacoes({ limite = 12 } = {}) {
-  const cache = await lerCache('indice.json');
+export async function listarAtualizacoes({ limite = 12, jogo = 'lol' } = {}) {
+  const cache = await lerCache('indice.json', jogo);
   if (cache && Date.now() - cache.em < VALIDADE_INDICE) return cache.lista.slice(0, limite);
 
   let lista;
   try {
-    const j = dadosDaPagina(await baixar(INDICE));
+    const j = dadosDaPagina(await baixar(doJogo(jogo).base + CAMINHO_INDICE));
     const itens = procurar(j.props?.pageProps ?? j,
       (o) => Array.isArray(o) && o.length > 3 && o[0]?.title && o[0]?.action);
     if (!itens) throw new Error('não achei a lista de notas no índice');
@@ -88,14 +106,18 @@ export async function listarAtualizacoes({ limite = 12 } = {}) {
         slug: caminho.split('/').filter(Boolean).pop() ?? '',
         imagem: x.media?.url ?? x.imageMedia?.url ?? null,
       };
-    }).filter((x) => x.slug);
+    /* So o que e nota NESTE site. O indice traz uma ou outra isca de fora -- medido: o do
+     * LoL tem 1 item em 178 apontando pra `br.leagueoflegends.com/pt-br/event/...`, e o de
+     * `game-updates` do Valorant tem trailer do YouTube. Caminho absoluto virava
+     * `base + "https://..."`, uma URL colada e impossivel de abrir. */
+    }).filter((x) => x.slug && x.caminho.startsWith('/'));
   } catch (erro) {
     // Sem internet: um índice vencido ainda vale mais que uma tela vazia.
     if (cache) return cache.lista.slice(0, limite);
     throw erro;
   }
 
-  await gravarCache('indice.json', { em: Date.now(), lista });
+  await gravarCache('indice.json', { em: Date.now(), lista }, jogo);
   return lista.slice(0, limite);
 }
 
@@ -151,7 +173,7 @@ function balancear(html) {
  * Tag proibida perde as marcas mas mantém o texto de dentro; o que era um
  * `<script>` vira texto inofensivo em vez de sumir sem aviso.
  */
-export function higienizar(html) {
+export function higienizar(html, base = JOGOS.lol.base) {
   if (!html) return '';
   let saida = String(html)
     // Conteúdo executável ou de carregamento vai inteiro, com miolo e tudo.
@@ -172,7 +194,7 @@ export function higienizar(html) {
       if (!permitidos.includes(nome)) continue;
       if ((nome === 'href' || nome === 'src') && !seguroHref(valor)) continue;
       // Link relativo do site precisa virar absoluto pra funcionar fora dele.
-      const final = (nome === 'href' && valor.startsWith('/')) ? SITE + valor : valor;
+      const final = (nome === 'href' && valor.startsWith('/')) ? base + valor : valor;
       mantidos.push(`${nome}="${final.replace(/"/g, '&quot;')}"`);
     }
     // Link externo sempre abre fora e sem passar referência de janela.
@@ -241,7 +263,7 @@ function secaoEm(bruto, posicao) {
  * simples — do mesmo jeito que "Passiva – Duelista" ou "Q – Negociarrr". Por
  * isso a segunda varredura só aceita nome que exista no elenco de verdade.
  */
-function prepararCorpo(bruto, elenco = []) {
+function prepararCorpo(bruto, elenco = [], base = JOGOS.lol.base) {
   // Uma busca por nome sem acento, aceitando a grafia traduzida e a do Data
   // Dragon: a nota diz "Bardo" e o banco diz "Bard".
   const porNome = new Map();
@@ -322,7 +344,7 @@ function prepararCorpo(bruto, elenco = []) {
     (m, antes, depois) => `<span class="antes"> ${antes.trim()}</span> ⇒ <span class="depois">${depois.trim()}</span>`);
 
   return {
-    corpo: higienizar(corpo),
+    corpo: higienizar(corpo, base),
     blocos: achados.map(({ nome, chave, chaveTexto, secao, ancora }) =>
       ({ nome, chave, chaveTexto, secao, ancora })),
   };
@@ -336,23 +358,23 @@ function prepararCorpo(bruto, elenco = []) {
 // sem isto uma nota lida por uma versão antiga ficaria velha para sempre também.
 const FORMATO = 5;   // 4: antes ⇒ depois destacado
 
-export async function lerAtualizacao(slug, { elenco = [] } = {}) {
+export async function lerAtualizacao(slug, { elenco = [], jogo = 'lol' } = {}) {
   const limpo = String(slug).replace(/[^a-zA-Z0-9-]/g, '');
   if (!limpo) throw new Error('endereço de atualização inválido');
 
-  const cache = await lerCache(`${limpo}.json`);
+  const cache = await lerCache(`${limpo}.json`, jogo);
   if (cache?.formato === FORMATO) return cache;
 
-  const lista = await listarAtualizacoes({ limite: 60 }).catch(() => []);
+  const lista = await listarAtualizacoes({ limite: 60, jogo }).catch(() => []);
   const item = lista.find((x) => x.slug === limpo);
-  const url = `${SITE}${item?.caminho ?? `/pt-br/news/game-updates/${limpo}`}`;
+  const url = `${doJogo(jogo).base}${item?.caminho ?? `/pt-br/news/game-updates/${limpo}`}`;
 
   const j = dadosDaPagina(await baixar(url));
   const no = procurar(j.props?.pageProps ?? j,
     (o) => typeof o.body === 'string' && o.body.length > 1000);
   if (!no) throw new Error('não achei o texto da atualização nesta página');
 
-  const { corpo, blocos } = prepararCorpo(no.body, elenco);
+  const { corpo, blocos } = prepararCorpo(no.body, elenco, doJogo(jogo).base);
   const dados = {
     formato: FORMATO,
     slug: limpo,
@@ -364,7 +386,7 @@ export async function lerAtualizacao(slug, { elenco = [] } = {}) {
     blocos,
   };
 
-  await gravarCache(`${limpo}.json`, dados);
+  await gravarCache(`${limpo}.json`, dados, jogo);
   return dados;
 }
 

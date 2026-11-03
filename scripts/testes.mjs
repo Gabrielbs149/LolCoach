@@ -2777,3 +2777,199 @@ test('painel: as partidas de Valorant nao contam a que esta em andamento no temp
   await t.carregarValPartidas();
   assert.match(t.els['#vpLista'].innerHTML, /não consegui ler o diário/);
 });
+
+/* ------------------------------------------- notas de atualizacao dos DOIS jogos
+ *
+ * O modulo de notas era so do LoL e passou a servir os dois. Era refatoracao em codigo que
+ * funciona e nao tinha UM teste -- estes sao os primeiros.
+ *
+ * O que protege: o caminho do LoL continuar igualzinho (e o que ele usa hoje), cada jogo
+ * guardar cache no seu canto, e o item de indice que aponta pra FORA do site nao virar
+ * nota -- medido, o indice do LoL tem 1 em 178 assim, e com ele a URL saia colada
+ * ("https://www.leagueoflegends.com" + "https://br.leagueoflegends.com/..."), impossivel
+ * de abrir.
+ */
+test('patchnotes: os dois jogos, cada um no seu site e no seu cache', async () => {
+  const { mkdtemp, readdir } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-patch-'));
+  const antes = process.env.LOLCOACH_DIR;
+  const buscaDeVerdade = globalThis.fetch;
+  process.env.LOLCOACH_DIR = base;
+
+  // o indice que a Riot serve, do jeito que serve: __NEXT_DATA__ com a lista dentro
+  const indice = (itens) => `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: { pageProps: { page: { blades: [{ items: itens }] } } },
+  })}</script></html>`;
+  const item = (titulo, url) => ({
+    title: titulo, publishedAt: '2026-10-27T13:00:00.000Z', description: 'resumo',
+    action: { payload: { url } }, media: { url: 'https://cdn/x.png' },
+  });
+  const nota = (corpo) => `<html><script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: { pageProps: { page: { body: corpo } } },
+  })}</script></html>`;
+
+  const pedidas = [];
+  globalThis.fetch = async (url) => {
+    pedidas.push(String(url));
+    const u = String(url);
+    let html;
+    if (u.includes('leagueoflegends.com') && u.includes('tags/patch-notes')) {
+      html = indice([
+        item('Notas da Atualização 26.22', '/pt-br/news/game-updates/lol-26-22'),
+        item('Notas da Atualização 26.21', '/pt-br/news/game-updates/lol-26-21'),
+        item('Notas da Atualização 26.20', '/pt-br/news/game-updates/lol-26-20'),
+        item('Notas da Atualização 26.19', '/pt-br/news/game-updates/lol-26-19'),
+        // o de fora: existe no indice de verdade e nao e nota
+        item('Gwen – Resumo das Habilidades', 'https://br.leagueoflegends.com/pt-br/event/gwen/'),
+      ]);
+    } else if (u.includes('playvalorant.com') && u.includes('tags/patch-notes')) {
+      html = indice([
+        item('Atualização 13.09 do VALORANT', '/pt-br/news/game-updates/val-1309'),
+        item('Notas da Atualização 13.08', '/pt-br/news/game-updates/val-13-08'),
+        item('Atualização 13.06 do VALORANT', '/pt-br/news/game-updates/val-13-06'),
+        item('Atualização 13.05 do VALORANT', '/pt-br/news/game-updates/val-13-05'),
+      ]);
+    } else if (u.includes('/val-1309')) {
+      // nota do Valorant: secoes em h2, sem a estrutura de campeao do LoL
+      html = nota(`<h2>ATUALIZAÇÕES DOS AGENTES</h2><p>Hush chegou. ${'texto '.repeat(200)}</p>`
+        + `<h2>ATUALIZAÇÕES DE ARMAS</h2><p>Dano 140 ⇒ 120</p>`
+        + `<p><a href="/pt-br/alguma-coisa/">link relativo</a></p>`
+        + `<script src="https://x.js" /><iframe src="https://x" />`);
+    } else if (u.includes('/lol-26-22')) {
+      html = nota(`<h2 id="patch-top">Destaques</h2><h3 class="change-title" id="patch-ahri">Ahri</h3>`
+        + `<p>Dano 80 ⇒ 70. ${'texto '.repeat(200)}</p>`
+        + `<p><a href="/pt-br/champions/ahri/">link relativo</a></p>`);
+    } else {
+      throw new Error(`pedido inesperado: ${u}`);
+    }
+    return { ok: true, status: 200, text: async () => html };
+  };
+
+  try {
+    const P = await import(`../src/dados/patchnotes.js?dois=${Date.now()}`);
+
+    /* 1) Cada jogo no SEU site. Sem isto, as notas do Valorant seriam buscadas no site do
+     *    LoL e a tela do Valorant mostraria patch de campeão. */
+    const lol = await P.listarAtualizacoes({ limite: 10 });
+    const val = await P.listarAtualizacoes({ limite: 10, jogo: 'val' });
+    assert.ok(pedidas.some((u) => u.startsWith('https://www.leagueoflegends.com')), 'LoL pelo site do LoL');
+    assert.ok(pedidas.some((u) => u.startsWith('https://playvalorant.com')), 'Valorant pelo site do Valorant');
+    assert.deepEqual(val.map((n) => n.slug), ['val-1309', 'val-13-08', 'val-13-06', 'val-13-05']);
+
+    /* 2) O item que aponta pra fora do site NAO vira nota: 5 itens no indice do LoL, 4
+     *    notas. Antes ele entrava e a URL saia colada, impossivel de abrir. */
+    assert.equal(lol.length, 4, `o item de fora entrou: ${lol.map((n) => n.slug).join(', ')}`);
+    assert.ok(!lol.some((n) => n.slug.includes('gwen')));
+
+    /* 3) Jogo sem nome no mapa cai no LoL, que e o padrao de quem ja chamava sem `jogo`. */
+    const semNome = await P.listarAtualizacoes({ limite: 1, jogo: 'jogo-que-nao-existe' });
+    assert.equal(semNome[0].slug, 'lol-26-22');
+
+    /* 4) A NOTA do Valorant: corpo limpo, zero blocos de campeao (a estrutura do LoL nao
+     *    casa), script e iframe fora, e link relativo apontando pro site CERTO. */
+    const nv = await P.lerAtualizacao('val-1309', { jogo: 'val' });
+    assert.equal(nv.url, 'https://playvalorant.com/pt-br/news/game-updates/val-1309');
+    assert.equal(nv.blocos.length, 0, 'nota de Valorant nao tem bloco de campeao');
+    assert.doesNotMatch(nv.corpo, /<script|<iframe/i, 'script e iframe tem que sair');
+    assert.match(nv.corpo, /href="https:\/\/playvalorant\.com\/pt-br\/alguma-coisa\//,
+      'link relativo tem que virar absoluto NO SITE DO VALORANT');
+    assert.match(nv.corpo, /ATUALIZAÇÕES DOS AGENTES/);
+    assert.match(nv.corpo, /class="depois"/, 'o destaque de antes/depois vale pros dois');
+
+    /* 5) A nota do LoL continua inteira: bloco de campeao achado, preambulo fora, link no
+     *    site do LoL. E o que ele usa hoje -- nao pode ter mudado. */
+    const nl = await P.lerAtualizacao('lol-26-22', { elenco: [{ chave: 'Ahri', nome: 'Ahri' }] });
+    assert.equal(nl.url, 'https://www.leagueoflegends.com/pt-br/news/game-updates/lol-26-22');
+    assert.equal(nl.blocos.length, 1, 'o bloco da Ahri tinha que ser achado');
+    assert.equal(nl.blocos[0].chave, 'ahri');
+    assert.doesNotMatch(nl.corpo, /Destaques/, 'o preambulo do LoL sai');
+    assert.match(nl.corpo, /href="https:\/\/www\.leagueoflegends\.com\/pt-br\/champions\/ahri\//);
+
+    /* 6) Cada um no seu cache. Mesma pasta faria "indice.json" de um jogo responder pelo
+     *    outro -- e o cache de indice vale 6 h, entao o estrago duraria. */
+    const pastas = await readdir(resolve(base, 'dados'));
+    assert.ok(pastas.includes('patchnotes'), `faltou a pasta do LoL: ${pastas.join(', ')}`);
+    assert.ok(pastas.includes('patchnotes-val'), `faltou a pasta do Valorant: ${pastas.join(', ')}`);
+    assert.deepEqual((await readdir(resolve(base, 'dados', 'patchnotes-val'))).sort(),
+      ['indice.json', 'val-1309.json']);
+    assert.deepEqual((await readdir(resolve(base, 'dados', 'patchnotes'))).sort(),
+      ['indice.json', 'lol-26-22.json']);
+  } finally {
+    globalThis.fetch = buscaDeVerdade;
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});
+
+/* A tela de Patch do Valorant: as fichas de secao saem do DOM depois de o corpo entrar,
+ * porque os titulos da Riot nao tem `id`. Se isso parar de pôr ancora, as fichas ficam
+ * clicaveis e nao levam a lugar nenhum -- falha silenciosa, a pior. */
+test('painel: as fichas de secao do patch do Valorant ganham ancora', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  const cercado = `
+    const els = {};
+    const achar = (k) => (els[k] ??= { innerHTML: '', titulos: [],
+      querySelectorAll() { return this.titulos; } });
+    const $ = (s) => achar(s);
+    const esc = (s) => String(s ?? '');
+    const carregando = () => 'carregando';
+    const dia = (s) => String(s ?? '').slice(0, 10);
+    let vpatchNotas = [], vpatchAberta = null;   // estado solto da tela
+    let resposta = null;
+    const pegar = async (u) => { if (resposta === 'erro') throw new Error('sem rede'); return resposta(u); };
+    const extras = { els, responder: (r) => { resposta = r; }, aberta: () => vpatchAberta,
+      titulo: (s) => vpatchTitulo(s), el: (k) => achar(k) };
+  `;
+  const t = await funcoesDaTela('painel.html',
+    ['carregarValPatch', 'desenharListaValPatch', 'abrirNotaVal'], cercado, ['vpatchTitulo']);
+
+  // o título perde o "do VALORANT" e o "Notas da", que só ocupam a lista
+  assert.equal(t.titulo('Atualização 13.09 do VALORANT'), 'Atualização 13.09');
+  assert.equal(t.titulo('Notas da Atualização 13.08'), 'Atualização 13.08');
+
+  // três títulos, um deles já com id próprio e um vazio (que não vira ficha)
+  const titulos = [
+    { textContent: 'ATUALIZAÇÕES DOS AGENTES', id: '' },
+    { textContent: 'DE ARMAS', id: 'jaTinha' },
+    { textContent: '   ', id: '' },
+  ];
+  t.el('#vpatchCorpo').titulos = titulos;
+
+  t.responder(async (u) => (u === '/api/val/patch'
+    ? [{ slug: 'val-1309', titulo: 'Atualização 13.09 do VALORANT', data: '2026-10-27' }]
+    : { corpo: '<h2>x</h2>', url: 'https://playvalorant.com/x' }));
+  await t.carregarValPatch();
+  /* `carregarValPatch` dispara `abrirNotaVal` SEM await (igual ao lado do LoL), entao a
+   * nota ainda esta chegando quando ele volta. Sem esperar um tique, o teste media a tela
+   * antes de ela existir. */
+  await new Promise((r) => setTimeout(r, 0));
+
+  assert.equal(titulos[0].id, 'vpSec0', 'título sem id ganha âncora');
+  assert.equal(titulos[1].id, 'jaTinha', 'título que já tinha id mantém o dele');
+  const topo = t.els['#vpatchTopo'].innerHTML;
+  assert.match(topo, /2 seções/, 'o título vazio não conta como seção');
+  assert.match(topo, /irPara\('vpSec0'\)/);
+  assert.match(topo, /irPara\('jaTinha'\)/);
+  assert.equal(t.aberta(), 'val-1309', 'abre a mais nova sozinho');
+  assert.match(t.els['#vpatchLista'].innerHTML, /Atualização 13\.09</);
+
+  // uma seção só não merece barra de atalho
+  t.el('#vpatchCorpo').titulos = [{ textContent: 'TUDO', id: '' }];
+  await t.abrirNotaVal('val-1309');
+  assert.equal(t.els['#vpatchTopo'].innerHTML, '');
+
+  // sem rede não deixa "carregando" pra sempre
+  t.responder('erro');
+  await t.carregarValPatch();
+  assert.match(t.els['#vpatchLista'].innerHTML, /sem internet/);
+
+  // resposta que não é lista também não derruba a tela (já quebrou no lado do LoL)
+  t.responder(async () => ({ qualquer: 'coisa' }));
+  await t.carregarValPatch();
+  assert.match(t.els['#vpatchLista'].innerHTML, /não vieram agora/);
+  t.responder(async () => ({ erro: 'o site da Riot respondeu HTTP 503' }));
+  await t.carregarValPatch();
+  assert.match(t.els['#vpatchLista'].innerHTML, /HTTP 503/);
+});
