@@ -22,9 +22,8 @@ Feito nesta rodada: o seletor LoL/Valorant, a barra trocando inteira, o rodapé 
 jogo do modo, abrir no jogo que está rodando, e a tela de Partidas do Valorant.
 Falta, em ordem:
 1. ~~Notas de atualização do Valorant~~ — **FEITA**, mesmo cano do LoL com `jogo: 'val'`.
-2. **Cruzar as partidas com as marcas**: mostrar, ao lado de cada mapa da tela de Partidas,
-   quantas lineups ele já marcou ali. Responde "onde marcar rende" com os dois dados que o
-   app já tem. Só fazer depois de medir que o casamento mapa→marca não erra.
+2. ~~Cruzar as partidas com as marcas~~ — **FEITA.** Medido antes: das 176 marcas, 100%
+   casam com um mapa só (zero ambígua, zero órfã), então a contagem não erra.
 3. Composição inimiga (item 3) — perguntar antes, ver lá.
 Não fazer sem ele pedir: trocar o tema inteiro de cor por modo. Mexer em `--ouro` no modo
 Valorant atropelaria o tema que ele edita no modo edição (admin), que grava no `:root`.
