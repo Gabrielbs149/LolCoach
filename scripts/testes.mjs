@@ -2459,3 +2459,86 @@ test('lineups: a recuperacao de qualidade trata tudo abaixo de 720p como ruim', 
   t.lnPintarQualidade('');
   assert.equal(t.selo.textContent, '…');
 });
+
+/* ------------------------------------------- a marcacao a mao nao pode sumir
+ *
+ * Esse arquivo e o unico dado do app que nao da pra refazer: o acervo e o catalogo voltam
+ * com uma busca nova, as 149 marcas dele nao voltam de lugar nenhum -- o parser tem teto de
+ * 30% exatamente porque o resto so sai a mao.
+ *
+ * E ele era gravado com writeFile direto, que TRUNCA antes de escrever: morrer nesse vao
+ * deixava o arquivo vazio, sem copia e sem volta. Agora grava ao lado e renomeia em cima,
+ * guardando a versao anterior.
+ */
+test('lineups: a marcacao a mao sobrevive a arquivo quebrado', async () => {
+  const { mkdtemp, mkdir, writeFile, readFile, readdir } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { resolve } = await import('node:path');
+  const base = await mkdtemp(resolve(tmpdir(), 'lolcoach-marcas-'));
+  const antes = process.env.LOLCOACH_DIR;
+  process.env.LOLCOACH_DIR = base;
+  try {
+    const pasta = resolve(base, 'dados', 'valorant');
+    await mkdir(pasta, { recursive: true });
+    const arq = resolve(pasta, 'meus-pontos.json');
+    const bak = `${arq}.bak`;
+
+    // duas marcas que ele ja tinha feito
+    const jaTinha = {
+      formato: 1,
+      pontos: {
+        'v1#10': { posicao: { x: 0.2, y: 0.3 }, em: 1 },
+        'v2#20': { alvo: { x: 0.8, y: 0.9 }, confirmei: true, em: 2 },
+      },
+    };
+    await writeFile(arq, JSON.stringify(jaTinha), 'utf8');
+
+    const L = await import(`../src/valorant/lineups.js?marcas=${Date.now()}`);
+
+    /* 1) A copia nasce na LEITURA, nao na primeira marca. Medido: com o arquivo dele de
+     *    149 marcas e nenhuma copia, um arquivo cortado fazia 149 virar 1. Se a copia só
+     *    aparecesse ao marcar, quem abre o app e nao marca nada seguiria sem rede. */
+    await L.comMeusPontos({ callouts: [], lineups: [{ video: 'v1', segundo: 10 }] });
+    assert.equal(Object.keys(JSON.parse(await readFile(bak, 'utf8')).pontos).length, 2,
+      'a copia tinha que existir so de ler');
+
+    /* 2) Gravar guarda a versao anterior. Sem isso, um arquivo quebrado nao tem de onde
+     *    voltar -- que era a situacao ate agora. */
+    await L.marcarPonto({ video: 'v3', segundo: 30, qual: 'posicao', x: 0.5, y: 0.5 });
+    const copia = JSON.parse(await readFile(bak, 'utf8'));
+    assert.equal(Object.keys(copia.pontos).length, 2, 'a copia tem que ser a versao ANTERIOR');
+    const agora = JSON.parse(await readFile(arq, 'utf8'));
+    assert.equal(Object.keys(agora.pontos).length, 3, 'e o principal tem a marca nova');
+
+    /* 3) Nao sobra arquivo temporario na pasta dele. */
+    const sobrou = (await readdir(pasta)).filter((n) => n.endsWith('.novo'));
+    assert.deepEqual(sobrou, [], `sobrou temporario: ${sobrou.join(', ')}`);
+
+    /* 4) O principal quebrado NAO apaga o trabalho: le da copia.
+     *    Isto e o teste que importa -- e o cenario de perder tudo. */
+    await writeFile(arq, '{"formato":1,"pontos":{"v1#10":{"posic', 'utf8');  // escrita cortada no meio
+    const R = await import(`../src/valorant/lineups.js?quebrado=${Date.now()}`);
+    const r = await R.comMeusPontos({
+      callouts: [],
+      lineups: [{ video: 'v1', segundo: 10 }, { video: 'v2', segundo: 20 }],
+    });
+    assert.equal(r.lineups[0].posicao?.meu, true, 'a marca de v1 tinha que voltar da copia');
+    assert.equal(r.lineups[1].confirmei, true, 'e o "eu fiz essa e funcionou" tambem');
+
+    // e a copia boa continua boa: recuperar nao pode promover o arquivo quebrado a copia
+    const copiaDepois = JSON.parse(await readFile(bak, 'utf8'));
+    assert.equal(Object.keys(copiaDepois.pontos).length, 2, 'a copia nao pode virar o lixo');
+    // o principal foi reescrito com o que se salvou
+    assert.equal(Object.keys(JSON.parse(await readFile(arq, 'utf8')).pontos).length, 2);
+
+    /* 5) Copia vazia nao conta como recuperacao: comecar do zero e o certo quando nao ha
+     *    nada guardado, senao qualquer app novo acharia que perdeu algo. */
+    await writeFile(arq, 'lixo', 'utf8');
+    await writeFile(bak, JSON.stringify({ formato: 1, pontos: {} }), 'utf8');
+    const Z = await import(`../src/valorant/lineups.js?zero=${Date.now()}`);
+    const vazio = await Z.comMeusPontos({ callouts: [], lineups: [{ video: 'v1', segundo: 10 }] });
+    assert.equal(vazio.lineups[0].posicao?.meu, undefined, 'sem nada guardado, nao inventa marca');
+  } finally {
+    if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
+  }
+});

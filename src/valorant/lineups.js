@@ -14,7 +14,7 @@
  * Nada aqui toca no processo do Valorant. Não há leitura de memória nem sobreposição em
  * cima do jogo: o Vanguard é anticheat de kernel e trata overlay como trapaça.
  */
-import { readFile, writeFile, mkdir, readdir, unlink } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, unlink, rename, copyFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pastaBase } from '../caminhos.js';
 
@@ -61,7 +61,21 @@ async function semOsRuins(r) {
 const garantirPasta = () => mkdir(pasta(), { recursive: true }).catch(() => {});
 const garantirBuscas = () => mkdir(resolve(pasta(), 'buscas'), { recursive: true }).catch(() => {});
 const lerJson = async (caminho, reserva) => { try { return JSON.parse(await readFile(caminho, 'utf8')); } catch { return reserva; } };
-const gravarJson = async (caminho, v) => { await garantirPasta(); await writeFile(caminho, JSON.stringify(v, null, 2), 'utf8'); };
+/**
+ * Grava trocando o arquivo de uma vez: escreve ao lado e só então renomeia em cima.
+ *
+ * `writeFile` direto TRUNCA o arquivo antes de escrever. Se a máquina desliga ou o app
+ * morre nesse vão, sobra um arquivo vazio ou pela metade — e aqui dentro mora a marcação
+ * à mão dele, que o parser não consegue refazer. O rename sobrescreve de uma vez (no
+ * Windows o Node usa MoveFileEx com REPLACE_EXISTING), então o arquivo bom só deixa de
+ * existir quando o novo já está inteiro no disco.
+ */
+const gravarJson = async (caminho, v) => {
+  await garantirPasta();
+  const novo = `${caminho}.novo`;
+  await writeFile(novo, JSON.stringify(v, null, 2), 'utf8');
+  await rename(novo, caminho);
+};
 
 const buscarJson = async (url, ms = 12000) => {
   const corta = AbortSignal.timeout(ms);
@@ -576,11 +590,60 @@ const FORMATO_PONTOS = 1;
 const chaveDoPonto = (video, segundo) => `${String(video ?? '').trim()}#${Math.round(Number(segundo) || 0)}`;
 const entre0e1 = (n) => Math.min(1, Math.max(0, Math.round(Number(n) * 1000) / 1000));
 
+/**
+ * Isto aqui é o único dado do app que não dá pra refazer.
+ *
+ * O acervo, o catálogo e as buscas voltam sozinhos — é só buscar de novo. A marcação à
+ * mão não: são mais de cem lineups em que ELE olhou o vídeo e disse onde se joga e onde
+ * cai, e o parser tem teto de 30% justamente porque o resto só sai assim. Perder este
+ * arquivo é perder trabalho que não tem de onde vir.
+ *
+ * Por isso a gravação guarda a versão anterior antes de trocar, e a leitura cai nela se o
+ * arquivo principal não abrir.
+ */
+const arqCopiaPontos = () => `${arqMeusPontos()}.bak`;
+const pontosValidos = (g) => (g?.formato === FORMATO_PONTOS && g.pontos && typeof g.pontos === 'object' ? g.pontos : null);
+
+/** Cria a cópia se ainda não existe. Não sobrescreve: a que está lá já é uma versão boa. */
+async function garantirCopiaDosPontos() {
+  try { await readFile(arqCopiaPontos(), 'utf8'); return false; } catch {}
+  await copyFile(arqMeusPontos(), arqCopiaPontos()).catch(() => {});
+  return true;
+}
+
+async function gravarPontos(pontos) {
+  // A cópia sai do arquivo que está no disco, que é sempre um arquivo inteiro: quem grava
+  // é o `gravarJson`, que troca de uma vez. Na primeira gravação ainda não existe — segue.
+  await copyFile(arqMeusPontos(), arqCopiaPontos()).catch(() => {});
+  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+}
+
 let pontosDele = null;
 async function meusPontos() {
   if (!pontosDele) {
-    const g = await lerJson(arqMeusPontos(), null);
-    pontosDele = (g?.formato === FORMATO_PONTOS && g.pontos) ? g.pontos : {};
+    const bom = pontosValidos(await lerJson(arqMeusPontos(), null));
+    if (bom) {
+      pontosDele = bom;
+      /* Primeira cópia já na leitura, não na primeira marca. Senão quem abre o app com
+       * cento e tantas marcas e não marca nada hoje fica sem rede: a cópia só existiria
+       * depois da próxima marca, e é justamente o arquivo antigo que corre risco. */
+      if (Object.keys(bom).length) await garantirCopiaDosPontos();
+      return pontosDele;
+    }
+
+    /* O principal não abriu. Antes de começar do zero — que apagaria tudo na primeira
+     * marca nova — tenta a cópia. Só vale se ela tiver marca dentro: cópia vazia não é
+     * recuperação, é o mesmo nada com outro nome. */
+    const copia = pontosValidos(await lerJson(arqCopiaPontos(), null));
+    if (copia && Object.keys(copia).length) {
+      console.warn(`[lineups] meus-pontos.json não abriu; recuperei ${Object.keys(copia).length} marcas da cópia`);
+      pontosDele = copia;
+      // Volta a cópia pro lugar sem mexer nela: se eu usasse o gravarPontos, o arquivo
+      // quebrado viraria a cópia nova e a boa sumiria.
+      await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos: copia }).catch(() => {});
+      return pontosDele;
+    }
+    pontosDele = {};
   }
   return pontosDele;
 }
@@ -593,7 +656,7 @@ export async function marcarPonto({ video, segundo, qual, x, y } = {}) {
   const pontos = { ...(await meusPontos()) };
   const chave = chaveDoPonto(video, segundo);
   pontos[chave] = { ...(pontos[chave] ?? {}), [qual]: { x: entre0e1(x), y: entre0e1(y) }, em: Date.now() };
-  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  await gravarPontos(pontos);
   pontosDele = pontos;
   return { ok: true, ponto: pontos[chave] };
 }
@@ -623,7 +686,7 @@ export async function confirmarLineup({ video, segundo, confirmada = true } = {}
     if (resto.posicao || resto.alvo || resto.escondida) pontos[chave] = resto;
     else delete pontos[chave];
   }
-  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  await gravarPontos(pontos);
   pontosDele = pontos;
   return { ok: true, confirmada: !!pontos[chave]?.confirmei };
 }
@@ -654,7 +717,7 @@ export async function esconderLineup({ video, segundo, esconder = true } = {}) {
     if (resto.posicao || resto.alvo || resto.confirmei) pontos[chave] = resto;
     else delete pontos[chave];
   }
-  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  await gravarPontos(pontos);
   pontosDele = pontos;
   return { ok: true, escondida: !!pontos[chave]?.escondida };
 }
@@ -686,7 +749,7 @@ export async function marcarLado({ video, segundo, lado = null } = {}) {
     if (resto.posicao || resto.alvo || resto.confirmei || resto.escondida) pontos[chave] = resto;
     else delete pontos[chave];
   }
-  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  await gravarPontos(pontos);
   pontosDele = pontos;
   return { ok: true, lado: pontos[chave]?.lado ?? null };
 }
@@ -716,7 +779,7 @@ export async function esquecerPonto({ video, segundo, qual } = {}) {
     const { confirmei, escondida } = pontos[chave];
     pontos[chave] = { ...(confirmei ? { confirmei } : {}), ...(escondida ? { escondida } : {}) };
   } else delete pontos[chave];
-  await gravarJson(arqMeusPontos(), { formato: FORMATO_PONTOS, pontos });
+  await gravarPontos(pontos);
   pontosDele = pontos;
   return { ok: true };
 }
