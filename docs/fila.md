@@ -21,10 +21,7 @@ Regras que valem pra toda rodada:
 Feito nesta rodada: o seletor LoL/Valorant, a barra trocando inteira, o rodapé falando do
 jogo do modo, abrir no jogo que está rodando, e a tela de Partidas do Valorant.
 Falta, em ordem:
-1. **Notas de atualização do Valorant.** É o que dá a terceira aba ao modo Valorant e ele
-   mesmo pediu ("valorant tambem tem patch notes"). Conferido em 03/11: a página responde
-   200 com 571 KB e tem o mesmo `__NEXT_DATA__` que o lado do LoL já lê (`patchLista()` /
-   `patchNota()` em `src/daemon.js`). É copiar caminho que já funciona.
+1. ~~Notas de atualização do Valorant~~ — **FEITA**, mesmo cano do LoL com `jogo: 'val'`.
 2. **Cruzar as partidas com as marcas**: mostrar, ao lado de cada mapa da tela de Partidas,
    quantas lineups ele já marcou ali. Responde "onde marcar rende" com os dois dados que o
    app já tem. Só fazer depois de medir que o casamento mapa→marca não erra.
