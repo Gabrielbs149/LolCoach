@@ -6664,8 +6664,8 @@ const vpMaisJogado = (lista, campo) => [...lista.reduce((c, p) => (p[campo] ? c.
 
 async function carregarValPartidas(){
   $('#vpLista').innerHTML = carregando();
-  let lista = [];
-  try { lista = (await pegar('/api/val/partidas')).partidas ?? []; }
+  let lista = [], marcas = {};
+  try { const r = await pegar('/api/val/partidas'); lista = r.partidas ?? []; marcas = r.marcasPorMapa ?? {}; }
   catch { $('#vpLista').innerHTML = '<div class="vazio">não consegui ler o diário</div>'; return; }
 
   if (!lista.length) {
@@ -6683,19 +6683,37 @@ async function carregarValPartidas(){
   const mapas = vpMaisJogado(lista, 'mapa');
   const agentes = vpMaisJogado(lista, 'agente');
 
+  /* Onde marcar lineup rende: o mapa que ele JOGA e tem menos marca.
+   *
+   * É a pergunta que a lista de partidas levanta sozinha. Medido quando isto entrou: ele
+   * tinha 35 marcas na Lotus e UMA na Corrode — e tinha acabado de jogar duas competitivas
+   * na Corrode. Sem cruzar as duas coisas, isso não aparece em lugar nenhum.
+   *
+   * Só entra mapa que ele jogou: mapa que ele não pega não é falta de marca, é mapa que
+   * não importa. E em empate vence quem ele jogou mais. */
+  const buraco = mapas
+    .map(([nome, n]) => ({ nome, partidas: n, marcas: marcas[nome] ?? 0 }))
+    .sort((a, b) => (a.marcas - b.marcas) || (b.partidas - a.partidas))[0];
+
   const cartao = (rot, val, pe) => `<div class="cartao"><div class="rot">${esc(rot)}</div><div class="val">${esc(val)}</div><div class="pe">${esc(pe ?? '')}</div></div>`;
   $('#vpCartoes').innerHTML = [
     cartao('Partidas', String(lista.length), fechadas.length < lista.length ? `${lista.length - fechadas.length} em andamento` : ''),
     cartao('Tempo em partida', vpTempo(total), fechadas.length ? `média de ${vpMin(total / fechadas.length)} min` : ''),
     cartao('Mapa que mais joga', mapas[0]?.[0] ?? '—', mapas[0] ? `${mapas[0][1]} de ${lista.length}` : ''),
-    cartao('Agente que mais joga', agentes[0]?.[0] ?? '—', agentes[0] ? `${agentes[0][1]} de ${lista.length}` : ''),
+    buraco
+      ? cartao('Onde marcar rende', buraco.nome, `${buraco.partidas} ${buraco.partidas === 1 ? 'partida' : 'partidas'} · ${buraco.marcas} ${buraco.marcas === 1 ? 'marca' : 'marcas'}`)
+      : cartao('Agente que mais joga', agentes[0]?.[0] ?? '—', agentes[0] ? `${agentes[0][1]} de ${lista.length}` : ''),
   ].join('');
 
-  const emBarras = (pares) => barras(pares.map(([nome, n]) => ({
+  // No mapa, o que importa ao lado da partida é quanta lineup já tem ali — a porcentagem
+  // de partidas a barra já mostra. No agente não existe marca por agente, então fica a %.
+  $('#vpMapas').innerHTML = barras(mapas.map(([nome, n]) => ({
+    rotulo: nome, valor: n, destaque: String(n),
+    sub: `${marcas[nome] ?? 0} ${(marcas[nome] ?? 0) === 1 ? 'marca' : 'marcas'}`,
+  })), { estreito: true });
+  $('#vpAgentes').innerHTML = barras(agentes.map(([nome, n]) => ({
     rotulo: nome, valor: n, destaque: String(n), sub: `${Math.round(100 * n / lista.length)}%`,
   })), { estreito: true });
-  $('#vpMapas').innerHTML = emBarras(mapas);
-  $('#vpAgentes').innerHTML = emBarras(agentes);
 
   const quando = (ms) => new Date(ms).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   $('#vpLista').innerHTML = `<table class="amTabela">

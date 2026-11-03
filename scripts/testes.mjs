@@ -2736,7 +2736,11 @@ test('painel: as partidas de Valorant nao contam a que esta em andamento no temp
     { em: 60 * min, fim: 90 * min, mapa: 'Sunset', agente: 'Fade', fila: 'competitive', fechada: true },
     { em: 10 * min, fim: 40 * min, mapa: 'Sunset', agente: 'Fade', fila: 'unrated', fechada: true },
     { em: 0, fim: 30 * min, mapa: 'Bind', agente: 'Omen', fila: 'competitive', fechada: true },
-  ] });
+  /* A Lotus entra com ZERO marca de propósito, e ele não jogou Lotus nenhuma vez aqui: é o
+   * que faz a asserção de baixo valer algo. Uma versão que varresse a contagem inteira em
+   * vez das partidas acharia a Lotus como "onde marcar rende" — e mandaria ele marcar um
+   * mapa que ele não pega. */
+  ], marcasPorMapa: { Sunset: 23, Bind: 30, Corrode: 1, Lotus: 0 } });
   await t.carregarValPartidas();
 
   const cartoes = t.els['#vpCartoes'].innerHTML;
@@ -2750,8 +2754,23 @@ test('painel: as partidas de Valorant nao contam a que esta em andamento no temp
 
   // o mapa mais jogado conta TODAS, inclusive a em andamento: ali a pergunta e "onde eu jogo"
   assert.match(cartoes, /Sunset/);
-  assert.match(t.els['#vpMapas'].innerHTML, /Sunset=2\/50%/);
-  assert.match(t.els['#vpMapas'].innerHTML, /Corrode=1\/25%/);
+
+  /* ONDE MARCAR RENDE: o mapa que ele joga e tem menos marca. Com estes dados e a Corrode
+   * (1 marca contra 23 da Sunset e 30 da Bind) -- que e exatamente o caso real que fez
+   * isto existir: 35 marcas na Lotus, UMA na Corrode, e duas competitivas na Corrode. */
+  assert.match(cartoes, /Onde marcar rende/);
+  assert.match(cartoes, />Corrode</, `o buraco tinha que ser a Corrode: ${cartoes}`);
+  assert.match(cartoes, /1 partida · 1 marca/, 'singular no 1, e nao "1 partidas"');
+
+  /* A Lotus tem MENOS marca que a Bind, mas ele nao jogou Lotus nenhuma vez aqui: mapa que
+   * ele nao pega nao e falta de marca, e mapa que nao importa. */
+  assert.doesNotMatch(cartoes, /Lotus/, 'mapa que ele nao jogou nao entra no buraco');
+
+  // ao lado de cada mapa, quanta lineup ja tem ali -- a % de partidas a barra ja mostra
+  assert.match(t.els['#vpMapas'].innerHTML, /Sunset=2\/23 marcas/);
+  // o espaço no fim importa: sem ele, "1 marcas" também casaria e o singular não estaria testado
+  assert.match(t.els['#vpMapas'].innerHTML, /Corrode=1\/1 marca /, 'singular no 1');
+  // no agente nao existe marca por agente, entao ali continua a porcentagem
   assert.match(t.els['#vpAgentes'].innerHTML, /Fade=3\/75%/);
 
   // a lista traduz a fila e nao chama "21 min" o que ainda esta rolando
@@ -2764,6 +2783,9 @@ test('painel: as partidas de Valorant nao contam a que esta em andamento no temp
   // fila que o jogo inventar depois aparece crua em vez de sumir da tabela
   t.responder({ partidas: [{ em: 0, fim: 10 * min, mapa: 'Abyss', agente: 'Fade', fila: 'modoNovo2027', fechada: true }] });
   await t.carregarValPartidas();
+  // sem contagem nenhuma (varredura falhou) a tela nao quebra: mostra zero, nao "undefined"
+  assert.match(t.els['#vpMapas'].innerHTML, /Abyss=1\/0 marcas/);
+  assert.match(t.els['#vpCartoes'].innerHTML, /0 marcas/);
   assert.match(t.els['#vpLista'].innerHTML, /modoNovo2027/);
 
   // sem nada anotado, diz que anota sozinho -- nao fica uma tela vazia sem explicacao

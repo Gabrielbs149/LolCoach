@@ -14,7 +14,7 @@
  * Nada aqui toca no processo do Valorant. Não há leitura de memória nem sobreposição em
  * cima do jogo: o Vanguard é anticheat de kernel e trata overlay como trapaça.
  */
-import { readFile, writeFile, mkdir, readdir, unlink, rename, copyFile } from 'node:fs/promises';
+import { readFile, writeFile, mkdir, readdir, unlink, rename, copyFile, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pastaBase } from '../caminhos.js';
 
@@ -1694,6 +1694,54 @@ async function remontarIndice(cat) {
  * vezes. Hoje a habilidade filtra na tela e esses arquivos não são lidos por ninguém:
  * entram só como `sobra`, pra ele apagar quando quiser.
  */
+/**
+ * Quantas lineups ele já marcou em cada mapa.
+ *
+ * Responde a pergunta que o diário de partidas levanta e não resolve sozinho: ONDE marcar
+ * rende. A marca é por `vídeo#segundo` e não guarda mapa nenhum — quem sabe de que mapa é
+ * cada vídeo são os arquivos de busca, então não tem atalho: é varredura.
+ *
+ * **Medido nas 176 marcas dele: 100% casam com UM mapa só.** Zero ambígua (mesmo vídeo em
+ * dois mapas) e zero órfã (marca de lineup que saiu do acervo). Era a condição pra isto
+ * existir — contagem por mapa que erra é pior que contagem nenhuma.
+ *
+ * E é CARA: 80 arquivos, 5,2 MB, ~200 ms (medido três vezes: 221, 198, 208). Ele pode estar
+ * numa partida, então o resultado fica guardado e só é refeito quando a marcação ou as
+ * buscas mudam de verdade — a chave é o relógio dos arquivos, não um prazo.
+ */
+let cacheMarcasMapa = null;   // { chave, contagem }
+
+export async function marcasPorMapa() {
+  const dir = resolve(pasta(), 'buscas');
+  const arquivos = (await readdir(dir).catch(() => [])).filter((n) => n.endsWith('.json'));
+
+  /* A chave inclui o relógio da marcação E o mais novo das buscas. Mexer num ponto que já
+   * existe não muda mapa nenhum (a chave da marca é vídeo+segundo, que não se move), mas
+   * marca nova e busca refeita mudam — e as duas acontecem aqui com frequência. */
+  const quando = async (p) => (await stat(p).catch(() => null))?.mtimeMs ?? 0;
+  const relogios = await Promise.all([quando(arqMeusPontos()), ...arquivos.map((n) => quando(resolve(dir, n)))]);
+  const chave = `${arquivos.length}:${relogios.join(',')}`;
+  if (cacheMarcasMapa?.chave === chave) return cacheMarcasMapa.contagem;
+
+  const pontos = await meusPontos();
+  const marcadas = new Set(Object.keys(pontos));
+  const porMapa = new Map();
+  for (const arq of arquivos) {
+    const g = await lerJson(resolve(dir, arq), null);
+    const mapa = g?.pedido?.mapa;
+    if (!mapa || !g?.lineups?.length) continue;
+    for (const l of g.lineups) {
+      const k = chaveDoPonto(l.video, l.segundo);
+      // Conjunto e não contador: a mesma lineup aparece na busca do atacante e na do
+      // defensor, e nas duas de habilidade. Somar contaria a mesma marca várias vezes.
+      if (marcadas.has(k)) (porMapa.get(mapa) ?? porMapa.set(mapa, new Set()).get(mapa)).add(k);
+    }
+  }
+  const contagem = Object.fromEntries([...porMapa].map(([m, s]) => [m, s.size]));
+  cacheMarcasMapa = { chave, contagem };
+  return contagem;
+}
+
 export async function acervo() {
   const cat = await catalogo().catch(() => null);
   const ix = await remontarIndice(cat);

@@ -2640,12 +2640,19 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
      * cegas. O nome do agente sai do catálogo aqui, porque o id cru não serve pra ninguém
      * olhar — e se o catálogo não estiver em mão a partida vem sem nome em vez de não vir. */
     valPartidas: async () => {
-      const [lista, cat] = await Promise.all([
+      /* As marcas por mapa vêm junto porque é a pergunta que a lista de partidas levanta e
+         não responde: onde marcar lineup rende. Se a varredura falhar, a tela continua
+         mostrando as partidas — contagem é o extra, não o conteúdo. */
+      const [lista, cat, marcas] = await Promise.all([
         partidasGuardadas(),
         Lineups.catalogo().catch(() => null),
+        Lineups.marcasPorMapa().catch(() => ({})),
       ]);
       const nome = new Map((cat?.agentes ?? []).map((a) => [a.id, a.nome]));
-      return { partidas: lista.map((p) => ({ ...p, agente: nome.get(p.agenteId) ?? null })) };
+      return {
+        partidas: lista.map((p) => ({ ...p, agente: nome.get(p.agenteId) ?? null })),
+        marcasPorMapa: marcas,
+      };
     },
     valLinks: (p = {}) => ({
       youtube: Lineups.linkYoutube(Lineups.termoDaBusca(p)),
