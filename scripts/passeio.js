@@ -29,9 +29,14 @@ const AQUI = join(dirname(fileURLToPath(import.meta.url)), '..', 'src', 'ui');
 const VERBOSO = process.argv.includes('--ver');
 
 /* ── a tela sendo visitada ────────────────────────────────────────────────────────── */
+/* Todas as abas dos DOIS modos. As de Valorant entram aqui pelo mesmo motivo que as de
+ * LoL: aba que ninguém abre é aba que sobe quebrada. O `abrirAba` troca o modo sozinho
+ * quando a aba é do outro jogo, então o passeio não precisa saber que existe modo. */
 const ABAS = [
   'visao', 'calendario', 'partidas', 'estat', 'amigos',
-  'meta', 'builds', 'patch', 'lineups', 'admin', 'config',
+  'meta', 'builds', 'patch',
+  'lineups', 'valPartidas', 'valPatch',
+  'admin', 'config',
 ];
 
 /* As QUATRO telas do app, não só o painel. As três de baixo são as que ficam abertas
