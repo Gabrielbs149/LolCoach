@@ -17,6 +17,21 @@ Regras que valem pra toda rodada:
 
 ## Aberto
 
+### A. Terminar de separar o app em dois (pedido dele: "2 app em 1")
+Feito nesta rodada: o seletor LoL/Valorant, a barra trocando inteira, o rodapé falando do
+jogo do modo, abrir no jogo que está rodando, e a tela de Partidas do Valorant.
+Falta, em ordem:
+1. **Notas de atualização do Valorant.** É o que dá a terceira aba ao modo Valorant e ele
+   mesmo pediu ("valorant tambem tem patch notes"). Conferido em 03/11: a página responde
+   200 com 571 KB e tem o mesmo `__NEXT_DATA__` que o lado do LoL já lê (`patchLista()` /
+   `patchNota()` em `src/daemon.js`). É copiar caminho que já funciona.
+2. **Cruzar as partidas com as marcas**: mostrar, ao lado de cada mapa da tela de Partidas,
+   quantas lineups ele já marcou ali. Responde "onde marcar rende" com os dois dados que o
+   app já tem. Só fazer depois de medir que o casamento mapa→marca não erra.
+3. Composição inimiga (item 3) — perguntar antes, ver lá.
+Não fazer sem ele pedir: trocar o tema inteiro de cor por modo. Mexer em `--ouro` no modo
+Valorant atropelaria o tema que ele edita no modo edição (admin), que grava no `:root`.
+
 ### 0b. Clipes do Outplayed — TIRADOS do app (2.28.298)
 Entraram na 2.28.297 e saíram na 2.28.298, a pedido dele: "falei pra tirar o player do
 vídeo meu". O código está no commit 339afbd e no ramo `clipes-outplayed`. **Não reinstalar
@@ -57,12 +72,38 @@ nas 12 primeiras; depois troca. **Cuidado com a prorrogação**, onde a troca mu
 e com Deathmatch/Escalada, que não têm lado. Só mexer com os dois medidos de verdade numa
 partida que chegue lá — senão é adivinhação, e adivinhar lado é pior que não mostrar.
 
+**MEDIDO NO CAMPO (03/11, ele em partida na Corrode, competitiva).** O que o `core-game`
+entrega, conferido e não suposto:
+- `/core-game/v1/matches/{id}`: `State: IN_PROGRESS`, `MapID: /Game/Maps/Rook/Rook`,
+  `ModeID: /Game/GameModes/Bomb/BombGameMode.BombGameMode_C`, `MatchmakingData.QueueID:
+  competitive`, `IsRanked: true`. O `ModeID` é o que diz se lado existe — Deathmatch e
+  Escalada se descartam por ali, sem lista de filas pra manter à mão.
+- `Players[]` traz os 10, cada um com `Subject`, `TeamID` ("Blue"/"Red"), `TeamNumber`,
+  `CharacterID`, `IsCoach`. Ele estava em **Red**. Zero coach na lista.
+- **ARMADILHA, e séria: o agente dele apareceu nos DOIS times.** Fade
+  (`dade69b4-…-e58d267f4e95`) estava em Blue e em Red na mesma partida. Achar o time dele
+  pelo `CharacterID` daria o time ERRADO em qualquer partida de agente popular — e era o
+  atalho óbvio. Só `Subject === puuid` serve.
+- Round: `ally 7 + enemy 4 = 11` rodadas feitas, round 12. A conta é `ally + enemy + 1`.
+
+**O que ainda falta é só isto:** o `core-game` NÃO diz quem ataca — nenhum campo do payload
+tem lado. Então lado = f(TeamID, round), e a convenção "Blue ataca no primeiro tempo"
+continua sendo leitura minha, não medição. **Não shippar sem gabarito.** O gabarito é
+barato: no detalhe da partida (depois dela), `roundResults[0].bombPlanter` é um puuid, e o
+time dele era o atacante do round 1. Uma partida fecha a convenção; duas dão a prorrogação.
+
 ### 2b. ~~Websocket no lugar da espiada de 6 s~~ — MEDIDO E DESCARTADO
 Depois do cache do agente (2.28.281) a volta do laço custa 50 ms. O websocket economizaria
 0,8% e traria reconexão, autenticação e um estado a mais pra manter. Não vale.
 
 ### 3. Composição inimiga a partir do `core-game` que já é baixado
-**Depende do Valorant aberto pra conferir.** O dado já vem na resposta e é jogado fora.
+**Já não depende de mais nada: medido no campo em 03/11** (ver item 2). O `core-game`
+devolve os 10 jogadores com `TeamID` e `CharacterID`, e o app usa só o `CharacterID` dele —
+os outros nove são baixados e jogados no lixo a cada partida. O time dele sai do `Subject`,
+os inimigos são os do outro `TeamID`, e o nome de cada agente já está no catálogo local.
+Sem adivinhação em nenhum passo.
+**O que falta decidir é se vale a tela**, não se dá: o que mais pesa pra lineup é o mapa e o
+agente DELE, que ele já vê. Perguntar antes de construir.
 
 ### 4. Varrer o registro do app atrás de mais padrão
 Três varreduras feitas (2.28.271, .272, .273). As duas primeiras tiraram 85% do registro,
