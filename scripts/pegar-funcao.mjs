@@ -21,7 +21,24 @@ const AQUI = dirname(fileURLToPath(import.meta.url));
 export function corpoDaFuncao(fonte, nome) {
   const i = fonte.indexOf(`function ${nome}(`);
   if (i < 0) throw new Error(`não achei "function ${nome}(" — foi renomeada ou saiu da tela?`);
-  const abre = fonte.indexOf('{', i);
+  /* O `async` vem junto. Sem ele, uma função assíncrona da tela chega aqui como função
+   * comum e o `await` de dentro vira SyntaxError — o teste morre antes de testar nada. */
+  const antes = /async\s+$/.exec(fonte.slice(Math.max(0, i - 12), i));
+  const inicio = antes ? i - antes[0].length : i;
+
+  /* A chave do CORPO vem depois da lista de parâmetros fechar.
+   *
+   * Pegar a primeira `{` depois do nome parece dar no mesmo, e dá — até a função receber um
+   * parâmetro desestruturado. Aí a primeira `{` é a do parâmetro, a contagem fecha nela, e
+   * o que volta é meia assinatura: `function f(a, { b = 1 }`. Compila em nada. */
+  const abreP = fonte.indexOf('(', i);
+  let parens = 0, fimP = -1;
+  for (let k = abreP; k < fonte.length; k++) {
+    if (fonte[k] === '(') parens++;
+    else if (fonte[k] === ')' && --parens === 0) { fimP = k; break; }
+  }
+  if (fimP < 0) throw new Error(`"${nome}" não fecha os parênteses`);
+  const abre = fonte.indexOf('{', fimP);
   if (abre < 0) throw new Error(`"${nome}" sem corpo`);
   let nivel = 0;
   for (let k = abre; k < fonte.length; k++) {
@@ -29,7 +46,7 @@ export function corpoDaFuncao(fonte, nome) {
     if (c === '{') nivel++;
     else if (c === '}') {
       nivel--;
-      if (nivel === 0) return fonte.slice(i, k + 1);
+      if (nivel === 0) return fonte.slice(inicio, k + 1);
     }
   }
   throw new Error(`"${nome}" não fecha as chaves`);

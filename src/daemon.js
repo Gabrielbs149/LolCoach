@@ -15,6 +15,7 @@ import * as Controle from './dados/controle.js';
 import { recadoDeSequencia } from './analise/parar.js';
 import { licaoDaPartida } from './analise/licao.js';
 import * as Lineups from './valorant/lineups.js';
+import { partidasGuardadas } from './valorant/partidas.js';
 import { situacaoDoValorant } from './valorant/jogo.js';
 
 /**
@@ -2617,6 +2618,20 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       estado?.set?.('valorant', { ...v, em: Date.now() });
       return v;
     },
+    /* O diário que o app já escrevia e ninguém lia.
+     *
+     * Ele é gravado desde que existe (electron/main.js, a cada troca de estado do jogo) e
+     * nunca apareceu em tela: eram 11 partidas com mapa, agente e duração guardadas às
+     * cegas. O nome do agente sai do catálogo aqui, porque o id cru não serve pra ninguém
+     * olhar — e se o catálogo não estiver em mão a partida vem sem nome em vez de não vir. */
+    valPartidas: async () => {
+      const [lista, cat] = await Promise.all([
+        partidasGuardadas(),
+        Lineups.catalogo().catch(() => null),
+      ]);
+      const nome = new Map((cat?.agentes ?? []).map((a) => [a.id, a.nome]));
+      return { partidas: lista.map((p) => ({ ...p, agente: nome.get(p.agenteId) ?? null })) };
+    },
     valLinks: (p = {}) => ({
       youtube: Lineups.linkYoutube(Lineups.termoDaBusca(p)),
       strats: Lineups.linkStrats(p),
@@ -2642,7 +2657,7 @@ const ACOES_DO_PAINEL = [
   'builds', 'aplicarRunasDaBuild', 'aplicarBuildsNoLol', 'imagemItem', 'imagemRuna', 'imagemFeitico',
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
-  'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao',
+  'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao', 'valPartidas',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
   'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar', 'valEsconder', 'valMarcarLado',
 ];

@@ -2542,3 +2542,238 @@ test('lineups: a marcacao a mao sobrevive a arquivo quebrado', async () => {
     if (antes === undefined) delete process.env.LOLCOACH_DIR; else process.env.LOLCOACH_DIR = antes;
   }
 });
+
+/* ------------------------------------------- o app e dois: LoL e Valorant
+ *
+ * O Valorant era UMA aba no fim de uma barra inteira de LoL. Duas coisas davam errado por
+ * causa disso, e as duas estao medidas aqui:
+ *
+ *  - o rodape so sabia falar do client do LoL. Numa partida de Valorant com o League
+ *    fechado ele dizia "client desconectado" -- verdade e inutil;
+ *  - nao havia onde por o que e de Valorant (as 11 partidas gravadas nao apareciam em
+ *    tela nenhuma).
+ *
+ * O que este teste protege e o comportamento que e facil quebrar sem ninguem ver: qual aba
+ * fica aberta ao trocar de modo, e em que jogo o app abre.
+ */
+test('painel: os dois modos trocam a barra e o rodape fala do jogo certo', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  const cercado = `
+    const els = {};
+    const achar = (k) => (els[k] ??= { textContent: '', className: '' });
+    const $ = (s) => achar(s);
+    const botoes = [
+      { dataset: { aba: 'visao', jogo: 'lol' } },
+      { dataset: { aba: 'patch', jogo: 'lol' } },
+      { dataset: { aba: 'lineups', jogo: 'val' } },
+      { dataset: { aba: 'config' } },
+    ];
+    const modos = ['lol', 'val'].map((m) => ({ dataset: { modo: m }, on: false,
+      classList: { toggle(c, v) { this.ligado = v; } } }));
+    const document = {
+      body: { dataset: {} },
+      querySelectorAll: (s) => (s === 'nav button' ? botoes : s === '#modos button' ? modos : []),
+      getElementById: (id) => (botoes.some((b) => b.dataset.aba === id) ? {} : null),
+    };
+    const guardado = {};
+    const localStorage = { getItem: (k) => guardado[k] ?? null, setItem: (k, v) => { guardado[k] = v; } };
+    const location = { hash: '' };
+    const FASE_PT = { ChampSelect: 'selecao' };
+    let lnCatalogo = { agentes: [{ id: 'fade-id', nome: 'Fade' }] };
+    let abaAtual = 'visao', modoJogo = 'lol', ultimoEstado = null, valSituacao = null, valEspiadoEm = 0;
+    const abertas = [];
+    function abrirAba(nome) { abertas.push(nome); abaAtual = nome; }
+    let resposta = null;
+    const pegar = async () => { if (resposta === 'erro') throw new Error('sem rede'); return resposta; };
+
+    const extras = {
+      els, abertas, guardado, location, modos, document,
+      estado: (e) => { ultimoEstado = e; },
+      valor: (j) => { valSituacao = j; },
+      responder: (r) => { resposta = r; },
+      lembrar: (v) => { guardado.modoJogo = v; },
+      ondeEsta: (a) => { abaAtual = a; },
+      modo: () => modoJogo,
+      aba: () => abaAtual,
+      zerarEspiada: () => { valEspiadoEm = 0; },
+    };
+  `;
+  const t = await funcoesDaTela('painel.html',
+    ['trocarModo', 'pintarEstado', 'espiarValorant', 'escolherModoDeEntrada'],
+    cercado, ['ABA_INICIAL', 'VAL_ONDE', 'jogoDaAba']);
+
+  /* 1) O RODAPE. Em partida de Valorant ele diz Valorant -- com mapa e agente -- e nao
+   *    fala do client do LoL, que e exatamente a frase errada que ele lia antes. */
+  t.valor({ ligado: true, estado: 'jogando', emFila: false, mapa: 'Corrode', agenteId: 'fade-id' });
+  t.trocarModo('val');
+  assert.equal(t.els['#estClient'].textContent, 'Valorant em partida');
+  assert.equal(t.els['#estFase'].textContent, 'Corrode · Fade');
+  assert.ok(t.els['#luz'].className.includes('on'), 'jogo aberto acende a luz');
+
+  // na fila, e na selecao de agente
+  t.valor({ ligado: true, estado: 'menu', emFila: true, mapa: null, agenteId: null });
+  t.pintarEstado();
+  assert.equal(t.els['#estClient'].textContent, 'Valorant na fila');
+  assert.equal(t.els['#estFase'].textContent, '', 'sem mapa nao inventa texto');
+  t.valor({ ligado: true, estado: 'selecao', emFila: false, mapa: 'Bind', agenteId: 'fade-id' });
+  t.pintarEstado();
+  assert.equal(t.els['#estClient'].textContent, 'Valorant escolhendo agente');
+
+  // jogo fechado
+  t.valor({ ligado: false });
+  t.pintarEstado();
+  assert.equal(t.els['#estClient'].textContent, 'Valorant fechado');
+  assert.equal(t.els['#luz'].className.includes('on'), false);
+
+  // e o modo LoL continua falando do LoL
+  t.estado({ conectado: true, fase: 'ChampSelect' });
+  t.trocarModo('lol');
+  assert.equal(t.els['#estClient'].textContent, 'client conectado');
+  assert.equal(t.els['#estFase'].textContent, 'selecao');
+  t.estado(null);
+  t.pintarEstado();
+  assert.equal(t.els['#estClient'].textContent, 'painel sem conexão');
+
+  /* 2) A ABA ABERTA. Trocar de modo nao pode deixar no ar uma tela cujo botao a barra nao
+   *    mostra mais -- o Perfil ficava aceso sem botao nenhum. */
+  t.ondeEsta('visao');
+  t.abertas.length = 0;
+  t.trocarModo('val');
+  assert.deepEqual(t.abertas, ['lineups'], 'saindo do LoL abre a primeira aba do Valorant');
+
+  // aba dos DOIS (Configuração) nao se mexe: ele estava mexendo ali, continua ali
+  t.ondeEsta('config');
+  t.abertas.length = 0;
+  t.trocarModo('lol');
+  assert.deepEqual(t.abertas, [], 'aba dos dois jogos fica onde esta');
+  assert.equal(t.aba(), 'config');
+
+  // e trocar pro modo em que a aba JA esta tambem nao mexe
+  t.ondeEsta('lineups');
+  t.abertas.length = 0;
+  t.trocarModo('val');
+  assert.deepEqual(t.abertas, []);
+
+  /* 3) EM QUE JOGO O APP ABRE. O jogo rodando manda, mas nao sobrescreve a escolha dele:
+   *    senao abrir o app uma vez com o Valorant ligado mudaria a preferencia pra sempre. */
+  t.lembrar('lol');
+  t.responder({ ligado: true, estado: 'jogando', mapa: 'Corrode', agenteId: 'fade-id' });
+  await t.escolherModoDeEntrada();
+  assert.equal(t.modo(), 'val', 'Valorant rodando: abre no Valorant');
+  assert.equal(t.guardado.modoJogo, 'lol', 'mas o lembrado continua o dele');
+
+  // nada rodando: vale o lembrado
+  t.responder({ ligado: false });
+  t.lembrar('val');
+  await t.escolherModoDeEntrada();
+  assert.equal(t.modo(), 'val');
+  t.lembrar('lol');
+  await t.escolherModoDeEntrada();
+  assert.equal(t.modo(), 'lol');
+
+  // sem nada lembrado, abre no LoL
+  delete t.guardado.modoJogo;
+  await t.escolherModoDeEntrada();
+  assert.equal(t.modo(), 'lol');
+
+  /* A URL manda em tudo: e por #lineups que a janela da segunda tela nasce no meio da
+   * partida. Ela nao pode ser jogada de volta pro LoL por esta funcao, que resolve depois
+   * porque e async. */
+  t.location.hash = '#lineups';
+  t.responder({ ligado: false });
+  t.lembrar('lol');
+  await t.escolherModoDeEntrada();
+  assert.equal(t.modo(), 'val', 'a aba pedida na URL decide o modo');
+  t.location.hash = '';
+
+  // daemon fora do ar na abertura nao trava nem muda nada: cai no lembrado
+  t.responder('erro');
+  t.lembrar('lol');
+  await t.escolherModoDeEntrada();
+  assert.equal(t.modo(), 'lol');
+
+  /* 4) A ESPIADA. 5 s e o ritmo; o tick e de 2 s, e consultar tres vezes mais no meio da
+   *    partida dele nao traz informacao nova. */
+  t.trocarModo('val');
+  t.zerarEspiada();
+  t.responder({ ligado: true, estado: 'jogando', mapa: 'Ascent', agenteId: 'fade-id' });
+  await t.espiarValorant();
+  assert.equal(t.els['#estFase'].textContent, 'Ascent · Fade');
+  t.responder({ ligado: true, estado: 'jogando', mapa: 'Sunset', agenteId: 'fade-id' });
+  await t.espiarValorant();
+  assert.equal(t.els['#estFase'].textContent, 'Ascent · Fade', 'dentro dos 5 s nao consulta de novo');
+});
+
+/* ------------------------------------------- a tela de partidas do Valorant
+ *
+ * O diario ja era gravado desde que existe e nao aparecia em tela nenhuma: 12 partidas com
+ * mapa, agente e duracao guardadas as cegas. A conta que importa aqui e a do TEMPO: a
+ * partida em andamento tem `fim` = ultima vez que o app olhou o jogo, entao somar ela diz
+ * "2 min" numa partida no terceiro round e derruba a media justamente enquanto ele joga.
+ */
+test('painel: as partidas de Valorant nao contam a que esta em andamento no tempo', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+
+  const cercado = `
+    const els = {};
+    const achar = (k) => (els[k] ??= { innerHTML: '' });
+    const $ = (s) => achar(s);
+    const esc = (s) => String(s ?? '');
+    const carregando = () => 'carregando';
+    const barras = (linhas) => linhas.map((l) => l.rotulo + '=' + l.destaque + '/' + l.sub).join(' ');
+    let resposta = null;
+    const pegar = async () => { if (resposta === 'erro') throw new Error('sem rede'); return resposta; };
+    const extras = { els, responder: (r) => { resposta = r; } };
+  `;
+  const t = await funcoesDaTela('painel.html', ['carregarValPartidas'], cercado,
+    ['VP_FILA', 'vpMin', 'vpTempo', 'vpMaisJogado']);
+
+  const min = 60000;
+  t.responder({ partidas: [
+    // em andamento: 2 min de "duracao" porque o app olhou o jogo agora
+    { em: 100 * min, fim: 102 * min, mapa: 'Corrode', agente: 'Fade', fila: 'competitive', fechada: false },
+    { em: 60 * min, fim: 90 * min, mapa: 'Sunset', agente: 'Fade', fila: 'competitive', fechada: true },
+    { em: 10 * min, fim: 40 * min, mapa: 'Sunset', agente: 'Fade', fila: 'unrated', fechada: true },
+    { em: 0, fim: 30 * min, mapa: 'Bind', agente: 'Omen', fila: 'competitive', fechada: true },
+  ] });
+  await t.carregarValPartidas();
+
+  const cartoes = t.els['#vpCartoes'].innerHTML;
+  assert.match(cartoes, />4</, 'conta as 4 partidas, inclusive a em andamento');
+  assert.match(cartoes, /1 em andamento/);
+  /* 3 fechadas de 30 min = 1h30. Se a em andamento entrasse, daria 1h32 e media de 23 min
+   * em vez de 30 -- que e o erro que este teste existe pra pegar. */
+  assert.match(cartoes, /1 h 30 min/, 'tempo = so as fechadas');
+  assert.doesNotMatch(cartoes, /1 h 32 min/, 'somar a em andamento daria 1h32');
+  assert.match(cartoes, /média de 30 min/, 'a media tambem ignora a em andamento');
+
+  // o mapa mais jogado conta TODAS, inclusive a em andamento: ali a pergunta e "onde eu jogo"
+  assert.match(cartoes, /Sunset/);
+  assert.match(t.els['#vpMapas'].innerHTML, /Sunset=2\/50%/);
+  assert.match(t.els['#vpMapas'].innerHTML, /Corrode=1\/25%/);
+  assert.match(t.els['#vpAgentes'].innerHTML, /Fade=3\/75%/);
+
+  // a lista traduz a fila e nao chama "21 min" o que ainda esta rolando
+  const lista = t.els['#vpLista'].innerHTML;
+  assert.match(lista, /Competitiva/);
+  assert.match(lista, /Sem classificação/);
+  assert.match(lista, /em andamento/);
+  assert.match(lista, /30 min/);
+
+  // fila que o jogo inventar depois aparece crua em vez de sumir da tabela
+  t.responder({ partidas: [{ em: 0, fim: 10 * min, mapa: 'Abyss', agente: 'Fade', fila: 'modoNovo2027', fechada: true }] });
+  await t.carregarValPartidas();
+  assert.match(t.els['#vpLista'].innerHTML, /modoNovo2027/);
+
+  // sem nada anotado, diz que anota sozinho -- nao fica uma tela vazia sem explicacao
+  t.responder({ partidas: [] });
+  await t.carregarValPartidas();
+  assert.match(t.els['#vpLista'].innerHTML, /anota sozinho/);
+  assert.equal(t.els['#vpCartoes'].innerHTML, '');
+
+  // daemon fora do ar nao deixa "carregando..." pra sempre
+  t.responder('erro');
+  await t.carregarValPartidas();
+  assert.match(t.els['#vpLista'].innerHTML, /não consegui ler o diário/);
+});
