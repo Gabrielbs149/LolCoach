@@ -3035,3 +3035,43 @@ test('olho: so desconfia da tela cheia depois que a partida desenhou o minimapa'
   assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: 200, avisadoEm: agora - 5000, agora }), false);
   assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: 200, avisadoEm: agora - 31000, agora }), true);
 });
+
+/* ------------------------------------------- "tem janela na frente do jogo" tambem mentia
+ *
+ * Este aviso nao e so registro: vira FALA no meio da partida. A guarda que existia era o
+ * tempo de JOGO (> 60 s), e ela nao cobre o caso real -- quando o app pega uma partida JA
+ * EM ANDAMENTO (reconexao, ou o app abriu no meio), o tempo de jogo ja nasce alto e nao
+ * segura nada, enquanto o olho ainda esta comecando.
+ *
+ * MEDIDO: 6 avisos em 18 dias. Os 2 que nao se resolveram dispararam 12 e 14 s depois de o
+ * minimapa ser achado (34 s e 60 s de captura). Os outros 4 voltaram a enxergar em 0,5 a
+ * 2,3 s -- minimapa vazio, nao janela na frente.
+ */
+test('olho: so culpa a janela depois que o olho esta enxergando ha um tempo', async () => {
+  const { devoAvisarCego, ESPERA_OLHO } = await import('../src/vivo/olho.js');
+
+  const agora = 1_000_000;
+  const ha = (s) => agora - s * 1000;
+  const base = { calib: true, cegoHa: 20, tempoDeJogo: 600, agora };
+
+  /* Os dois casos REAIS do registro: 12 s e 14 s depois de achar o minimapa, com o tempo
+   * de jogo ja alto (partida pega em andamento). Nenhum pode mais avisar. */
+  assert.equal(devoAvisarCego({ ...base, calibDesde: ha(12) }), false, '12 s de olho aberto nao basta');
+  assert.equal(devoAvisarCego({ ...base, calibDesde: ha(14) }), false, '14 s tambem nao');
+
+  // enxergando ha tempo e cego mesmo assim: aviso legitimo, continua saindo
+  assert.equal(devoAvisarCego({ ...base, calibDesde: ha(120) }), true);
+  assert.equal(devoAvisarCego({ ...base, calibDesde: ha(ESPERA_OLHO) }), true, 'no limite, avisa');
+
+  // sem minimapa nao e este aviso -- quem fala disso e o devoAvisarSemMinimapa
+  assert.equal(devoAvisarCego({ ...base, calib: false, calibDesde: ha(300) }), false);
+
+  // as guardas que ja existiam continuam valendo
+  assert.equal(devoAvisarCego({ ...base, cegoHa: 14, calibDesde: ha(300) }), false, 'menos de 15 s cego, nao');
+  assert.equal(devoAvisarCego({ ...base, tempoDeJogo: 30, calibDesde: ha(300) }), false, 'comeco de jogo, nao');
+
+  // sem saber desde quando enxerga, nao inventa
+  assert.equal(devoAvisarCego({ ...base, calibDesde: 0 }), false);
+  assert.equal(devoAvisarCego({ ...base, calibDesde: undefined }), false);
+  assert.equal(devoAvisarCego(), false);
+});

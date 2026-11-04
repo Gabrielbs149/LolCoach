@@ -141,6 +141,32 @@ export function devoAvisarSemMinimapa({ achou, tempoDeJogo, avisadoEm = 0, agora
   return agora - (avisadoEm || 0) > cadencia;
 }
 
+/**
+ * Vale dizer que tem janela na frente do jogo — ou o olho é que acabou de abrir os olhos?
+ *
+ * Este aviso não é só registro: ele vira FALA no meio da partida dele. Dizer "tem janela
+ * na frente do jogo" quando não tem é pior que ficar calado.
+ *
+ * A guarda que existia era o tempo de JOGO (> 60 s), e ela não cobre o caso real: quando o
+ * app pega uma partida **já em andamento** — ele reconectou, ou o app abriu no meio —, o
+ * tempo de jogo já nasce alto e a guarda não segura nada, enquanto o olho ainda está
+ * começando. **Medido no registro: 6 avisos em 18 dias; os 2 que não se resolveram
+ * dispararam 12 e 14 s depois de o minimapa ser achado, com 34 s e 60 s de captura.** Os
+ * outros 4 voltaram a enxergar em 0,5 a 2,3 s — minimapa vazio, não janela na frente.
+ *
+ * Então agora conta também o tempo DO OLHO: 60 s desde que ele achou o minimapa. Janela na
+ * frente do jogo não sai sozinha, então atrasar o aviso um minuto não perde nada de real.
+ */
+export const ESPERA_OLHO = 60;   // segundos com o minimapa já achado antes de culpar uma janela
+
+export function devoAvisarCego({ calib, cegoHa, tempoDeJogo, calibDesde, agora = Date.now() } = {}) {
+  if (!calib) return false;                                   // sem minimapa é o outro aviso
+  if (!(Number(cegoHa) >= 15)) return false;
+  if (!(Number(tempoDeJogo) > 60)) return false;
+  if (!calibDesde) return false;                              // ainda não sei desde quando enxerga
+  return (agora - calibDesde) / 1000 >= ESPERA_OLHO;
+}
+
 const LANE_DE = { top: 'top', mid: 'mid', adc: 'bot', sup: 'bot', jungle: 'jungle' };
 
 /**

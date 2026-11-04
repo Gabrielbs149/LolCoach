@@ -1436,6 +1436,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       }
     } catch { /* sem lugar */ }
     if (dados.calib && (!antes?.calib || antes.calib.s !== dados.calib.s)) log(`olho: minimapa ${dados.calib.s}px (score ${dados.calib.score})${dados.escala ? `, ícone ${dados.escala.d}px` : ''}`);
+    // Desde quando o olho enxerga: é o relógio que o aviso de "cego" usa, porque o tempo
+    // de JOGO não serve quando o app pega uma partida já em andamento.
+    if (dados.calib && !partidaVivo.calibDesde) partidaVivo.calibDesde = Date.now();
+    else if (!dados.calib) partidaVivo.calibDesde = 0;
     /* O aviso de tela cheia só vale depois que a partida teve tempo de desenhar o minimapa
        — ver `devoAvisarSemMinimapa`, que tem a medição do registro dele por trás. */
     if (antes?.calib !== null) {
@@ -1447,7 +1451,11 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
     }
     // Cego (nada reconhecido há 15 s+ com o minimapa achado, depois de 1:00 de jogo): avisa uma vez por episódio
     const eAgora = partidaVivo.ultimoEstado;
-    const cegoAgora = !!dados.calib && (dados.cego ?? 0) >= 15 && (eAgora?.tempo ?? 0) > 60;
+    const { devoAvisarCego } = await import('./vivo/olho.js');
+    const cegoAgora = devoAvisarCego({
+      calib: !!dados.calib, cegoHa: dados.cego ?? 0,
+      tempoDeJogo: eAgora?.tempo ?? 0, calibDesde: partidaVivo.calibDesde,
+    });
     if (cegoAgora && !partidaVivo.cegoAvisado) {
       partidaVivo.cegoAvisado = true;
       partidaVivo.falas.push(prontaFala({ seq: ++seqFalas, t: eAgora.tempo, modulo: 'mapa', prioridade: 2, serio: F`Olho cego: tem janela na frente do jogo.`, divertido: F`Olho cego: tira a janela da frente do jogo.` }));
