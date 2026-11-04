@@ -980,6 +980,10 @@ pre.log{background:var(--f0);border:1px solid var(--borda);border-radius:var(--r
   background:linear-gradient(transparent,#000a)}
 .lnCartao span small{font-weight:400;font-size:11px;opacity:.85}
 .lnVazioCartao{color:var(--apagado);font-weight:400;text-shadow:none}
+/* O aviso de que o lado virou sozinho. Dourado e curto: some em 6 s. */
+.lnTrocouLado{flex:0 0 auto;align-self:center;font-size:11px;font-weight:600;letter-spacing:.2px;
+  color:var(--ouro-claro);background:var(--f0);border:1px solid var(--ouro-escuro);
+  border-radius:99px;padding:4px 10px;white-space:nowrap}
 .lnLados{display:flex;border:1px solid var(--borda);border-radius:var(--r-m);overflow:hidden}
 .lnLados button{flex:1;background:var(--f1);border:0;color:var(--fraco);padding:9px 0;
   font-size:12.5px;cursor:pointer;font-family:inherit;font-weight:600}
@@ -1377,6 +1381,32 @@ body.lnTelaCheia .lnVoltar{position:fixed;left:14px;top:14px;z-index:72;
    montado, mas para de ser desenhado — e com ele param as 12 bolinhas animadas das rotas.
    Durante a partida essa GPU faz falta: é ela que o player usa pra decodificar o vídeo. */
 body.lnTelaCheia #lnMapaCx{display:none}
+
+/* ------------------------------------------------- a segunda tela, durante a partida
+ *
+ * A janela que abre sozinha no segundo monitor quando a partida começa carrega o MESMO
+ * painel — e por isso vinha com tudo: barra lateral, acervo, filtros, links pra fora.
+ * Jogando, nada disso serve: ele olha de canto de olho e precisa do mapa e dos pinos.
+ *
+ * Então aqui some tudo que não é o mapa. O que fica: o cartão do mapa e do agente (que o
+ * jogo preenche sozinho), o lado (que agora vira sozinho), as habilidades — que é como ele
+ * escolhe o que ver — e o botão de voltar, à esquerda. */
+body.modoPartida aside,
+body.modoPartida #lineups>.titulo,
+body.modoPartida #lineups>h2,
+body.modoPartida #lnAcervo,
+body.modoPartida .lnCols,
+body.modoPartida #lnBuscar,
+body.modoPartida .lnFora,
+body.modoPartida .lnResumo,
+body.modoPartida #buscaGlobal{display:none}
+body.modoPartida main{padding:10px 12px 12px}
+body.modoPartida .lnLado{padding:6px;gap:6px}
+body.modoPartida .lnPalco{margin-top:6px}
+/* O mapa ganha a altura que sobrou das coisas que saíram. */
+body.modoPartida #lnMapaCx{max-height:calc(100vh - 86px)}
+/* O voltar fica grande e à esquerda: é o único botão que ele aperta com a partida rodando. */
+body.modoPartida .lnVoltar{padding:8px 16px;font-size:13px;font-weight:600}
 /* o selo de qualidade: diz em quanto o YouTube está mandando e dá pra clicar pra ele
    escolher de novo (ver lnOlharQualidade) */
 .lnTag.lnQ{font:inherit;font-size:10.5px;cursor:pointer;background:none;font-variant-numeric:tabular-nums}
@@ -1653,6 +1683,7 @@ h2{letter-spacing:1px}
           <button class="on" data-lado="atacando">Atacante</button>
           <button data-lado="defendendo">Defensor</button>
         </div>
+        <div class="lnTrocouLado" id="lnTrocouLado" hidden></div>
         <button class="lnCartao lnCartaoAg" id="lnCartaoAgente" onclick="lnAbrirSeletor('agente')"></button>
         <div class="lnHabs" id="lnBlocoHab"><div class="lnHabs" id="lnHabs"></div></div>
         <div class="lnEmpurra"></div>
@@ -4534,6 +4565,7 @@ async function carregarConquistas(){
 let lnCatalogo = null, lnAchadas = [], lnPlanta = null, lnCallouts = [];
 let lnTodas = [];        // tudo que a busca trouxe, antes do filtro e da deduplicação
 let lnMapaAtual = '', lnAgenteAtual = '', lnLadoAtual = 'atacando', lnHabAtual = '', lnPinoAtivo = null;
+let lnLadoDetectado = null;   // o último lado que o JOGO disse; null fora de partida
 // quantas ficaram de fora por serem do outro lado, e se ele pediu pra ver elas mesmo assim
 let lnDoOutroLado = 0, lnMisturarLados = false;
 let lnMudasFora = 0, lnEsconderMudas = false;
@@ -4610,6 +4642,35 @@ async function carregarLineups(){
 
 function lnDesenharLados(){
   for (const b of document.querySelectorAll('#lnLados button')) b.classList.toggle('on', b.dataset.lado === lnLadoAtual);
+}
+
+/**
+ * Trocar ou não o lado que a tela está mostrando, quando o jogo diz um lado.
+ *
+ * A regra que importa: o gatilho é o lado detectado MUDAR, não ele ser diferente do que
+ * está na tela. Se fosse a segunda coisa, toda vez que ele clicasse em "Defensor" pra
+ * olhar o outro lado, a espiada seguinte (6 s depois) desfaria o clique — a tela brigaria
+ * com ele a partida inteira. Com a primeira, entre uma virada e outra quem manda é ele, e
+ * na virada de verdade (metade, prorrogação) a tela acompanha.
+ *
+ * O aviso não sai na PRIMEIRA detecção da partida: ali a tela só está se ajeitando, não
+ * houve virada nenhuma pra contar.
+ */
+function lnDecidirLado({ doJogo, detectadoAntes, naTela, emPartida } = {}){
+  if (!emPartida) return { detectado: null, trocar: false, avisar: false };   // acabou: esquece
+  if (!doJogo || doJogo === detectadoAntes) return { detectado: detectadoAntes, trocar: false, avisar: false };
+  return { detectado: doJogo, trocar: doJogo !== naTela, avisar: detectadoAntes !== null && doJogo !== naTela };
+}
+
+/* Trocar o lado sozinho no meio da partida tem que ser VISÍVEL. Tela que muda sem dizer
+ * por quê parece defeito — ainda mais esta, que ele olha de canto de olho enquanto joga. */
+let lnAvisoLadoTimer = null;
+function lnAvisarLado(lado, rodada){
+  const el = $('#lnTrocouLado'); if (!el) return;
+  el.textContent = `virou pra ${LADO_NOME[lado] ?? lado}${rodada ? ` · rodada ${rodada}` : ''}`;
+  el.hidden = false;
+  clearTimeout(lnAvisoLadoTimer);
+  lnAvisoLadoTimer = setTimeout(() => { el.hidden = true; }, 6000);
 }
 
 const lnMapaDe = () => lnCatalogo?.mapas?.find(x => x.nome === lnMapaAtual) ?? null;
@@ -6539,6 +6600,17 @@ async function lnOlharOJogo(){
    * virava uma busca inteira no mapa errado. Se o nome não é um dos mapas de verdade, é erro
    * de tradução ou mapa novo — e nesses dois casos é melhor ficar no que ele escolheu. */
   if (j.mapa && lnCatalogo?.mapas?.length && !lnCatalogo.mapas.some(m => m.nome === j.mapa)) j.mapa = null;
+
+  // O lado vem do jogo e troca sozinho quando o jogo troca — ver `lnDecidirLado`.
+  const d = lnDecidirLado({ doJogo: j.lado, detectadoAntes: lnLadoDetectado, naTela: lnLadoAtual, emPartida: j.ligado && j.estado === 'jogando' });
+  lnLadoDetectado = d.detectado;
+  if (d.trocar) {
+    lnLadoAtual = j.lado;
+    lnDesenharLados(); lnLinks();
+    if (lnMapaAtual && lnAgenteAtual) lnProcurarLogo();
+    if (d.avisar) lnAvisarLado(j.lado, j.rodada);
+  }
+
   const marca = `${j.mapa ?? ''}|${j.agenteNome ?? ''}`;
   if (marca === '|' || marca === lnUltimoDetectado) return;     // nada novo
   lnUltimoDetectado = marca;
@@ -6771,6 +6843,22 @@ document.querySelectorAll('#modos button').forEach(b => b.onclick = () => trocar
  * tem o Valorant ligado vê Valorant AGORA e continua com LoL lembrado pra próxima vez que
  * não houver jogo nenhum aberto.
  */
+/**
+ * A janela da segunda tela pede `?partida=1`: é o mesmo painel, mas enxuto.
+ *
+ * Fica só o mapa com os pinos, e só as lineups que ele JÁ MEXEU — jogando, uma lineup que
+ * ele nunca olhou é ruído: não tem de onde se joga, não foi conferida, e ele não vai
+ * descobrir isso no meio de um round.
+ */
+function lnModoPartida(){
+  let ligado = false;
+  try { ligado = new URLSearchParams(location.search).get('partida') === '1'; } catch {}
+  if (!ligado) return false;
+  document.body.classList.add('modoPartida');
+  lnSoMinhas = 'mexi';
+  return true;
+}
+
 async function escolherModoDeEntrada(){
   /* Aba pedida na URL manda em tudo: é por #lineups que a janela da segunda tela nasce no
    * meio da partida, e ela não pode ser jogada de volta pro modo LoL por esta função
@@ -6823,6 +6911,7 @@ for(const el of ['#cartoes','#roles','#campeoes','#lista','#tipos','#elos','#mae
   try { logada = (await pegar('/api/estado')).conta; } catch {}
   await carregarContas(logada);
   $('#contaSel').onchange = (ev) => trocarConta(ev.target.value);
+  lnModoPartida();
   await escolherModoDeEntrada();
   carregarVisao(); carregarPartidas(); carregarPadroes(); carregarConfig(); tick();
 })();

@@ -3075,3 +3075,111 @@ test('olho: so culpa a janela depois que o olho esta enxergando ha um tempo', as
   assert.equal(devoAvisarCego({ ...base, calibDesde: undefined }), false);
   assert.equal(devoAvisarCego(), false);
 });
+
+/* ------------------------------------------- o lado da rodada, sozinho
+ *
+ * O `core-game` diz o time ("Blue"/"Red") e o placar da presenca diz a rodada. O que ele
+ * NAO diz, em campo nenhum, e quem ataca -- essa peca e regra do jogo e mora numa
+ * constante, que e a unica coisa ali que nao saiu de medicao.
+ *
+ * MEDIDO em partida dele: TeamID "Blue"/"Red", ModeID
+ * "/Game/GameModes/Bomb/BombGameMode.BombGameMode_C", placar ally 7 + enemy 4 = rodada 12.
+ */
+test('valorant: o lado sai do time + rodada, e so no modo com bomba', async () => {
+  const { ladoDaRodada, rodadaDoPlacar, temLado, BLUE_ATACA_NO_PRIMEIRO_TEMPO } =
+    await import('../src/valorant/jogo.js');
+
+  const BOMBA = '/Game/GameModes/Bomb/BombGameMode.BombGameMode_C';
+  const lado = (meuTime, rodada, modo = BOMBA) => ladoDaRodada({ meuTime, rodada, modo });
+
+  /* Primeiro tempo: Blue ataca (a constante), Red defende. Se a constante virar, estes
+   * dois viram junto -- o teste segue a regra em vez de cravar o texto. */
+  const noPrimeiro = BLUE_ATACA_NO_PRIMEIRO_TEMPO ? 'atacando' : 'defendendo';
+  const oOutro = noPrimeiro === 'atacando' ? 'defendendo' : 'atacando';
+  assert.equal(lado('Blue', 1), noPrimeiro);
+  assert.equal(lado('Red', 1), oOutro);
+  assert.equal(lado('Blue', 12), noPrimeiro, 'a rodada 12 ainda e primeiro tempo');
+
+  // troca na metade
+  assert.equal(lado('Blue', 13), oOutro, 'a 13 ja e segundo tempo');
+  assert.equal(lado('Red', 13), noPrimeiro);
+  assert.equal(lado('Blue', 24), oOutro);
+
+  /* Prorrogacao: trocam a cada rodada, e a 25 volta a ser como o primeiro tempo. */
+  assert.equal(lado('Blue', 25), noPrimeiro);
+  assert.equal(lado('Blue', 26), oOutro);
+  assert.equal(lado('Blue', 27), noPrimeiro);
+  assert.equal(lado('Red', 26), noPrimeiro);
+
+  // o caso REAL medido: ele em Red, rodada 12 (ally 7 + enemy 4 + 1), Corrode competitiva
+  assert.equal(lado('Red', 12), oOutro === 'atacando' ? 'atacando' : 'defendendo');
+
+  /* Modo sem lado nao inventa: Deathmatch e Escalada nao tem ataque nem defesa. O corte e
+   * pelo ModeID e nao por lista de filas -- fila nova aparece, modo novo e raro. */
+  assert.equal(temLado(BOMBA), true);
+  assert.equal(temLado('/Game/GameModes/Deathmatch/DeathmatchGameMode.DeathmatchGameMode_C'), false);
+  assert.equal(lado('Blue', 5, '/Game/GameModes/Deathmatch/DeathmatchGameMode_C'), null);
+  assert.equal(lado('Blue', 5, null), null);
+
+  // dado faltando nao vira chute
+  assert.equal(lado(null, 5), null);
+  assert.equal(lado('Blue', null), null);
+  assert.equal(lado('Blue', 0), null);
+  assert.equal(lado('Verde', 5), null);
+  assert.equal(ladoDaRodada(), null);
+
+  /* A rodada sai do placar. Fora de partida os dois sao 0 -- isso NAO e rodada 1, senao o
+   * app juraria que ele esta no primeiro round do nada. */
+  assert.equal(rodadaDoPlacar({ partyOwnerMatchScoreAllyTeam: 7, partyOwnerMatchScoreEnemyTeam: 4 }), 12);
+  assert.equal(rodadaDoPlacar({ partyOwnerMatchScoreAllyTeam: 0, partyOwnerMatchScoreEnemyTeam: 0 }), null);
+  assert.equal(rodadaDoPlacar({ partyOwnerMatchScoreAllyTeam: 1, partyOwnerMatchScoreEnemyTeam: 0 }), 2);
+  assert.equal(rodadaDoPlacar({}), null);
+  assert.equal(rodadaDoPlacar(null), null);
+});
+
+/* ------------------------------------------- a tela acompanhando o lado do jogo
+ *
+ * O gatilho e o lado detectado MUDAR, nao ele ser diferente do que esta na tela. Com a
+ * segunda regra, todo clique dele em "Defensor" seria desfeito pela espiada seguinte, 6 s
+ * depois -- a tela brigaria com ele a partida inteira.
+ */
+test('painel: o lado acompanha o jogo sem atropelar o clique dele', async () => {
+  const { funcoesDaTela } = await import('./pegar-funcao.mjs');
+  const t = await funcoesDaTela('painel.html', ['lnDecidirLado'], '');
+
+  const emP = { emPartida: true };
+
+  // 1) primeira deteccao da partida: ajeita a tela, mas nao anuncia virada nenhuma
+  let r = t.lnDecidirLado({ ...emP, doJogo: 'defendendo', detectadoAntes: null, naTela: 'atacando' });
+  assert.deepEqual(r, { detectado: 'defendendo', trocar: true, avisar: false });
+
+  // 2) mesma coisa de novo (as espiadas de 6 s): nao mexe em nada
+  r = t.lnDecidirLado({ ...emP, doJogo: 'defendendo', detectadoAntes: 'defendendo', naTela: 'defendendo' });
+  assert.deepEqual(r, { detectado: 'defendendo', trocar: false, avisar: false });
+
+  /* 3) ELE clica em "Atacante" pra olhar o outro lado. A espiada seguinte ve o mesmo
+   *    'defendendo' de antes -- e NAO pode desfazer o clique. E o caso que define a regra. */
+  r = t.lnDecidirLado({ ...emP, doJogo: 'defendendo', detectadoAntes: 'defendendo', naTela: 'atacando' });
+  assert.equal(r.trocar, false, 'a tela nao pode desfazer o clique dele');
+
+  // 4) virou a metade: agora sim troca, e avisa
+  r = t.lnDecidirLado({ ...emP, doJogo: 'atacando', detectadoAntes: 'defendendo', naTela: 'defendendo' });
+  assert.deepEqual(r, { detectado: 'atacando', trocar: true, avisar: true });
+
+  /* 5) virou a metade E ele ja estava olhando esse lado: atualiza o detectado, mas nao ha
+   *    o que trocar nem o que avisar -- aviso de uma tela que nao mudou e ruido. */
+  r = t.lnDecidirLado({ ...emP, doJogo: 'atacando', detectadoAntes: 'defendendo', naTela: 'atacando' });
+  assert.deepEqual(r, { detectado: 'atacando', trocar: false, avisar: false });
+
+  // 6) sem lado (modo sem ataque/defesa, ou placar ainda zerado): nao mexe
+  r = t.lnDecidirLado({ ...emP, doJogo: null, detectadoAntes: 'atacando', naTela: 'defendendo' });
+  assert.deepEqual(r, { detectado: 'atacando', trocar: false, avisar: false });
+
+  // 7) acabou a partida: esquece o detectado, senao a proxima partida comecaria "ja virada"
+  r = t.lnDecidirLado({ emPartida: false, doJogo: 'atacando', detectadoAntes: 'atacando', naTela: 'atacando' });
+  assert.deepEqual(r, { detectado: null, trocar: false, avisar: false });
+
+  // e a partida seguinte volta a avisar so na virada, nao na primeira deteccao
+  r = t.lnDecidirLado({ ...emP, doJogo: 'atacando', detectadoAntes: null, naTela: 'defendendo' });
+  assert.equal(r.avisar, false, 'partida nova nao anuncia virada');
+});

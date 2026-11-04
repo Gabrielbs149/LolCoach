@@ -350,7 +350,8 @@ function abrirLineups() {
     autoHideMenuBar: true, show: false,
     webPreferences: { nodeIntegration: false, contextIsolation: true, backgroundThrottling: false },
   });
-  janelaLineups.loadURL(endereco ? `${endereco}/#lineups` : PAGINA_DE_ERRO('o painel local não subiu.'));
+  // `partida=1`: o mesmo painel, mas enxuto — só o mapa e as lineups que ele já mexeu.
+  janelaLineups.loadURL(endereco ? `${endereco}/?partida=1#lineups` : PAGINA_DE_ERRO('o painel local não subiu.'));
   janelaLineups.once('ready-to-show', () => {
     if (janelaLineups?.isDestroyed()) return;
     posicionarNaTela(janelaLineups, tela);

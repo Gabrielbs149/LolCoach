@@ -229,7 +229,56 @@ export function lerPresenca(blob, mapas = null) {
     emFila: emFilaAgora(blob),
     mapa: estado === 'menu' ? null : mapaPeloCaminho(ondeEstaOMapa, mapas),
     fila: md.queueId ?? blob?.queueId ?? null,
+    rodada: rodadaDoPlacar(blob),
   };
+}
+
+/* ------------------------------------------------------------------ lado da rodada */
+
+/**
+ * Em que rodada a partida está, pelo placar que a presença publica.
+ *
+ * MEDIDO com ele em partida: a presença traz `partyOwnerMatchScoreAllyTeam` e
+ * `...EnemyTeam` (7 e 4 numa Corrode). Rodadas vencidas somadas + 1 é a que está
+ * acontecendo. Fora de partida os dois são 0, e aí não há rodada nenhuma — devolve null em
+ * vez de "rodada 1", que faria o app jurar que ele está no primeiro round do nada.
+ */
+export function rodadaDoPlacar(blob) {
+  const a = Number(blob?.partyOwnerMatchScoreAllyTeam);
+  const b = Number(blob?.partyOwnerMatchScoreEnemyTeam);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || a < 0 || b < 0) return null;
+  if (a === 0 && b === 0) return null;     // ou não começou, ou a presença ainda não falou
+  return a + b + 1;
+}
+
+/** Só o modo com bomba tem ataque e defesa. Deathmatch, Escalada e afins não têm lado. */
+export const temLado = (modo) => /BombGameMode/i.test(String(modo ?? ''));
+
+/**
+ * O lado em que ele está jogando NESTA rodada.
+ *
+ * O `core-game` diz o time ("Blue"/"Red") e o placar diz a rodada; o que ele NÃO diz, em
+ * campo nenhum, é quem ataca. Essa última peça é a regra do jogo: no modo com bomba, o
+ * time Blue ataca o primeiro tempo e troca na metade. Está isolada aqui numa constante
+ * justamente por ser a única coisa deste arquivo que não saiu de medição.
+ *
+ * Prorrogação: os times trocam de lado a cada rodada, e a 25 volta a ser como o primeiro
+ * tempo. Fora do modo com bomba não existe lado — devolve null em vez de chutar.
+ */
+export const BLUE_ATACA_NO_PRIMEIRO_TEMPO = true;
+
+export function ladoDaRodada({ meuTime, rodada, modo } = {}) {
+  if (!temLado(modo)) return null;
+  const time = String(meuTime ?? '').toLowerCase();
+  if (time !== 'blue' && time !== 'red') return null;
+  const r = Number(rodada);
+  if (!Number.isInteger(r) || r < 1) return null;
+
+  // 1ª metade = 0, 2ª = 1; na prorrogação alterna a cada rodada, começando como a 1ª.
+  const metade = r <= 12 ? 0 : r <= 24 ? 1 : (r - 25) % 2;
+  const blueAtaca = metade === 0 ? BLUE_ATACA_NO_PRIMEIRO_TEMPO : !BLUE_ATACA_NO_PRIMEIRO_TEMPO;
+  const euAtaco = (time === 'blue') === blueAtaca;
+  return euAtaco ? 'atacando' : 'defendendo';
 }
 
 /* ---------------------------------------------------- qual presença é a dele
@@ -304,8 +353,15 @@ async function agenteEscolhido(lock, estado, meuPuuid = null) {
 
   const partida = await buscar(`${glz}/${ordem[0]}/v1/matches/${idPartida}`)
     ?? await buscar(`${glz}/${ordem[1]}/v1/matches/${idPartida}`);
+  /* O time e o modo saem DESTA MESMA resposta, sem um pedido a mais: o `core-game` já vinha
+     inteiro e só o CharacterID era aproveitado.
+
+     O `Subject` é a única forma de achar o jogador certo. MEDIDO numa partida dele: o
+     agente que ele estava jogando (Fade) aparecia nos DOIS times — procurar pelo
+     CharacterID daria o time errado em qualquer partida de agente popular. */
   const meu = (partida?.AllyTeam?.Players ?? partida?.Players ?? []).find((j) => j.Subject === sessao.puuid);
-  return meu?.CharacterID || null;
+  if (!meu) return null;
+  return { agente: meu.CharacterID || null, time: meu.TeamID ?? null, modo: partida?.ModeID ?? null };
 }
 
 /* ------------------------------------------------------------------ tudo junto */
@@ -330,9 +386,14 @@ export async function situacaoDoValorant({ mapas = null } = {}) {
   try { blob = JSON.parse(Buffer.from(minha.private, 'base64').toString('utf8')); } catch { /* formato novo */ }
   if (!blob) return { ligado: true, estado: null, emFila: false, mapa: null, agenteId: null };
 
-  const { estado, emFila, mapa, fila } = lerPresenca(blob, mapas);
-  const agenteId = await agenteDaVez(lock, estado, mapa, sessao?.puuid ?? null);
-  return { ligado: true, estado, emFila, mapa, agenteId, fila };
+  const { estado, emFila, mapa, fila, rodada } = lerPresenca(blob, mapas);
+  const daPartida = await agenteDaVez(lock, estado, mapa, sessao?.puuid ?? null);
+  const lado = ladoDaRodada({ meuTime: daPartida?.time, rodada, modo: daPartida?.modo });
+  return {
+    ligado: true, estado, emFila, mapa, fila,
+    agenteId: daPartida?.agente ?? null,
+    meuTime: daPartida?.time ?? null, rodada, lado,
+  };
 }
 
 /* O AGENTE NÃO MUDA NO MEIO DA PARTIDA — e era perguntado de 6 em 6 segundos mesmo assim.
@@ -345,12 +406,12 @@ export async function situacaoDoValorant({ mapas = null } = {}) {
  * Na SELEÇÃO continua perguntando toda vez, porque ali o valor muda de verdade — é dele
  * que sai a busca de lineups. Sair de 'jogando' joga fora o que estava guardado, então
  * duas partidas seguidas no mesmo mapa não se confundem. */
-let agenteDaPartida = { mapa: null, agente: null };
+let agenteDaPartida = { mapa: null, dados: null };
 async function agenteDaVez(lock, estado, mapa, puuid) {
-  if (estado !== 'jogando') agenteDaPartida = { mapa: null, agente: null };
-  else if (agenteDaPartida.agente && agenteDaPartida.mapa === mapa) return agenteDaPartida.agente;
+  if (estado !== 'jogando') agenteDaPartida = { mapa: null, dados: null };
+  else if (agenteDaPartida.dados?.agente && agenteDaPartida.mapa === mapa) return agenteDaPartida.dados;
 
-  const agente = await agenteEscolhido(lock, estado, puuid).catch(() => null);
-  if (estado === 'jogando' && agente) agenteDaPartida = { mapa, agente };
-  return agente;
+  const dados = await agenteEscolhido(lock, estado, puuid).catch(() => null);
+  if (estado === 'jogando' && dados?.agente) agenteDaPartida = { mapa, dados };
+  return dados;
 }
