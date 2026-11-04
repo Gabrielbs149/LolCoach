@@ -2995,3 +2995,43 @@ test('painel: as fichas de secao do patch do Valorant ganham ancora', async () =
   await t.carregarValPatch();
   assert.match(t.els['#vpatchLista'].innerHTML, /HTTP 503/);
 });
+
+/* ------------------------------------------- o olho parou de culpar a tela cheia a toa
+ *
+ * MEDIDO no registro dele, 18 dias: o aviso "nao achei o minimapa (jogo em tela cheia
+ * exclusiva? overlay por cima?)" saiu 14 vezes, TODAS entre 12,8 s e 28,4 s do inicio da
+ * captura -- nenhuma depois. E em 13 das 14 o olho achou o minimapa logo em seguida.
+ *
+ * Ou seja: a mensagem so aparecia na janela em que ela nao quer dizer nada, e culpava a
+ * configuracao dele. Agora espera a partida ter tempo de desenhar o minimapa.
+ */
+test('olho: so desconfia da tela cheia depois que a partida desenhou o minimapa', async () => {
+  const { devoAvisarSemMinimapa, ESPERA_MINIMAPA } = await import('../src/vivo/olho.js');
+
+  /* O teto sai da pior recuperacao medida (94 s do inicio da captura ate achar). Menos que
+   * isso traria de volta os falsos alarmes. */
+  assert.ok(ESPERA_MINIMAPA >= 94, `espera de ${ESPERA_MINIMAPA}s e menor que a pior recuperacao medida (94s)`);
+
+  // os 14 alarmes reais: todos entre 12,8 e 28,4 s. Nenhum pode mais sair.
+  for (const t of [12.8, 13.2, 16.1, 19.1, 28.4]) {
+    assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: t, avisadoEm: 0 }), false,
+      `aos ${t}s ainda nao da pra culpar a tela cheia`);
+  }
+
+  // passado o tempo, o aviso serve e sai
+  assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: 200, avisadoEm: 0 }), true);
+
+  // achou o minimapa: nunca avisa, por mais tarde que seja
+  assert.equal(devoAvisarSemMinimapa({ achou: true, tempoDeJogo: 900, avisadoEm: 0 }), false);
+
+  /* Sem tempo de jogo (fora de partida, ou o estado ainda nao chegou) nao avisa. Antes
+   * isso nem era olhado -- e e justamente o comeco, quando o minimapa nao esta la. */
+  assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: null, avisadoEm: 0 }), false);
+  assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: undefined, avisadoEm: 0 }), false);
+  assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: 0, avisadoEm: 0 }), false);
+
+  // a cadencia de 30 s continua: o aviso nao vira enchente no registro
+  const agora = 1_000_000;
+  assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: 200, avisadoEm: agora - 5000, agora }), false);
+  assert.equal(devoAvisarSemMinimapa({ achou: false, tempoDeJogo: 200, avisadoEm: agora - 31000, agora }), true);
+});

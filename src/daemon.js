@@ -1436,7 +1436,15 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       }
     } catch { /* sem lugar */ }
     if (dados.calib && (!antes?.calib || antes.calib.s !== dados.calib.s)) log(`olho: minimapa ${dados.calib.s}px (score ${dados.calib.score})${dados.escala ? `, ícone ${dados.escala.d}px` : ''}`);
-    if (!dados.calib && antes?.calib !== null && Date.now() - partidaVivo.olhoLog > 30000) { partidaVivo.olhoLog = Date.now(); log('olho: não achei o minimapa (jogo em tela cheia exclusiva? overlay por cima?)'); }
+    /* O aviso de tela cheia só vale depois que a partida teve tempo de desenhar o minimapa
+       — ver `devoAvisarSemMinimapa`, que tem a medição do registro dele por trás. */
+    if (antes?.calib !== null) {
+      const { devoAvisarSemMinimapa } = await import('./vivo/olho.js');
+      if (devoAvisarSemMinimapa({ achou: !!dados.calib, tempoDeJogo: partidaVivo.ultimoEstado?.tempo, avisadoEm: partidaVivo.olhoLog })) {
+        partidaVivo.olhoLog = Date.now();
+        log('olho: não achei o minimapa (jogo em tela cheia exclusiva? overlay por cima?)');
+      }
+    }
     // Cego (nada reconhecido há 15 s+ com o minimapa achado, depois de 1:00 de jogo): avisa uma vez por episódio
     const eAgora = partidaVivo.ultimoEstado;
     const cegoAgora = !!dados.calib && (dados.cego ?? 0) >= 15 && (eAgora?.tempo ?? 0) > 60;

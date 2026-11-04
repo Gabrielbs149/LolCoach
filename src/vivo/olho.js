@@ -118,6 +118,29 @@ export function lugar(x, y, meuTime = 100) {
 
 export const novaMemoriaOlho = () => ({ porCampeao: new Map(), grupoEm: 0, seq: 0 });
 
+/**
+ * Vale avisar que o minimapa não foi achado — ou a partida só não desenhou ele ainda?
+ *
+ * O aviso existe pra um problema real: jogo em tela cheia exclusiva, ou janela por cima,
+ * e aí o olho fica cego a partida inteira. Só que ele não tinha guarda de tempo nenhuma, e
+ * no começo da partida o minimapa demora pra aparecer.
+ *
+ * **Medido no registro dele (18 dias): o aviso saiu 14 vezes, TODAS entre 12,8 s e 28,4 s
+ * do início da captura — nenhuma depois.** E em 13 dessas 14 o olho achou o minimapa logo
+ * em seguida (mediana 37 s). Ou seja: do jeito que estava, a mensagem só aparecia na
+ * janela em que ela não quer dizer nada, e culpava a configuração dele por isso.
+ *
+ * O teto é 120 s porque a pior recuperação medida levou 94 s do início da captura até
+ * achar. Passou disso, é problema de verdade e o aviso serve.
+ */
+export const ESPERA_MINIMAPA = 120;   // segundos de jogo antes de desconfiar da tela cheia
+
+export function devoAvisarSemMinimapa({ achou, tempoDeJogo, avisadoEm = 0, agora = Date.now(), cadencia = 30000 } = {}) {
+  if (achou) return false;
+  if (!(Number(tempoDeJogo) >= ESPERA_MINIMAPA)) return false;   // sem tempo (null/0), não avisa
+  return agora - (avisadoEm || 0) > cadencia;
+}
+
 const LANE_DE = { top: 'top', mid: 'mid', adc: 'bot', sup: 'bot', jungle: 'jungle' };
 
 /**
