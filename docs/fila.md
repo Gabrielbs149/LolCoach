@@ -102,8 +102,19 @@ Sem adivinhação em nenhum passo.
 agente DELE, que ele já vê. Perguntar antes de construir.
 
 ### 4. Varrer o registro do app atrás de mais padrão
-Três varreduras feitas (2.28.271, .272, .273). As duas primeiras tiraram 85% do registro,
-que eram duas mensagens de uma release quebrada. A terceira foi **medida e descartada**:
+**Quarta varredura feita (03/11, 6.460 linhas em 18 dias).** Achou uma coisa e descartou
+outra, as duas medidas:
+- **FEITO:** o aviso "não achei o minimapa (jogo em tela cheia exclusiva?)" saía 14 vezes,
+  todas entre 12,8 s e 28,4 s do início da captura, e em 13 delas o olho achava o minimapa
+  logo depois. Virou guarda de 120 s (`devoAvisarSemMinimapa` em `src/vivo/olho.js`).
+- **NEGATIVO:** os 42,8% de registro ocupados por "procurando atualização…" + o erro de
+  `latest.yml` são de UM dia (17/10, 25 erros por minuto), que as varreduras .271/.272 já
+  resolveram. Em novembro são 1x isolado por publicação — propagação do CDN, não defeito.
+- **NEGATIVO:** afrouxar o limiar do minimapa não converteria falha nenhuma. Quem acha
+  pontua 0,52–0,65 (37 medições) e quem falha chega no máximo a 0,29. Não são quase-acertos.
+
+Três varreduras anteriores (2.28.271, .272, .273). As duas primeiras tiraram 85% do
+registro, que eram duas mensagens de uma release quebrada. A terceira foi **medida e descartada**:
 dar chave por formato ao guarda (números viram N) daria 0,1% a mais, e as ~917 linhas do
 olho são ~50 por dia — diagnóstico, não enchente. Vale repetir de tempos em tempos: é o
 único lugar com dado do uso REAL dele.
