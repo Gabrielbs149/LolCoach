@@ -72,7 +72,15 @@ ele marca, e é este que o cartão "onde marcar rende" (2.28.303) manda ele empu
 Dentro do que ele usa, o alvo exato é bem melhor que a média (63,4% contra 49,6%) e a saída
 é pior (26,8% contra 32,3%) — o gargalo dele é "de onde se joga", não "onde cai".
 
-### 2. Mostrar as lineups do LADO em que ele está jogando
+### 2. ~~Mostrar as lineups do LADO em que ele está jogando~~ — FEITO na 2.28.306
+**Falta UMA conferida, e so ela:** a constante `BLUE_ATACA_NO_PRIMEIRO_TEMPO` em
+`src/valorant/jogo.js` e a unica peca que nao saiu de medicao -- o `core-game` nao diz em
+campo nenhum quem ataca. Gabarito: com o cliente do Valorant aberto, pegar o detalhe da
+ultima partida e ver `roundResults[0].bombPlanter`; o time desse puuid atacava no round 1.
+Se bater com a constante, fechar o item; se nao, inverter o booleano (um caractere).
+Enquanto isso o lado aparece e ele pode trocar na mao -- erro aqui e visivel e reversivel.
+
+### 2z. (historico) Mostrar as lineups do LADO em que ele está jogando
 Hoje ele troca Atacante/Defensor na mão. Durante a partida isso é metade do que ele vê
 sem serventia.
 **Medido no cliente ao vivo, em partida:** a presença NÃO tem o lado. Tem o placar
