@@ -3217,3 +3217,38 @@ test('painel: nada de filtro no painel que contem o botao de voltar', async () =
   assert.match(regra[1], /left\s*:\s*\d+px/, 'o voltar tem que ser preso pela ESQUERDA');
   assert.doesNotMatch(regra[1], /right\s*:/, 'prender pela direita desfaz o pedido dele');
 });
+
+/* ------------------------------------------- a 2a tela nao pode ficar em branco jogando
+ *
+ * Ela mostra so as lineups que ele JA MEXEU. MEDIDO: dos 13 mapas, 5 nao tem marca nenhuma
+ * dele (Breeze, Fracture, Icebox, Pearl, Split) e a Corrode tem uma. Cair num desses
+ * deixaria a tela vazia justamente quando ele nao pode parar pra mexer -- e a mensagem
+ * padrao manda "clicar no filtro la em cima", que naquela tela nem existe.
+ *
+ * Entao o filtro se solta sozinho. E a ORDEM importa: `lnDesenharMapa` pinta o que esta em
+ * `lnAchadas`, e quem monta `lnAchadas` e o `lnFiltrarEDedupar`. Soltar o filtro sem
+ * refiltrar deixava o mapa vazio do mesmo jeito -- conferido no navegador: o Split ficava
+ * em 0 pinos dizendo "vieram sem ponto no mapa", mentira, ele tem 162 lineups e 150 com
+ * ponto. Com o refiltro: 11 pinos.
+ */
+test('painel: soltar o filtro na 2a tela refiltra antes de redesenhar', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { resolve, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const aqui = dirname(fileURLToPath(import.meta.url));
+  const fonte = await readFile(resolve(aqui, '..', 'src', 'ui', 'painel.html'), 'utf8');
+
+  const i = fonte.indexOf("if (lnSoMinhas && document.body.classList.contains('modoPartida'))");
+  assert.ok(i > 0, 'nao achei o trecho que solta o filtro na segunda tela');
+  const bloco = fonte.slice(i, fonte.indexOf('}', fonte.indexOf('lnDesenharMapa();', i)));
+
+  const refiltro = bloco.indexOf('lnFiltrarEDedupar();');
+  const desenho = bloco.indexOf('lnDesenharMapa();');
+  assert.ok(refiltro > 0, 'soltar o filtro sem refiltrar deixa o mapa vazio do mesmo jeito');
+  assert.ok(refiltro < desenho, 'o refiltro tem que vir ANTES do desenho');
+  assert.match(bloco, /lnMostrarTudoNoJogo = true/, 'precisa marcar que soltou, pra voltar no mapa seguinte');
+
+  // e a volta: mapa novo restaura o filtro, senao a concessao de um mapa vira permanente
+  const volta = /modoPartida'\) && lnMostrarTudoNoJogo\) \{\s*lnSoMinhas = 'mexi'; lnMostrarTudoNoJogo = false;/;
+  assert.match(fonte, volta, 'mapa novo tem que voltar pro filtro "mexi"');
+});

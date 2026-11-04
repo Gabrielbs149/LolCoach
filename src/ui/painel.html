@@ -4587,6 +4587,7 @@ let lnMudasFora = 0, lnEsconderMudas = false;
  * essa e funcionou", o filtro nasceria vazio e não serviria pra nada. Confirmar é outro
  * eixo — é ter TESTADO no jogo, não ter completado o dado — e por isso tem botão próprio. */
 let lnSoMinhas = '';          // '' | 'mexi' | 'prontas' | 'falta' | 'fiz'
+let lnMostrarTudoNoJogo = false;   // na 2ª tela, soltou o filtro porque este mapa não tem marca
 let lnContaMinhas = { todas: 0, mexi: 0, prontas: 0, falta: 0, fiz: 0, escondidas: 0 };
 /* As que ele jogou fora somem da tela, mas não do disco — e a coluna "escondidas" traz de
  * volta. Excluir rápido só é seguro se desfazer também for rápido. */
@@ -4667,9 +4668,22 @@ function lnDecidirLado({ doJogo, detectadoAntes, naTela, emPartida } = {}){
   return { detectado: doJogo, trocar: doJogo !== naTela, avisar: detectadoAntes !== null && doJogo !== naTela };
 }
 
+/* A tarja que avisa o que o app decidiu sozinho — o lado que virou, o filtro que soltou.
+ * As duas usam o mesmo lugar e o mesmo relógio: duas tarjas empilhadas seriam pior que uma. */
+let lnAvisoLadoTimer = null;
+
+/* Soltar o filtro é uma decisão do app, e ele precisa ver que foi isso — senão parece que
+ * a tela ignorou o que ele pediu. Usa a mesma tarja do aviso de lado, que ele já conhece. */
+function lnAvisarSoltouFiltro(){
+  const el = $('#lnTrocouLado'); if (!el) return;
+  el.textContent = 'você ainda não marcou nada neste mapa — mostrando todas';
+  el.hidden = false;
+  clearTimeout(lnAvisoLadoTimer);
+  lnAvisoLadoTimer = setTimeout(() => { el.hidden = true; }, 8000);
+}
+
 /* Trocar o lado sozinho no meio da partida tem que ser VISÍVEL. Tela que muda sem dizer
  * por quê parece defeito — ainda mais esta, que ele olha de canto de olho enquanto joga. */
-let lnAvisoLadoTimer = null;
 function lnAvisarLado(lado, rodada){
   const el = $('#lnTrocouLado'); if (!el) return;
   el.textContent = `virou pra ${LADO_NOME[lado] ?? lado}${rodada ? ` · rodada ${rodada}` : ''}`;
@@ -4933,6 +4947,13 @@ function lnProcurarLogo(){
 async function lnProcurar(forcar){
   const e = lnEscolha();
   if (!e.mapa || !e.agente) { $('#lnAviso').innerHTML = `<div class="vazio">escolha o mapa e o agente</div>`; return; }
+  /* Mapa novo, filtro de volta ao normal. Na segunda tela o padrão é "só as que ele mexeu",
+     e soltar esse filtro é uma concessão de UM mapa — num mapa onde ele marcou, voltar a
+     mostrar tudo seria desfazer o que ele pediu. Se o mapa novo também estiver vazio, o
+     desenho solta de novo. */
+  if (document.body.classList.contains('modoPartida') && lnMostrarTudoNoJogo) {
+    lnSoMinhas = 'mexi'; lnMostrarTudoNoJogo = false;
+  }
   const meu = ++lnPedido;
   lnFecharClipe();
   const lento = setTimeout(() => { if (meu === lnPedido) $('#lnMapaCx').innerHTML = carregando('procurando as lineups…'); }, 400);
@@ -5252,6 +5273,26 @@ function lnDesenharMapa(){
     return;
   }
   if (!pinos.length) {
+    /* Na segunda tela o filtro é fixo em "mexi" e os botões não estão lá — então mandar
+     * ele "clicar no filtro lá em cima" seria apontar pra um controle que não existe, no
+     * meio de uma partida.
+     *
+     * MEDIDO: dos 13 mapas, 5 não têm marca nenhuma dele (Breeze, Fracture, Icebox, Pearl,
+     * Split) e a Corrode tem uma. Cair num desses deixaria a tela VAZIA justamente quando
+     * ele não pode parar pra mexer. Jogando, alguma lineup é melhor que nenhuma: solta o
+     * filtro sozinho e diz por quê. */
+    if (lnSoMinhas && document.body.classList.contains('modoPartida')) {
+      lnSoMinhas = '';
+      lnMostrarTudoNoJogo = true;
+      /* Refiltrar ANTES de redesenhar: o `lnDesenharMapa` pinta o que está em `lnAchadas`,
+         e quem monta `lnAchadas` é o `lnFiltrarEDedupar`. Sem esta linha o filtro cai mas a
+         lista continua a filtrada de antes — o mapa seguia vazio e ainda dizia "vieram sem
+         ponto no mapa", que é falso: o Split tem 162 lineups, 150 com ponto. */
+      lnFiltrarEDedupar();
+      lnAvisarSoltouFiltro();
+      lnDesenharMapa();
+      return;
+    }
     // quem esvaziou o mapa foi o filtro? então diga isso, e não "vieram sem ponto"
     $('#lnMapaCx').innerHTML = lnSoMinhas
       ? `<div class="vazio">nenhuma lineup deste mapa está em "${esc(LN_FILTROS[lnSoMinhas].nome)}" —
