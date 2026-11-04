@@ -1367,8 +1367,13 @@ body.lnTelaCheia .lnVideoCx #lnYT,body.lnTelaCheia .lnVideoCx iframe{
 /* o lado vira um painel por cima, no canto */
 body.lnTelaCheia .lnLadoDetalhe{position:fixed;right:14px;top:14px;width:var(--lnLado,250px);z-index:71;
   background:#0b1016e8;border:1px solid var(--borda);border-radius:var(--r-m);padding:11px;
-  flex-direction:column;align-items:stretch;gap:8px;max-height:calc(100vh - 28px);overflow:auto;
-  backdrop-filter:blur(4px)}
+  flex-direction:column;align-items:stretch;gap:8px;max-height:calc(100vh - 28px);overflow:auto}
+/* SEM `backdrop-filter` aqui, e isso não é gosto: um elemento com filtro vira o bloco de
+   contenção de todo `position:fixed` que estiver DENTRO dele. O botão de voltar é filho
+   deste painel e mora aqui; com o blur, o `left:14px` dele passava a contar da borda do
+   painel — que fica à DIREITA da tela. Medido numa janela de 1920: o voltar aparecia em
+   x=1673, do lado oposto ao pedido. O fundo já é #0b1016e8, quase opaco: o blur mudava
+   pouco e quebrava a posição. */
 body.lnTelaCheia .lnLadoDetalhe .lnMini{width:100%;flex:none}
 body.lnTelaCheia .lnTocandoNome{font-size:14px}
 /* o voltar sai do painel e vai pro canto de CIMA À ESQUERDA da tela. Dentro da HUD ele
@@ -1376,7 +1381,7 @@ body.lnTelaCheia .lnTocandoNome{font-size:14px}
    e ficava no canto mais longe de onde a mao esta. Fora dela, fica sozinho num canto vazio
    do video e nao empurra mais nada. z-index acima da HUD pra nunca ficar por baixo. */
 body.lnTelaCheia .lnVoltar{position:fixed;left:14px;top:14px;z-index:72;
-  padding:6px 12px;font-size:12px;background:#0b1016e8;backdrop-filter:blur(4px)}
+  padding:6px 12px;font-size:12px;background:#0b1016f2}
 /* com o clipe aberto, o mapa grande fica ESCONDIDO de verdade (display:none). Ele continua
    montado, mas para de ser desenhado — e com ele param as 12 bolinhas animadas das rotas.
    Durante a partida essa GPU faz falta: é ela que o player usa pra decodificar o vídeo. */

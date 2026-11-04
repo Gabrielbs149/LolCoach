@@ -3183,3 +3183,37 @@ test('painel: o lado acompanha o jogo sem atropelar o clique dele', async () => 
   r = t.lnDecidirLado({ ...emP, doJogo: 'atacando', detectadoAntes: null, naTela: 'defendendo' });
   assert.equal(r.avisar, false, 'partida nova nao anuncia virada');
 });
+
+/* ------------------------------------------- o voltar tem que ficar na ESQUERDA
+ *
+ * Ele pediu isso duas vezes e nas duas o botao continuou na direita. A regra sempre esteve
+ * certa (`left:14px`), e nao era ela: o painel lateral que CONTEM o botao tinha
+ * `backdrop-filter: blur(4px)`, e um elemento com filtro vira o bloco de contencao de todo
+ * `position: fixed` dentro dele. Com isso o `left:14px` passou a contar da borda do painel
+ * -- que fica a direita. MEDIDO numa janela de 1920: o botao aparecia em x=1673.
+ *
+ * Este teste nao olha a aparencia, olha a causa: nenhuma regra que pegue o painel em tela
+ * cheia pode voltar a ter filtro, senao o botao sai do lugar de novo e sem aviso.
+ */
+test('painel: nada de filtro no painel que contem o botao de voltar', async () => {
+  const { readFile } = await import('node:fs/promises');
+  const { resolve, dirname } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const aqui = dirname(fileURLToPath(import.meta.url));
+  const fonte = await readFile(resolve(aqui, '..', 'src', 'ui', 'painel.html'), 'utf8');
+
+  // o botao continua morando dentro do painel lateral? se sair de la, este teste perde o sentido
+  assert.match(fonte, /class="acao lnVoltar"/, 'o botao de voltar sumiu ou mudou de classe');
+
+  const bloco = /body\.lnTelaCheia \.lnLadoDetalhe\s*\{([^}]*)\}/.exec(fonte);
+  assert.ok(bloco, 'nao achei a regra do painel lateral em tela cheia');
+  assert.doesNotMatch(bloco[1], /backdrop-filter|filter\s*:|transform\s*:|perspective\s*:/,
+    `filtro ou transform no painel joga o voltar pra direita: ${bloco[1].trim()}`);
+
+  // e a regra do proprio botao continua mandando ele pra esquerda
+  const regra = /body\.lnTelaCheia \.lnVoltar\s*\{([^}]*)\}/.exec(fonte);
+  assert.ok(regra, 'nao achei a regra do botao de voltar');
+  assert.match(regra[1], /position\s*:\s*fixed/);
+  assert.match(regra[1], /left\s*:\s*\d+px/, 'o voltar tem que ser preso pela ESQUERDA');
+  assert.doesNotMatch(regra[1], /right\s*:/, 'prender pela direita desfaz o pedido dele');
+});
