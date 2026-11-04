@@ -57,6 +57,21 @@ saber o lugar de verdade naquele mapa. Próximo passo possível: medir se a arte
 dá pra conferir (o callout mais perto do ponto que o nome sugere), ou aceitar que daqui
 pra frente quem fecha a conta é ele marcando no mapa — que já funciona desde a 2.28.262.
 
+**MEDIDO EM 04/11, E ISTO MUDA O QUE ACOMPANHAR AQUI.** A marcação dele foi de 149 pra 176
+e o número do acervo **não se mexeu um dígito**: 32,3% de saída, 49,6% de alvo, 47,1% de
+lado — idênticos aos de 02/11. Não é estagnação: é que este número mede o que o PARSER
+deixou no disco, e a marcação dele entra na LEITURA (`comMeusPontos`), não no arquivo.
+Com as marcas por cima são 33,9% (+72 de saída, +20 de alvo). Ou seja: **por mais que ele
+marque, o 32,3% nunca sobe.** Acompanhar esse número como se fosse progresso dele é
+perseguir algo que não pode andar.
+
+O número honesto é o do pedaço que ele USA — Fade nos 8 mapas que ele de fato jogou:
+**1.250 lineups, 335 (26,8%) dizem de onde se joga, 793 (63,4%) têm alvo exato, e 281
+(22,5%) estão COMPLETAS** (as duas pontas, fora as 25 jogadas fora). É este que sobe quando
+ele marca, e é este que o cartão "onde marcar rende" (2.28.303) manda ele empurrar.
+Dentro do que ele usa, o alvo exato é bem melhor que a média (63,4% contra 49,6%) e a saída
+é pior (26,8% contra 32,3%) — o gargalo dele é "de onde se joga", não "onde cai".
+
 ### 2. Mostrar as lineups do LADO em que ele está jogando
 Hoje ele troca Atacante/Defensor na mão. Durante a partida isso é metade do que ele vê
 sem serventia.
