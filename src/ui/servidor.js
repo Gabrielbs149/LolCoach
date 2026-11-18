@@ -920,6 +920,14 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         }
       }
 
+      // O radar de um mapa de CS, extraido do jogo dele. Imagem local, sem rede.
+      const csm = url.pathname.match(/^\/cs\/mapa\/([a-z0-9_]+)\.png$/);
+      if (csm && acoes.csArteDoMapa) {
+        const png = await acoes.csArteDoMapa(csm[1]);
+        if (png) return enviar(200, 'image/png', png);
+        return enviar(404, 'text/plain', 'mapa de CS nao extraido');
+      }
+
       // Arte do campeão, pro visual das telas. Baixada uma vez e guardada.
       const ar = url.pathname.match(/^\/arte\/(\d+)$/);
       if (ar && acoes.arte) {
@@ -968,7 +976,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       // GET: catálogo (mapas/agentes), busca de vídeo, as salvas e os links de fora.
       // Tudo devolve JSON e nenhuma derruba a aba: sem internet, a busca volta com aviso
       // e as salvas continuam vindo do disco.
-      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao'], ['/api/val/acervo', 'valAcervo'], ['/api/val/partidas', 'valPartidas']]) {
+      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao'], ['/api/val/acervo', 'valAcervo'], ['/api/val/partidas', 'valPartidas'], ['/api/cs/catalogo', 'csCatalogo']]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         const p = {
           forcar: url.searchParams.get('forcar') === '1',
@@ -977,6 +985,8 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
           habilidade: url.searchParams.get('habilidade') || '',
           lado: url.searchParams.get('lado') || null,
           refazer: url.searchParams.get('refazer') === '1',
+          // qual jogo: sem isto a busca de CS procuraria o mapa no catálogo do Valorant
+          jogo: url.searchParams.get('jogo') === 'cs' ? 'cs' : 'val',
         };
         try { return enviar(200, 'application/json', JSON.stringify(await acoes[nome](p))); }
         catch (erro) { return enviar(503, 'application/json', JSON.stringify({ erro: erro.message })); }

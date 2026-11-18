@@ -2601,7 +2601,7 @@ test('painel: os dois modos trocam a barra e o rodape fala do jogo certo', async
   `;
   const t = await funcoesDaTela('painel.html',
     ['trocarModo', 'pintarEstado', 'espiarValorant', 'escolherModoDeEntrada'],
-    cercado, ['ABA_INICIAL', 'VAL_ONDE', 'jogoDaAba']);
+    cercado, ['ABA_INICIAL', 'VAL_ONDE', 'jogoDaAba', 'MODOS']);
 
   /* 1) O RODAPE. Em partida de Valorant ele diz Valorant -- com mapa e agente -- e nao
    *    fala do client do LoL, que e exatamente a frase errada que ele lia antes. */

@@ -92,10 +92,14 @@ body.recolhida .recolher svg{transform:rotate(180deg)}
 .modos button:hover{color:var(--texto)}
 .modos button.on{background:var(--f3);color:var(--ouro-claro);box-shadow:inset 0 -2px 0 var(--ouro)}
 .modos button[data-modo="val"].on{color:#ff8c93;box-shadow:inset 0 -2px 0 var(--val)}
-body[data-jogo="lol"] nav [data-jogo="val"],
-body[data-jogo="val"] nav [data-jogo="lol"]{display:none}
+/* Uma aba pode servir a mais de um jogo (Lineups vale pro Valorant E pro CS), por isso o
+   `~=`, que casa com a palavra dentro da lista, e nao o `=`, que exige a lista inteira. */
+body[data-jogo="lol"] nav [data-jogo]:not([data-jogo~="lol"]),
+body[data-jogo="val"] nav [data-jogo]:not([data-jogo~="val"]),
+body[data-jogo="cs"] nav [data-jogo]:not([data-jogo~="cs"]){display:none}
 /* A conta e o aviso de patch são do LoL: no modo Valorant estariam falando do jogo errado. */
-body[data-jogo="val"] .conta,body[data-jogo="val"] .contaSel,body[data-jogo="val"] #estPatch{display:none}
+body[data-jogo="val"] .conta,body[data-jogo="val"] .contaSel,body[data-jogo="val"] #estPatch,
+body[data-jogo="cs"] .conta,body[data-jogo="cs"] .contaSel,body[data-jogo="cs"] #estPatch{display:none}
 /* Na barra recolhida o botão tem 31px e "Valorant" pede 36: o nome vaza. Mesmo arranjo do
  * título do app ali em cima (.longo/.curto), que é o que já se faz aqui quando falta
  * largura. Medido depois: 25px de texto em 31px de botão. */
@@ -1465,6 +1469,7 @@ h2{letter-spacing:1px}
   <div class="modos" id="modos">
     <button data-modo="lol" title="League of Legends"><span class="longo">LoL</span><span class="curto">LOL</span></button>
     <button data-modo="val" title="Valorant"><span class="longo">Valorant</span><span class="curto">VAL</span></button>
+    <button data-modo="cs" title="Counter-Strike 2"><span class="longo">CS2</span><span class="curto">CS</span></button>
   </div>
   <nav>
     <div class="grupo" data-jogo="lol">Você</div>
@@ -1485,8 +1490,8 @@ h2{letter-spacing:1px}
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg><span class="nome">Builds</span></button>
     <button data-jogo="lol" data-aba="patch" title="Patch">
       <svg viewBox="0 0 24 24"><path d="M6 3h9l5 5v13H6z M14 3v6h6 M9 13h7M9 17h7"/></svg><span class="nome">Patch</span></button>
-    <div class="grupo" data-jogo="val">Treino</div>
-    <button data-jogo="val" data-aba="lineups" title="Lineups">
+    <div class="grupo" data-jogo="val cs">Treino</div>
+    <button data-jogo="val cs" data-aba="lineups" title="Lineups">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/></svg><span class="nome">Lineups</span></button>
     <button data-jogo="val" data-aba="valPartidas" title="Partidas">
       <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg><span class="nome">Partidas</span></button>
@@ -1992,18 +1997,31 @@ let abaAtual = 'visao';
  * Trocar o modo troca a barra inteira. O que é dos dois (Admin, Configuração) fica.
  */
 let modoJogo = 'lol';
-const ABA_INICIAL = { lol: 'visao', val: 'lineups' };
+const MODOS = ['lol', 'val', 'cs'];
+const ABA_INICIAL = { lol: 'visao', val: 'lineups', cs: 'lineups' };
+/* Qual jogo a tela de lineups está servindo. O CS usa a mesma tela com outro catálogo —
+ * lá o "agente" é o CS2 e as habilidades são smoke, flash, molotov e HE. */
+const lnJogoDoModo = () => (modoJogo === 'cs' ? 'cs' : 'val');
 const jogoDaAba = (nome) => [...document.querySelectorAll('nav button')].find(b => b.dataset.aba === nome)?.dataset.jogo ?? null;
 
 function trocarModo(m, { lembrar = true, abrir = true } = {}){
-  modoJogo = m === 'val' ? 'val' : 'lol';
+  const antes = modoJogo;
+  modoJogo = MODOS.includes(m) ? m : 'lol';
   document.body.dataset.jogo = modoJogo;
   document.querySelectorAll('#modos button').forEach(b => b.classList.toggle('on', b.dataset.modo === modoJogo));
   if (lembrar) try { localStorage.setItem('modoJogo', modoJogo); } catch {}
+
+  /* Valorant e CS dividem a MESMA tela de lineups, com catálogos diferentes — mapas e
+   * utilitários de um não existem no outro. Trocar entre os dois sem recarregar deixaria
+   * a tela do CS com os agentes do Valorant em cima do radar do Mirage. */
+  if (antes !== modoJogo && (antes === 'cs' || modoJogo === 'cs') && typeof lnEsquecerCatalogo === 'function') {
+    lnEsquecerCatalogo();
+  }
+
   /* Aba de outro jogo não pode ficar aberta embaixo de uma barra que não a mostra mais:
    * sem isto, trocar pra Valorant deixava o Perfil no ar sem nenhum botão aceso. */
   const jogo = jogoDaAba(abaAtual);
-  if (abrir && jogo && jogo !== modoJogo) abrirAba(ABA_INICIAL[modoJogo]);
+  if (abrir && jogo && !jogo.split(' ').includes(modoJogo)) abrirAba(ABA_INICIAL[modoJogo]);
   pintarEstado();
 }
 
@@ -4619,19 +4637,33 @@ const LN_FILTROS = {
 };
 const lnMMSS = (s) => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
 
+/* O que ele escolheu da última vez é POR JOGO: mapa do Valorant não existe no CS e o
+ * contrário também. Com uma chave só, trocar de modo apagava a escolha do outro. */
+const lnChaveLembrada = () => (lnJogoDoModo() === 'cs' ? 'lineupsCs' : 'lineups');
+
+/* Trocar entre Valorant e CS troca o catálogo inteiro. Isto joga fora o que estava em mão
+ * e faz a tela buscar de novo no próximo abrir — senão o radar do Mirage apareceria com os
+ * agentes do Valorant em cima. */
+function lnEsquecerCatalogo(){
+  lnCatalogo = null; lnAchadas = []; lnTodas = []; lnCallouts = []; lnPlanta = null;
+  lnMapaAtual = ''; lnAgenteAtual = ''; lnHabAtual = ''; lnPinoAtivo = null;
+  try { jaCarregou.delete('lineups'); } catch {}
+  if (abaAtual === 'lineups') carregarLineups().catch((e) => console.error('lineups', e));
+}
+
 async function carregarLineups(){
   // a API do YouTube baixa agora, enquanto ele escolhe mapa e agente — e não no primeiro
   // clique numa lineup, que é justo a hora em que ele está com pressa
   lnApiYT().catch(() => {});
   $('#lnAviso').innerHTML = carregando('buscando mapas e agentes…');
-  try { lnCatalogo = await pegar('/api/val/catalogo'); }
-  catch { $('#lnAviso').innerHTML = `<div class="vazio">não consegui carregar o catálogo do Valorant</div>`; return; }
+  try { lnCatalogo = await pegar(lnJogoDoModo() === 'cs' ? '/api/cs/catalogo' : '/api/val/catalogo'); }
+  catch { $('#lnAviso').innerHTML = `<div class="vazio">não consegui carregar o catálogo do ${lnJogoDoModo() === 'cs' ? 'CS2' : 'Valorant'}</div>`; return; }
 
   $('#lnAviso').innerHTML = lnCatalogo.aviso ? `<div class="vazio">${esc(lnCatalogo.aviso)}</div>` : '';
 
   // o que ele escolheu da última vez: na hora de jogar ninguém quer remontar o filtro
   try {
-    const g = JSON.parse(localStorage.getItem('lineups') || '{}');
+    const g = JSON.parse(localStorage.getItem(lnChaveLembrada()) || '{}');
     if (lnCatalogo.mapas?.some(m => m.nome === g.mapa)) lnMapaAtual = g.mapa;
     if (lnCatalogo.agentes?.some(a => a.nome === g.agente)) lnAgenteAtual = g.agente;
     if (g.lado) lnLadoAtual = g.lado;
@@ -4917,13 +4949,13 @@ function lnEscolherNoSeletor(qual, nome){
 }
 
 function lnEscolha(){
-  return { mapa: lnMapaAtual, agente: lnAgenteAtual, habilidade: lnHabAtual, lado: lnLadoAtual };
+  return { mapa: lnMapaAtual, agente: lnAgenteAtual, habilidade: lnHabAtual, lado: lnLadoAtual, jogo: lnJogoDoModo() };
 }
 
 /** Os links de fora acompanham o filtro, pra ele consultar a biblioteca dos outros sem sair daqui. */
 async function lnLinks(){
   const e = lnEscolha();
-  try { localStorage.setItem('lineups', JSON.stringify(e)); } catch {}
+  try { localStorage.setItem(lnChaveLembrada(), JSON.stringify(e)); } catch {}
   try {
     const q = new URLSearchParams(Object.fromEntries(Object.entries(e).filter(([, v]) => v)));
     const l = await pegar('/api/val/links?' + q);

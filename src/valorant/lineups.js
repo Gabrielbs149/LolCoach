@@ -1202,6 +1202,22 @@ const FORMATO_BUSCA = 10;
 // quantos vídeos a busca abre (ver o comentário em buscarLineups) e quantos ganham prévia
 const VIDEOS_LIDOS = 18;
 const VIDEOS_COM_PREVIA = 6;
+/**
+ * O catálogo do jogo da busca.
+ *
+ * O CS entrega o catálogo no MESMO formato ({ mapas, agentes }), de propósito: lá o
+ * "agente" é o CS2 e as "habilidades" são smoke, flash, molotov e HE. Com isso toda a
+ * máquina daqui pra baixo — chave de busca, termo do YouTube, pontas, lado, dedupe — vale
+ * pros dois sem um segundo caminho pra manter.
+ *
+ * O padrão é Valorant: quem chamava sem dizer o jogo continua igual.
+ */
+async function catalogoDe(jogo) {
+  if (jogo !== 'cs') return catalogo();
+  const { catalogo: csCatalogo } = await import('../cs/mapas.js');
+  return csCatalogo();
+}
+
 export const chaveDaBusca = (p = {}) => [p.mapa, p.agente, p.habilidade || '-', p.lado || '-']
   .map((x) => String(x ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_')).join('__');
 
@@ -1324,7 +1340,7 @@ function soDesteAgente(agente, lineups, nomes) {
  */
 async function migrarBusca(p, g) {
   if (![3, 4, 5, 6, 7, 8, 9].includes(g.formato)) return null;   // mais velho que isso não vale a tentativa
-  const cat = await catalogo().catch(() => null);
+  const cat = await catalogoDe(p.jogo).catch(() => null);
   const nomes = (cat?.mapas ?? []).map((x) => x.nome);
   const agentes = (cat?.agentes ?? []).map((x) => x.nome);
   if (!nomes.length || !agentes.length) return null;
@@ -1472,7 +1488,7 @@ export async function buscarLineups(p = {}) {
   }
 
   // o ponto no mapa sai daqui, não do navegador: a tela só desenha o pino
-  const cat = await catalogo().catch(() => null);
+  const cat = await catalogoDe(p.jogo).catch(() => null);
   const callouts = cat?.mapas?.find((x) => x.nome === p.mapa)?.callouts ?? [];
   const habs = cat?.agentes?.find((x) => x.nome === p.agente)?.habilidades ?? [];
   const nomesDeMapa = (cat?.mapas ?? []).map((x) => x.nome);

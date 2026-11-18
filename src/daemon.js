@@ -707,17 +707,23 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
    * Começa 40 s depois de abrir (o app tem mais o que fazer na largada), vai devagar, não
    * gasta rede nenhuma, e para na hora se ele entrar em fila, seleção ou partida — de
    * League ou de Valorant. O que não deu tempo fica pra próxima abertura. */
+  /* "Ele está jogando alguma coisa?" — de League ou de Valorant.
+   *
+   * Vive aqui fora e não dentro do setTimeout porque mais de um trabalho de fundo precisa
+   * perguntar isso: a migração do acervo e, desde o modo CS, a extração dos radares do
+   * jogo dele. Duas cópias da mesma regra acabariam discordando uma hora. */
+  const emJogo = () => {
+    const i = estado?.instantaneo?.() ?? {};
+    const f = i.fase ?? null;
+    const noLol = f != null && !['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(f);
+    const v = i.valorant ?? null;
+    // leitura velha não serve de permissão: sem notícia recente, trata como se estivesse jogando
+    const recente = v && Date.now() - (v.em ?? 0) < 60_000;
+    const noVal = recente && (v.estado === 'selecao' || v.estado === 'jogando' || v.emFila === true);
+    return noLol || noVal;
+  };
+
   setTimeout(() => {
-    const emJogo = () => {
-      const i = estado?.instantaneo?.() ?? {};
-      const f = i.fase ?? null;
-      const noLol = f != null && !['None', 'Lobby', 'EndOfGame', 'PreEndOfGame', 'WaitingForStats'].includes(f);
-      const v = i.valorant ?? null;
-      // leitura velha não serve de permissão: sem notícia recente, trata como se estivesse jogando
-      const recente = v && Date.now() - (v.em ?? 0) < 60_000;
-      const noVal = recente && (v.estado === 'selecao' || v.estado === 'jogando' || v.emFila === true);
-      return noLol || noVal;
-    };
     Lineups.migrarAcervo({ podeAgora: () => !emJogo(), log }).catch(() => {});
   }, 40_000).unref?.();
 
@@ -2670,6 +2676,22 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
         marcasPorMapa: marcas,
       };
     },
+    /* O CS entra pelo mesmo cano das lineups: o catálogo dele tem o mesmo formato, com o
+       "agente" sendo o CS2 e as habilidades sendo smoke/flash/molotov/HE. */
+    csCatalogo: async (p = {}) => {
+      const CS = await import('./cs/mapas.js');
+      let cat = await CS.catalogo({ forcar: p.forcar });
+      if (!cat.mapas.length) {
+        // primeira vez: extrai do jogo dele. São ~5 s pros dez mapas, medido.
+        await CS.extrairMapas({ podeAgora: () => !emJogo(), log });
+        cat = await CS.catalogo({ forcar: true });
+      }
+      return cat;
+    },
+    csArteDoMapa: async (id) => {
+      const CS = await import('./cs/mapas.js');
+      return CS.arteDoMapa(id);
+    },
     valLinks: (p = {}) => ({
       youtube: Lineups.linkYoutube(Lineups.termoDaBusca(p)),
       strats: Lineups.linkStrats(p),
@@ -2696,7 +2718,7 @@ const ACOES_DO_PAINEL = [
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao', 'valPartidas',
-  'valPatchLista', 'valPatchNota',
+  'valPatchLista', 'valPatchNota', 'csCatalogo', 'csArteDoMapa',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
   'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar', 'valEsconder', 'valMarcarLado',
 ];
