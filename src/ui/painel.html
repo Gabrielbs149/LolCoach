@@ -5334,12 +5334,23 @@ function lnDesenharMapa(){
       lnDesenharMapa();
       return;
     }
-    // quem esvaziou o mapa foi o filtro? então diga isso, e não "vieram sem ponto"
-    $('#lnMapaCx').innerHTML = lnSoMinhas
-      ? `<div class="vazio">nenhuma lineup deste mapa está em "${esc(LN_FILTROS[lnSoMinhas].nome)}" —
-         clica no filtro lá em cima pra ver todas</div>`
-      : `<div class="vazio">as lineups vieram sem ponto no mapa — a lista está logo abaixo</div>`;
-    return;
+    /* SÓ SAI DAQUI SE NÃO HOUVER LINEUP NENHUMA.
+     *
+     * Antes este `return` valia pra qualquer mapa sem pino, e aí nem o mapa nem a lista
+     * eram desenhados — a lista é montada 160 linhas abaixo e só quando há pino aberto.
+     * A tela ficava um vazio com a frase "a lista está logo abaixo", que não existia.
+     *
+     * Ele caiu nisso no primeiro minuto do modo CS, e com razão: num mapa onde NADA foi
+     * marcado ainda — o ponto de partida de todo mapa de CS — some justamente a
+     * ferramenta de marcar. Agora o mapa é desenhado vazio e todas as lineups vão pra
+     * tira, que é de onde ele abre o clipe e marca o ponto. */
+    if (!lnAchadas.length) {
+      $('#lnMapaCx').innerHTML = lnSoMinhas
+        ? `<div class="vazio">nenhuma lineup deste mapa está em "${esc(LN_FILTROS[lnSoMinhas].nome)}" —
+           clica no filtro lá em cima pra ver todas</div>`
+        : `<div class="vazio">nenhuma lineup encontrada neste mapa</div>`;
+      return;
+    }
   }
   // os nomes dos cantos do mapa, pra ele se achar sem precisar decorar a planta
   let nomes = lnCallouts.filter(c => !pinos.some(p => p.nome === c.nome));
@@ -5373,7 +5384,17 @@ function lnDesenharMapa(){
    * isso sai de 1 retrato pra até 12, e de 12 lineups alcançáveis pras 35 que ele contou.
    */
   const rec = lnJanelaDoMapa();
-  const todasDaPonta = aberto?.lista ?? [];
+  /* SEM PINO ABERTO, A TIRA LISTA O QUE O MAPA NAO ALCANCA.
+   *
+   * Lineup que nao esta em pino nenhum nao tem como ser aberta: nao ha o que clicar. Era o
+   * caso inteiro do CS no primeiro dia — no Dust II sao 275 lineups e UM pino, entao 274
+   * ficavam invisiveis, e a tela ainda dizia "a lista esta logo abaixo".
+   *
+   * No Valorant isto quase nao aparece, porque la a maioria cai num pino; quando aparece, e
+   * exatamente a mesma falta e merece o mesmo tratamento. */
+  const emAlgumPino = new Set(pinos.flatMap((p) => p.lista ?? []));
+  const foraDoMapa = lnAchadas.filter((l) => !emAlgumPino.has(l));
+  const todasDaPonta = aberto?.lista ?? foraDoMapa;
   const comLugar = lnVariadas(todasDaPonta.filter(l => l.posicao), LN_NO_MAPA);
   let semLugar = todasDaPonta.filter(l => !comLugar.includes(l))
     // as que têm lugar e só não couberam vêm primeiro: estão a um zoom de virar retrato
@@ -5503,9 +5524,9 @@ function lnDesenharMapa(){
           <span class="lnPinoNome">${esc(p.nome)}</span>
         </button>`).join('')}
     </div>
-    ${aberto && semLugar.length ? `
+    ${semLugar.length ? `
       <div class="lnSemLugar">
-        <b>${semLugar.length === 1 ? 'mais uma' : `mais ${semLugar.length}`} nesta ponta</b>
+        <b>${aberto ? (semLugar.length === 1 ? 'mais uma' : `mais ${semLugar.length}`) + ' nesta ponta' : (semLugar.length === 1 ? 'uma lineup' : `${semLugar.length} lineups`) + ' fora do mapa'}</b>
         <small>${tapadas.length
           ? `${tapadas.length === 1 ? 'uma está' : `${tapadas.length} estão`} no mesmo ponto que outra no mapa — abre daqui${semLugarN ? `; o resto não diz de onde sai` : ''}`
           : semLugarN
