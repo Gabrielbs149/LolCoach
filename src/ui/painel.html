@@ -5402,7 +5402,20 @@ function lnDesenharMapa(){
    * exatamente a mesma falta e merece o mesmo tratamento. */
   const emAlgumPino = new Set(pinos.flatMap((p) => p.lista ?? []));
   const foraDoMapa = lnAchadas.filter((l) => !emAlgumPino.has(l));
-  const todasDaPonta = aberto?.lista ?? foraDoMapa;
+  /* A TIRA SÓ MUDA NO CLIQUE, NUNCA NO MOUSE — e isso não é gosto, é o que travava a tela.
+   *
+   * Espiar um pino trocava o conteúdo da tira ("as desta ponta" no lugar das que estão
+   * fora do mapa). Conteúdo diferente, ALTURA diferente: o `lnCaberNaTela` refazia a conta,
+   * o mapa mudava de tamanho, o pino saía de debaixo do cursor, o `mouseleave` disparava e
+   * desenhava tudo de novo — pisca-pisca, e sem conseguir clicar na lineup.
+   *
+   * Ficou pior quando a tira passou a listar o que o mapa não alcança (2.28.310): no Dust II
+   * são 103 fichas contra as poucas de uma ponta, ou seja, o salto de altura é enorme.
+   *
+   * Espiar é PREVIEW: mexe no mapa (linha, retrato, o resto apagado) e não encosta no
+   * layout em volta. Quem reestrutura a página é o clique. */
+  const fixado = pinos.find((p) => p.chave === lnPinoAtivo) ?? null;
+  const todasDaPonta = fixado?.lista ?? foraDoMapa;
   const comLugar = lnVariadas(todasDaPonta.filter(l => l.posicao), LN_NO_MAPA);
   let semLugar = todasDaPonta.filter(l => !comLugar.includes(l))
     // as que têm lugar e só não couberam vêm primeiro: estão a um zoom de virar retrato
@@ -5534,7 +5547,7 @@ function lnDesenharMapa(){
     </div>
     ${semLugar.length ? `
       <div class="lnSemLugar">
-        <b>${aberto ? (semLugar.length === 1 ? 'mais uma' : `mais ${semLugar.length}`) + ' nesta ponta' : (semLugar.length === 1 ? 'uma lineup' : `${semLugar.length} lineups`) + ' fora do mapa'}</b>
+        <b>${fixado ? (semLugar.length === 1 ? 'mais uma' : `mais ${semLugar.length}`) + ' nesta ponta' : (semLugar.length === 1 ? 'uma lineup' : `${semLugar.length} lineups`) + ' fora do mapa'}</b>
         <small>${tapadas.length
           ? `${tapadas.length === 1 ? 'uma está' : `${tapadas.length} estão`} no mesmo ponto que outra no mapa — abre daqui${semLugarN ? `; o resto não diz de onde sai` : ''}`
           : semLugarN
