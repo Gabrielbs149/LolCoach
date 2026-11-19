@@ -20,7 +20,7 @@ import { abrirVpk, lerDoVpk, texturaParaPng, lerOverview } from './vpk.js';
 
 const pasta = () => resolve(pastaBase(), 'dados', 'cs');
 const arqCatalogo = () => resolve(pasta(), 'catalogo.json');
-const FORMATO = 2;   // 2: mapas marcados como `inteiro` (a arte ja e a area jogavel)
+const FORMATO = 4;   // 2: `inteiro`; 3: callouts; 4: callouts no vocabulario do CS
 
 /**
  * Onde o CS2 está. A pasta padrão do Steam primeiro; se não, as bibliotecas que o
@@ -64,6 +64,49 @@ export const MAPAS = [
   { id: 'de_vertigo', nome: 'Vertigo' },
   { id: 'de_cache', nome: 'Cache' },
 ];
+
+/**
+ * Callouts por mapa, pra o parser conseguir pôr a lineup no mapa pelo NOME dela.
+ *
+ * É a peça que faltava: no Valorant os callouts vêm da API com coordenada, e é por isso
+ * que lá o app já sabia mais ou menos onde cada lineup cai sem ele marcar uma por uma. No
+ * CS não existe fonte: o `.nav` do mapa (versão 36) **não tem nome de lugar** — a Valve
+ * tirou — e o lump de entidades, onde os `env_cs_place` morariam, vem comprimido.
+ *
+ * Então é tabela à mão, e com uma regra: **só entra callout cujo lugar eu consigo apontar
+ * olhando o radar.** Pino no lugar errado é pior que pino nenhum — ele vai confiar e ir
+ * pro canto errado. O que eu não consegui cravar (Cat, Xbox, Pit, Car, Pizza, Back Plat,
+ * Hinge, Mid Door, Top Door) ficou DE FORA de propósito; essas lineups seguem na tira,
+ * pra ele marcar à mão, que é o que já funciona.
+ *
+ * As coordenadas são 0..1 na arte do radar, lidas numa grade por cima da imagem. Os quatro
+ * pontos que o jogo garante (bombsites e spawns) vêm do `.txt` de overview e não repetem
+ * aqui.
+ */
+const CALLOUTS = {
+  de_dust2: [
+    { nome: 'A Site', regiao: 'A', site: 'A', x: 0.80, y: 0.16 },
+    { nome: 'B Site', regiao: 'B', site: 'B', x: 0.21, y: 0.12 },
+    { nome: 'T Spawn', regiao: 'Spawn', x: 0.39, y: 0.91 },
+    { nome: 'CT Spawn', regiao: 'Spawn', x: 0.62, y: 0.21 },
+    // o corredor central, inconfundivel: vai do T spawn ate os mid doors
+    { nome: 'Mid', regiao: 'Mid', x: 0.50, y: 0.45 },
+    // a passagem na borda direita, de baixo ate o A
+    { nome: 'Long A', regiao: 'Long', site: 'A', x: 0.90, y: 0.42 },
+    { nome: 'Outside Long', regiao: 'Long', site: 'A', x: 0.80, y: 0.62 },
+    // o caminho do B: sala embaixo do site e o corredor estreito que desce
+    { nome: 'Upper Tunnels', regiao: 'Tunnels', site: 'B', x: 0.15, y: 0.28 },
+    { nome: 'Lower Tunnels', regiao: 'Tunnels', site: 'B', x: 0.17, y: 0.52 },
+  ],
+  de_mirage: [
+    { nome: 'A Site', regiao: 'A', site: 'A', x: 0.54, y: 0.76 },
+    { nome: 'B Site', regiao: 'B', site: 'B', x: 0.23, y: 0.28 },
+    { nome: 'T Spawn', regiao: 'Spawn', x: 0.87, y: 0.36 },
+    { nome: 'CT Spawn', regiao: 'Spawn', x: 0.28, y: 0.70 },
+    // o meio aberto, entre o B (em cima) e o A (embaixo)
+    { nome: 'Mid', regiao: 'Mid', x: 0.55, y: 0.45 },
+  ],
+};
 
 /* O utilitário no lugar do agente. `busca` é o que vai pro YouTube, e por isso é em inglês:
  * vídeo de lineup de CS é quase todo em inglês, igual ao que já se aprendeu no Valorant —
@@ -141,7 +184,12 @@ export async function catalogo({ forcar = false } = {}) {
            extensão nenhuma. No Valorant a caixa faz sentido porque são ~17 callouts e a
            arte tem margem preta em volta; aqui não há margem pra tirar. */
         inteiro: true,
-        callouts: (geo.pontos ?? []).map((p) => ({ nome: p.nome, x: p.x, y: p.y, regiao: p.nome, grande: p.nome, site: null })),
+        /* Do mapa com tabela saem os callouts dela, que ja incluem os bombsites e spawns
+           com o nome que o pessoal de CS usa ("A Site", nao "Bombsite A") -- e e por esse
+           nome que o parser casa a lineup. Mapa ainda sem tabela fica so com os quatro
+           pontos do .txt, que ao menos desenham as referencias. */
+        callouts: (CALLOUTS[m.id] ?? geo.pontos ?? [])
+          .map((p) => ({ nome: p.nome, x: p.x, y: p.y, regiao: p.regiao ?? p.nome, grande: p.regiao ?? p.nome, site: p.site ?? null })),
         geometria: { posX: geo.posX, posY: geo.posY, escala: geo.escala, largura: geo.largura, altura: geo.altura },
       });
     } catch { /* esse mapa ainda não foi extraído */ }
