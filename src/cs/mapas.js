@@ -213,6 +213,49 @@ export async function catalogo({ forcar = false } = {}) {
   return cat;
 }
 
+/**
+ * Põe o `.cfg` que faz o CS2 falar com o app.
+ *
+ * Sem ele a integração simplesmente não existe — e pedir pra ele copiar arquivo na mão
+ * seria um passo que o app sabe fazer sozinho. É o mesmo mecanismo que o Overwolf já usa
+ * na máquina dele (`gamestate_integration_ow_native.cfg` na mesma pasta), então não há
+ * nada de exótico aqui: vários `.cfg` convivem, cada um com seu endereço.
+ *
+ * Reescreve quando a porta muda e não toca em mais nada do jogo.
+ */
+export async function garantirIntegracao(porta) {
+  const csgo = await acharCs();
+  if (!csgo) return { erro: 'não achei o CS2 instalado' };
+  const arq = resolve(csgo, 'cfg', 'gamestate_integration_lolcoach.cfg');
+  const texto = `"LolCoach"
+{
+	"uri"			"http://127.0.0.1:${porta}/cs/gsi"
+	"timeout"		"5.0"
+	"buffer"		"0.1"
+	"throttle"		"0.5"
+	"heartbeat"		"30.0"
+	"data"
+	{
+		"provider"			"1"
+		"map"				"1"
+		"round"				"1"
+		"player_id"			"1"
+		"player_state"		"1"
+		"player_weapons"	"1"
+	}
+}
+`;
+  try {
+    const atual = await readFile(arq, 'utf8').catch(() => null);
+    if (atual === texto) return { arq, mudou: false };
+    await writeFile(arq, texto, 'utf8');
+    return { arq, mudou: true };
+  } catch (e) {
+    // pasta do jogo sem permissão de escrita: não é motivo pra derrubar nada
+    return { erro: e.message };
+  }
+}
+
 /** O PNG de um mapa, pra rota que serve a imagem. */
 export async function arteDoMapa(id) {
   if (!/^[a-z0-9_]+$/.test(String(id))) return null;

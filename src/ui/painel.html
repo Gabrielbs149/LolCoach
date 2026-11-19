@@ -101,7 +101,9 @@ body[data-jogo="cs"] nav [data-jogo]:not([data-jogo~="cs"]){display:none}
 body[data-jogo="val"] .conta,body[data-jogo="val"] .contaSel,body[data-jogo="val"] #estPatch,
 body[data-jogo="cs"] .conta,body[data-jogo="cs"] .contaSel,body[data-jogo="cs"] #estPatch,
 /* a caixa de situacao e o acervo sao do Valorant: no CS nao ha estado de jogo pra ler */
-body[data-jogo="cs"] #lnJogo,body[data-jogo="cs"] #lineups>h2,body[data-jogo="cs"] #lnAcervo{display:none}
+/* O acervo é do Valorant (guardar agente), mas a caixa de situação voltou a servir: desde
+   que o CS fala com o app, ela mostra o mapa, o lado e a granada na mão dele. */
+body[data-jogo="cs"] #lineups>h2,body[data-jogo="cs"] #lnAcervo{display:none}
 /* Na barra recolhida o botão tem 31px e "Valorant" pede 36: o nome vaza. Mesmo arranjo do
  * título do app ali em cima (.longo/.curto), que é o que já se faz aqui quando falta
  * largura. Medido depois: 25px de texto em 31px de botão. */
@@ -6711,8 +6713,60 @@ function lnTextoDoJogo(j){
   return `<b>Valorant ${esc(onde)}</b><small>${det ? esc(det) : 'ainda sem mapa'}</small>`;
 }
 
+/**
+ * No modo CS a tela segue o jogo: mapa, lado e a granada que está na mão dele.
+ *
+ * O CS entrega essas três coisas pela integração oficial da Valve — `map.name`,
+ * `player.team` e a arma com `state: "active"`. O lado aqui é EXATO (T ataca, CT defende),
+ * sem a convenção que no Valorant eu ainda não consegui conferir.
+ *
+ * A regra de quem manda é a mesma do lado no Valorant: o gatilho é o valor DETECTADO
+ * mudar, não ser diferente do que está na tela. Senão, toda vez que ele clicasse em
+ * "Flash" pra olhar outra coisa, a espiada seguinte desfaria o clique.
+ */
+let csUltimo = { mapa: null, lado: null, utilitario: null };
+
+async function lnOlharOCs(){
+  let j;
+  try { j = await pegar('/api/cs/situacao'); } catch { return; }
+  if (!j) return;
+
+  const cx = $('#lnJogo');
+  if (cx) {
+    cx.hidden = false;
+    cx.className = 'lnJogo' + (j.ligado ? ' ligado' : '');
+    cx.innerHTML = j.ligado && j.mapa
+      ? `<b>CS2 ${esc(j.mapa)}</b><small>${j.lado === 'atacando' ? 'atacante (T)' : j.lado === 'defendendo' ? 'defensor (CT)' : ''}${j.utilitario ? ` · ${esc(j.utilitario)} na mão` : ''}</small>`
+      : `<b>CS2 ${j.ligado ? 'aberto' : 'fechado'}</b><small>escolhe o mapa aqui</small>`;
+  }
+  if (!j.ligado || !j.mapa) { csUltimo = { mapa: null, lado: null, utilitario: null }; return; }
+
+  let mudou = false;
+  if (j.mapa !== csUltimo.mapa) {
+    csUltimo.mapa = j.mapa;
+    if (lnCatalogo?.mapas?.some((m) => m.nome === j.mapa) && j.mapa !== lnMapaAtual) { lnMapaAtual = j.mapa; mudou = true; }
+  }
+  if (j.lado && j.lado !== csUltimo.lado) {
+    csUltimo.lado = j.lado;
+    if (j.lado !== lnLadoAtual) { lnLadoAtual = j.lado; lnDesenharLados(); mudou = true; lnAvisarLado(j.lado, null); }
+  }
+  /* A granada na mão troca o FILTRO, não a busca: as quatro utilidades vêm na mesma busca
+   * (mapa × lado) e o filtro é de tela, instantâneo. Trocar de smoke pra flash no meio do
+   * round não pode custar uma ida ao YouTube. */
+  if (j.utilitario !== csUltimo.utilitario) {
+    csUltimo.utilitario = j.utilitario;
+    if (j.utilitario && j.utilitario !== lnHabAtual) {
+      lnHabAtual = j.utilitario;
+      lnDesenharHabs();
+      if (!mudou) { lnFiltrarEDedupar(); lnPintarResumo(); lnDesenharMapa(); }
+    }
+  }
+  if (mudou) { lnDesenharCartoes(); lnLinks(); lnProcurarLogo(); }
+}
+
 async function lnOlharOJogo(){
   if (abaAtual !== 'lineups') return;
+  if (lnJogoDoModo() === 'cs') return lnOlharOCs();
   let j;
   try { j = await pegar('/api/val/situacao'); } catch { return; }
   if (!j) return;

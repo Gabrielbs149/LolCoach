@@ -700,6 +700,13 @@ app.whenReady().then(async () => {
       db: daemon.db, estado, porta: 8770,
       acoes: { ...daemon.acoes, atualizar: atualizarAgora, backup, restaurar, diagnostico, tecla: teclaApertada, overlayAjustar, overlayMover, overlayEstado },
     }));
+    /* O CS2 só fala com o app se existir um .cfg apontando pra cá. Escrever é do app, não
+       dele — e é por isso que vai logo depois de o servidor subir, com a porta de verdade.
+       Falha (pasta sem permissão) não derruba nada: o modo CS continua funcionando na mão. */
+    import('../src/cs/mapas.js')
+      .then(({ garantirIntegracao }) => garantirIntegracao(8770))
+      .then((r) => { if (r?.mudou) estado.log('cs: integração com o jogo instalada'); })
+      .catch(() => {});
   } catch (erro) {
     // Sem client aberto o painel ainda deve subir, só sem dados ao vivo.
     console.error('falha ao iniciar:', erro.message);

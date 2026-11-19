@@ -634,6 +634,16 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
         try { await acoes.olhoFoto(Buffer.concat(pedacos), meta); } catch { /* disco cheio? segue */ }
         return enviar(200, 'application/json', '{"ok":true}');
       }
+      /* O CS2 falando com o app (Game State Integration). Nao e /api: o endereco vai num
+         .cfg dentro do jogo, e quanto mais curto e estavel, melhor. Responde sempre 200 e
+         rapido -- o jogo tem timeout, e travar aqui e travar o jogo. */
+      if (req.method === 'POST' && url.pathname === '/cs/gsi' && acoes.csGsi) {
+        const pedacos = [];
+        for await (const p of req) pedacos.push(p);
+        try { acoes.csGsi(JSON.parse(Buffer.concat(pedacos).toString('utf8') || '{}')); } catch { /* pacote torto */ }
+        return enviar(200, 'text/plain', '');
+      }
+
       if (req.method === 'POST' && url.pathname === '/api/olho' && acoes.olho) {
         const pedacos = [];
         for await (const p of req) pedacos.push(p);
@@ -976,7 +986,7 @@ export function criarServidor({ db, estado, acoes = {}, porta = 8770 }) {
       // GET: catálogo (mapas/agentes), busca de vídeo, as salvas e os links de fora.
       // Tudo devolve JSON e nenhuma derruba a aba: sem internet, a busca volta com aviso
       // e as salvas continuam vindo do disco.
-      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao'], ['/api/val/acervo', 'valAcervo'], ['/api/val/partidas', 'valPartidas'], ['/api/cs/catalogo', 'csCatalogo']]) {
+      for (const [caminho, nome] of [['/api/val/catalogo', 'valCatalogo'], ['/api/val/buscar', 'valBuscar'], ['/api/val/salvas', 'valSalvas'], ['/api/val/links', 'valLinks'], ['/api/val/situacao', 'valSituacao'], ['/api/val/acervo', 'valAcervo'], ['/api/val/partidas', 'valPartidas'], ['/api/cs/catalogo', 'csCatalogo'], ['/api/cs/situacao', 'csSituacao']]) {
         if (url.pathname !== caminho || !acoes[nome]) continue;
         const p = {
           forcar: url.searchParams.get('forcar') === '1',

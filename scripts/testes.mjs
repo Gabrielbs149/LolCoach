@@ -3253,3 +3253,83 @@ test('painel: soltar o filtro na 2a tela refiltra antes de redesenhar', async ()
   const volta = /modoPartida'\) && lnMostrarTudoNoJogo\) \{\s*lnSoMinhas = 'mexi'; lnMostrarTudoNoJogo = false;/;
   assert.match(fonte, volta, 'mapa novo tem que voltar pro filtro "mexi"');
 });
+
+/* ------------------------------------------- o CS2 falando com o app
+ *
+ * MEDIDO no CS2 dele, dentro de um mapa: um cliente NORMAL recebe `provider, map, round,
+ * player`, com `player.team` ("T"), `player.activity` ("playing") e `player.weapons`, onde
+ * a arma em uso tem `state: "active"`.
+ *
+ * E NAO recebe `player_position` nem `allgrenades`, por mais que o .cfg peca os dois: sao
+ * so pra espectador/GOTV. Por isso a ideia de gravar a lineup sozinho (de onde jogou, onde
+ * caiu) nao existe -- esta medido, nao suposto.
+ */
+test('cs: o pacote do jogo vira mapa, lado e utilitario na mao', async () => {
+  const { lerPacote, utilitarioNaMao, mapaDoCs, guardarPacote, situacaoDoCs, esquecerCs } =
+    await import('../src/cs/jogo.js');
+  const { MAPAS } = await import('../src/cs/mapas.js');
+
+  // o pacote REAL capturado na maquina dele, com os campos que vieram de verdade
+  const real = {
+    provider: { name: 'Counter-Strike: Global Offensive' },
+    map: { name: 'miragelinups', mode: 'casual', phase: 'live' },
+    round: { phase: 'live' },
+    player: {
+      steamid: '1', name: 'rolindo', observer_slot: 0, team: 'T', activity: 'playing',
+      state: { health: 100, armor: 100, flashed: 0, smoked: 0, money: 59700 },
+      weapons: {
+        weapon_0: { name: 'weapon_knife_t', type: 'Knife', state: 'holstered' },
+        weapon_1: { name: 'weapon_glock', type: 'Pistol', state: 'holstered' },
+        weapon_3: { name: 'weapon_smokegrenade', type: 'Grenade', ammo_reserve: 1, state: 'active' },
+      },
+    },
+  };
+
+  const s = lerPacote(real, MAPAS);
+  assert.equal(s.ligado, true);
+  assert.equal(s.estado, 'jogando');
+  /* Mapa de WORKSHOP conta: "miragelinups" e onde ele treina lineup, e e justamente ali
+   * que a tela tem que acompanhar. O nome oficial esta dentro do nome do workshop. */
+  assert.equal(s.mapa, 'Mirage');
+  assert.equal(s.lado, 'atacando', 'T planta, entao T e o atacante');
+  assert.equal(s.utilitario, 'Smoke');
+
+  // CT e defensor -- aqui nao ha convencao pra adivinhar, ao contrario do Valorant
+  assert.equal(lerPacote({ ...real, player: { ...real.player, team: 'CT' } }, MAPAS).lado, 'defendendo');
+
+  // a granada na mao: so a ATIVA conta, e so o que tem lineup
+  const arma = (nome) => ({ w: { name: nome, type: 'Grenade', state: 'active' } });
+  assert.equal(utilitarioNaMao(arma('weapon_flashbang').w ? { a: arma('weapon_flashbang').w } : {}), 'Flash');
+  assert.equal(utilitarioNaMao({ a: { name: 'weapon_hegrenade', state: 'active' } }), 'HE');
+  assert.equal(utilitarioNaMao({ a: { name: 'weapon_molotov', state: 'active' } }), 'Molotov');
+  assert.equal(utilitarioNaMao({ a: { name: 'weapon_incgrenade', state: 'active' } }), 'Molotov',
+    'incendiaria e molotov sao a mesma lineup');
+  // decoy nao tem lineup: trocar o filtro pra algo vazio seria pior que nao trocar
+  assert.equal(utilitarioNaMao({ a: { name: 'weapon_decoy', state: 'active' } }), null);
+  assert.equal(utilitarioNaMao({ a: { name: 'weapon_ak47', state: 'active' } }), null);
+  // arma guardada nao conta
+  assert.equal(utilitarioNaMao({ a: { name: 'weapon_smokegrenade', state: 'holstered' } }), null);
+  assert.equal(utilitarioNaMao(), null);
+
+  // mapa oficial e mapa de workshop
+  assert.equal(mapaDoCs('de_dust2', MAPAS), 'Dust II');
+  assert.equal(mapaDoCs('yprac_dust2', MAPAS), 'Dust II');
+  assert.equal(mapaDoCs('de_cbble', MAPAS), null, 'mapa fora da tabela nao vira outro');
+  assert.equal(mapaDoCs('', MAPAS), null);
+
+  /* No MENU vem so steamid/name/activity -- sem mapa e sem time. Isso nao pode virar
+   * "jogando em lugar nenhum", senao a tela trocaria de mapa sozinha no menu. */
+  const menu = lerPacote({ provider: {}, player: { steamid: '1', name: 'rolindo', activity: 'menu' } }, MAPAS);
+  assert.equal(menu.ligado, true);
+  assert.equal(menu.estado, 'menu');
+  assert.equal(menu.mapa, null);
+  assert.equal(menu.lado, null);
+
+  /* O CS nao avisa que fechou: ele para de mandar. Sem noticia recente, desligado. */
+  esquecerCs();
+  assert.equal(situacaoDoCs().ligado, false, 'sem pacote nenhum, fechado');
+  guardarPacote(real, MAPAS);
+  assert.equal(situacaoDoCs().ligado, true);
+  assert.equal(situacaoDoCs().utilitario, 'Smoke');
+  esquecerCs();
+});

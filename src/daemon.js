@@ -16,6 +16,8 @@ import { recadoDeSequencia } from './analise/parar.js';
 import { licaoDaPartida } from './analise/licao.js';
 import * as Lineups from './valorant/lineups.js';
 import { partidasGuardadas } from './valorant/partidas.js';
+import { guardarPacote as csGuardar, situacaoDoCs as csSituacao } from './cs/jogo.js';
+import { MAPAS as CS_MAPAS } from './cs/mapas.js';
 import { situacaoDoValorant } from './valorant/jogo.js';
 
 /**
@@ -2688,6 +2690,10 @@ export async function iniciarDaemon({ estado, config: configDada, aoSelecionar, 
       }
       return cat;
     },
+    /* O CS2 mandando estado. Guarda e pronto: quem pergunta e a tela, pelo csSituacao.
+       Nao faz I/O aqui -- isto roda a cada mudanca no jogo dele. */
+    csGsi: (pacote) => { csGuardar(pacote, CS_MAPAS); },
+    csSituacao: () => csSituacao(),
     csArteDoMapa: async (id) => {
       const CS = await import('./cs/mapas.js');
       return CS.arteDoMapa(id);
@@ -2718,7 +2724,7 @@ const ACOES_DO_PAINEL = [
   'amigos', 'amigoPerfil', 'adicionarAmigo', 'removerAmigo', 'convidarAmigo', 'nicks', 'vozVozes', 'vozFalar', 'vozFalas',
   'adminUsuarios', 'adminGravarControle', 'adminEsquecer', 'sessao', 'marcadas', 'marcar', 'marcarFlash', 'olho', 'olhoFoto', 'situacoesPartidas', 'situacoesIds', 'situacoesDe', 'avaliarSituacao', 'avaliarUltima', 'overlayTamanho', 'situacoesResumo',
   'valCatalogo', 'valBuscar', 'valSalvas', 'valSalvar', 'valApagar', 'valLinks', 'valSituacao', 'valPartidas',
-  'valPatchLista', 'valPatchNota', 'csCatalogo', 'csArteDoMapa',
+  'valPatchLista', 'valPatchNota', 'csCatalogo', 'csArteDoMapa', 'csGsi', 'csSituacao',
   'valAcervo', 'valGuardarAgente', 'valEsquecerAgente', 'valLimparSobra', 'valVideoRuim',
   'valMarcarPonto', 'valEsquecerPonto', 'valConfirmar', 'valEsconder', 'valMarcarLado',
 ];
