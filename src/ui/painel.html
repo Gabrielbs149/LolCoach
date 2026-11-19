@@ -99,7 +99,9 @@ body[data-jogo="val"] nav [data-jogo]:not([data-jogo~="val"]),
 body[data-jogo="cs"] nav [data-jogo]:not([data-jogo~="cs"]){display:none}
 /* A conta e o aviso de patch são do LoL: no modo Valorant estariam falando do jogo errado. */
 body[data-jogo="val"] .conta,body[data-jogo="val"] .contaSel,body[data-jogo="val"] #estPatch,
-body[data-jogo="cs"] .conta,body[data-jogo="cs"] .contaSel,body[data-jogo="cs"] #estPatch{display:none}
+body[data-jogo="cs"] .conta,body[data-jogo="cs"] .contaSel,body[data-jogo="cs"] #estPatch,
+/* a caixa de situacao e o acervo sao do Valorant: no CS nao ha estado de jogo pra ler */
+body[data-jogo="cs"] #lnJogo,body[data-jogo="cs"] #lineups>h2,body[data-jogo="cs"] #lnAcervo{display:none}
 /* Na barra recolhida o botão tem 31px e "Valorant" pede 36: o nome vaza. Mesmo arranjo do
  * título do app ali em cima (.longo/.curto), que é o que já se faz aqui quando falta
  * largura. Medido depois: 25px de texto em 31px de botão. */
@@ -1685,7 +1687,7 @@ h2{letter-spacing:1px}
   </section>
 
   <section id="lineups">
-    <div class="titulo">Lineups <small>Valorant</small></div>
+    <div class="titulo">Lineups <small id="lnJogoNome">Valorant</small></div>
     <div class="lnHud">
       <div class="lnLado">
         <button class="lnCartao" id="lnCartaoMapa" onclick="lnAbrirSeletor('mapa')"></button>
@@ -4669,8 +4671,15 @@ async function carregarLineups(){
     if (g.lado) lnLadoAtual = g.lado;
     if (g.habilidade) lnHabAtual = g.habilidade;
   } catch {}
+
+  /* Agente único não é escolha. No CS não existe agente: o catálogo tem um só, "CS2", e o
+   * que varia é o utilitário (que já é o filtro de habilidade). Fazer ele clicar num
+   * seletor de uma opção só seria um passo que não decide nada. */
+  if (!lnAgenteAtual && lnCatalogo.agentes?.length === 1) lnAgenteAtual = lnCatalogo.agentes[0].nome;
+
+  const nomeJogo = $('#lnJogoNome'); if (nomeJogo) nomeJogo.textContent = lnJogoDoModo() === 'cs' ? 'CS2' : 'Valorant';
   lnDesenharLados(); lnDesenharCartoes(); lnDesenharHabs(); lnLinks();
-  carregarAcervo();
+  if (lnJogoDoModo() !== 'cs') carregarAcervo();
   lnVigiarJogo(true);
   // lembrou mapa e agente da última vez? já mostra, sem ele pedir
   if (lnMapaAtual && lnAgenteAtual) lnProcurar();
@@ -6897,7 +6906,10 @@ abrirAba = function(nome){
    * um deles precisar saber que existe modo. Não lembra a escolha: foi o app que decidiu,
    * não ele. */
   const jogo = jogoDaAba(nome);
-  if (jogo && jogo !== modoJogo) trocarModo(jogo, { lembrar: false, abrir: false });
+  /* `jogo` pode ser uma LISTA ("val cs"): a aba de Lineups serve aos dois. Comparar a
+     lista inteira com o modo nunca casava, e trocarModo caia no padrao 'lol' -- era por
+     isso que entrar no modo CS voltava pro LoL sozinho. */
+  if (jogo && !jogo.split(' ').includes(modoJogo)) trocarModo(jogo.split(' ')[0], { lembrar: false, abrir: false });
   abrirAbaOriginal(nome);
   // o vigia do Valorant só roda com a aba aberta: não faz sentido bater no cliente à toa
   if (typeof lnVigiarJogo === 'function') lnVigiarJogo(nome === 'lineups');
@@ -6943,7 +6955,7 @@ async function escolherModoDeEntrada(){
    * (que resolve depois, porque é async). */
   const pedida = (location.hash || '').replace('#', '');
   const jogoPedido = pedida && document.getElementById(pedida) ? jogoDaAba(pedida) : null;
-  if (jogoPedido) { trocarModo(jogoPedido, { lembrar: false, abrir: false }); return; }
+  if (jogoPedido) { trocarModo(jogoPedido.split(' ')[0], { lembrar: false, abrir: false }); return; }
 
   let lembrado = null;
   try { lembrado = localStorage.getItem('modoJogo'); } catch {}
