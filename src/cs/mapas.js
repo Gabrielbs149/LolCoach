@@ -20,7 +20,7 @@ import { abrirVpk, lerDoVpk, texturaParaPng, lerOverview } from './vpk.js';
 
 const pasta = () => resolve(pastaBase(), 'dados', 'cs');
 const arqCatalogo = () => resolve(pasta(), 'catalogo.json');
-const FORMATO = 1;
+const FORMATO = 2;   // 2: mapas marcados como `inteiro` (a arte ja e a area jogavel)
 
 /**
  * Onde o CS2 está. A pasta padrão do Steam primeiro; se não, as bibliotecas que o
@@ -135,6 +135,12 @@ export async function catalogo({ forcar = false } = {}) {
         planta: `/cs/mapa/${m.id}.png`,
         arte: `/cs/mapa/${m.id}.png`,
         icone: `/cs/mapa/${m.id}.png`,
+        /* O radar da Valve JÁ vem recortado na área jogável — é a imagem que o jogo usa no
+           canto da tela. Recortar de novo pela caixa dos callouts cortaria o mapa, e aqui
+           são só quatro pontos (os dois bombsites e os dois spawns): isso não descreve
+           extensão nenhuma. No Valorant a caixa faz sentido porque são ~17 callouts e a
+           arte tem margem preta em volta; aqui não há margem pra tirar. */
+        inteiro: true,
         callouts: (geo.pontos ?? []).map((p) => ({ nome: p.nome, x: p.x, y: p.y, regiao: p.nome, grande: p.nome, site: null })),
         geometria: { posX: geo.posX, posY: geo.posY, escala: geo.escala, largura: geo.largura, altura: geo.altura },
       });

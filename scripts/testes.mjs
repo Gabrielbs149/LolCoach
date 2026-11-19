@@ -2332,10 +2332,11 @@ test('lineups: a caixa do mapa cabe o que ele marcou, inteiro', async () => {
   const { funcoesDaTela } = await import('./pegar-funcao.mjs');
 
   const cercado = `
-    let lnCallouts = [], lnTodas = [];
+    let lnCallouts = [], lnTodas = [], mapaAtual = null;
     const LN_MARGEM_RECORTE = 0.06;
+    const lnMapaDe = () => mapaAtual;
     const extras = {
-      pôr: (cs, ls) => { lnCallouts = cs; lnTodas = ls ?? []; },
+      pôr: (cs, ls, m = null) => { lnCallouts = cs; lnTodas = ls ?? []; mapaAtual = m; },
     };
   `;
   const t = await funcoesDaTela('painel.html', ['lnJanelaDoMapa'], cercado);

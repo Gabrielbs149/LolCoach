@@ -5055,6 +5055,14 @@ const LN_MARGEM_RECORTE = 0.06;
 function lnJanelaDoMapa(){
   const cs = lnCallouts ?? [];
   if (cs.length < 3) return { x0: 0, y0: 0, lx: 1, ly: 1 };
+  /* Mapa que já vem recortado na área jogável usa a arte INTEIRA.
+   *
+   * É o caso do CS: o radar que a Valve empacota é a mesma imagem que o jogo mostra no
+   * canto da tela, sem margem pra tirar. E os "callouts" de lá são só quatro pontos — os
+   * dois bombsites e os dois spawns —, que não descrevem extensão nenhuma; a caixa deles
+   * cortava o mapa todo, que foi o que ele viu ("ta cortado o mapa, e não é só esse").
+   * No Valorant a caixa continua valendo: são ~17 callouts e a arte tem borda preta. */
+  if (lnMapaDe()?.inteiro) return { x0: 0, y0: 0, lx: 1, ly: 1 };
   const xs = cs.map(c => c.x), ys = cs.map(c => c.y);
   /* A CAIXA TAMBÉM TEM QUE CABER O QUE ELE MARCOU.
    *
